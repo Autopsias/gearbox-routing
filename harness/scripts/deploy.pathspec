@@ -11,9 +11,9 @@
 #                 hotfix that has not been carried back. It ABORTS `gearbox deploy`
 #                 and is only committed by an explicit `gearbox harvest`.
 #   LIVE-STATE    runtime output that can ONLY be produced in the deploy target
-#                 (auto-memory, plan trees, routing eval output). Versioned by
-#                 decision D3. Dirt here is ROUTINE — it never blocks a deploy and
-#                 is auto-harvested with provenance.
+#                 (auto-memory, plan trees, routing eval output). Dirt here is
+#                 ROUTINE — it never blocks a deploy and is auto-harvested with
+#                 provenance.
 #   MACHINE-CHURN a value the Claude Code binary itself rewrites in response to a
 #                 UI action (/model, /effort, "allow always", /plugin, /statusline).
 #                 Same treatment as LIVE-STATE: auto-harvested, never blocking.
@@ -21,8 +21,19 @@
 #
 # Syntax: `[section]` headers; one entry per line; `#` comments; blank lines ignored.
 # Globs: `*` matches within one path segment, `**` matches across segments.
+#
+# WHAT THIS EXPORTED COPY CARRIES, AND WHAT IT DOES NOT:
+# [live-state] and [settings-churn-keys] are generic categories — glob classes
+# over this harness's own documented runtime surfaces, and the Claude Code
+# binary's own settings keys. They ship real, so this file classifies a live
+# deploy target out of the box.
+# [mode-0600] does not ship real. That list is a map of which files on a deploy
+# target hold credentials; it is per-deployment and it is nobody else's
+# business, so the names below are FICTIONAL PLACEHOLDERS. `gearbox deploy`
+# refuses to run while any REPLACE_ME_ entry remains — an un-edited list would
+# chmod nothing and protect nothing silently, which is worse than no list.
 
-# --- LIVE-STATE: machine-written runtime surface (decision D3: versioned) -----
+# --- LIVE-STATE: machine-written runtime surface -----------------------------
 [live-state]
 projects/*/memory/**
 _plans/**
@@ -30,26 +41,27 @@ evals/routing/MISROUTES.md
 evals/routing/results/**
 
 # --- MACHINE-CHURN: settings.json keys the binary rewrites on a UI action ------
-# Dotted JSON key paths. A changed key is churn iff it, or one of its dotted
+# Dotted JSON key paths, one per line; each is a key some UI action rewrites
+# under you (a model switch, an effort switch, an "allow always" click, a theme
+# or plugin toggle). A changed key is churn iff it, or one of its dotted
 # ancestors, is listed here. Everything else in settings.json — notably `hooks`,
-# `env`, `permissions.deny`, `permissions.ask` and `permissions.defaultMode` — is
-# HARNESS-CODE: a change there is real drift and MUST abort a deploy.
+# `env`, `permissions.deny`, `permissions.ask` and `permissions.defaultMode` —
+# is HARNESS-CODE: a change there is real drift and MUST abort a deploy.
 #
-# Observed in practice: a concurrent session's `/model` escalation rewrote
-# `model` on an otherwise clean tree. Treating the whole file as harness source
-# made that a deploy-aborting event AND made `git merge --ff-only` refuse — which
-# is what this split exists to prevent.
+# Treating the whole file as harness source instead makes an ordinary model
+# switch a deploy-aborting event AND makes `git merge --ff-only` refuse, which
+# is the failure this split exists to prevent.
 [settings-churn-keys]
-model                              # /model
-effortLevel                        # /effort
-theme                              # /config theme
-editorMode                         # /vim
-tui                                # /config
-statusLine                         # /statusline
-permissions.allow                  # "allow always" click-through growth
-skillOverrides                     # /skill on|off
-enabledPlugins                     # /plugin enable|disable
-extraKnownMarketplaces             # /plugin marketplace add
+model
+effortLevel
+theme
+editorMode
+tui
+statusLine
+permissions.allow
+skillOverrides
+enabledPlugins
+extraKnownMarketplaces
 preferredNotifChannel
 remoteControlAtStartup
 inputNeededNotifEnabled
@@ -61,11 +73,13 @@ showClearContextOnPlanAccept
 voiceEnabled
 
 # --- mode-sensitive files: git does not preserve 0600, so deploy re-applies it --
-# Untracked by design (credential-adjacent runtime caches; see .gitignore's
-# never-track set). Missing files are skipped silently; this is a tighten-only pass.
+# FICTIONAL PLACEHOLDERS — replace all of them before you deploy. The categories
+# to think about on your own target: a tool/server config holding tokens, a
+# machine-local settings override, and an auth/session cache. Files like these
+# are untracked by design (see .gitignore's never-track set) and a missing one
+# is skipped silently, which is exactly why `scripts/gearbox` hard-fails on a
+# leftover REPLACE_ME_ rather than quietly chmod-ing nothing.
 [mode-0600]
-mcp.json
-config.json
-settings.local.json
-mcp-needs-auth-cache.json
-.credentials.json
+REPLACE_ME_service-config-holding-tokens.json
+REPLACE_ME_machine-local-overrides.json
+REPLACE_ME_auth-session-cache.json

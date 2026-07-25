@@ -337,6 +337,17 @@ do_deploy() {
   local f modes
   modes="$(python3 "$CLASSIFY" --pathspec "$PATHSPEC" --section mode-0600)" \
     || die 1 "could not read the [mode-0600] section of $PATHSPEC"
+  # A missing file is skipped silently below (tighten-only pass), so a list of
+  # placeholders would chmod nothing and report success — protecting nothing,
+  # loudly claiming otherwise. The published copy of this pathspec ships exactly
+  # such a list on purpose: which files hold credentials is a per-deployment
+  # attack-surface map and is not exported. Fail here, where it matters.
+  case "$modes" in
+    *REPLACE_ME_*) die 1 "[mode-0600] in $PATHSPEC still holds REPLACE_ME_ placeholders.
+  The exported pathspec ships fictional filenames so it cannot publish a real
+  credential map. Replace every REPLACE_ME_ entry with the credential-adjacent
+  runtime files YOUR deploy target writes before deploying." ;;
+  esac
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     if [ -e "$CD/$f" ]; then

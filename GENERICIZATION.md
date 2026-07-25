@@ -16,6 +16,53 @@ your own deployment, or when contributing back a change extracted from one.
 | `MISROUTES.md` real ledger entries | header + format only, **zero real rows** |
 | Concrete model ids / tiers / prices | dated **verify-before-use examples** (see `ARCHITECTURE.md` §3) |
 | Your username, machine paths (`/Users/<you>/...`) | `~` or generic placeholders |
+| The source repo's commit SHA in `harness/SYNCED-FROM` | export date + pipeline version only (below) |
+| `scripts/deploy.pathspec`'s `[mode-0600]` credential-file list | fictional `REPLACE_ME_*` placeholders (below) |
+
+### Provenance: what the export stamps, and what it does not
+
+`harness/SYNCED-FROM` carries **`exported_at` and `pipeline_version`, nothing
+else.** A source-repo commit id is not resolvable by anyone reading this repo,
+so it was never provenance a public reader could act on — it was a permanent,
+unique token correlating this repo to a private history, republished on every
+sync. The field list is a closed **allowlist** (`check_provenance_stamp()` in
+`scripts/sync-from-claude.py`, run inside scan layer 2, therefore enforced by
+`pre-push`): any other key in that file blocks the push. An allowlist, not a
+"no SHA-shaped token" regex, because the class to keep out is *every*
+private-tier fact about the source repo, not just the one removed last time.
+
+The source revision is still recorded — in `gearbox-export-provenance.jsonl`,
+appended next to the (private-tier, out-of-repo) export manifest, joined to the
+public stamp by the identical `exported_at` timestamp. A ledger the pipeline
+cannot write is a hard failure, not a silent skip: it is the only record there
+is. See `scripts/README.md` §Provenance.
+
+### `deploy.pathspec`: policy shape ships, deployment map does not
+
+The deploy classifier's three sections are not the same disclosure, so the
+export treats them differently (`_scrub_deploy_pathspec` in
+`scripts/sync-from-claude.py`):
+
+- `[live-state]` and `[settings-churn-keys]` ship **real**. They are generic
+  categories — glob classes over runtime surfaces this harness documents openly,
+  and the Claude Code binary's own settings keys. Templating them would buy no
+  privacy and would leave an exported classifier that classifies nothing.
+- `[mode-0600]` ships **fictional**. That list is a map of which files on a
+  deploy target hold credentials: per-deployment, and of no use to an adopter,
+  who has their own. The exported names are `REPLACE_ME_*` placeholders.
+
+The obvious objection is that fictional names ship a classifier that silently
+protects nothing — a missing file is skipped by design in that tighten-only
+`chmod` pass. So `scripts/gearbox` **refuses to deploy** while any `REPLACE_ME_`
+entry remains. Loud, at the point of harm, instead of quiet.
+
+Everything outside the section bodies is **regenerated from a template** rather
+than filtered, so private prose in the source's comments cannot ride along after
+a future edit, and an **unrecognized section is a hard failure** — a section the
+transform has not classified could be anything, and defaulting to "publish it"
+is how maps leak. The transform names none of the strings it removes: whole-
+section replacement needs no match string, which is the same reason scrub
+strings live in the manifest rather than in the published script.
 
 ## Drops
 
@@ -127,7 +174,9 @@ enforced in both directions:
 Those patterns are hardcoded rather than manifest-driven: they are generic
 trailer key names, not confidential values, so the gate works on any clone.
 Write the message as subject + body — what changed and why — and nothing else.
-Provenance for this repo is the `harness/SYNCED-FROM` stamp, not a trailer.
+Provenance for this repo is the `harness/SYNCED-FROM` stamp, not a trailer — and
+that stamp carries an export date and a pipeline version, never a source-repo
+revision (see below).
 
 ### Why the gate is on `push`, not just `commit`
 

@@ -53,13 +53,15 @@ version `.git/hooks`, so a fresh clone has no guard until that runs.
  3. run the sync pipeline (from the Gearbox repo):
         scripts/sync-from-claude.py \
           --manifest /path/to/private/manifest.json \
-          --claude-home ~/.claude \
+          --source ~/path/to/your-private-harness \
           --private-commit <the SHA you just pushed in step 2> \
           --scan-report-out /tmp/scan-report.txt \
           --scan-status-out /tmp/scan-status.json
     This copies every `publish`/`scrub-then-publish` manifest entry into
     harness/, applies scrub transforms, stamps harness/SYNCED-FROM with the
-    private commit SHA from step 2, then hard-fails if either scan layer
+    export date + pipeline version, records the step-2 SHA in the private
+    provenance ledger beside your manifest (NOT in this repo — see
+    scripts/README.md §Provenance), then hard-fails if either scan layer
     finds a hit. NEVER weaken the scan to make it pass — fix the manifest
     transform or the source file instead.
  4. review the scrubbed diff (git diff / git status inside Gearbox) —
@@ -131,7 +133,10 @@ strings too, and the gate doesn't trust subtree scoping.
 2. **Blocked-pattern grep** — every regex in the manifest's
    `blocked_patterns` (client names, personal paths, the CGNAT/Tailscale IP
    range, SSH login-string patterns, etc.), grepped line-by-line across every
-   file `git ls-files` would consider part of the tree.
+   file `git ls-files` would consider part of the tree. This layer also runs
+   the **published-provenance shape check**: `harness/SYNCED-FROM` may carry
+   only `exported_at` and `pipeline_version`, so a re-added source-repo SHA (or
+   any other new key) is a hit here — see `GENERICIZATION.md` §Provenance.
 
 `_evidence/s06/scan-status.json`-shaped output (`{status, blocked_pattern_hits,
 secret_findings, scanner, scanner_version, scan_scope, tree_or_commit_hash}`)

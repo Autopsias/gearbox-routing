@@ -33,7 +33,9 @@ Classify the task, set the tier. Authority: `claude/model-routing.yaml`
 commit.** It is public — a session URL is a private-tier identifier and a
 co-author line discloses which model wrote the change, and a commit message is
 published irreversibly. Write subject + body (what changed and why) and nothing
-else; provenance here is the `harness/SYNCED-FROM` stamp.
+else; provenance here is the `harness/SYNCED-FROM` stamp — export date and
+pipeline version only, never a source-repo revision (`scripts/README.md`
+§Provenance).
 
 Enforced structurally, both directions: `.githooks/commit-msg` refuses to create
 such a commit, `.githooks/pre-push` refuses to push one. Enable both once per

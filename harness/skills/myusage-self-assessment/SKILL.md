@@ -142,6 +142,14 @@ method line (corpus size, digest record count), corpus baseline (interactive vs
 automation denominator), a headline, the ranked candidates with verdict tags and
 citations, an "explicitly NOT proposing" list, and cross-cutting observations.
 
+**On a Gearbox-managed `~/.claude` (deploy target, not source):**
+`reflection-notes.md` is not listed in `scripts/deploy.pathspec`'s `[live-state]`
+section, so this append classifies as HARNESS-CODE, not routine runtime output —
+`gearbox deploy` will abort on it like any other unharvested hotfix. Run
+`~/.claude/scripts/gearbox harvest -m "reflection: <date> self-assessment"`
+right after this phase so the append lands in `~/your-private-harness` instead of
+sitting as blocking drift.
+
 When the ranked verdicts are decision-shaped (a small set of skill/automation/
 fix/nothing calls the user will accept/reject), also emit them as a decision-card
 one-pager per `~/.claude/commands/references/shared/decision-card-html.md`.

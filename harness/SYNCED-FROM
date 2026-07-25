@@ -1,6 +1,16 @@
-# SYNCED-FROM — provenance stamp, written by scripts/sync-from-claude.py
+# SYNCED-FROM — export provenance, written by scripts/sync-from-claude.py.
 # Do not hand-edit; regenerated on every sync run.
-private_commit: b1149c5
-synced_at: 2026-07-25T19:58:41Z
-source_note: private-repo (pushed) commit SHA, supplied via --private-commit
-private_worktree_dirty_at_sync_time: false
+#
+# WHAT IS DELIBERATELY NOT HERE: the source revision this export was built from.
+# The source repo is private, so its commit id is not resolvable by anyone
+# reading this repo — it is not provenance you can act on, it is only a
+# permanent token correlating this repo to a private history, republished on
+# every sync. The source revision IS recorded, in an operator-side ledger held
+# with the (private-tier) export manifest outside this repo, joined to this file
+# by exported_at. See scripts/README.md.
+#
+# Fields here are a closed allowlist enforced by the pre-push scan
+# (check_provenance_stamp in scripts/sync-from-claude.py): adding any other key
+# to this file blocks the push.
+exported_at: 2026-07-25T23:08:56Z
+pipeline_version: 3

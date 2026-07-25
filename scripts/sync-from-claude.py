@@ -56,18 +56,33 @@ TWO SCAN LAYERS (hard-fail on any hit, no soft-fail path):
      ls-files, so runtime-cache junk doesn't produce noise) — any hit is
      printed as file:line and is fatal.
 
-PROVENANCE (adv-claude-drift-provenance / codex-verify-r1):
-Writes harness/SYNCED-FROM to record which private-repo commit produced this
-export. Ordering fallback (codex-verify-r1): if --private-commit is not
-given, this stamps from `git -C ~/.claude rev-parse HEAD` instead (local
-provenance is still better than none) and prints a WARN that the
-"no unpushed private changes" enforcement is deferred to s07b (push time).
+PROVENANCE — SPLIT BY TIER (s06-fix3 item 1):
+harness/SYNCED-FROM used to stamp the SOURCE REPO'S COMMIT SHA into the public
+repo on every sync. Nobody reading this repo can resolve that SHA, so it was
+never provenance a public reader could act on — it was a permanent, unique
+token correlating this repo to a private history, republished on every export.
+So the two audiences are now served separately:
 
-IDEMPOTENCY: re-running with no upstream source changes and the same
---private-commit produces an empty diff in harness/ (SYNCED-FROM's
-synced_at timestamp is the only field allowed to differ run-to-run; compare
-with `git diff -- harness/ ':!harness/SYNCED-FROM'` if you want a byte-exact
-check).
+  PUBLIC  harness/SYNCED-FROM carries only what a public reader can act on —
+          the export date and the pipeline contract version. Its shape is
+          enforced by check_provenance_stamp() as a KEY ALLOWLIST, so a
+          re-added SHA (or any other new field) is a scan hit, at pre-push too.
+  PRIVATE the source revision, whether it was the authoritative pushed SHA or
+          a local-HEAD fallback, and whether the source worktree was dirty, are
+          appended to an operator-side JSONL ledger written NEXT TO THE
+          MANIFEST — the external, private-tier location that already exists
+          for exactly this class of data. Join key to the public stamp is the
+          timestamp: ledger `exported_at` == SYNCED-FROM `exported_at`.
+
+So "which source revision produced this export?" is still answerable by the
+operator, and unanswerable from the public repo alone. Ledger writes are
+fail-closed: if the ledger cannot be written the export aborts (exit 2) rather
+than producing an export whose provenance was silently never recorded.
+
+IDEMPOTENCY: re-running with no upstream source changes produces an empty diff
+in harness/ (SYNCED-FROM's exported_at timestamp is the only field allowed to
+differ run-to-run; compare with `git diff -- harness/ ':!harness/SYNCED-FROM'`
+if you want a byte-exact check).
 
 ponytail: no daemon, no git hook wiring here — this is a single manually-run
 script + one external manifest file. A future skill wrapper (e.g. a
@@ -105,6 +120,12 @@ SCAN_STATUS_REL = "_scan-status.json"  # written by caller (sync-and-scan wrappe
 # any manifest that does not declare exactly this — a stale or foreign policy
 # must fail closed rather than scan with rules this script cannot interpret.
 MANIFEST_SCHEMA_VERSION = "2"
+
+# Bumped when the SHAPE of what this pipeline produces changes (what it copies,
+# what it scrubs, what it stamps). Published in harness/SYNCED-FROM so a reader
+# can tell which export contract produced the tree they are looking at. It is a
+# property of this script, not of any deployment — it discloses nothing.
+PIPELINE_VERSION = "3"
 
 
 class SyncError(Exception):
@@ -294,6 +315,140 @@ def _scrub_prod_status_pinned_sh(text: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# deploy.pathspec — publish the POLICY SHAPE, never the deployment's own map.
+#
+# The pathspec has three sections and they are NOT the same disclosure:
+#
+#   [live-state] / [settings-churn-keys] are generic categories over surfaces
+#   this harness and the Claude Code binary already document publicly — glob
+#   classes, never instances. They ship as-is, which is what lets the exported
+#   classifier actually classify a real deploy target instead of being a toy.
+#
+#   [mode-0600] is different in kind. It is a list of which files on a deploy
+#   target hold credentials — an attack-surface map, per-deployment, and of no
+#   use to anyone else. Publishing it teaches nothing that generic placeholders
+#   do not, so the export replaces it with fictional names.
+#
+# The obvious objection to fictional names is that they ship a classifier that
+# silently protects nothing, which is worse than the disclosure. That is why
+# `scripts/gearbox` REFUSES to deploy while a REPLACE_ME_ entry remains: the
+# failure is loud and at the exact moment it matters, not silent.
+#
+# Everything outside the section bodies is REGENERATED from the template below
+# rather than filtered, so private prose in the source's comments (decision
+# ids, incident notes) cannot ride along, now or after a future edit. Unknown
+# sections are a hard failure: a section this function has not classified could
+# be anything, and defaulting to "publish it" is how maps leak.
+#
+# NOTE this function names NO string it removes. Naming the credential
+# filenames here in order to match them would republish them one directory up
+# from the file being cleaned — s06-fix finding 1+2, the reason scrub strings
+# live in the manifest at all. Whole-section replacement needs no match string.
+# ---------------------------------------------------------------------------
+
+_DEPLOY_PATHSPEC_SECTIONS = ("live-state", "settings-churn-keys", "mode-0600")
+
+_DEPLOY_PATHSPEC_TEMPLATE = """\
+# deploy.pathspec — the ONE tracked definition of how `scripts/gearbox` classifies
+# a dirty path in the deploy target (~/.claude). Read by scripts/gearbox-classify.py;
+# every consumer (deploy, drift, harvest, the SessionStart hook, the weekly loop)
+# goes through that classifier, so this file is the single source of the policy.
+#
+# THREE CLASSES, fail-closed. Anything this file does not explicitly name is
+# HARNESS-CODE — the loud class that aborts a deploy. Adding a path to a list
+# below is a deliberate act of saying "a machine writes this; do not alarm on it".
+#
+#   HARNESS-CODE  authored harness source. Dirt here in the deploy target is a
+#                 hotfix that has not been carried back. It ABORTS `gearbox deploy`
+#                 and is only committed by an explicit `gearbox harvest`.
+#   LIVE-STATE    runtime output that can ONLY be produced in the deploy target
+#                 (auto-memory, plan trees, routing eval output). Dirt here is
+#                 ROUTINE — it never blocks a deploy and is auto-harvested with
+#                 provenance.
+#   MACHINE-CHURN a value the Claude Code binary itself rewrites in response to a
+#                 UI action (/model, /effort, "allow always", /plugin, /statusline).
+#                 Same treatment as LIVE-STATE: auto-harvested, never blocking.
+#                 Expressed as JSON key paths, not file paths — see below.
+#
+# Syntax: `[section]` headers; one entry per line; `#` comments; blank lines ignored.
+# Globs: `*` matches within one path segment, `**` matches across segments.
+#
+# WHAT THIS EXPORTED COPY CARRIES, AND WHAT IT DOES NOT:
+# [live-state] and [settings-churn-keys] are generic categories — glob classes
+# over this harness's own documented runtime surfaces, and the Claude Code
+# binary's own settings keys. They ship real, so this file classifies a live
+# deploy target out of the box.
+# [mode-0600] does not ship real. That list is a map of which files on a deploy
+# target hold credentials; it is per-deployment and it is nobody else's
+# business, so the names below are FICTIONAL PLACEHOLDERS. `gearbox deploy`
+# refuses to run while any REPLACE_ME_ entry remains — an un-edited list would
+# chmod nothing and protect nothing silently, which is worse than no list.
+
+# --- LIVE-STATE: machine-written runtime surface -----------------------------
+[live-state]
+{live_state}
+
+# --- MACHINE-CHURN: settings.json keys the binary rewrites on a UI action ------
+# Dotted JSON key paths, one per line; each is a key some UI action rewrites
+# under you (a model switch, an effort switch, an "allow always" click, a theme
+# or plugin toggle). A changed key is churn iff it, or one of its dotted
+# ancestors, is listed here. Everything else in settings.json — notably `hooks`,
+# `env`, `permissions.deny`, `permissions.ask` and `permissions.defaultMode` —
+# is HARNESS-CODE: a change there is real drift and MUST abort a deploy.
+#
+# Treating the whole file as harness source instead makes an ordinary model
+# switch a deploy-aborting event AND makes `git merge --ff-only` refuse, which
+# is the failure this split exists to prevent.
+[settings-churn-keys]
+{churn_keys}
+
+# --- mode-sensitive files: git does not preserve 0600, so deploy re-applies it --
+# FICTIONAL PLACEHOLDERS — replace all of them before you deploy. The categories
+# to think about on your own target: a tool/server config holding tokens, a
+# machine-local settings override, and an auth/session cache. Files like these
+# are untracked by design (see .gitignore's never-track set) and a missing one
+# is skipped silently, which is exactly why `scripts/gearbox` hard-fails on a
+# leftover REPLACE_ME_ rather than quietly chmod-ing nothing.
+[mode-0600]
+REPLACE_ME_service-config-holding-tokens.json
+REPLACE_ME_machine-local-overrides.json
+REPLACE_ME_auth-session-cache.json
+"""
+
+
+def _scrub_deploy_pathspec(text: str) -> str:
+    sections: dict[str, list[str]] = {}
+    current = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        line = re.split(r"\s+#", line, maxsplit=1)[0].strip()  # drop trailing comments
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            sections.setdefault(current, [])
+            continue
+        if current is None:
+            raise fatal(f"deploy.pathspec scrub: entry before any [section]: {line!r}")
+        sections[current].append(line)
+
+    if tuple(sections) != _DEPLOY_PATHSPEC_SECTIONS:
+        raise fatal(
+            f"deploy.pathspec scrub: sections are {tuple(sections)!r}, expected "
+            f"{_DEPLOY_PATHSPEC_SECTIONS!r}. A section this transform has not classified "
+            "would be published verbatim — decide deliberately whether it is a generic "
+            "category (ship it) or a deployment map (template it), then update "
+            "_scrub_deploy_pathspec."
+        )
+    return _DEPLOY_PATHSPEC_TEMPLATE.format(
+        live_state="\n".join(sections["live-state"]),
+        churn_keys="\n".join(sections["settings-churn-keys"]),
+    )
+
+
 # Keyed by path RELATIVE TO harness/ (i.e. same as the manifest's rel_path).
 # Only STRUCTURAL transforms live here — every find/replace whose match string
 # is itself a confidential value now lives in manifest["scrub_rules"].
@@ -301,6 +456,7 @@ TARGETED_TRANSFORMS: dict[str, "callable"] = {
     "CLAUDE.md": _scrub_claude_md,
     "settings.json": _scrub_settings_json,
     "scripts/prod-status-pinned.sh": _scrub_prod_status_pinned_sh,
+    "scripts/deploy.pathspec": _scrub_deploy_pathspec,
 }
 
 
@@ -536,34 +692,127 @@ def git_dirty(repo: Path) -> bool:
         return False
 
 
+PROVENANCE_LEDGER_NAME = "gearbox-export-provenance.jsonl"
+
+SYNCED_FROM_REL = "harness/SYNCED-FROM"
+
+# THE PUBLISHED PROVENANCE STAMP IS A CLOSED SET OF FIELDS.
+# Enforced as a key allowlist rather than as a "no SHA-shaped token" regex: the
+# thing being kept out is not one string, it is the whole class of private-tier
+# facts about the source repo (its revision, its worktree state, its layout). An
+# allowlist fails closed on a field nobody anticipated; a denylist only ever
+# catches the one that was removed last time.
+SYNCED_FROM_KEY_SHAPES = {
+    "exported_at": re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"),
+    "pipeline_version": re.compile(r"^[0-9]+(?:\.[0-9]+)*$"),
+}
+
+SYNCED_FROM_HEADER = """\
+# SYNCED-FROM — export provenance, written by scripts/sync-from-claude.py.
+# Do not hand-edit; regenerated on every sync run.
+#
+# WHAT IS DELIBERATELY NOT HERE: the source revision this export was built from.
+# The source repo is private, so its commit id is not resolvable by anyone
+# reading this repo — it is not provenance you can act on, it is only a
+# permanent token correlating this repo to a private history, republished on
+# every sync. The source revision IS recorded, in an operator-side ledger held
+# with the (private-tier) export manifest outside this repo, joined to this file
+# by exported_at. See scripts/README.md.
+#
+# Fields here are a closed allowlist enforced by the pre-push scan
+# (check_provenance_stamp in scripts/sync-from-claude.py): adding any other key
+# to this file blocks the push.
+"""
+
+
 def write_provenance(
-    harness_dir: Path, source_dir: Path, private_commit_arg: str | None
-) -> tuple[str, bool]:
-    """Returns (commit_sha_used, is_authoritative_private_sha)."""
+    harness_dir: Path, source_dir: Path, private_commit_arg: str | None, manifest_path: Path
+) -> tuple[str, bool, Path]:
+    """Stamp the public export date; record the private source revision privately.
+
+    Returns (source_revision_recorded, is_authoritative_pushed_sha, ledger_path).
+    The first two are for the operator's console output and never reach the repo.
+    """
     now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if private_commit_arg:
         sha = private_commit_arg
         authoritative = True
-        source_note = "private-repo (pushed) commit SHA, supplied via --private-commit"
+        source_note = "source-repo (pushed) commit SHA, supplied via --private-commit"
     else:
         sha = git_head(source_dir) or "UNKNOWN"
         authoritative = False
         source_note = (
-            "LOCAL source-repo git HEAD (no --private-commit given) — this is a FALLBACK "
-            "stamp per codex-verify-r1; the 'no unpushed private changes' enforcement is "
-            "DEFERRED to s07b (push time), not enforced by this script"
+            "LOCAL source-repo git HEAD (no --private-commit given) — FALLBACK stamp; "
+            "the 'no unpushed source changes' enforcement happens at push time, not here"
         )
-    dirty = git_dirty(source_dir)
-    content = (
-        "# SYNCED-FROM — provenance stamp, written by scripts/sync-from-claude.py\n"
-        "# Do not hand-edit; regenerated on every sync run.\n"
-        f"private_commit: {sha}\n"
-        f"synced_at: {now}\n"
-        f"source_note: {source_note}\n"
-        f"private_worktree_dirty_at_sync_time: {str(dirty).lower()}\n"
-    )
+
+    content = SYNCED_FROM_HEADER + f"exported_at: {now}\npipeline_version: {PIPELINE_VERSION}\n"
     (harness_dir / "SYNCED-FROM").write_text(content, encoding="utf-8")
-    return sha, authoritative
+
+    # The private half. Written beside the manifest because that is already the
+    # agreed private-tier home for data this repo must not carry, and because it
+    # keeps the mapping and the policy that produced it in one place.
+    ledger = manifest_path.resolve().parent / PROVENANCE_LEDGER_NAME
+    record = {
+        "exported_at": now,                       # join key to harness/SYNCED-FROM
+        "pipeline_version": PIPELINE_VERSION,
+        "source_revision": sha,
+        "source_revision_is_pushed": authoritative,
+        "source_note": source_note,
+        "source_worktree_dirty_at_export": git_dirty(source_dir),
+        "source_dir": str(source_dir),
+        "exported_into": str(harness_dir.parent),
+    }
+    try:
+        with open(ledger, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except OSError as e:
+        # Fail closed. An export whose source revision was never recorded
+        # anywhere cannot answer "which revision produced this?" later, and
+        # silently degrading to "no provenance at all" is how the private half
+        # ends up back in the public file next time.
+        raise fatal(
+            f"could not append to the provenance ledger {ledger}: {e}. The public stamp "
+            "carries no source revision by design, so this ledger is the ONLY record of "
+            "which source revision produced this export — refusing to export without it."
+        )
+    return sha, authoritative, ledger
+
+
+def check_provenance_stamp(repo_dir: Path) -> list[str]:
+    """Scan check: harness/SYNCED-FROM may carry ONLY the allowlisted fields.
+
+    Runs inside the blocked-pattern layer, so the pre-push hook enforces it too.
+    Comments are free text; every other non-blank line must be `key: value` with
+    key on the allowlist and value matching that key's published shape.
+    """
+    stamp = repo_dir / SYNCED_FROM_REL
+    if not stamp.is_file():
+        return []  # nothing exported yet — not this check's business
+    allowed = ", ".join(sorted(SYNCED_FROM_KEY_SHAPES))
+    hits: list[str] = []
+    for lineno, line in enumerate(
+        stamp.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
+    ):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        key, sep, value = stripped.partition(":")
+        key, value = key.strip(), value.strip()
+        shape = SYNCED_FROM_KEY_SHAPES.get(key) if sep else None
+        if shape is None:
+            hits.append(
+                f"{SYNCED_FROM_REL}:{lineno}: field {key!r} is not on the published-provenance "
+                f"allowlist ({allowed}) — source-repo revisions and worktree state belong in "
+                f"the operator-side ledger ({PROVENANCE_LEDGER_NAME}), never in this repo: "
+                f"{stripped[:200]}"
+            )
+        elif not shape.match(value):
+            hits.append(
+                f"{SYNCED_FROM_REL}:{lineno}: {key} value {value!r} does not match its "
+                f"published shape {shape.pattern!r}"
+            )
+    return hits
 
 
 # ---------------------------------------------------------------------------
@@ -866,6 +1115,10 @@ def run_outgoing_object_scan(
 
 
 def run_blocked_pattern_scan(repo_dir: Path, blocked_patterns: list[str]) -> tuple[bool, str, int]:
+    """Manifest blocked patterns over the whole tree, PLUS the published-provenance
+    shape check (check_provenance_stamp) — folded in here so it runs everywhere
+    this layer runs, the pre-push hook included, with no second call site to forget.
+    """
     files = tracked_and_untracked_files(repo_dir)
     compiled = _compile_blocked(blocked_patterns)
     hits: list[str] = []
@@ -881,9 +1134,14 @@ def run_blocked_pattern_scan(repo_dir: Path, blocked_patterns: list[str]) -> tup
             hits.append(f"{rel}: UNREADABLE tracked file — cannot be cleared ({e})")
             continue
         hits += _match_all(str(rel), raw, compiled)
+    hits += check_provenance_stamp(repo_dir)
     # Same identifier found in several decodings is one leak, not many.
     hits = list(dict.fromkeys(hits))
-    output = "\n".join(hits) if hits else "no blocked-pattern hits across whole Gearbox tree"
+    output = (
+        "\n".join(hits)
+        if hits
+        else "no blocked-pattern hits across whole Gearbox tree; published provenance stamp clean"
+    )
     return (len(hits) == 0), output, len(hits)
 
 
@@ -935,6 +1193,7 @@ def main(argv: list[str] | None = None) -> int:
     copied: list[str] = []
     private_sha = None
     authoritative = False
+    ledger_path: Path | None = None
 
     if not args.scan_only:
         if args.source is None:
@@ -956,9 +1215,17 @@ def main(argv: list[str] | None = None) -> int:
         for entry in prune_settings_hooks(harness_dir):
             print(f"DROPPED settings.json hook wiring for a non-exported script: {entry}", file=sys.stderr)
         scrub_tree(harness_dir, scrub_rules)
-        private_sha, authoritative = write_provenance(harness_dir, source_dir, args.private_commit)
+        try:
+            private_sha, authoritative, ledger_path = write_provenance(
+                harness_dir, source_dir, args.private_commit, manifest_path
+            )
+        except SyncError as e:
+            print(f"FATAL: {e}", file=sys.stderr)
+            return 2
         print(f"== synced {len(copied)} entries into {harness_dir} ==")
-        print(f"   SYNCED-FROM: {private_sha} (authoritative private-repo SHA: {authoritative})")
+        # Console only — the SHA is deliberately absent from the exported tree.
+        print(f"   source revision {private_sha} (pushed: {authoritative}) recorded in {ledger_path}")
+        print(f"   harness/SYNCED-FROM stamps export date + pipeline_version {PIPELINE_VERSION} only")
 
     # --- Scan layer 1: secrets, whole Gearbox tree ---
     secrets_green, scanner, scanner_ver, secrets_output, secret_findings = run_secret_scan(repo_dir, args.allow_missing_scanner)
@@ -991,7 +1258,7 @@ def main(argv: list[str] | None = None) -> int:
         secrets_output.strip(),
         f"LAYER 1 STATUS: {'GREEN' if secrets_green else 'RED'}",
         "",
-        "--- Layer 2: blocked-pattern grep ---",
+        "--- Layer 2: blocked-pattern grep + published-provenance shape ---",
         patterns_output.strip(),
         f"LAYER 2 STATUS: {'GREEN' if patterns_green else 'RED'} ({hit_count} hit(s))",
         "",
@@ -1019,8 +1286,11 @@ def main(argv: list[str] | None = None) -> int:
             "scan_scope": "whole-gearbox-tree",
             "tree_or_commit_hash": tree_hash,
             "synced_entries": len(copied),
-            "synced_from_private_commit": private_sha,
-            "synced_from_authoritative": authoritative,
+            # The source revision is NOT reported here: this file is a scan
+            # artifact that gets copied into evidence directories and pasted
+            # into reports. It records only WHERE the revision was recorded.
+            "provenance_ledger": str(ledger_path) if ledger_path else None,
+            "pipeline_version": PIPELINE_VERSION,
             "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         Path(args.scan_status_out).write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
