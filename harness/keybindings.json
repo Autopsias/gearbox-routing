@@ -1,0 +1,12 @@
+{
+  "bindings": [
+    {
+      "context": "Chat",
+      "bindings": {
+        "shift+enter": "chat:newline",
+        "ctrl+enter": "chat:submit",
+        "alt+p": "chat:modelPicker"
+      }
+    }
+  ]
+}

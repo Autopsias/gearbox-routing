@@ -1,0 +1,117 @@
+[2026-05-23 09:39:10Z INFO HostContext] No proxy settings were found based on environmental variables (http_proxy/https_proxy/HTTP_PROXY/HTTPS_PROXY)
+[2026-05-23 09:39:10Z INFO HostContext] Well known directory 'Bin': '/Users/RUNNER_HOME/actions-runners/RUNNER_1/bin.RUNNER_VER'
+[2026-05-23 09:39:10Z INFO HostContext] Well known directory 'Root': '/Users/RUNNER_HOME/actions-runners/RUNNER_1'
+[2026-05-23 09:39:10Z INFO HostContext] Well known config file 'Credentials': '/Users/RUNNER_HOME/actions-runners/RUNNER_1/.credentials'
+[2026-05-23 09:39:10Z INFO HostContext] Well known directory 'Bin': '/Users/RUNNER_HOME/actions-runners/RUNNER_1/bin.RUNNER_VER'
+[2026-05-23 09:39:10Z INFO HostContext] Well known directory 'Root': '/Users/RUNNER_HOME/actions-runners/RUNNER_1'
+[2026-05-23 09:39:10Z INFO HostContext] Well known config file 'Runner': '/Users/RUNNER_HOME/actions-runners/RUNNER_1/.runner'
+[2026-05-23 09:39:10Z INFO Worker] Version: 2.334.0
+[2026-05-23 09:39:10Z INFO Worker] Commit: f1995ede5d885c997d13d8eca5467c4ce97fe69c
+[2026-05-23 09:39:10Z INFO Worker] Culture: en-PT
+...[trimmed for fixture]...
+  },
+  "timeline": {
+    "id": "6ac2a401-ab51-4e63-af8c-f01edcb4873e",
+    "changeId": 0,
+    "location": null
+  },
+  "jobId": "c2701eef-c3ac-5a6a-8133-ed8847d820cc",
+  "jobDisplayName": "ci-ok",
+  "jobName": "__default",
+  "requestId": 0,
+  "lockedUntil": "0001-01-01T00:00:00",
+  "resources": {
+    "endpoints": [
+      {
+        "data": {
+          "ServerId": "",
+          "ServerName": "",
+          "CacheServerUrl": "https://artifactcache.actions.githubusercontent.com/DIgl4iocpqUl4Ts1BwlzDNsQCXFx6pCt7SeuOZYYjwSErKDPbk/",
+          "FeedStreamUrl": "wss://results-receiver.actions.githubusercontent.com/_ws/ingest.sock",
+          "ResultsServiceUrl": "https://results-receiver.actions.githubusercontent.com/",
+          "PipelinesServiceUrl": "https://pipelinesghubeus22.actions.githubusercontent.com/DIgl4iocpqUl4Ts1BwlzDNsQCXFx6pCt7SeuOZYYjwSErKDPbk/",
+          "GenerateIdTokenUrl": "",
+          "ConnectivityChecks": "[\"https://broker.actions.githubusercontent.com/health\",\"https://token.actions.githubusercontent.com/ready\",\"https://run.actions.githubusercontent.com/health\"]"
+        },
+        "name": "SystemVssConnection",
+        "url": "https://run-actions-3-azure-eastus.actions.githubusercontent.com/13/",
+        "authorization": {
+          "parameters": {
+            "AccessToken": "***"
+          },
+          "scheme": "OAuth"
+        },
+        "isShared": false,
+        "isReady": true
+      }
+    ]
+  },
+  "contextData": {
+    "github": {
+      "t": 2,
+      "d": [
+        {
+          "k": "ref",
+          "v": "refs/heads/main"
+        },
+        {
+          "k": "sha",
+          "v": "a2bb8d77a2ac9ec8e8715cb14b6051545a7c6b65"
+        },
+        {
+          "k": "repository",
+          "v": "acme-org/example-repo"
+        },
+        {
+          "k": "repository_owner",
+          "v": "acme-org"
+        },
+        {
+          "k": "repository_owner_id",
+          "v": "REDACTED_ID"
+        },
+        {
+          "k": "repositoryUrl",
+          "v": "git://github.com/acme-org/example-repo.git"
+        },
+        {
+          "k": "run_id",
+          "v": "26329163504"
+        },
+        {
+          "k": "run_number",
+          "v": "2220"
+        },
+        {
+          "k": "retention_days",
+          "v": "90"
+        },
+        {
+          "k": "run_attempt",
+          "v": "1"
+        },
+        {
+          "k": "artifact_cache_size_limit",
+          "v": "10"
+        },
+        {
+          "k": "repository_visibility",
+          "v": "private"
+        },
+        {
+          "k": "actor_id",
+...[trimmed: steps ran, last step result below]...
+  "type": "runner",
+  "stage": "Post",
+  "stepId": "e7f060de-1db8-4dc9-95d4-1783ad4e44bb",
+  "result": "succeeded",
+  "errorMessages": [],
+  "executionTimeInSeconds": 1,
+  "startTime": "2026-05-23T09:39:11.342206Z",
+  "finishTime": "2026-05-23T09:39:11.677589Z"
+}.
+[2026-05-23 09:39:11Z INFO JobRunner] Job result after all job steps finish: Failed
+[2026-05-23 09:39:11Z INFO JobRunner] Completing the job execution context.
+[2026-05-23 09:39:11Z INFO JobRunner] Shutting down the job server queue.
+[2026-05-23 09:39:11Z INFO JobServerQueue] Fire signal to shutdown all queues.
+[2026-05-23 09:39:12Z INFO JobServerQueue] Job timeline record has been updated for the first time.

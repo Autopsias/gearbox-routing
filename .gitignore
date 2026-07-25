@@ -1,0 +1,11 @@
+# Local Claude Code dev state — never part of the shipped repo; can contain
+# machine-local paths.
+.claude/settings.local.json
+
+# Internal build/QA artifacts — kept local, never published (they name the
+# source deployment's confidential identifiers / paths).
+RELEASE-CHECKLIST.md
+claude/skills/_scrub-evidence-s04.log
+
+# OS cruft
+.DS_Store

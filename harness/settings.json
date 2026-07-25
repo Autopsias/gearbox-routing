@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/gearbox-drift-warn.sh",
+            "timeout": 10,
+            "statusMessage": "Checking harness drift"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [],
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/safe-refactor-advisory.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "input=$(cat); model=$(echo \"$input\" | jq -r '.model.display_name'); effort=$(echo \"$input\" | jq -r '.effort.level // empty'); session=$(echo \"$input\" | jq -r '.session_name // empty'); dir=$(basename \"$(echo \"$input\" | jq -r '.workspace.current_dir' | sed \"s|^$HOME|~|\")\"); used=$(echo \"$input\" | jq -r '.context_window.used_percentage // empty'); rl5h=$(echo \"$input\" | jq -r '.rate_limits.five_hour.used_percentage // empty'); rl7d=$(echo \"$input\" | jq -r '.rate_limits.seven_day.used_percentage // empty'); if [ -n \"$effort\" ]; then model_seg=\"$model ($effort)\"; else model_seg=\"$model\"; fi; rl=\"\"; if [ -n \"$rl5h\" ]; then rl=$(printf '5h:%.0f%%' \"$rl5h\"); fi; if [ -n \"$rl7d\" ]; then rf=$(printf '7d:%.0f%%' \"$rl7d\"); if [ -n \"$rl\" ]; then rl=\"$rl $rf\"; else rl=\"$rf\"; fi; fi; out=\"\"; if [ -n \"$session\" ]; then out=\"[$session] \"; fi; out=\"${out}${model_seg} | ${dir}\"; if [ -n \"$used\" ]; then out=$(printf '%s | Ctx:%.0f%%' \"$out\" \"$used\"); fi; if [ -n \"$rl\" ]; then out=\"$out | RL $rl\"; fi; printf '%s' \"$out\""
+  }
+}

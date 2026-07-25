@@ -1,0 +1,54 @@
+#!/bin/sh
+# Gearbox commit-msg — THIS REPO CARRIES NO SESSION / CO-AUTHOR TRAILERS.
+# FAIL CLOSED, no skip path.
+#
+# WHY THIS EXISTS:
+# The surrounding environment's commit convention appends provenance trailers to
+# every commit — a `Claude-Session:` URL and a `Co-Authored-By:` model line. On a
+# private repo that is useful history. On a PUBLIC repo it is a per-commit
+# disclosure of a private session identifier and of which model wrote the change,
+# published irreversibly with the commit. It is exactly why an earlier outgoing
+# range on this repo had to be rebuilt before it was ever pushed.
+#
+# That convention lives OUTSIDE this repo and cannot be relied on to make an
+# exception for it. So the exception is structural and local: this hook refuses
+# to create such a commit, and `.githooks/pre-push` (scan layer 2b) refuses to
+# push one — so a commit made with hooks disabled still cannot escape.
+#
+# HOW TO WRITE THE MESSAGE INSTEAD: subject + body describing WHAT changed and
+# WHY, and nothing else. No `Claude-Session:` trailer, no `Co-Authored-By:`
+# trailer, no session URL anywhere in the message. Provenance for this repo is
+# the `harness/SYNCED-FROM` stamp, not a commit trailer.
+#
+# Enable (once per clone):  git config core.hooksPath .githooks
+# Escape hatch: none. `--no-verify` bypasses this, and using it on this repo is
+# a policy violation, not a workaround.
+
+set -u
+
+MSG_FILE="${1:-}"
+if [ -z "$MSG_FILE" ] || [ ! -r "$MSG_FILE" ]; then
+    echo "commit-msg: no readable message file ('$MSG_FILE') — COMMIT BLOCKED (fail-closed)." >&2
+    exit 1
+fi
+
+# Kept in lockstep with FORBIDDEN_COMMIT_TRAILERS in scripts/sync-from-claude.py,
+# which enforces the same policy over OUTGOING commits at pre-push. The URL form
+# is written escaped so this file does not itself contain the literal string an
+# identifier sweep looks for.
+FORBIDDEN='^[[:space:]]*Claude-Session[[:space:]]*:|^[[:space:]]*Co-Authored-By[[:space:]]*:|claude\.ai/code'
+
+if grep -nEi "$FORBIDDEN" "$MSG_FILE" >&2; then
+    echo "" >&2
+    echo "COMMIT BLOCKED (commit-msg, fail-closed): the message above carries a" >&2
+    echo "session/co-author provenance trailer. This is a PUBLIC repo — a session" >&2
+    echo "URL is a private-tier identifier and a co-author line discloses which" >&2
+    echo "model wrote the change. Both are irreversible once pushed." >&2
+    echo "" >&2
+    echo "Rewrite the message with subject + body only (what changed and why)," >&2
+    echo "and no trailers. See the header of .githooks/commit-msg." >&2
+    echo "Never --no-verify." >&2
+    exit 1
+fi
+
+exit 0

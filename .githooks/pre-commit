@@ -1,0 +1,21 @@
+#!/bin/sh
+# Gearbox pre-commit — gitleaks leak scan, FAIL CLOSED (GENERICIZATION.md).
+# Pinned scanner: gitleaks 8.30.0. Missing or version-drifted scanner blocks
+# the commit; there is no skip path.
+
+PINNED="8.30.0"
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "pre-commit: gitleaks not installed — commit BLOCKED (fail-closed)." >&2
+    echo "Install: brew install gitleaks  (pinned: $PINNED)" >&2
+    exit 1
+fi
+
+FOUND=$(gitleaks version 2>/dev/null)
+if [ "$FOUND" != "$PINNED" ]; then
+    echo "pre-commit: gitleaks $FOUND != pinned $PINNED — commit BLOCKED (fail-closed)." >&2
+    echo "Update the pin here and in .gitleaks.toml deliberately, or install $PINNED." >&2
+    exit 1
+fi
+
+exec gitleaks protect --staged --config .gitleaks.toml --verbose

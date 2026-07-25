@@ -1,0 +1,374 @@
+#!/usr/bin/env bash
+# gearbox — deploy / drift / harvest for the ~/.claude deploy target.
+#
+#   gearbox deploy            fetch the source, sync this tree forward, re-wire the
+#                             guard hooks, re-apply 0600 modes, run the full guard,
+#                             report what changed. Idempotent: a second run is a
+#                             clean no-op.
+#   gearbox drift [--brief]   cheap, offline, read-only: what is dirty here and in
+#                             which class. --brief = one line, only when it matters
+#                             (the SessionStart hook and the weekly loop use it).
+#   gearbox harvest [-m MSG]  carry local edits back to the source repo: commits
+#                             EXPLICITLY classified paths (never `add -A`) and pushes.
+#
+# The three-tier topology (see README.md): changes are authored in the edit clone
+# ~/your-private-harness, pushed to <your-org>/<your-private-harness>, and fast-forwarded here.
+# ~/.claude sets pull.ff=only, so it can only ever move forward — with one blessed
+# exception: a HARVEST commit made here (runtime output, machine churn) which this
+# script rebases onto the incoming source before pushing. That exception is asserted,
+# not assumed: if any local commit is NOT a harvest commit, deploy refuses and says so.
+#
+# Classification policy lives in scripts/deploy.pathspec and is applied by
+# scripts/gearbox-classify.py. This script never re-derives it.
+#
+# Never `git pull` (bare pull can merge), never --force, never --no-verify, never
+# `git stash` (~/.claude/rules/git-safety.md: hidden state is unrecoverable state).
+set -euo pipefail
+
+CD="${CLAUDE_DIR:-$HOME/.claude}"
+SELF_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CLASSIFY="$SELF_DIR/gearbox-classify.py"
+PATHSPEC="$SELF_DIR/deploy.pathspec"
+LOCK="$CD/.gearbox.lock"
+SNAP=""
+LOCK_HELD=0
+
+say()  { printf '%s\n' "$*"; }
+warn() { printf '%s\n' "$*" >&2; }
+die()  { local code="$1"; shift; warn ""; warn "FATAL: $*"; exit "$code"; }
+
+cleanup() {
+  [ -n "$SNAP" ] && rm -f "$SNAP" "$SNAP".* 2>/dev/null || true
+  if [ "$LOCK_HELD" = 1 ] && [ -f "$LOCK/pid" ] && [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ]; then
+    rm -rf "$LOCK"
+  fi
+}
+trap cleanup EXIT
+
+# Coarse advisory lock. Two concurrent deploys interleaving a rebase and a push is
+# the one way this script can lose a commit. ponytail: mkdir is the lock primitive
+# this box has (no flock(1)); stale reclaim after 600s, same shape as githooks/pre-commit.
+take_lock() {
+  local tries=0
+  while ! mkdir "$LOCK" 2>/dev/null; do
+    local age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))
+    if [ "$age" -gt 600 ]; then warn "reclaiming stale $LOCK (age ${age}s)"; rm -rf "$LOCK"; continue; fi
+    tries=$((tries + 1))
+    [ "$tries" -ge 10 ] && die 1 "another gearbox run holds $LOCK — retry when it finishes"
+    sleep 1
+  done
+  echo $$ > "$LOCK/pid"
+  LOCK_HELD=1
+}
+
+# --- classification snapshot ------------------------------------------------
+# ONE snapshot per run: every downstream decision reads the same file, so the
+# abort check and the harvest set can never disagree about what was dirty.
+snapshot() {
+  SNAP="$(mktemp "${TMPDIR:-/tmp}/gearbox-classify.XXXXXX")"
+  CLAUDE_DIR="$CD" python3 "$CLASSIFY" --claude-dir "$CD" --pathspec "$PATHSPEC" > "$SNAP" \
+    || die 2 "classifier could not inspect $CD — refusing to act on an unknown tree"
+}
+# snap_paths <file> <class>[,<class>...]  -> NUL-separated paths
+snap_paths() {
+  python3 - "$SNAP" "$2" > "$1" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+out = []
+for k in sys.argv[2].split(","):
+    out.extend(d[k.strip()])
+sys.stdout.write("\0".join(out))
+PY
+}
+snap_count() {
+  python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(sum(len(d[k]) for k in sys.argv[2].split(",")))' "$SNAP" "$1"
+}
+# Formats THE SNAPSHOT, not a fresh git status — the report an operator reads must
+# be the same observation the abort/harvest decisions were made on.
+report() { python3 "$CLASSIFY" --pathspec "$PATHSPEC" --from-json "$SNAP" --text; }
+
+preflight() {
+  command -v git >/dev/null     || die 1 "git not on PATH"
+  command -v python3 >/dev/null || die 1 "python3 not on PATH"
+  [ -d "$CD/.git" ]             || die 1 "$CD is not a git working tree"
+  [ -f "$CLASSIFY" ]            || die 1 "missing $CLASSIFY"
+  [ -f "$PATHSPEC" ]            || die 1 "missing $PATHSPEC"
+}
+
+upstream() {
+  git -C "$CD" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null \
+    || die 1 "$CD has no upstream branch configured (git branch --set-upstream-to=origin/main)"
+}
+
+# --- harvest ----------------------------------------------------------------
+# Commits EXPLICIT classified paths. --routine restricts it to the two auto-foldable
+# classes and skips the push (deploy calls it that way, then syncs and pushes once).
+do_harvest() {
+  local routine=0 msg="" classes
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --routine) routine=1 ;;
+      -m) shift; msg="${1:-}" ;;
+      *) die 1 "harvest: unknown argument: $1" ;;
+    esac
+    shift
+  done
+
+  [ -n "$SNAP" ] || { preflight; snapshot; }
+
+  # Untracked runtime output is harvestable; untracked anything ELSE is never
+  # auto-added — that is the guard against silently tracking transcripts/PII.
+  if [ "$routine" = 1 ]; then
+    classes="churn,live_state"     # tracked modifications only: deploy must not
+  else                             # create new tracked paths without an operator
+    classes="churn,live_state,live_untracked,harness"
+  fi
+  snap_paths "$SNAP.add" "$classes"
+
+  local triage; triage="$(snap_count triage_untracked)"
+  if [ "$triage" != "0" ]; then
+    warn "NOTE: $triage untracked path(s) outside every known surface were NOT staged (triage):"
+    python3 -c 'import json,sys;[print("        "+p) for p in json.load(open(sys.argv[1]))["triage_untracked"]]' "$SNAP" >&2
+    warn "      Add an ignore rule, or add them deliberately — gearbox never auto-tracks a new path."
+  fi
+
+  if [ ! -s "$SNAP.add" ]; then
+    say "harvest: nothing to harvest (no classified dirt)"
+    return 0
+  fi
+
+  if [ "$routine" = 0 ]; then
+    local up; up="$(upstream)"
+    git -C "$CD" fetch --quiet "$(git -C "$CD" config --get "branch.$(git -C "$CD" rev-parse --abbrev-ref HEAD).remote" || echo origin)" \
+      || die 1 "harvest: fetch failed"
+    if [ "$(git -C "$CD" rev-list --count "HEAD..$up")" != "0" ]; then
+      die 5 "harvest: $up is ahead of this tree — run \`gearbox deploy\` first (it harvests, syncs and pushes in one pass)."
+    fi
+  fi
+
+  say ""
+  say "harvest: staging classified paths ($classes)"
+  xargs -0 git -C "$CD" add -- < "$SNAP.add"
+
+  if git -C "$CD" diff --cached --quiet; then
+    say "harvest: staged set is identical to HEAD — nothing to commit"
+    return 0
+  fi
+
+  local body; body="$(python3 - "$SNAP" "$classes" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+sel = [c.strip() for c in sys.argv[2].split(",")]
+label = {"live_state": "live-state", "live_untracked": "live-state (new)",
+         "churn": "machine-churn", "harness": "HARNESS hotfix"}
+counts = [f"{len(d[c])} {label[c]}" for c in sel if d[c]]
+print("harvest: " + ", ".join(counts))
+print()
+for c in sel:
+    for p in d[c]:
+        det = d["detail"].get(p)
+        keys = ""
+        if det:
+            bits = []
+            if det["churn"]:   bits.append("churn keys: " + ", ".join(det["churn"]))
+            if det["harness"]: bits.append("HARNESS keys: " + ", ".join(det["harness"]))
+            keys = "  [" + " | ".join(bits) + "]"
+        print(f"  {label[c]}: {p}{keys}")
+print()
+print("Provenance: auto-classified by scripts/gearbox against scripts/deploy.pathspec.")
+print("Machine-churn entries are values the Claude Code binary rewrote in response to")
+print("a UI action (/model, /effort, allow-always, /plugin); they are recorded, not reviewed.")
+PY
+)"
+  [ -n "$msg" ] && body="$msg
+
+$body"
+
+  git -C "$CD" commit -q -F - <<< "$body" || die 1 "harvest: commit failed (see the hook output above — never --no-verify)"
+  say "harvest: committed $(git -C "$CD" rev-parse --short HEAD)"
+
+  if [ "$routine" = 0 ]; then
+    git -C "$CD" push || die 5 "harvest: push rejected — run \`gearbox deploy\`"
+    say "harvest: pushed"
+  fi
+}
+
+# --- drift ------------------------------------------------------------------
+do_drift() {
+  local brief=0
+  [ "${1:-}" = "--brief" ] && brief=1
+  preflight
+  snapshot
+
+  local harness unpushed
+  harness="$(snap_count harness)"
+  unpushed="$(git -C "$CD" rev-list --count "@{u}..HEAD" 2>/dev/null || echo 0)"
+
+  if [ "$brief" = 1 ]; then
+    # SessionStart path: never blocks, never noisy when there is nothing to say.
+    if [ "$harness" != "0" ]; then
+      warn "[gearbox] DRIFT: $harness harness-source file(s) edited in the deploy target ($CD)."
+      python3 -c 'import json,sys;[print("           "+p) for p in json.load(open(sys.argv[1]))["harness"][:5]]' "$SNAP" >&2
+      warn "           Carry them back:  $CD/scripts/gearbox harvest"
+    fi
+    if [ "$unpushed" != "0" ]; then
+      warn "[gearbox] $unpushed local commit(s) not pushed to the source repo — run: $CD/scripts/gearbox deploy"
+    fi
+    return 0
+  fi
+
+  say "gearbox drift @ $(date -u +%Y-%m-%dT%H:%M:%SZ)   CLAUDE_DIR=$CD"
+  say "  HEAD $(git -C "$CD" rev-parse --short HEAD)   upstream $(upstream) (remote-tracking ref, not fetched)"
+  say "  unpushed local commits: $unpushed"
+  say ""
+  report
+  [ "$harness" = "0" ] || return 1
+  return 0
+}
+
+# --- deploy -----------------------------------------------------------------
+do_deploy() {
+  preflight
+  take_lock
+
+  local up before behind ahead remote
+  up="$(upstream)"
+  remote="$(git -C "$CD" config --get "branch.$(git -C "$CD" rev-parse --abbrev-ref HEAD).remote" || echo origin)"
+  before="$(git -C "$CD" rev-parse HEAD)"
+
+  say "gearbox deploy @ $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  say "  target   $CD   (HEAD $(git -C "$CD" rev-parse --short HEAD))"
+  say "  source   $up"
+  say ""
+
+  # (b) fetch FIRST — read-only, and the quiesce gate's fast-forward precondition
+  # cannot be evaluated without knowing which paths are incoming.
+  say "-- fetch --"
+  git -C "$CD" fetch --prune "$remote" || die 1 "fetch failed"
+  behind="$(git -C "$CD" rev-list --count "HEAD..$up")"
+  ahead="$(git -C "$CD" rev-list --count "$up..HEAD")"
+  say "   $up: $behind commit(s) ahead of us, $ahead local commit(s) not on it"
+  say ""
+
+  say "-- classify local state --"
+  snapshot
+  report
+  say ""
+
+  # (c) HARNESS-CODE dirt aborts. Local edits are NEVER clobbered — the operator
+  # decides what a hotfix in the deploy target means.
+  if [ "$(snap_count harness)" != "0" ]; then
+    warn ""
+    warn "ABORT: harness source has been edited in the deploy target."
+    warn "This tree is a DEPLOY TARGET; those edits exist nowhere else and a"
+    warn "fast-forward could destroy them. Carry them back first:"
+    warn ""
+    warn "    $CD/scripts/gearbox harvest"
+    warn ""
+    warn "…then re-run \`gearbox deploy\`. (Authored changes belong in ~/your-private-harness.)"
+    exit 3
+  fi
+
+  # (a) quiesce — reuse the adversarially-reviewed gate verbatim, telling it which
+  # dirty paths this run has already classified as routine so it does not red on them.
+  say "-- quiesce --"
+  snap_paths "$SNAP.tolerate" "churn,live_state,live_untracked"
+  tr '\0' '\n' < "$SNAP.tolerate" > "$SNAP.tolerate.txt"
+  local qrc=0
+  git -C "$CD" diff --name-only "HEAD..$up" > "$SNAP.ffpaths"
+  QUIESCE_TOLERATE_FILE="$SNAP.tolerate.txt" \
+  QUIESCE_FF_FILE="$SNAP.ffpaths" \
+  CLAUDE_DIR="$CD" bash "$SELF_DIR/quiesce-check.sh" || qrc=$?
+  if [ "$qrc" != "0" ]; then
+    [ "$qrc" = "2" ] && die 6 "the quiesce gate could NOT INSPECT $CD — a harder stop than an observed violation. Do not deploy."
+    die 4 "not quiesced — another session is mid-write in $CD. Wait and re-run."
+  fi
+  say ""
+
+  # (e, first pass) the guard hooks must be live BEFORE we make any commit here.
+  say "-- hooks --"
+  bash "$CD/scripts/install-hooks.sh" || die 1 "install-hooks.sh failed"
+  say ""
+
+  # (c cont.) routine dirt is auto-harvested, never blocking. Committing it before
+  # the sync is also what keeps a churned settings.json from making the merge refuse.
+  if [ "$(snap_count churn,live_state)" != "0" ]; then
+    say "-- auto-harvest (routine classes) --"
+    do_harvest --routine
+    ahead="$(git -C "$CD" rev-list --count "$up..HEAD")"
+    say ""
+  fi
+
+  # (d) sync — merge --ff-only, never a bare pull. The one non-ff case we resolve is
+  # our OWN harvest commits landing under an advanced source; anything else is loud.
+  say "-- sync --"
+  if [ "$ahead" = "0" ] && [ "$behind" = "0" ]; then
+    say "   already up to date — no-op"
+  elif [ "$ahead" = "0" ]; then
+    git -C "$CD" merge --ff-only "$up" || die 5 "fast-forward refused — see above. Never force; resolve in the source repo."
+  elif [ "$behind" = "0" ]; then
+    say "   $ahead local commit(s) to publish"
+    git -C "$CD" push || die 5 "push rejected — the source moved mid-deploy; re-run."
+  else
+    local nonharvest
+    nonharvest="$(git -C "$CD" log --format=%s "$up..HEAD" | grep -vE '^harvest[:(]' || true)"
+    if [ -n "$nonharvest" ]; then
+      warn "ABORT: this tree has diverged from $up with commit(s) that are not harvests:"
+      printf '       %s\n' "$nonharvest" >&2
+      warn "A deploy target may only ever fast-forward. Resolve this by hand (never --force)."
+      exit 5
+    fi
+    say "   diverged by our own harvest commit(s) — replaying them onto $up"
+    git -C "$CD" rebase "$up" || {
+      git -C "$CD" rebase --abort || true
+      die 5 "rebase of the harvest commit(s) onto $up conflicted — resolve by hand. Tree left untouched."
+    }
+    git -C "$CD" push || die 5 "push rejected — the source moved mid-deploy; re-run."
+  fi
+  say ""
+
+  # (e, second pass) re-wire against the version we just deployed + assert.
+  say "-- hooks (post-sync) --"
+  bash "$CD/scripts/install-hooks.sh" || die 1 "install-hooks.sh failed after sync"
+  say ""
+
+  # (f) git does not preserve modes — re-apply 0600 to the credential-adjacent set.
+  say "-- modes --"
+  local f modes
+  modes="$(python3 "$CLASSIFY" --pathspec "$PATHSPEC" --section mode-0600)" \
+    || die 1 "could not read the [mode-0600] section of $PATHSPEC"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if [ -e "$CD/$f" ]; then
+      chmod 600 "$CD/$f"
+      say "   0600 $f"
+    fi
+  done <<< "$modes"
+  say ""
+
+  # (g) the full guard — fail-closed, and its own hook check is fail-closed too.
+  say "-- verify-routing (full) --"
+  CLAUDE_DIR="$CD" bash "$CD/scripts/verify-routing.sh" --full || die 1 "verify-routing FAILED after deploy — the deployed tree is not green."
+  say ""
+
+  # (h) what actually changed
+  say "-- changed --"
+  if [ "$before" = "$(git -C "$CD" rev-parse HEAD)" ]; then
+    say "   nothing (clean no-op)"
+  else
+    git -C "$CD" diff --stat "$before" HEAD | tail -1
+    git -C "$CD" diff --name-status "$before" HEAD | sed 's/^/   /'
+  fi
+  say ""
+  say "deploy OK — $CD is at $(git -C "$CD" rev-parse --short HEAD)"
+}
+
+case "${1:-}" in
+  deploy)  shift; do_deploy "$@" ;;
+  drift)   shift; do_drift "$@" ;;
+  harvest) shift; do_harvest "$@" ;;
+  -h|--help|"")
+    sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    ;;
+  *) die 1 "unknown subcommand: $1 (deploy | drift | harvest)" ;;
+esac

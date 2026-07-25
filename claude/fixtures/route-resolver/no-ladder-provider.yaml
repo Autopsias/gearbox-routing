@@ -1,0 +1,95 @@
+# Minimal fixture SSOT for resolve_route.py's unit tests — NOT the real repo
+# SSOT. Deliberately small (just enough shape for the resolver to parse) rather
+# than a full copy of claude/model-routing.yaml, since this fixture's only job
+# is to exercise ONE path the real SSOT doesn't currently exercise: a provider
+# that DECLINES to declare a ladder (`escalation: none` / `degrade: none`).
+#
+# `bare_signal_provider` also seeds the historical `on:` YAML-1.1 bare-key
+# gotcha the session brief flagged (the SSOT's degrade-signal key is now named
+# `signals:` precisely to sidestep this — kept here as `signals:` too, proving
+# the resolver's regex-based parsing (never a real YAML loader) reads it as
+# the neutral string key it is, not the boolean `True` a YAML-1.1 loader would
+# coerce a BARE `on:` key to).
+#
+# `missing_ladder_key_provider` seeds a THIRD path (added post-review, S09
+# closeout finding #2): a provider block with NO `escalation:`/`degrade:` key
+# at all (as opposed to the explicit opt-out literal `none` above) — proves
+# the resolver raises RouteResolverError rather than silently treating a
+# typo'd/omitted key the same as an intentional opt-out (ARCHITECTURE.md §3:
+# "a missing block is a validation error, not a default").
+
+task_classes:
+  mechanical:     { tier: cheap_fast,        effort: light    }
+  standard_build: { tier: workhorse,         effort: standard }
+  agentic_build:  { tier: workhorse,         effort: thorough }
+  deep_reasoning: { tier: frontier_reasoner, effort: standard }
+  linchpin:       { tier: frontier_reasoner, effort: thorough }
+
+providers:
+  no_ladder_provider:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "fixture — not a real calibration"
+    models:
+      cheap_fast:        fixture-cheap-1
+      workhorse:         fixture-mid-1
+      frontier_reasoner: fixture-frontier-1
+    effort:
+      control: effort
+      map:
+        cheap_fast:        { light: null,   standard: null,   thorough: null   }
+        workhorse:         { light: low,    standard: medium, thorough: high   }
+        frontier_reasoner: { light: low,    standard: low,    thorough: medium }
+    escalation: none
+    degrade: none
+
+  bare_signal_provider:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "fixture — not a real calibration"
+    models:
+      cheap_fast:        fixture-cheap-2
+      workhorse:         fixture-mid-2
+      frontier_reasoner: fixture-frontier-2
+    effort:
+      control: effort
+      map:
+        cheap_fast:        { light: null,   standard: null,   thorough: null   }
+        workhorse:         { light: low,    standard: medium, thorough: high   }
+        frontier_reasoner: { light: low,    standard: low,    thorough: medium }
+    escalation:
+      trigger: "2 failures at the same root cause"
+      effort_ladder:
+        workhorse:         [medium, high]
+        frontier_reasoner: [low, medium]
+      model_ladder: [cheap_fast, workhorse, frontier_reasoner]
+      invariants:
+        - "never auto-drop judgement work below workhorse"
+    degrade:
+      signals: [entitlement, unavailable]
+      ladder: { frontier_reasoner: workhorse }
+      floor: workhorse
+      effort_on_degrade: { workhorse: high }
+
+  missing_ladder_key_provider:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "fixture — not a real calibration"
+    models:
+      cheap_fast:        fixture-cheap-3
+      workhorse:         fixture-mid-3
+      frontier_reasoner: fixture-frontier-3
+    effort:
+      control: effort
+      map:
+        cheap_fast:        { light: null,   standard: null,   thorough: null   }
+        workhorse:         { light: low,    standard: medium, thorough: high   }
+        frontier_reasoner: { light: low,    standard: low,    thorough: medium }
+    # Deliberately NO `escalation:` key and NO `degrade:` key at all — neither
+    # a real ladder block nor the explicit `none` opt-out literal.

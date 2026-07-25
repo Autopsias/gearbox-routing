@@ -1,0 +1,11 @@
+{
+  "ship-tail": {
+    "kind": "skill",
+    "skill": "ship-tail",
+    "args": "--skip-tests",
+    "probe_flags": ["--skip-tests", "ci-loop.md", "CI_MAX_CYCLES"],
+    "timeout": 3600,
+    "success_criteria": "ship-tail reaches CI GREEN (commit + push + PR opened + CI passes); the CI rung ([ship-tail][ci-loop] CI_PATH=) must fire — a NO-CI or TODO-seam wiring is a gate failure",
+    "fixture_fake": { "returncode": 0, "stdout": "ship-tail COMPLETE (fixture)" }
+  }
+}

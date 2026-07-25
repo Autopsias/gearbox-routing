@@ -1,0 +1,69 @@
+# Malformed-SSOT regression fixtures for resolve_route.py — seeds the two HIGH
+# findings Codex's adversarial-review pass caught in S09's closeout review
+# (2026-07-05), both reproduced and fixed the same day:
+#
+#   1. `missing_standard_provider` — a non-null `effort.map.workhorse` row that
+#      omits the mandatory `standard` key. Before the fix, `native_effort()`
+#      silently returned `None` for a `standard`-intent task instead of raising
+#      — indistinguishable from a legitimate "tier rejects the dial" result.
+#      Now raises RouteResolverError at the point `native_effort()` is called.
+#
+#   2. `misordered_ladder_provider` — an `escalation.model_ladder` NOT in
+#      ascending tier order (`[workhorse, cheap_fast, frontier_reasoner]`)
+#      combined with `degrade.floor: workhorse`. Before the fix, escalating
+#      past workhorse's spent effort_ladder walked straight into `cheap_fast`
+#      — BELOW the absolute floor, violating ARCHITECTURE.md §3 ("floor...
+#      overrides any ladder step, escalation or degrade"). Now the escalation
+#      walk skips any model_ladder rung below the profile's degrade.floor and
+#      lands on the next non-below-floor tier (frontier_reasoner here).
+
+task_classes:
+  standard_build: { tier: workhorse, effort: standard }
+
+providers:
+  missing_standard_provider:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "fixture — not a real calibration"
+    models:
+      cheap_fast:        m-cheap-1
+      workhorse:         m-mid-1
+      frontier_reasoner: m-frontier-1
+    effort:
+      control: effort
+      map:
+        cheap_fast:        { light: null, standard: null, thorough: null }
+        workhorse:         { light: low,  thorough: high }   # NOTE: no `standard` key — malformed
+        frontier_reasoner: { light: low,  standard: low, thorough: medium }
+    escalation: none
+    degrade: none
+
+  misordered_ladder_provider:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "fixture — not a real calibration"
+    models:
+      cheap_fast:        m-cheap-2
+      workhorse:         m-mid-2
+      frontier_reasoner: m-frontier-2
+    effort:
+      control: effort
+      map:
+        cheap_fast:        { light: null,   standard: null,   thorough: null   }
+        workhorse:         { light: low,    standard: medium, thorough: high   }
+        frontier_reasoner: { light: low,    standard: low,    thorough: medium }
+    escalation:
+      trigger: "fixture — not a real trigger"
+      effort_ladder:
+        workhorse: [medium]
+      model_ladder: [workhorse, cheap_fast, frontier_reasoner]   # NOTE: NOT ascending — malformed
+      invariants: []
+    degrade:
+      signals: [entitlement]
+      ladder: { frontier_reasoner: workhorse }
+      floor: workhorse
+      effort_on_degrade: { workhorse: high }

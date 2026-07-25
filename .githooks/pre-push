@@ -1,0 +1,137 @@
+#!/bin/sh
+# Gearbox pre-push — THE LAST GATE BEFORE PUBLICATION. FAIL CLOSED, no skip path.
+#
+# WHY A PRE-PUSH GATE AND NOT JUST PRE-COMMIT:
+# A local commit is recoverable — rewrite it, amend it, reset it, nobody ever saw
+# it. A push is NOT. Once a blob reaches GitHub it stays reachable: the fork
+# network keeps unreachable objects alive on sibling repos, and a commit SHA
+# remains fetchable by its (4+ char) prefix long after a force-push "removed" it.
+# `git push --force` does not unpublish anything; it only stops the branch from
+# pointing at it. So the only defence that actually works is refusing the FIRST
+# push. That is this hook.
+#
+# FOUR LAYERS, ALL FAIL-CLOSED (see also GENERICIZATION.md §Leak defence):
+#   1. SECRETS — pinned gitleaks over the working tree.
+#   2. BLOCKED PATTERNS — every confidential-identifier regex from the export
+#      manifest, over the whole working tree with ZERO path exemptions.
+#   2b. OUTGOING OBJECTS — the same patterns over the exact objects this push
+#      would create: each new commit's message and author/committer fields, and
+#      every blob new in the range. The working tree is NOT what a push
+#      publishes; a gate that scans only the checkout misses an identifier in
+#      an earlier outgoing commit, in a commit message, or in content since
+#      replaced by a clean uncommitted edit.
+#      This layer ALSO enforces the repo-local commit-trailer policy
+#      (FORBIDDEN_COMMIT_TRAILERS in scripts/sync-from-claude.py): no outgoing
+#      commit message may carry a session URL or a `Co-Authored-By:` line. It is
+#      the second half of `.githooks/commit-msg` — that hook stops such a commit
+#      being CREATED, this one stops one made with hooks disabled being PUSHED.
+#   3. ALLOWLIST-WHAT-PUBLISHES — the pushed tree may only contain the top-level
+#      surfaces named below. A NEW top-level path is a deliberate decision, not
+#      something that rides along in a sync.
+#
+# Layers 1, 2 and 2b are executed by scripts/sync-from-claude.py, the same code
+# the export pipeline runs, so this hook cannot drift into a second, weaker copy
+# of the scan.
+#
+# THE MANIFEST IS DELIBERATELY OUTSIDE THIS REPO because it holds the values it
+# exists to prevent publishing. Point GEARBOX_EXPORT_MANIFEST at your own copy.
+# NO MANIFEST => NO PUSH: an unresolvable manifest blocks, it never degrades to
+# "layer 1 only".
+#
+# THIS HOOK IS THE ONLY IDENTIFIER GATE. CI CANNOT HELP.
+# The manifest is the client-name denylist itself; uploading it to GitHub
+# Actions as a secret would publish the very list it exists to keep unpublished,
+# on the same platform this repo is published to. So CI runs STRUCTURAL checks
+# only (.github/workflows/verify.yml) and says so in its own logs. A green CI
+# run is not evidence that a change is identifier-clean.
+# CONSEQUENCE: a clone that never ran `git config core.hooksPath .githooks` has
+# NO gate at all. That one command is the whole defence — CI verifies these hook
+# files are unmodified, but it cannot verify that your clone runs them.
+#
+# IF SOMETHING LEAKED ANYWAY — ROTATE FIRST, SCRUB SECOND (in this order):
+#   1. Treat every credential in the pushed blob as COMPROMISED and rotate it
+#      NOW — before any history rewrite. Rewriting history does not un-disclose
+#      a secret; assume it was scraped within seconds of the push.
+#   2. Only then rewrite (git-filter-repo / BFG) and force-push.
+#   3. Open a GitHub Support request to garbage-collect the unreachable objects
+#      and to purge the fork network — a rewrite ALONE leaves the old SHAs
+#      fetchable. Until Support confirms, treat the content as public.
+#   4. If the leak was a non-rotatable identifier (a client name, a home path, a
+#      person's name), rewriting is cosmetic. Record it, and add the scrub rule
+#      to your export manifest so the class cannot recur.
+#
+# Escape hatch: none. `--no-verify` is the one thing that bypasses this, and
+# using it on this repo is a policy violation, not a workaround.
+
+set -u
+
+PINNED="8.30.0"
+REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
+cd "$REPO_ROOT" || exit 1
+
+fail() {
+    echo "" >&2
+    echo "PUSH BLOCKED (pre-push, fail-closed): $1" >&2
+    echo "  A push is irreversible — see the rotate-on-leak runbook at the top of" >&2
+    echo "  .githooks/pre-push. Fix the SOURCE (scrub transform / manifest), re-run" >&2
+    echo "  the sync, and push again. Never --no-verify." >&2
+    exit 1
+}
+
+# --- layer 1 precondition: pinned scanner -----------------------------------
+command -v gitleaks >/dev/null 2>&1 \
+    || fail "gitleaks not installed (pinned $PINNED). Install: brew install gitleaks"
+FOUND=$(gitleaks version 2>/dev/null)
+[ "$FOUND" = "$PINNED" ] \
+    || fail "gitleaks $FOUND != pinned $PINNED. Change the pin deliberately, or install $PINNED."
+
+command -v python3 >/dev/null 2>&1 || fail "python3 not on PATH — cannot run the scan layers."
+
+# --- manifest resolution: no manifest, no push ------------------------------
+# NO DEFAULT. A default would have to name a real private-tier location, and
+# that path — the plan slug, the date, the filename of the confidential
+# manifest — is itself the kind of thing this hook exists to keep unpublished.
+MANIFEST="${GEARBOX_EXPORT_MANIFEST:-}"
+[ -n "$MANIFEST" ] || fail "GEARBOX_EXPORT_MANIFEST is not set.
+  Point it at your private-tier export manifest, e.g.
+      export GEARBOX_EXPORT_MANIFEST=~/path/to/your-private-manifest.json
+  This hook will NOT fall back to a secrets-only scan — the blocked-pattern
+  layer is the one that catches client names and personal paths, which gitleaks
+  does not look for."
+[ -r "$MANIFEST" ] || fail "export manifest not readable at '$MANIFEST'."
+
+case "$MANIFEST" in
+    "$REPO_ROOT"/*) fail "manifest '$MANIFEST' is INSIDE this repo. It names the
+  confidential strings as data — it must live outside the published worktree." ;;
+esac
+
+# --- layer 3: allowlist what publishes --------------------------------------
+# Checked BEFORE the expensive scans: an unexpected top-level path is the most
+# alarming finding and the cheapest to detect.
+ALLOWED=".github .githooks .gitignore .gitleaks.toml ARCHITECTURE.md CHANGELOG.md CLAUDE.md CODEOWNERS CODE_OF_CONDUCT.md CONTRIBUTING.md GENERICIZATION.md LICENSE README.md SECURITY.md claude docs harness install.sh scripts"
+UNEXPECTED=""
+for top in $(git ls-files | cut -d/ -f1 | sort -u); do
+    case " $ALLOWED " in
+        *" $top "*) ;;
+        *) UNEXPECTED="$UNEXPECTED $top" ;;
+    esac
+done
+[ -z "$UNEXPECTED" ] || fail "tracked top-level path(s) not on the publish allowlist:$UNEXPECTED
+  Add them to ALLOWED in this hook only after deciding they belong in a PUBLIC repo."
+
+# --- layers 1 + 2 + 2b: reuse the export pipeline's own scan ----------------
+# stdin carries the `<local_ref> <local_oid> <remote_ref> <remote_oid>` tuples
+# git hands a pre-push hook. It is forwarded UNREAD so the scanner can resolve
+# the exact outgoing object range — reading it here would consume it.
+echo "pre-push: scanning working tree AND the exact objects being pushed..." >&2
+# argv[1] is the destination remote's NAME. It scopes the outgoing-range
+# exclusion to that remote: without it, a branch that happens to exist on some
+# OTHER remote (a mirror, a fork, a backup clone) would be treated as already
+# published and scanned as empty.
+python3 scripts/sync-from-claude.py --scan-only --scan-push-input \
+    --push-remote "${1:-}" --manifest "$MANIFEST" \
+    || fail "scan layer found hits (see the report above). NEVER weaken the scan."
+
+echo "pre-push: OK — secrets clean, no blocked patterns in the tree or in any" >&2
+echo "          outgoing commit/message/blob, publish allowlist intact." >&2
+exit 0

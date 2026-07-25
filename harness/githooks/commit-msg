@@ -1,0 +1,41 @@
+#!/bin/bash
+# commit-msg hook — routing-pin-change approval-token gate (s02, GRD-01 re-harden gate c).
+#
+# pre-commit cannot see the final commit message (git supplies it later, at this
+# commit-msg stage), so the approval-token check lives here, not in pre-commit.
+#
+# A commit touching ANY routing-affecting surface (agent pin frontmatter, the SSOT,
+# the CLAUDE.md digest, run.py's _FALLBACK_LADDER/_REASONING_DIRECTIVE, or the
+# calibration manifest) must carry the literal token:
+#   routing-pin-change: approved-by-operator <YYYY-MM-DD>
+# This is an AUDIT-TRAIL marker, NOT a security control — a local operator can
+# forge it (single-user trust model). WARN by default; set ROUTING_GUARD_STRICT=1
+# to make a missing token FAIL the commit.
+set -euo pipefail
+
+CLAUDE_DIR="$(git rev-parse --show-toplevel)"
+MSG_FILE="$1"
+
+STAGED_FILES="$(git diff --cached --name-only)"
+# Keep in lockstep with SSOT `consumers:` and pre-commit's ROUTING_PREFIXES —
+# verify-routing.sh's surface-list-convergence check (s02 re-harden fix #5) FAILS if
+# a consumer is reachable by one hook regex but not this one.
+ROUTING_AFFECTING='^(model-routing\.yaml|model-routing\.digest\.md|CLAUDE\.md|agents/.*\.md|skills/plan-execute/scripts/run\.py|skills/plan-execute/SKILL\.md|epic-dev-assignments\.yaml|scripts/resolve_route\.py|commands/plan-harden\.md|skills/plan-builder/references/schemas\.md|skills/plan-builder/references/model-effort-guidance\.md|skills/plan-builder/SKILL\.md)$'
+
+if printf '%s\n' "$STAGED_FILES" | grep -qE "$ROUTING_AFFECTING"; then
+  if ! grep -qE 'routing-pin-change: approved-by-operator [0-9]{4}-[0-9]{2}-[0-9]{2}' "$MSG_FILE"; then
+    MATCHED=$(printf '%s\n' "$STAGED_FILES" | grep -E "$ROUTING_AFFECTING" | tr '\n' ' ')
+    if [[ "${ROUTING_GUARD_STRICT:-0}" == "1" ]]; then
+      echo "" >&2
+      echo "COMMIT BLOCKED: touches a routing-affecting surface ($MATCHED) but the message" >&2
+      echo "lacks 'routing-pin-change: approved-by-operator <YYYY-MM-DD>' (ROUTING_GUARD_STRICT=1)." >&2
+      exit 1
+    else
+      echo "" >&2
+      echo "WARN: commit touches a routing-affecting surface ($MATCHED) but the message lacks" >&2
+      echo "'routing-pin-change: approved-by-operator <YYYY-MM-DD>' — audit-trail token only," >&2
+      echo "not enforced (set ROUTING_GUARD_STRICT=1 to make this fail)." >&2
+    fi
+  fi
+fi
+exit 0

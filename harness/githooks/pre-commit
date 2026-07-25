@@ -1,0 +1,171 @@
+#!/bin/bash
+# Secret gate for ~/.claude commits: this repo whitelists config that sits
+# next to credential-bearing files (mcp.json, config.json). Block any commit
+# whose staged content trips gitleaks. False positive? Pin its fingerprint in
+# ~/.claude/.gitleaksignore and retry — NEVER `git commit --no-verify` (that
+# skips this ENTIRE hook, including the routing guard appended below it, and
+# violates the global hard rule against --no-verify). Recovery-only escapes for
+# the routing guard specifically: ROUTING_GUARD_ALLOW_FIX / ROUTING_GUARD_ALLOW_REVERT
+# (see the routing-guard section further down).
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --no-banner; then
+    echo "" >&2
+    echo "COMMIT BLOCKED: gitleaks found secret-shaped content in the staged set." >&2
+    echo "False positive? Pin its fingerprint in ~/.claude/.gitleaksignore and retry." >&2
+    exit 1
+  fi
+else
+  echo "WARNING: gitleaks not installed — committing without secret scan." >&2
+fi
+
+# ============================================================================
+# Routing drift guard (s02, GRD-01/model-effort-routing-2026-07-02). Fires on
+# EVERY ~/.claude commit, running verify-routing.sh's BARE/DEFAULT mode — today
+# that's --core; when s04 flips DEFAULT_MODE inside verify-routing.sh to "full",
+# this hook silently starts enforcing full mode too. NO hook edit needed at s04.
+#
+# Fails CLOSED on both a POLICY VIOLATION (drift found) and a TOOLING CRASH
+# (missing dep, malformed SSOT, traceback) — a broken guard must never become a
+# silent bypass. Recovery escapes (never --no-verify):
+#   ROUTING_GUARD_ALLOW_REVERT=1  — honored ONLY mid `git revert` (.git/REVERT_HEAD
+#                                   present), so a buggy guard can never block its
+#                                   own rollback.
+#   ROUTING_GUARD_ALLOW_FIX=1     — honored ONLY when the staged set is guard
+#                                   tooling ONLY (verify-routing.sh /
+#                                   render-routing-digest.py); runs a minimal
+#                                   static check (bash -n / ast.parse) instead of
+#                                   the full guard, so a forward-fix to a broken
+#                                   guard isn't blocked by the guard itself.
+# Both overrides log loudly to .routing-guard.log.
+#
+# Concurrent-mutation safety: a coarse advisory lock (.routing-session.lock —
+# mkdir-based; this machine has no flock(1)) serializes routing-session commits,
+# with stale-lock reclaim after 300s. Any routing-relevant file that is STAGED
+# with further UNSTAGED changes on top (a partial-stage race — what gets
+# committed would diverge from what the guard just validated on disk) aborts the
+# commit. HEAD is snapshotted before the guard runs and re-checked immediately
+# after; if it moved (a concurrent commit landed mid-validation), the commit
+# aborts rather than land against a moved HEAD.
+# NAMED BOUNDED RESIDUAL: a write-write collision from an external mutator that
+# ignores the lock file entirely is not preventable by an advisory lock — this is
+# accepted, not solved (single-operator machine; documented, not silent).
+# ============================================================================
+CLAUDE_DIR="$(git rev-parse --show-toplevel)"
+LOCK_DIR="$CLAUDE_DIR/.routing-session.lock"
+GUARD_LOG="$CLAUDE_DIR/.routing-guard.log"
+STALE_SECS=300
+
+_routing_log() { echo "[routing-guard $(date -u +%FT%TZ)] $*" | tee -a "$GUARD_LOG" >&2; }
+
+# Ownership-checked cleanup (s02 re-harden fix — lock pid). The pid file is written at
+# acquisition ($$) but was previously never read before the EXIT trap's `rm -rf`. A
+# slow (>STALE_SECS) holder finishing AFTER a successor has already reclaimed the
+# stale lock would delete that successor's LIVE lock out from under it. Only remove
+# the lock dir if the pid file still names THIS process.
+_routing_lock_cleanup() {
+  if [[ -f "$LOCK_DIR/pid" ]]; then
+    local _owner
+    _owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || echo "")"
+    if [[ "$_owner" == "$$" ]]; then
+      rm -rf "$LOCK_DIR"
+    else
+      _routing_log "NOTE: skipping lock cleanup — $LOCK_DIR/pid=$_owner does not match this process ($$); a successor already reclaimed this lock as stale. Not removing (would delete a live lock)."
+    fi
+  else
+    rm -rf "$LOCK_DIR"
+  fi
+}
+
+_lock_acquired=0
+for _try in 1 2 3 4 5; do
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    _lock_acquired=1
+    echo $$ > "$LOCK_DIR/pid" 2>/dev/null || true
+    break
+  fi
+  if [[ -d "$LOCK_DIR" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || echo 0)
+    _age=$(( $(date +%s) - _lock_mtime ))
+    if [[ $_age -gt $STALE_SECS ]]; then
+      _routing_log "WARNING: reclaiming stale lock $LOCK_DIR (age ${_age}s > ${STALE_SECS}s)"
+      rm -rf "$LOCK_DIR"
+      continue
+    fi
+  fi
+  sleep 1
+done
+if [[ $_lock_acquired -ne 1 ]]; then
+  _routing_log "FATAL: could not acquire $LOCK_DIR after retries — another routing-session commit appears to be in progress."
+  exit 1
+fi
+trap _routing_lock_cleanup EXIT
+
+_head_before="$(git rev-parse HEAD 2>/dev/null || echo none)"
+
+if [[ "${ROUTING_GUARD_ALLOW_REVERT:-0}" == "1" ]]; then
+  if [[ -f "$CLAUDE_DIR/.git/REVERT_HEAD" ]]; then
+    _routing_log "OVERRIDE: ROUTING_GUARD_ALLOW_REVERT=1 honored — mid git-revert (.git/REVERT_HEAD present). Skipping the routing guard for this commit."
+    exit 0
+  else
+    _routing_log "NOTE: ROUTING_GUARD_ALLOW_REVERT=1 set but no .git/REVERT_HEAD (not mid a git-revert) — ignoring, running the guard normally."
+  fi
+fi
+
+STAGED_FILES="$(git diff --cached --name-only)"
+
+if [[ "${ROUTING_GUARD_ALLOW_FIX:-0}" == "1" && -n "$STAGED_FILES" ]]; then
+  _non_guard=$(printf '%s\n' "$STAGED_FILES" | grep -v -E '^scripts/(verify-routing\.sh|render-routing-digest\.py)$' || true)
+  if [[ -z "$_non_guard" ]]; then
+    _routing_log "OVERRIDE: ROUTING_GUARD_ALLOW_FIX=1 honored — staged set is guard-tooling-only: $(printf '%s ' $STAGED_FILES). Running a minimal static check instead of the full guard."
+    _static_ok=1
+    bash -n "$CLAUDE_DIR/scripts/verify-routing.sh" || _static_ok=0
+    python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$CLAUDE_DIR/scripts/render-routing-digest.py" || _static_ok=0
+    if [[ $_static_ok -ne 1 ]]; then
+      _routing_log "FATAL: ROUTING_GUARD_ALLOW_FIX minimal static check FAILED — refusing even under override."
+      exit 1
+    fi
+    _routing_log "ROUTING_GUARD_ALLOW_FIX minimal static check passed — allowing commit."
+    exit 0
+  else
+    _routing_log "NOTE: ROUTING_GUARD_ALLOW_FIX=1 set but the staged set is NOT guard-tooling-only — ignoring override, running the full guard."
+  fi
+fi
+
+ROUTING_PREFIXES='^(model-routing\.yaml|model-routing\.digest\.md|CLAUDE\.md|agents/|skills/plan-execute/scripts/run\.py|skills/plan-execute/SKILL\.md|epic-dev-assignments\.yaml|scripts/verify-routing\.sh|scripts/render-routing-digest\.py|scripts/resolve_route\.py|commands/plan-harden\.md|skills/plan-builder/references/schemas\.md|skills/plan-builder/references/model-effort-guidance\.md|skills/plan-builder/SKILL\.md)'
+_partial=0
+if [[ -n "$STAGED_FILES" ]]; then
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    echo "$f" | grep -qE "$ROUTING_PREFIXES" || continue
+    if ! git diff --quiet -- "$f"; then
+      _routing_log "FATAL: '$f' is staged AND has further UNSTAGED changes on top of the staged version — refusing (partial-stage race: what gets committed would diverge from what the guard is about to validate on disk). Run 'git add \"$f\"' again once nothing else is touching it."
+      _partial=1
+      continue
+    fi
+    if [[ -f "$f" ]]; then
+      _staged_hash=$(git rev-parse ":$f" 2>/dev/null || echo "")
+      _disk_blob=$(git hash-object "$f" 2>/dev/null || echo "")
+      if [[ -n "$_staged_hash" && -n "$_disk_blob" && "$_staged_hash" != "$_disk_blob" ]]; then
+        _routing_log "FATAL: '$f' staged blob ($_staged_hash) != working-tree hash ($_disk_blob) — refusing."
+        _partial=1
+      fi
+    fi
+  done <<< "$STAGED_FILES"
+fi
+if [[ $_partial -ne 0 ]]; then
+  exit 1
+fi
+
+if ! CLAUDE_DIR="$CLAUDE_DIR" bash "$CLAUDE_DIR/scripts/verify-routing.sh"; then
+  _routing_log "FATAL: verify-routing.sh failed — commit blocked. Fix the drifted source (or the SSOT if it is wrong). Recovery-only escapes: ROUTING_GUARD_ALLOW_FIX / ROUTING_GUARD_ALLOW_REVERT above — never --no-verify."
+  exit 1
+fi
+
+_head_after="$(git rev-parse HEAD 2>/dev/null || echo none)"
+if [[ "$_head_before" != "$_head_after" ]]; then
+  _routing_log "FATAL: HEAD moved during routing-guard validation ($_head_before -> $_head_after) — a concurrent commit landed mid-guard. Refusing to commit against a moved HEAD; re-run."
+  exit 1
+fi
+# ============================================================================
+# end routing drift guard
+# ============================================================================

@@ -1,0 +1,49 @@
+# Gearbox gitleaks config — extends the built-in ruleset. Pinned gitleaks
+# version: 8.30.0 (see .githooks/pre-commit). Fail-closed: scanner absent =
+# commit blocked.
+
+[extend]
+useDefault = true
+
+# Global allowlist. The harness's own redaction tests
+# (harness/skills/plan-execute/scripts/test_shipping.py) embed SYNTHETIC
+# github-pat-shaped fixtures whose only purpose is to prove adapter.redact()
+# scrubs them — not real secrets. This finding comes from gitleaks' DEFAULT
+# github-pat rule (not the custom rule below), so it needs a GLOBAL allowlist.
+# The regex matches gitleaks' CAPTURED secret (ghp_ + exactly 36 chars — the
+# literal's trailing "ab" is outside the match), and is checked as a substring
+# so it holds across gitleaks versions. Scoped to this one sequential-alphabet
+# fake token, so any REAL ghp_ token elsewhere — even in this file — is caught.
+[allowlist]
+description = "Synthetic secret fixtures for the redaction tests (not real secrets)"
+regexes = [
+  '''ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789''',
+]
+
+# TEMPLATE RULE — customize for your fork. Replace the placeholders below with
+# YOUR OWN confidential identifiers (client names, usernames, private paths)
+# that must never be committed. The upstream authors' identifiers are
+# intentionally NOT shipped here.
+[[rules]]
+id = "gearbox-confidential-identifiers"
+description = "Confidential identifiers that must never ship (customize this list)"
+regex = '''(?i)(YOUR_CLIENT_NAME|YOUR_ORG|YOUR_USERNAME)'''
+keywords = ["YOUR_CLIENT_NAME", "YOUR_ORG", "YOUR_USERNAME"]
+
+# This config and the CI workflow legitimately restate the PLACEHOLDER tokens
+# above in order to define/enforce the rule, and the example manifest is a
+# fake-placeholder schema; allowlist exactly those three so the template tokens
+# are not flagged as their own leak.
+#
+# scripts/sync-from-claude.py IS DELIBERATELY NOT ON THIS LIST ANYMORE.
+# It used to be, on the reasoning that a scrub rule legitimately contains the
+# strings it matches. That reasoning made the one file holding every
+# confidential literal the one file no gate could see. The literals now live in
+# the external manifest, so the file has nothing to exempt. Re-adding it would
+# restore the blind spot — don't.
+[rules.allowlist]
+paths = [
+  '''^\.gitleaks\.toml$''',
+  '''^\.github/workflows/verify\.yml$''',
+  '''^scripts/sync-from-claude\.manifest\.example\.json$''',
+]

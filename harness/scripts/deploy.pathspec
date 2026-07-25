@@ -1,0 +1,71 @@
+# deploy.pathspec — the ONE tracked definition of how `scripts/gearbox` classifies
+# a dirty path in the deploy target (~/.claude). Read by scripts/gearbox-classify.py;
+# every consumer (deploy, drift, harvest, the SessionStart hook, the weekly loop)
+# goes through that classifier, so this file is the single source of the policy.
+#
+# THREE CLASSES, fail-closed. Anything this file does not explicitly name is
+# HARNESS-CODE — the loud class that aborts a deploy. Adding a path to a list
+# below is a deliberate act of saying "a machine writes this; do not alarm on it".
+#
+#   HARNESS-CODE  authored harness source. Dirt here in the deploy target is a
+#                 hotfix that has not been carried back. It ABORTS `gearbox deploy`
+#                 and is only committed by an explicit `gearbox harvest`.
+#   LIVE-STATE    runtime output that can ONLY be produced in the deploy target
+#                 (auto-memory, plan trees, routing eval output). Versioned by
+#                 decision D3. Dirt here is ROUTINE — it never blocks a deploy and
+#                 is auto-harvested with provenance.
+#   MACHINE-CHURN a value the Claude Code binary itself rewrites in response to a
+#                 UI action (/model, /effort, "allow always", /plugin, /statusline).
+#                 Same treatment as LIVE-STATE: auto-harvested, never blocking.
+#                 Expressed as JSON key paths, not file paths — see below.
+#
+# Syntax: `[section]` headers; one entry per line; `#` comments; blank lines ignored.
+# Globs: `*` matches within one path segment, `**` matches across segments.
+
+# --- LIVE-STATE: machine-written runtime surface (decision D3: versioned) -----
+[live-state]
+projects/*/memory/**
+_plans/**
+evals/routing/MISROUTES.md
+evals/routing/results/**
+
+# --- MACHINE-CHURN: settings.json keys the binary rewrites on a UI action ------
+# Dotted JSON key paths. A changed key is churn iff it, or one of its dotted
+# ancestors, is listed here. Everything else in settings.json — notably `hooks`,
+# `env`, `permissions.deny`, `permissions.ask` and `permissions.defaultMode` — is
+# HARNESS-CODE: a change there is real drift and MUST abort a deploy.
+#
+# Observed in practice: a concurrent session's `/model` escalation rewrote
+# `model` on an otherwise clean tree. Treating the whole file as harness source
+# made that a deploy-aborting event AND made `git merge --ff-only` refuse — which
+# is what this split exists to prevent.
+[settings-churn-keys]
+model                              # /model
+effortLevel                        # /effort
+theme                              # /config theme
+editorMode                         # /vim
+tui                                # /config
+statusLine                         # /statusline
+permissions.allow                  # "allow always" click-through growth
+skillOverrides                     # /skill on|off
+enabledPlugins                     # /plugin enable|disable
+extraKnownMarketplaces             # /plugin marketplace add
+preferredNotifChannel
+remoteControlAtStartup
+inputNeededNotifEnabled
+agentPushNotifEnabled
+skipAutoPermissionPrompt
+skipDangerousModePermissionPrompt
+skipWorkflowUsageWarning
+showClearContextOnPlanAccept
+voiceEnabled
+
+# --- mode-sensitive files: git does not preserve 0600, so deploy re-applies it --
+# Untracked by design (credential-adjacent runtime caches; see .gitignore's
+# never-track set). Missing files are skipped silently; this is a tighten-only pass.
+[mode-0600]
+mcp.json
+config.json
+settings.local.json
+mcp-needs-auth-cache.json
+.credentials.json

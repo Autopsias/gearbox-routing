@@ -1,0 +1,737 @@
+{
+  "title": "Sample plan (schema fixture)",
+  "subtitle": "Sample plan used as a schema fixture",
+  "categories": [
+    {
+      "key": "quick-wins",
+      "label": "Quick Wins",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    },
+    {
+      "key": "fleet",
+      "label": "Automation Fleet",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    },
+    {
+      "key": "resilience",
+      "label": "Orchestration Resilience",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    },
+    {
+      "key": "plan-suite",
+      "label": "Plan-Suite Hardening",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    },
+    {
+      "key": "hygiene",
+      "label": "Setup Hygiene & Security",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    },
+    {
+      "key": "self-assess",
+      "label": "Self-Assessment Skill",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means."
+    }
+  ],
+  "items": [
+    {
+      "id": "qw-01",
+      "title": "Sample title",
+      "category": "quick-wins",
+      "priority": "P0",
+      "effort": "S",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "qw-02",
+      "title": "Sample title",
+      "category": "quick-wins",
+      "priority": "P1",
+      "effort": "S",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "ft-01",
+      "title": "Sample title",
+      "category": "fleet",
+      "priority": "P0",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "ft-02",
+      "title": "Sample title",
+      "category": "fleet",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "ft-03",
+      "title": "Sample title",
+      "category": "fleet",
+      "priority": "P2",
+      "effort": "S",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "or-01",
+      "title": "Sample title",
+      "category": "resilience",
+      "priority": "P0",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "or-02",
+      "title": "Sample title",
+      "category": "resilience",
+      "priority": "P2",
+      "effort": "S",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "or-03",
+      "title": "Sample title",
+      "category": "resilience",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "ps-01",
+      "title": "Sample title",
+      "category": "plan-suite",
+      "priority": "P0",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "ps-02",
+      "title": "Sample title",
+      "category": "plan-suite",
+      "priority": "P1",
+      "effort": "S",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "sh-01",
+      "title": "Sample title",
+      "category": "hygiene",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "sh-02",
+      "title": "Sample title",
+      "category": "hygiene",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "sa-01",
+      "title": "Sample title",
+      "category": "self-assess",
+      "priority": "P0",
+      "effort": "L",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "description": "Synthetic description for the sample spec fixture. Explains what this item covers and what 'done' means.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    },
+    {
+      "id": "sa-02",
+      "title": "Sample title",
+      "category": "self-assess",
+      "priority": "P1",
+      "effort": "M",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why": "Synthetic reason.",
+      "agent_instructions": [
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture.",
+        "Synthetic agent instruction line for the sample fixture."
+      ],
+      "touches": "path/to/touched/file"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "s01",
+      "title": "Sample title",
+      "model": "Sonnet",
+      "reasoning": "medium",
+      "effort": "~1h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "qw-01",
+        "qw-02"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": "wave-a",
+        "depends_on": [],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s02",
+      "title": "Sample title",
+      "model": "Opus",
+      "reasoning": "high",
+      "effort": "~2h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "ft-01"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": "wave-b",
+        "depends_on": [
+          "s01"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true,
+        "checks": [
+          {
+            "name": "canary-standing",
+            "evidence_path": "_evidence/s02/canary-standing.txt",
+            "assert": "artifact exists and is non-empty"
+          }
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s03",
+      "title": "Sample title",
+      "model": "Sonnet",
+      "reasoning": "high",
+      "effort": "~1.5h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "sh-01"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": "wave-b",
+        "depends_on": [
+          "s01"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s04",
+      "title": "Sample title",
+      "model": "Sonnet",
+      "reasoning": "medium",
+      "effort": "~1h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "ft-02",
+        "ft-03"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": "wave-b",
+        "depends_on": [
+          "s01"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 1,
+        "require_evidence": true
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "spike",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s05",
+      "title": "Sample title",
+      "model": "Sonnet",
+      "reasoning": "high",
+      "effort": "~2h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "or-01",
+        "or-02"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s01"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "gates": [
+          "code-review-gate"
+        ],
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true,
+        "checks": [
+          {
+            "name": "retry-classifier-tests",
+            "evidence_path": "_evidence/s05/retry-classifier-tests.txt",
+            "assert": "artifact exists and is non-empty"
+          },
+          {
+            "name": "commit-boundary-honored",
+            "evidence_path": "_evidence/s05/commit-boundary-log.txt",
+            "assert": "artifact exists and is non-empty"
+          }
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s06",
+      "title": "Sample title",
+      "model": "Opus",
+      "reasoning": "high",
+      "effort": "~1.5h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "sh-02"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s03"
+        ],
+        "requires_human_checkpoint": true
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 1,
+        "require_evidence": true,
+        "gates": [
+          "code-review-gate"
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s07",
+      "title": "Sample title",
+      "model": "Sonnet",
+      "reasoning": "high",
+      "effort": "~2h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "ps-01",
+        "ps-02"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s05"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "gates": [
+          "code-review-gate"
+        ],
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true,
+        "checks": [
+          {
+            "name": "structural-diff-primary",
+            "evidence_path": "_evidence/s07/structural-diff-result.json",
+            "assert": "artifact exists and is non-empty"
+          },
+          {
+            "name": "refused-done-demo",
+            "evidence_path": "_evidence/s07/refused-done-transcript.txt",
+            "assert": "artifact exists and is non-empty"
+          }
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s08",
+      "title": "Sample title",
+      "model": "Opus",
+      "reasoning": "high",
+      "effort": "~2h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "or-03"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s07"
+        ],
+        "requires_human_checkpoint": false
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s09",
+      "title": "Sample title",
+      "model": "Opus",
+      "reasoning": "high",
+      "effort": "~3h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "sa-01"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s02",
+          "s04",
+          "s06",
+          "s08"
+        ],
+        "requires_human_checkpoint": false,
+        "depends_on_policy": "completed_or_terminal"
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 2,
+        "require_evidence": true,
+        "checks": [
+          {
+            "name": "coverage-map",
+            "evidence_path": "_evidence/s09/coverage-map.json",
+            "assert": "artifact exists and is non-empty"
+          },
+          {
+            "name": "digest-smoke",
+            "evidence_path": "_evidence/s09/digest-record-count.txt",
+            "assert": "artifact exists and is non-empty"
+          }
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "ship-ready",
+        "skip_if_partial": true
+      }
+    },
+    {
+      "id": "s10",
+      "title": "Sample title",
+      "model": "Fable",
+      "reasoning": "high",
+      "effort": "~1.5h",
+      "human_summary": "Synthetic one-line human summary of this item.",
+      "deliverable": "Synthetic deliverable: a named artifact this item must produce.",
+      "why_model": "Synthetic rationale for the model/reasoning pick on this session.",
+      "items": [
+        "sa-02"
+      ],
+      "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
+      "dispatch": {
+        "subagent_type": null,
+        "parallel_group": null,
+        "depends_on": [
+          "s09"
+        ],
+        "requires_human_checkpoint": false,
+        "model_fallbacks": [
+          "Opus"
+        ],
+        "reasoning_fallbacks": [
+          "xhigh"
+        ]
+      },
+      "verify": {
+        "on_fail": "rework",
+        "max_rework": 1,
+        "require_evidence": true,
+        "checks": [
+          {
+            "name": "tool-smoke",
+            "evidence_path": "_evidence/s10/digest-smoke.txt",
+            "assert": "artifact exists and is non-empty"
+          },
+          {
+            "name": "postfix-honesty",
+            "evidence_path": "_evidence/s10/postfix-session-count.txt",
+            "assert": "artifact exists and is non-empty"
+          },
+          {
+            "name": "deferred-trigger",
+            "evidence_path": "_evidence/s10/deferred-trigger.txt",
+            "assert": "artifact exists and is non-empty"
+          }
+        ]
+      },
+      "post_session": {
+        "git": "commit",
+        "kind": "spike",
+        "skip_if_partial": true
+      }
+    }
+  ],
+  "infographic": {
+    "type": "phase-journey",
+    "title": "Sample title",
+    "eyebrow": "SAMPLE",
+    "narrative": "Synthetic narrative for the sample plan used as a test fixture.",
+    "phases": [
+      {
+        "num": 1,
+        "name": "Quick strikes",
+        "tagline": "Sample tagline",
+        "items": [
+          "qw-01",
+          "qw-02",
+          "ft-01",
+          "sh-01",
+          "ft-02",
+          "ft-03"
+        ]
+      },
+      {
+        "num": 2,
+        "name": "Resilience",
+        "tagline": "Sample tagline",
+        "items": [
+          "or-01",
+          "or-02",
+          "sh-02"
+        ]
+      },
+      {
+        "num": 3,
+        "name": "Plan-suite",
+        "tagline": "Sample tagline",
+        "items": [
+          "ps-01",
+          "ps-02",
+          "or-03"
+        ]
+      },
+      {
+        "num": 4,
+        "name": "Self-assessment",
+        "tagline": "Sample tagline",
+        "items": [
+          "sa-01",
+          "sa-02"
+        ]
+      }
+    ],
+    "anchor_now": {
+      "name": "Taxed setup",
+      "tagline": "Sample tagline"
+    },
+    "anchor_goal": {
+      "name": "Self-measuring system",
+      "tagline": "Sample tagline"
+    }
+  }
+}

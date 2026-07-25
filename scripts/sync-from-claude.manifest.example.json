@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "schema_version": "2",
+    "note": "FAKE PLACEHOLDER SCHEMA EXAMPLE ONLY. This file may live in the public Gearbox repo because every value below is invented, not real. The REAL manifest -- real blocked_patterns AND real scrub_rules -- is private-tier data and lives OUTSIDE this repo entirely; see scripts/README.md and docs/HARNESS.md. sync-from-claude.py hard-refuses to run if --manifest resolves inside this repo's worktree, and refuses any manifest whose _meta.schema_version is not exactly the version it understands.",
+    "why_scrub_rules_live_here": "A scrub rule's MATCH SOURCE is the confidential value. Keeping the rules in the published script would re-publish every literal one directory up from the file it cleans -- and it historically forced a scan exemption for that script, blinding every gate to the one file holding every identifier. The script now carries the mechanism; this manifest carries the strings."
+  },
+  "blocked_patterns": [
+    "/Users/YOUR_USERNAME",
+    "your-email@example.com",
+    "YourClientName",
+    "YourOrgName"
+  ],
+  "scrub_rules_note": "Applied IN LIST ORDER to every text file under harness/ after the copy. `path` (relative to harness/) scopes a rule to one file and MUST be listed before any tree-wide rule that would otherwise mangle its match. `regex` and `ignorecase` default to false; the replacement is always literal.",
+  "scrub_rules": [
+    {
+      "path": "scripts/example-script.sh",
+      "find": "readonly TARGET_HOST=\"admin@203.0.113.7\"",
+      "replace": "readonly TARGET_HOST=\"${TARGET_HOST:?set TARGET_HOST, e.g. admin@your-host}\""
+    },
+    {
+      "find": "/Users/YOUR_USERNAME",
+      "replace": "~"
+    },
+    {
+      "find": "\\bYourClientName\\b",
+      "replace": "example-project",
+      "regex": true,
+      "ignorecase": true
+    }
+  ],
+  "entries": [
+    { "path": "skills/example-skill/", "verdict": "publish", "transforms": [], "blockers": [] },
+    { "path": "scripts/example-script.sh", "verdict": "scrub-then-publish", "transforms": ["Replace the hardcoded host with an env-var placeholder"], "blockers": [] },
+    { "path": "skills/example-private-skill/", "verdict": "private-never", "transforms": [], "blockers": ["Contains client-specific content, never publishable"] }
+  ]
+}

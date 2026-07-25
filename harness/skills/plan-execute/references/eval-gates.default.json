@@ -1,0 +1,28 @@
+{
+  "eval-smoke-baseline": {
+    "kind": "skill",
+    "skill": "eval",
+    "args": "--smoke",
+    "probe_flags": ["--smoke"],
+    "timeout": 1200,
+    "success_criteria": "the /eval smoke run reports PASS (no metric drop >2% vs the saved baseline)",
+    "fixture_fake": { "returncode": 0, "stdout": "PASS (fixture)" }
+  },
+  "code-review-gate": {
+    "kind": "skill",
+    "skill": "code-review",
+    "args": "",
+    "timeout": 1200,
+    "success_criteria": "the review returns NO blocking/critical finding; the orchestrator reports the gate failed (rework) if any blocking finding exists, attaching the findings as the rework feedback",
+    "fixture_fake": { "returncode": 0, "stdout": "no blocking findings (fixture)" }
+  },
+  "test-orchestrate": {
+    "kind": "skill",
+    "skill": "test-orchestrate",
+    "args": "--run-first --no-chain",
+    "probe_flags": ["--run-first", "--no-chain"],
+    "timeout": 1800,
+    "success_criteria": "all tests pass (exit-zero outcome from test-orchestrate); any remaining failure is a gate failure that triggers rework",
+    "fixture_fake": { "returncode": 0, "stdout": "All tests passing (fixture)" }
+  }
+}

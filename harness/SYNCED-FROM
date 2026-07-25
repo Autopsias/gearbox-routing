@@ -1,0 +1,6 @@
+# SYNCED-FROM — provenance stamp, written by scripts/sync-from-claude.py
+# Do not hand-edit; regenerated on every sync run.
+private_commit: b1149c5
+synced_at: 2026-07-25T19:58:41Z
+source_note: private-repo (pushed) commit SHA, supplied via --private-commit
+private_worktree_dirty_at_sync_time: false

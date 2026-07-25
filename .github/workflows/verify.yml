@@ -1,0 +1,94 @@
+name: verify (structural only — NO identifier scan)
+
+# ===========================================================================
+# WHAT THIS WORKFLOW DOES NOT DO: it does NOT scan for confidential
+# identifiers, and it cannot. Do not read a green run as "no leak".
+#
+# WHY. The identifier/blocked-pattern sweep is driven by a private-tier export
+# manifest whose CONTENTS ARE THE DENYLIST — the client names, personal paths,
+# host identifiers and plan slugs that must never be published. Uploading that
+# manifest to GitHub Actions as a repository secret would put the entire list
+# on the same platform this repo is published to, in order to check that the
+# repo does not name them. That defeats the pipeline's whole purpose, so it is
+# not done. This is a deliberate, reviewed decision, not an unfinished setup.
+#
+# WHERE IDENTIFIER SCANNING ACTUALLY HAPPENS: locally, at pre-push, in
+# `.githooks/pre-push` — fail-closed, no manifest means no push, no skip path.
+# See GENERICIZATION.md §"Why CI cannot scan for identifiers".
+#
+# RESIDUAL RISK, stated plainly so nobody has to infer it:
+#   * A green run here means the routing policy is internally consistent, the
+#     installer works, no CREDENTIAL-shaped secret was committed, and the local
+#     gate files are byte-identical to what was reviewed. Nothing more.
+#   * The local pre-push hook is now the ONLY gate that can catch an identifier
+#     leak. A push from a clone that never ran
+#         git config core.hooksPath .githooks
+#     is completely unguarded. That one command is the whole defence. The
+#     "Local gate integrity" step below verifies the hook FILES are intact; no
+#     CI job can verify that your clone is wired to RUN them.
+# ===========================================================================
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  structural:
+    name: structural checks (identifier scanning happens at pre-push, not here)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0   # full history — gitleaks needs it
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Routing policy drift guard (verify-routing.sh --full --strict)
+        run: |
+          set -euo pipefail
+          bash claude/scripts/verify-routing.sh --full --strict
+
+      - name: Install throwaway target + run install.sh
+        run: |
+          set -euo pipefail
+          TMP_HOME="$RUNNER_TEMP/gearbox-ci-home"
+          ./install.sh --claude-home "$TMP_HOME" --accept-example-profile --provider anthropic
+
+      - name: Run gitleaks (CREDENTIALS ONLY — does not look for client names or personal paths)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Local gate integrity (the identifier scan lives in these hooks, NOT in CI)
+        run: |
+          set -euo pipefail
+          echo "NOTE: this job does NOT scan for confidential identifiers."
+          echo "      That scan is manifest-driven and runs locally at pre-push"
+          echo "      (.githooks/pre-push). See this workflow's header comment."
+          echo ""
+          echo "What IS checked here: the committed hook files are byte-identical"
+          echo "to their reviewed content and are executable in the git index."
+          echo ""
+          # A hook that is not executable in the index is silently not run by git
+          # on a fresh clone — a leak class of its own.
+          bad=0
+          for h in pre-commit commit-msg pre-push; do
+            mode=$(git ls-files -s ".githooks/$h" | cut -d' ' -f1)
+            if [ "$mode" != "100755" ]; then
+              echo "FAIL: .githooks/$h has index mode '$mode', expected 100755 (executable)." >&2
+              bad=1
+            fi
+          done
+          [ "$bad" -eq 0 ] || exit 1
+          # Tamper evidence. Weakening or deleting a hook now requires editing
+          # this checksum file in the same PR, where a reviewer sees it.
+          # Regenerate deliberately after a real hook change:
+          #   shasum -a 256 .githooks/pre-commit .githooks/commit-msg .githooks/pre-push \
+          #       > .githooks/CHECKSUMS.sha256
+          sha256sum -c .githooks/CHECKSUMS.sha256
+          echo "OK: local gate files intact."

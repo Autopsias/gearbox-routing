@@ -1,0 +1,367 @@
+# model-routing.yaml — SINGLE SOURCE OF TRUTH for how every coding task picks its
+# model tier, reasoning effort, agent, and when to pull in a second-model peer.
+#
+# AUTHORITY. This file is the authority for task-class defaults, the escalation
+# ladder, the peer-review lane, and per-agent tier/effort pins. If a consumer
+# disagrees with this file, fix the consumer.
+#
+# PROVIDER-ABSTRACT BY DESIGN. task_classes: below name an abstract capability
+# TIER (cheap_fast / workhorse / frontier_reasoner) and an abstract EFFORT
+# INTENT (light / standard / thorough) — never a concrete model id. See
+# ARCHITECTURE.md §1-2 for why: there is no cross-provider effort equivalence,
+# so the neutral layer stops at "how much depth does this task deserve" and each
+# entry under providers: below owns the translation to its own native dial.
+# Swapping active_provider: is the only edit a provider swap makes; task_classes
+# never changes.
+#
+# METHODOLOGY & VERSIONING. The prose rationale for why each task class maps to
+# the tier/effort it does — and the history of recalibrations — lives in
+# docs/METHODOLOGY.md (methodology + worked calibration examples) and is
+# governed by docs/VERSIONING.md (semver rules: vocabulary/schema change = MAJOR,
+# provider recalibration = MINOR, no-behavior-change = PATCH). This file no
+# longer inlines decision-history prose blocks — CHANGELOG.md + docs/METHODOLOGY.md
+# are the durable record; this header stays short by design.
+#
+# ============================================================================
+# GUARD PARSE CONTRACT (read this before editing keys or touching s05's guard)
+# ============================================================================
+# The ported drift guard (claude/scripts/verify-routing.sh, s05) parses this
+# file with the following EXACT anchors. Renaming any of these tokens without
+# updating the guard in the SAME commit silently zeroes out every row it reads
+# — the guard does not fail loudly on a renamed key, it just returns 0 matches.
+#
+#   1. Top-level block names are parsed literally: `task_classes:`, `providers:`,
+#      `agents:`, `consumers:`. Do not rename these blocks.
+#   2. Per-task-class rows are parsed as `{ tier: <tier>, effort: <intent> }`.
+#      NOTE the rename from the pre-Gearbox source SSOT: that file's rows used
+#      `model:` (a concrete model id). This file uses `tier:` instead — a BARE
+#      s/model:/tier:/ port with no other change is exactly the failure mode
+#      this contract exists to prevent: the OLD guard regex keyed on the literal
+#      token `model:` and a same-shape rename to `tier:` makes it match ZERO
+#      rows (FATAL, not a warning — the guard would report a clean "0 drift"
+#      result on a file it never actually parsed). The s05 guard MUST be written
+#      (or re-pointed) to key on `tier:` + `effort:`, not `model:`.
+#   3. Each task_class row carries EXACTLY ONE reasoning key: `effort:`. Do not
+#      add a second reasoning key (e.g. no parallel `intent:` field) — `effort:`
+#      IS the abstract intent value (light | standard | thorough) at this layer;
+#      provider profiles translate it to their native dial (see providers:
+#      below). A row with two reasoning keys breaks any guard regex that assumes
+#      one match per row.
+#   4. `providers.<name>.models.<tier>` gives the tier -> concrete model id for
+#      that provider; `providers.<name>.effort.map.<tier>.<intent>` gives the
+#      intent -> native effort level for that provider+tier. The guard's
+#      tier<->provider-map completeness check (s05 GUARD-01) walks
+#      `task_classes[*].tier` and confirms each value is a key under
+#      `providers[active_provider].models`.
+#   5. `active_provider:` is a single scalar naming a key under `providers:`.
+#      The guard validates it resolves.
+#   6. The version line is `version: <semver string>` (quoted, e.g. "2.0.0") on
+#      its own line, immediately followed by `last_reviewed: <ISO date>` on the
+#      next line — both top-level scalars, not nested under another block. The
+#      guard's version-present check does a line-anchored match on this exact
+#      `^version:` / `^last_reviewed:` pair.
+# ============================================================================
+
+version: "2.0.0"
+last_reviewed: 2026-07-05   # s02 port: task_classes -> {tier, effort}; providers: block added; scrubbed + versioned
+
+active_provider: anthropic   # the only line a provider swap edits — see ARCHITECTURE.md §3
+
+# Task classes — the stable, provider-neutral public vocabulary. Each row names
+# a capability TIER (cheap_fast | workhorse | frontier_reasoner) and an EFFORT
+# INTENT (light | standard | thorough — see providers.<name>.effort.map for the
+# per-provider translation to a native dial). Full rationale: docs/METHODOLOGY.md.
+task_classes:
+  mechanical:     { tier: cheap_fast,        effort: light    }   # rename sweep, formatting, codemod, doc edits
+  standard_build: { tier: workhorse,         effort: standard }   # CRUD, wiring, templated features, test scaffolds
+  agentic_build:  { tier: workhorse,         effort: thorough }   # integration / multi-file refactor / non-obvious debugging
+  deep_reasoning: { tier: frontier_reasoner, effort: standard }   # architecture, ambiguous tradeoffs, security-sensitive design, hard root-cause
+  linchpin:       { tier: frontier_reasoner, effort: thorough }   # one-shot irreversible adjudication; cross-cutting synthesis the rest of a plan rests on
+
+# Main-session advisory default. The interactive orchestrator cannot switch its
+# own session model/effort; this is the tier+intent to RECOMMEND (via /model,
+# /effort) on a task-class mismatch — never auto-applied. See ARCHITECTURE.md
+# §1 "MAIN-SESSION model choice" scoping note.
+main_session:
+  advisory_default_tier:   frontier_reasoner
+  advisory_default_effort: light   # standing default; escalate only on the two named triggers below
+
+# Escalation — what to try after repeated failure at the SAME root cause, before
+# involving a second model/peer. Effort first (cost-favourable), then tier.
+# Per-provider elasticity (which effort rungs are "dead", tier dominance, etc.)
+# is calibration data and lives under providers.<name>.escalation, NOT here —
+# this block is the neutral trigger + ladder ORDER only.
+escalation:
+  trigger: "2 failures at the same root cause"
+  ladder:
+    - raise_effort_one_rung        # walk the active provider's effort_ladder for the current tier
+    - raise_tier_one_rung           # then walk providers.<name>.escalation.model_ladder
+    - pull_second_model_peer        # see codex_peer below
+  invariants:
+    - "Never auto-drop judgement work below the provider's declared floor (see providers.<name>.degrade.floor)."
+    - "Escalate effort before tier — tier is the more expensive lever."
+
+# Degradation — REACTIVE fallback when a dispatched tier is refused for
+# access/entitlement reasons. Per-provider ladder + floor + compensation lives
+# under providers.<name>.degrade (see ARCHITECTURE.md §3 schema). This top-level
+# stanza only names the neutral trigger taxonomy the resolver reacts to.
+degradation:
+  signals: [entitlement, unavailable]   # `refusal` is NOT auto-rerouted by default — see ARCHITECTURE.md §3 `degrade.signals` note
+  floor: workhorse                 # never auto-degrade judgement work to cheap_fast
+
+# Second-model peer — when to pull in an external model as a second pair of eyes.
+# Generic placeholders: name your own peer tool(s) here (adversarial-review /
+# a rescue subagent / any external-model review path your setup has).
+codex_peer:
+  triggers:
+    architecture_decision:  peer_review     # dual-model design review
+    irreversible_change:    peer_review
+    security_sensitive:     peer_review
+    stuck_after_escalation: peer_review      # escalation ladder exhausted
+    stuck:                  peer_rescue      # background rescue subagent
+  lint_keywords:
+    architecture_decision: [architecture, schema design, system design, redesign, design decision]
+    irreversible_change:   [irreversible, one-shot, one shot, non-reversible, point of no return, cutover, migration]
+    security_sensitive:    [security, secrets, credential, credentials, auth, vulnerability, exploit, pii]
+  # Data-sensitivity guard — OVERRIDES every trigger above.
+  data_sensitivity_guard:
+    rule: "Restricted content NEVER leaves the model / approved tools without an explicit operator ask, even when a peer trigger matches."
+    restricted:
+      - "<your-confidential-corpus> (client/customer data, private graph or vault content)"
+      - "credentials / secrets / tokens"
+      - ".env* material"
+    on_match: "stop-and-ask the operator before any external-peer handoff; default is DO-NOT-SEND."
+
+# Fan-out dispatch COST guard — parallel / multi-agent / map-style dispatches.
+# Distinct from codex_peer's data-sensitivity guard: that one is about WHAT
+# leaves the model; this one is about HOW EXPENSIVE the dispatch surface is.
+# A frontier_reasoner tier is typically the highest per-token price tier and its
+# efficiency edge is per-single-hard-task; fanning it across N agents that each
+# re-read the same context multiplies the most-expensive unit and is pathological.
+fanout_policy:
+  rule: "Parallel / multi-agent / fan-out dispatches (workflows, batch subagents, map-style reviews) MUST pin an explicit tier and MUST NOT inherit the main-session advisory default."
+  default_tier: workhorse            # the fan-out worker default
+  mechanical_shard_tier: cheap_fast   # mechanical shards go cheaper still
+  never: frontier_reasoner            # never fan the frontier tier across N agents — its edge is per-single-task, not per-fan-out
+  enforcement: advisory                # no cheap runtime guard feasible; SSOT + digest advisory only
+
+# ============================================================================
+# Providers — all provider-specific facts. Exactly one is active (active_provider:
+# above). Adding a provider never touches task_classes:. Schema: ARCHITECTURE.md §3.
+# Model ids below are DATED, VERIFY-BEFORE-USE EXAMPLES, not vocabulary — the
+# real ids get researched and filled in by a later calibration session (see
+# claude/skills/routing-update/). Do not dispatch against an `unresearched`
+# provider profile; that status is a hard validation error if it is also
+# active_provider (see ARCHITECTURE.md §3 calibration.status).
+# ============================================================================
+# ----------------------------------------------------------------------------
+# EXAMPLE — verify current model lineup, effort semantics, and pricing before
+# relying on this. Every model id / effort map / price below was checked
+# against first-party provider docs on the date stamped `as_of`, but provider
+# catalogs and pricing move fast — re-verify before any real dispatch, and DO
+# NOT flip a profile's calibration.status to `researched` without re-running
+# this check yourself. These are worked EXAMPLES, not a validated production
+# profile — see PROV-01/02/03 sources list at the bottom of this file for what
+# was checked and when.
+#
+# as_of GRANULARITY NOTE: `prices.<provider>.<tier>` carries a per-cell
+# `as_of` (that block has no normative shape, so a structured field is safe
+# there). `providers.<name>.models.<tier>` and `.effort.map` do NOT get a
+# per-cell as_of field — the GUARD PARSE CONTRACT above requires `models.<tier>`
+# to stay a bare model-id scalar (s05's guard keys on that literal shape) and
+# ARCHITECTURE.md §3 contracts `effort.map` as `{lvl}` per tier, not per-cell.
+# Their as_of lives at PROVIDER-BLOCK granularity instead: `calibration.date`
+# is the as_of for that whole provider's models + effort map (both were
+# verified together, in the same research pass, on that date) — repeated in
+# the `models:` comment for visibility without touching the guarded shape.
+#
+# EFFORT IS NOT PORTABLE ACROSS PROVIDERS. Anthropic `effort`, OpenAI
+# `reasoning_effort`, and Gemini `thinking_level` are three DIFFERENT native
+# controls with different semantics — not the same dial under different
+# names:
+#   - Anthropic `effort` governs ALL token spend: text, tool calls, AND
+#     thinking. It also visibly changes agentic behavior (how many tool calls,
+#     how much preamble, how literally the model scopes to what was asked) —
+#     i.e. it is partly an instruction-adherence/agentic-laziness dial, not
+#     purely a reasoning-depth dial.
+#   - OpenAI `reasoning_effort` (Responses API: `reasoning.effort`; Chat
+#     Completions: `reasoning_effort`) bounds internal reasoning-token depth
+#     before the visible response; it does not carry Anthropic's documented
+#     agentic-behavior-shaping property.
+#   - Gemini `thinking_level` bounds the MAXIMUM depth of internal reasoning
+#     before producing a response — a ceiling, not a spend-shaping dial either.
+# Each provider block below is therefore a PER-PROVIDER POLICY (this
+# provider's own intent -> native-level mapping), never a claim that
+# Gearbox's light/standard/thorough means the same thing, or costs the same
+# thing, on every provider. Do not build a cross-provider equivalence table —
+# ARCHITECTURE.md §5 says this deliberately does not exist.
+# ----------------------------------------------------------------------------
+providers:
+  anthropic:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "S03 (this session) — verified against platform.claude.com/docs live pages"
+    models:                  # EXAMPLE — verify current model lineup before relying on this. as_of: 2026-07-05 (see calibration.date above)
+      cheap_fast:        claude-haiku-4-5   # $1 / $5 per MTok in/out; no effort/thinking support
+      workhorse:         claude-sonnet-5    # $3 / $15 std (intro $2/$10 thru 2026-08-31); adaptive thinking on by default
+      frontier_reasoner: claude-opus-4-8    # $5 / $25 per MTok in/out; adaptive thinking, effort default `high`
+    effort:
+      control: effort         # Anthropic's native dial name; values: low | medium | high (default) | xhigh | max
+      # POLICY (intent -> native level), per tier. Anthropic's effort spans ALL
+      # token spend (text + tool calls + thinking) and measurably changes
+      # agentic behavior at lower rungs (fewer tool calls, terser output,
+      # tighter scoping) — this is Anthropic-specific, not a universal effect.
+      map:
+        cheap_fast:        { light: null,     standard: null,   thorough: null   }  # claude-haiku-4-5 does not support the effort param — omit the dial
+        workhorse:         { light: low,      standard: medium, thorough: high   }  # claude-sonnet-5: high is the API default; xhigh reserved for escalation
+        frontier_reasoner: { light: low,      standard: low,    thorough: medium }  # claude-opus-4-8: low/medium already strong; reserve high/xhigh/max for escalation-only, not a standing default
+      source: "https://platform.claude.com/docs/en/build-with-claude/effort (fetched 2026-07-05)"
+    escalation:
+      trigger: "2 failures at the same root cause"
+      effort_ladder:
+        workhorse:         [medium, high, xhigh]     # claude-sonnet-5: xhigh is the documented ceiling below max; max reserved for genuinely frontier cases
+        frontier_reasoner: [low, medium, high, xhigh, max]
+      model_ladder: [cheap_fast, workhorse, frontier_reasoner]
+      invariants:
+        - "never auto-drop judgement work below workhorse"
+    degrade:
+      signals: [entitlement, unavailable]
+      ladder: { frontier_reasoner: workhorse }
+      floor: workhorse
+      effort_on_degrade: { workhorse: high }   # compensate for the lost tier by maxing workhorse's non-escalation effort rung
+
+  openai:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "S03 (this session) — verified against developers.openai.com/api/docs live pages"
+    models:                  # EXAMPLE — verify current model lineup before relying on this. as_of: 2026-07-05 (see calibration.date above)
+      cheap_fast:        gpt-5.4-mini   # $0.75 / $4.50 per MTok in/out
+      workhorse:         gpt-5.4        # $2.50 / $15 per MTok in/out
+      frontier_reasoner: gpt-5.5        # $5 / $30 per MTok in/out; reasoning.effort defaults `medium`
+    effort:
+      control: reasoning_effort   # OpenAI's native dial name (Responses API: `reasoning.effort`; Chat Completions: `reasoning_effort`)
+      # POLICY (intent -> native level), per tier. OpenAI's reasoning_effort
+      # bounds internal reasoning-token depth before the visible response — it
+      # does NOT carry Anthropic's documented agentic-behavior-shaping
+      # property (fewer tool calls, terser output at low effort is not
+      # documented for OpenAI the way it is for Anthropic). Supported value
+      # sets are MODEL-DEPENDENT (check each model's own page) — this map
+      # assumes the common none/low/medium/high/xhigh set exposed on the
+      # models named above; verify per model before relying on it.
+      map:
+        cheap_fast:        { light: minimal, standard: low,    thorough: medium }  # gpt-5.4-mini
+        workhorse:         { light: low,     standard: medium, thorough: high   }  # gpt-5.4: medium is a documented balanced default
+        frontier_reasoner: { light: low,     standard: medium, thorough: high   }  # gpt-5.5: medium is the API default; do not assume this mirrors Anthropic's "low already dominates" shape — unverified whether low underperforms medium on this model generation
+      source: "https://developers.openai.com/api/docs/guides/reasoning (fetched 2026-07-05)"
+    escalation:
+      trigger: "2 failures at the same root cause"
+      effort_ladder:
+        workhorse:         [medium, high, xhigh]
+        frontier_reasoner: [medium, high, xhigh]
+      model_ladder: [cheap_fast, workhorse, frontier_reasoner]
+      invariants:
+        - "never auto-drop judgement work below workhorse"
+    degrade:
+      signals: [entitlement, unavailable]
+      ladder: { frontier_reasoner: workhorse }
+      floor: workhorse
+      effort_on_degrade: { workhorse: high }
+
+  gemini:
+    calibration:
+      status: researched
+      date: 2026-07-05
+      provider_version: null
+      research_ref: "S03 (this session) — verified against ai.google.dev/gemini-api/docs live pages"
+    models:                  # EXAMPLE — verify current model lineup before relying on this. as_of: 2026-07-05 (see calibration.date above)
+      cheap_fast:        gemini-3.1-flash-lite   # $0.25 / $1.50 per MTok in/out (text); thinking_level default `minimal`
+      workhorse:         gemini-3.5-flash        # $1.50 / $9.00 per MTok in/out
+      frontier_reasoner: gemini-3.1-pro-preview  # $2.00 / $12.00 per MTok in/out (<=200k ctx; higher above); thinking_level default `high`
+    effort:
+      control: thinking_level   # Gemini's native dial name; values: minimal | low | medium | high. Mutually exclusive with legacy `thinking_budget` (400 error if both set)
+      # POLICY (intent -> native level), per tier. Gemini's thinking_level is
+      # documented as a MAXIMUM-DEPTH ceiling on internal reasoning before
+      # producing a response — a bound, not a spend-shaping dial the way
+      # Anthropic's `effort` is, and not documented to change tool-call
+      # cadence or output terseness the way Anthropic's does. Do not assume
+      # this map's shape carries over from Anthropic or OpenAI.
+      map:
+        cheap_fast:        { light: minimal, standard: low,    thorough: medium }  # gemini-3.1-flash-lite defaults to minimal
+        workhorse:         { light: low,     standard: medium, thorough: high   }  # gemini-3.5-flash
+        frontier_reasoner: { light: low,     standard: medium, thorough: high   }  # gemini-3.1-pro-preview defaults to high; low/medium unverified for dominance vs Anthropic-style "low already strong" shape
+      source: "https://ai.google.dev/gemini-api/docs/gemini-3 (fetched 2026-07-05)"
+    escalation:
+      trigger: "2 failures at the same root cause"
+      effort_ladder:
+        workhorse:         [medium, high]
+        frontier_reasoner: [medium, high]
+      model_ladder: [cheap_fast, workhorse, frontier_reasoner]
+      invariants:
+        - "never auto-drop judgement work below workhorse"
+    degrade:
+      signals: [entitlement, unavailable]
+      ladder: { frontier_reasoner: workhorse }
+      floor: workhorse
+      effort_on_degrade: { workhorse: high }
+
+# Prices — per-provider concern, kept alongside the provider that priced them.
+# EXAMPLE — verify pricing. $/MTok (input/output), each entry stamped with the
+# date it was checked against first-party provider pricing pages. Re-verify
+# before trusting these for cost math — provider pricing changes without
+# notice (see Claude Sonnet 5's own introductory-vs-standard split below, a
+# live example of a same-model price change already scheduled).
+prices:
+  anthropic:
+    frontier_reasoner: { in: 5.00, out: 25.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. claude-opus-4-8" }
+    workhorse:         { in: 3.00, out: 15.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. claude-sonnet-5 standard rate (intro $2/$10 thru 2026-08-31)" }
+    cheap_fast:        { in: 1.00, out:  5.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. claude-haiku-4-5" }
+    source: "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-07-05)"
+  openai:
+    frontier_reasoner: { in: 5.00, out: 30.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gpt-5.5" }
+    workhorse:         { in: 2.50, out: 15.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gpt-5.4" }
+    cheap_fast:        { in: 0.75, out:  4.50, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gpt-5.4-mini" }
+    source: "https://developers.openai.com/api/docs/pricing (fetched 2026-07-05)"
+  gemini:
+    frontier_reasoner: { in: 2.00, out: 12.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gemini-3.1-pro-preview, <=200k context tier; higher above 200k" }
+    workhorse:         { in: 1.50, out:  9.00, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gemini-3.5-flash" }
+    cheap_fast:        { in: 0.25, out:  1.50, as_of: 2026-07-05, note: "EXAMPLE — verify pricing. gemini-3.1-flash-lite, text/image/video input rate" }
+    source: "https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-07-05)"
+
+# Agents — an ILLUSTRATIVE SNAPSHOT of the kind of per-agent tier/effort pins a
+# routing SSOT tracks, taken from one deployment's non-BMAD agent set at port
+# time. This is an EXAMPLE shape to regenerate from YOUR OWN agents — dump your
+# own agents' frontmatter into this shape rather than trusting these rows as
+# live data. (All BMAD/epic-* rows from the source deployment are dropped: the
+# epic-dev suite is not part of Gearbox — see GENERICIZATION.md "Drops".)
+agents:
+  # EXAMPLE SNAPSHOT — regenerate this block from your own ~/.claude/agents/
+  # (or equivalent) frontmatter; do not treat these rows as prescriptive.
+  api-test-fixer:            { tier: workhorse,         effort: standard }   # standard_build — bounded API-test repair; tool-driven, single-domain
+  aws-cost-calculator:       { tier: workhorse,         effort: standard }   # standard_build — bounded cost calc from fetched prices; structured output
+  aws-service-researcher:    { tier: workhorse,         effort: thorough }   # agentic_build — multi-source synthesis + heavy tool-calling
+  ci-infrastructure-builder: { tier: workhorse,         effort: standard }   # standard_build — templated CI config authoring with clear spec
+  ci-strategy-analyst:       { tier: frontier_reasoner, effort: light    }   # deep_reasoning — root-cause on recurring CI failure; nuanced judgment. SINGLE-DISPATCH ONLY — fanout_policy's "never frontier_reasoner" still governs any parallel dispatch
+  code-quality-analyzer:     { tier: workhorse,         effort: thorough }   # agentic_build — multi-file split/extract + complexity reduction under test-safety
+  database-test-fixer:       { tier: workhorse,         effort: standard }   # standard_build — bounded DB mock/fixture repair; pattern-based
+  digdeep:                   { tier: frontier_reasoner, effort: light    }   # deep_reasoning — the deep-reasoner: hard root-cause, analysis-only. SINGLE-DISPATCH ONLY
+  e2e-test-fixer:            { tier: workhorse,         effort: thorough }   # agentic_build — non-obvious flaky/race/selector debug from artifacts
+  import-error-fixer:        { tier: cheap_fast,        effort: unset    }   # mechanical — import/module resolution; cheap_fast tier rejects the effort dial (NO effort key)
+  linting-fixer:             { tier: cheap_fast,        effort: unset    }   # mechanical — lint/format sweep; cheap_fast tier rejects the effort dial (NO effort key)
+  pr-workflow-manager:       { tier: workhorse,         effort: standard }   # standard_build — git/PR workflow orchestration; tool-driven, bounded steps
+  safe-refactor:             { tier: workhorse,         effort: thorough }   # agentic_build — multi-file facade-pattern refactor with incremental test gates
+  security-scanner:          { tier: workhorse,         effort: standard }   # standard_build — scanner-driven + known-fix apply; not novel security design
+  type-error-fixer:          { tier: workhorse,         effort: standard }   # standard_build — bounded type-annotation fixes; structured
+  unit-test-fixer:           { tier: workhorse,         effort: standard }   # standard_build — bounded assertion/mock repair; pattern-based
+
+# Consumers — files that bind to this SSOT; the drift guard checks each.
+# `stamp` = HOW that consumer binds (what the guard verifies for it).
+consumers:
+  ~/CLAUDE.md:                                       { stamp: rendered-block }    # BEGIN/END ROUTING digest rendered from this SSOT
+  ~/.claude/commands/plan-harden.md:                 { stamp: lint-reads }       # model-selection lint applies these defaults/ladder
+  claude/skills/routing-update/:                     { stamp: prose-rationale }  # research/calibration workflow that fills provider maps
+  claude/skills/routing-retro/:                      { stamp: prose-rationale }  # read-only retrospective over routing performance
+  claude/scripts/resolve_route.py:                   { stamp: code-authoritative }  # the vendored stateless resolver — reads this file directly

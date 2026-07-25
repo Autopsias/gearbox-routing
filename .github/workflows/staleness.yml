@@ -1,0 +1,70 @@
+name: staleness (scheduled)
+
+# The PR-triggered `verify` workflow only runs when someone opens a PR — a
+# quiet repo with no incoming PRs would never notice the shipped example
+# provider profiles drifting past their staleness horizon. This job runs on
+# its own schedule so as_of/calibration.date drift surfaces even with zero
+# PR activity (docs/PROVIDERS.md "Staleness cadence for the shipped example
+# profiles").
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # every Monday 09:00 UTC
+  workflow_dispatch: {}    # allow manual trigger for testing
+
+jobs:
+  staleness-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Run verify-routing.sh --full and check for staleness WARNs
+        id: guard
+        run: |
+          set +e
+          # verify-routing.sh's calibration-staleness check is WARN-only by
+          # design (never fails the build — see the script's own "WARN-only;
+          # never fails the build" banner) so a PR-triggered guard doesn't
+          # block on a slow-moving provider re-verify. This SCHEDULED job's
+          # whole point is to surface that staleness even without a PR, so it
+          # greps the guard's own WARN lines for staleness specifically
+          # rather than relying on the guard's exit code (which stays 0 on a
+          # stale-only run).
+          OUTPUT="$(bash claude/scripts/verify-routing.sh --full --strict 2>&1)"
+          echo "$OUTPUT"
+          GUARD_RC=$?
+          if echo "$OUTPUT" | grep -qE '^\s*WARN: provider .* calibration\.date=.* threshold\)'; then
+            echo "rc=1" >> "$GITHUB_OUTPUT"
+          elif [[ $GUARD_RC -ne 0 ]]; then
+            echo "rc=$GUARD_RC" >> "$GITHUB_OUTPUT"
+          else
+            echo "rc=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open an issue on stale as_of / calibration.date
+        if: steps.guard.outputs.rc != '0'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            // Fixed, hardcoded body/title only — no interpolation of any
+            // untrusted event payload (issue/PR title, body, commit message,
+            // etc.), so there is no script-injection surface here.
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "Scheduled staleness check failed — example provider profile(s) need /routing-update",
+              body: "The weekly scheduled staleness job found a stale `calibration.date`/`as_of` " +
+                    "on a shipped example provider profile (see the failed workflow run for which " +
+                    "provider). Run `/routing-update` to re-verify against current docs — see " +
+                    "docs/PROVIDERS.md \"Staleness cadence\" and docs/METHODOLOGY.md §4.",
+              labels: ["staleness", "routing"]
+            });
+
+      - name: Fail the job so the red X is visible even without an issue-open permission
+        if: steps.guard.outputs.rc != '0'
+        run: exit 1
