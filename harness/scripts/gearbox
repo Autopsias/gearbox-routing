@@ -148,7 +148,31 @@ do_harvest() {
 
   say ""
   say "harvest: staging classified paths ($classes)"
-  xargs -0 git -C "$CD" add -- < "$SNAP.add"
+  # Runtime state gets DELETED routinely (a superseded backup, a stale evidence file),
+  # and staging a deleted path needs care in two distinct ways:
+  #
+  #   1. `git add <path>` on a tracked-but-deleted file stages the deletion fine, but a
+  #      bare `git add` would not pick up deletions if the pathspec were a directory —
+  #      `--all` makes the pathspec mean "reconcile index with worktree for these paths".
+  #      Still scoped to the classified list; never a bare `git add -A`.
+  #   2. A path that is absent from BOTH disk and the index (e.g. the deletion was already
+  #      staged by hand) matches nothing, and `git add` hard-fails the whole invocation
+  #      with "pathspec did not match any files" — aborting the entire harvest over a path
+  #      that needs no work. `--all` does NOT rescue this; measured, not assumed.
+  #
+  # So drop already-resolved paths before staging. A path survives the filter if it exists
+  # on disk or is still known to the index.
+  : > "$SNAP.addable"
+  while IFS= read -r -d '' p; do
+    if [ -e "$CD/$p" ] || git -C "$CD" ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+      printf '%s\0' "$p" >> "$SNAP.addable"
+    fi
+  done < "$SNAP.add"
+  if [ -s "$SNAP.addable" ]; then
+    xargs -0 git -C "$CD" add --all -- < "$SNAP.addable"
+  else
+    say "harvest: every classified path is already resolved in the index — nothing to stage"
+  fi
 
   if git -C "$CD" diff --cached --quiet; then
     say "harvest: staged set is identical to HEAD — nothing to commit"
