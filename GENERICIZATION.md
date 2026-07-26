@@ -75,6 +75,10 @@ strings live in the manifest rather than in the published script.
 - `evals/routing/{results,harness,probe,graders,tasks}` — operator eval data,
   sweep outputs, and graders. Only the `evals/routing` README/runbook shape and
   `MISROUTES.md` template ship.
+- `evals/dyno/**` — dyno eval data, in full: distilled `results/**` reports,
+  harness/probe/grader code, and any transcript-derived content. None of it is
+  a generic category the way `[live-state]` globs are; all of it is
+  operator/session-specific. Nothing under `evals/dyno/` ships, at any tier.
 - `.routing-guard.log` and any other runtime logs.
 - Anything matched by the leak-defence scanner (below).
 
