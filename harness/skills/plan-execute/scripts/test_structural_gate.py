@@ -130,14 +130,27 @@ def test_check_landed_flags_mismatch(tmp_path):
     assert "DOING" in mismatches[0]
 
 
-def test_check_js_parses_the_real_dashboard_script(tmp_path):
+def test_check_js_parses_the_real_dashboard_script(tmp_path, monkeypatch):
+    # THE ONE TEST THAT MUST NOT TAKE THE SPEED-UP. conftest's autouse
+    # `_skip_browser_checks` sets PLAN_EXECUTE_SKIP_BROWSER_CHECKS=1 so the ~5 s of
+    # `npx eslint` does not run once per test — correct everywhere except HERE,
+    # where parsing the real dashboard script IS the assertion. Left on, this test
+    # asserts only that a skip reports itself as a skip, and a broken repaint
+    # script ships green. Unsetting it for this test keeps the suite fast and the
+    # gate real; do not delete either half.
+    monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
     plan_dir = make_plan(tmp_path, [SESS])
     result = sg.check_js_parses(plan_dir)
     # Never "unavailable-as-a-silent-pass": either it actually ran (passed/failed)
     # or it explicitly skipped with a reason (no node/eslint on this host).
     assert result["status"] in ("passed", "skipped")
     if result["status"] == "skipped":
+        # ...and the ONE reason that is no longer acceptable here is the opt-out.
         assert result.get("reason")
+        assert "PLAN_EXECUTE_SKIP_BROWSER_CHECKS" not in result["reason"], (
+            "the real dashboard-JS parse was skipped by the speed-up flag — this "
+            "test exists to run it for real"
+        )
 
 
 def test_run_gate_combines_both_checks(tmp_path):

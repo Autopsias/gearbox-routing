@@ -95,6 +95,8 @@ def scan_session(path, prices):
         "models": {},          # family -> {messages, in, out, cache_w, cache_r, cost_usd}
         "unknown_models": {},  # raw id -> message count (no prices: row)
         "cost_usd": 0.0,
+        "context_peak_tokens": 0,   # largest single-message context (fresh + cache read + cache write)
+        "reread_cost_usd": 0.0,     # spend on cache READS only — the price of carrying context forward
         "tool_errors": 0,
         "api_errors": 0,
         "max_tokens_truncations": 0,
@@ -142,6 +144,13 @@ def scan_session(path, prices):
                 s["assistant_messages"] += 1
                 fam = model_family(msg.get("model"))
                 usage = msg.get("usage") or {}
+                # Context size is priceless-agnostic — measure it even for unpriced models.
+                ctx = (
+                    (usage.get("input_tokens") or 0)
+                    + (usage.get("cache_read_input_tokens") or 0)
+                    + (usage.get("cache_creation_input_tokens") or 0)
+                )
+                s["context_peak_tokens"] = max(s["context_peak_tokens"], ctx)
                 if fam is None or fam not in prices:
                     key = msg.get("model") or "?"
                     s["unknown_models"][key] = s["unknown_models"].get(key, 0) + 1
@@ -171,6 +180,7 @@ def scan_session(path, prices):
                     row["cache_r"] += cr
                     row["cost_usd"] += cost
                     s["cost_usd"] += cost
+                    s["reread_cost_usd"] += cr * in_rate * CACHE_READ_X / 1_000_000
                 if (msg.get("stop_reason") == "max_tokens") or (
                     isinstance(msg.get("stop_details"), dict) and msg["stop_details"].get("reason") == "max_tokens"
                 ):
@@ -191,6 +201,14 @@ def scan_session(path, prices):
     for r in s["models"].values():
         r["mix_pct"] = round(100.0 * r["messages"] / total_msgs, 1) if total_msgs else 0.0
         r["cost_usd"] = round(r["cost_usd"], 4)
+    # Share of session spend that went on re-reading carried context rather than on
+    # fresh input + output. HIGH IS NOT AUTOMATICALLY BAD — see the rubric's
+    # context-bloat flag: cache reads are the cheap outcome, the question the judgment
+    # layer answers is whether the carried context was still RELEVANT.
+    s["reread_cost_pct"] = (
+        round(100.0 * s["reread_cost_usd"] / s["cost_usd"], 1) if s["cost_usd"] else 0.0
+    )
+    s["reread_cost_usd"] = round(s["reread_cost_usd"], 4)
     s["cost_usd"] = round(s["cost_usd"], 4)
     s["routing_receipts"] = s["routing_receipts"][:20]
     s["model_effort_switches"] = s["model_effort_switches"][:20]
@@ -253,6 +271,7 @@ def main():
         "totals": {
             "sessions": len(sessions),
             "cost_usd": round(sum(s["cost_usd"] for s in sessions), 2),
+            "reread_cost_usd": round(sum(s["reread_cost_usd"] for s in sessions), 2),
             "tool_errors": sum(s["tool_errors"] for s in sessions),
             "api_errors": sum(s["api_errors"] for s in sessions),
             "max_tokens_truncations": sum(s["max_tokens_truncations"] for s in sessions),

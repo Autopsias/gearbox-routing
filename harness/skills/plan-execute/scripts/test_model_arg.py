@@ -131,6 +131,28 @@ def test_begin_bakes_reasoning_directive_and_emits_tier(tmp_path, capsys):
     run.cmd_release(plan_dir)
 
 
+def test_shadow_marker_is_emitted_only_as_task_description(tmp_path, capsys, monkeypatch):
+    """Telemetry must never alter the primary work instructions.
+
+    The hook marker is intentionally metadata for the outer Agent call.  This
+    regression checks both the optional payload shape and the stronger invariant
+    that the byte string sent as ``prompt_text`` is unchanged.
+    """
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "Sonnet"}]
+    plan_dir = make_plan(tmp_path, sessions)
+    original_prompt = (plan_dir / "sessions" / "s01.prompt.md").read_text()
+    marker = "plan-execute:s01 dyno-shadow-v1:abcdefghijklmnopqrstuvwxyz012345"
+    monkeypatch.setattr(run, "_shadow_dispatch_description", lambda *_: marker)
+
+    run.cmd_begin(plan_dir, ["s01"])
+    member = json.loads(capsys.readouterr().out)["batch"][0]
+
+    assert member["dispatch_description"] == marker
+    assert member["prompt_text"] == original_prompt
+    assert marker not in member["prompt_text"]
+    run.cmd_release(plan_dir)
+
+
 # --------------------------------------------------------------------------
 # Reactive degradation (added 2026-07): xhigh tier + fallback ladder + audit record
 # --------------------------------------------------------------------------
@@ -147,7 +169,9 @@ def test_reasoning_xhigh_directive_and_extra_synonym():
 @pytest.mark.parametrize(
     "token,expected",
     [
-        ("fable", ("opus", "xhigh")),
+        # PER-TARGET effort: fable→opus lands at HIGH too (opus high→xhigh is a
+        # dead rung on our own calibration run) — stale at xhigh until 2026-07-26.
+        ("fable", ("opus", "high")),
         # PER-TARGET effort: opus→sonnet lands at HIGH (sonnet high→xhigh is
         # a dead rung) — this expectation was stale at xhigh until s04.
         ("opus", ("sonnet", "high")),
@@ -164,9 +188,14 @@ def test_fallback_for(token, expected):
 @pytest.mark.parametrize(
     "token,expected",
     [
+        # v1.15 5.6-ONLY lane: gpt-5.5 and the whole `workhorse` tier are retired.
         ("gpt-5.6-sol", ("gpt-5.6-terra", "max")),
-        ("gpt-5.6-terra", ("gpt-5.5", "xhigh")),
-        ("gpt-5.5", None),  # workhorse floor — exhaustion = NO-CODEX
+        # terra is the SINK: nothing degrades onto the mechanical-only luna (v1.15
+        # judgement floor), and that is also what keeps the rescue below from closing
+        # a terra->luna->terra cycle. A refused terra means NO-CODEX.
+        ("gpt-5.6-terra", None),
+        ("gpt-5.6-luna", ("gpt-5.6-terra", "max")),   # bottom tier — an UPWARD rescue, not a drop (CL-03, re-pointed v1.15)
+        ("gpt-5.5", None),  # RETIRED — no longer in the ladder at all
         ("fable", None),    # not in the openai ladder
     ],
 )
@@ -186,10 +215,10 @@ def test_begin_emits_fallback_model(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     by_id = {m["id"]: m for m in out["batch"]}
 
-    # Fable → Opus @ xhigh; Opus → Sonnet @ HIGH (per-target — sonnet's
+    # Fable → Opus @ HIGH; Opus → Sonnet @ HIGH (per-target — sonnet's
     # xhigh is a dead rung); Sonnet is the floor (no fallback).
     assert by_id["s01"]["fallback_model"] == "opus"
-    assert by_id["s01"]["fallback_reasoning"] == "xhigh"
+    assert by_id["s01"]["fallback_reasoning"] == "high"
     assert by_id["s02"]["fallback_model"] == "sonnet"
     assert by_id["s02"]["fallback_reasoning"] == "high"
     assert by_id["s03"]["fallback_model"] is None

@@ -347,7 +347,22 @@ def _scrub_prod_status_pinned_sh(text: str) -> str:
 # live in the manifest at all. Whole-section replacement needs no match string.
 # ---------------------------------------------------------------------------
 
-_DEPLOY_PATHSPEC_SECTIONS = ("live-state", "settings-churn-keys", "mode-0600")
+# Order matters: this tuple is compared to the section order as parsed, so it
+# must track deploy.pathspec's own layout. `codex-target`/`codex-render` were
+# added upstream when the Codex skill port became a second deploy target, and
+# this transform had never classified them — the sync refused every run until
+# each was decided (2026-08-15).
+#
+# Both ship REAL, for the same reason [live-state] does. `skills/*/codex` is a
+# repo-relative glob and says nothing about any machine. `~/.codex/skills` is
+# the standard Codex install path — identical for every user, so it reveals no
+# deployment detail; it is not the [mode-0600] case, where the list IS a map of
+# which files on one operator's box hold credentials. Templating it would ship
+# a deploy.pathspec that cannot classify a real Codex target out of the box,
+# which is the exact failure the [live-state] note below warns against.
+_DEPLOY_PATHSPEC_SECTIONS = (
+    "live-state", "settings-churn-keys", "codex-target", "codex-render", "mode-0600",
+)
 
 _DEPLOY_PATHSPEC_TEMPLATE = """\
 # deploy.pathspec — the ONE tracked definition of how `scripts/gearbox` classifies
@@ -375,10 +390,11 @@ _DEPLOY_PATHSPEC_TEMPLATE = """\
 # Globs: `*` matches within one path segment, `**` matches across segments.
 #
 # WHAT THIS EXPORTED COPY CARRIES, AND WHAT IT DOES NOT:
-# [live-state] and [settings-churn-keys] are generic categories — glob classes
-# over this harness's own documented runtime surfaces, and the Claude Code
-# binary's own settings keys. They ship real, so this file classifies a live
-# deploy target out of the box.
+# [live-state], [settings-churn-keys], [codex-target] and [codex-render] are
+# generic categories — glob classes over this harness's own documented runtime
+# surfaces, the Claude Code binary's own settings keys, and the standard Codex
+# skills location, which is the same path for everyone. They ship real, so this
+# file classifies a live deploy target out of the box.
 # [mode-0600] does not ship real. That list is a map of which files on a deploy
 # target hold credentials; it is per-deployment and it is nobody else's
 # business, so the names below are FICTIONAL PLACEHOLDERS. `gearbox deploy`
@@ -402,6 +418,22 @@ _DEPLOY_PATHSPEC_TEMPLATE = """\
 # is the failure this split exists to prevent.
 [settings-churn-keys]
 {churn_keys}
+
+# --- SECOND DEPLOY TARGET: the rendered Codex skill ports ---------------------
+# `gearbox deploy` renders skills/<name>/codex/ into the Codex skills directory
+# as a path-scoped copy that never deletes anything it did not write. A hand
+# edit to a rendered skill there is a hotfix exactly like one in the primary
+# deploy target: `gearbox drift` names it and `gearbox deploy` refuses until
+# `gearbox harvest` carries it back. Nothing else under the Codex directory is
+# touched, or even read.
+#
+# Both ship real: the target is the standard Codex location, identical for
+# every user, and the render pattern is repo-relative.
+[codex-target]
+{codex_target}
+
+[codex-render]
+{codex_render}
 
 # --- mode-sensitive files: git does not preserve 0600, so deploy re-applies it --
 # FICTIONAL PLACEHOLDERS — replace all of them before you deploy. The categories
@@ -446,6 +478,8 @@ def _scrub_deploy_pathspec(text: str) -> str:
     return _DEPLOY_PATHSPEC_TEMPLATE.format(
         live_state="\n".join(sections["live-state"]),
         churn_keys="\n".join(sections["settings-churn-keys"]),
+        codex_target="\n".join(sections["codex-target"]),
+        codex_render="\n".join(sections["codex-render"]),
     )
 
 
@@ -582,7 +616,17 @@ def copy_entries(manifest: dict, source_dir: Path, harness_dir: Path, scrub_rule
         if src.is_dir():
             if dest.exists():
                 shutil.rmtree(dest)
-            shutil.copytree(src, dest, symlinks=False, dirs_exist_ok=True)
+            # Never ship compiled bytecode (2026-08-15). A plain copytree
+            # carried `__pycache__/*.pyc` into harness/, and those are not
+            # source: they are machine-generated, they go stale against the
+            # .py beside them, and their high-entropy bytes tripped two
+            # `aws-access-token` findings in the secret scan — false
+            # positives that would have failed the export, and whose
+            # non-UTF-8 content also crashed the scanner's own log decode.
+            shutil.copytree(
+                src, dest, symlinks=False, dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+            )
             for p in dest.rglob("*"):
                 if p.is_file():
                     p.chmod(p.stat().st_mode | 0o200)  # ensure owner-writable regardless of source perms
@@ -844,7 +888,13 @@ def run_secret_scan(repo_dir: Path, allow_missing: bool) -> tuple[bool, str, str
             "--redact",
             "-v",
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(repo_dir))
+        # errors="replace", not the default strict decode (2026-08-15): gitleaks
+        # echoes a snippet of every match, so one non-UTF-8 byte anywhere in the
+        # scanned tree raised UnicodeDecodeError HERE and took the whole run
+        # down mid-scan — the loudest possible way to learn nothing. A scanner
+        # that cannot report is worse than a scanner that reports mojibake.
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              errors="replace", cwd=str(repo_dir))
         output = proc.stdout + proc.stderr
         # gitleaks --no-git scans the filesystem tree directly, which WOULD include
         # dotfiles/hidden files (no shell-glob dotfile exclusion applied) — this is the

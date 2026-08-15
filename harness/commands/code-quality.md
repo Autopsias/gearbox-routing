@@ -1,6 +1,6 @@
 ---
-description: "Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12) and dispatches safe-refactor agents to fix them. Use when you say 'check code/file size and complexity', 'files too large', 'reduce complexity', 'split large files'."
-argument-hint: "[--check] [--fix] [--dry-run] [--refresh-exceptions] [--focus=file-size|function-length|complexity] [--path=...] [--max-parallel=N] [--no-chain] [--continue] [--loop N] [--loop-delay S] [--fix-single-rule]"
+description: "Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via ruff C901, plus an advisory slop scan) and dispatches safe-refactor agents to fix them. Use when you say 'check code/file size and complexity', 'files too large', 'reduce complexity', 'split large files', or 'adopt quality gates in this repo' (--adopt)."
+argument-hint: "[--check] [--fix] [--dry-run] [--adopt] [--refresh-exceptions] [--focus=file-size|function-length|complexity] [--path=...] [--max-parallel=N] [--no-chain] [--continue] [--loop N] [--loop-delay S] [--fix-single-rule]"
 allowed-tools: ["Task", "Bash", "Grep", "Read", "Glob", "SlashCommand", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
@@ -25,8 +25,8 @@ Parse flags from "$ARGUMENTS":
 - `--dry-run`: Show refactoring plan without executing changes
 - `--focus=file-size|function-length|complexity`: Filter to specific issue type
 - `--path=apps/api|apps/web`: Limit scope to specific directory
-- `--max-parallel=N`: Maximum parallel agents (default: 3, max: 4)
-  WARNING: >4 parallel agents causes context degradation and hallucination risk
+- `--max-parallel=N`: Maximum parallel agents (default: 3, max: 6)
+  Higher parallelism raises hallucination risk; the batch gate verifies every batch either way
 - `--no-chain`: Disable automatic chain invocation after fixes
 - `--continue`: Resume from saved batch state (do NOT start fresh analysis)
 - `--refresh-exceptions`: Regenerate exception baselines to remove stale entries (no fixes)
@@ -47,6 +47,13 @@ If no arguments provided, default to `--check` (analysis only).
 Single-branch flag, only relevant when `$ARGUMENTS` contains `--refresh-exceptions`:
 `Read ~/.claude/commands/references/code-quality/refresh-exceptions.md` and run it,
 then exit (no other steps execute).
+
+### Special: --adopt (brownfield onboarding)
+
+Single-branch flag, only relevant when `$ARGUMENTS` contains `--adopt`:
+`Read ~/.claude/commands/references/code-quality/brownfield-adoption.md` and run it,
+then exit (no other steps execute). Grandfathers existing violations into baselines
+and sets up the ratchet so enforcement applies to changed code going forward.
 
 ---
 
@@ -290,6 +297,9 @@ Output final status:
 
 # Preview plan for specific path
 /code_quality --dry-run --path=apps/web
+
+# Onboard an existing repo: grandfather current violations, set up the ratchet
+/code_quality --adopt
 
 # Refresh stale exceptions (remove entries for already-fixed functions)
 /code_quality --refresh-exceptions

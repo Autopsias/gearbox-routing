@@ -55,7 +55,7 @@ overview / Claude Code model-config).
 > **2026-07-25**: **Opus 5** ($5/$25 — same price as 4.8) is the standing
 > default for ALL judgment work — deep-reasoning → `medium`, linchpin + hard
 > agentic → `high`; **Sonnet 5** keeps standard build + fan-out shards; **Fable 5
-> is the escalation apex only** (credit-metered, paywalled; a Fable dispatch
+> is the escalation apex only** (credit-metered; a Fable dispatch
 > failure auto-degrades to Opus @ `high`). Opus's ladder STOPS at `high` (`xhigh`
 > dead rung, `max` operator-elected). The **picker is ground truth**: verify the
 > current lineup and its default effort at authoring time rather than trusting
@@ -98,10 +98,13 @@ only (the same Low–Max effort dials apply in the Cowork picker), priced at
 work; benchmark deltas vs Opus 4.8 are largest exactly there (e.g. agentic-coding
 evals where performance scales strongly with the effort dial).
 
-> **⚠ Availability (2026-07).** Fable 5 was **suspended 2026-06-12** (export-control
-> order) and **paywalled from 2026-06-23** (usage credits on top of subscription); it
-> returns behind a paywall, no date. So Fable now draws **usage credits** and may be
-> **intermittently unavailable**. Anthropic's own built-in fallback for Fable is
+> **⚠ Availability (re-confirmed 2026-07-26).** Fable 5 is a **normal, available
+> model** — the earlier "suspended 2026-06-12 / paywalled" note was STALE and had been
+> quoted back at the operator as fact; `model-routing.yaml`'s `prices.fable` row now
+> carries a standing warning never to assume it. Fable does draw **usage credits** on
+> top of subscription, which is why it stays the escalation apex rather than a default
+> — a cost posture, not an availability one. Re-check the SSOT before relying on this.
+> Anthropic's own built-in fallback for Fable is
 > **Opus**, and `/plan-execute` implements exactly that: a failed/refused Fable
 > dispatch **auto-degrades to Opus @ `high`** (then Sonnet 5 @ `high` — per-target
 > degrade efforts, recalibrated on our own calibration run: BOTH Opus-5 and
@@ -134,14 +137,35 @@ in shape (elastic low→medium→high) but only exercised as the escalation apex
 the rungs are paid for by a trigger, never by default ($50/MTok output × deep
 thinking is still the most expensive combo in the table).
 
-## Codex-executed sessions (`client: codex`)
+## Codex-executed sessions (`model: gpt-5.6-*`)
 
-Sessions with `client: "codex"` run in the Codex CLI on the user's machine, not
-in Cowork — the Cowork picker does NOT apply. Set `model` to a descriptive label
-(e.g. "GPT-5 Codex"); `thinking` maps to the Codex reasoning-effort suggestion
-(Medium for mechanical verification/install work, High for retrieval/eval work).
-The card renders a CODEX badge and replaces the picker hint with a
-run-in-Codex-CLI instruction automatically.
+<!-- routing-ssot: vN (stamp with your own SSOT's revision) -->
+**Corrected 2026-07-28 (dual-harness S03, CL-01/CL-02).** There is no separate
+`client: "codex"` field — that was an earlier, never-wired concept. The real
+mechanism: set a session's `model` directly to a Codex token —
+`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` — and `build_plan.py`
+validates + renders it exactly like Haiku/Sonnet/Opus/Fable (no warning, a
+dedicated chip color: slate "Codex," distinct from the four Claude colors).
+`/plan-execute --harness codex` then dispatches that session through the Codex
+CLI on the user's machine instead of the Cowork picker; the Cowork picker simply
+does not apply to a Codex-pinned session.
+
+**Codex rubric — the balanced map** (DeepSWE 2026-07-27,
+`evals/routing/external-priors-gpt56-2026-07.md`; the same numbers back
+`model-routing.yaml`'s `providers.openai`):
+
+| Session kind | `model` | `reasoning` | Why |
+|---|---|---|---|
+| Mechanical (rename sweep, formatting, codemod, doc edits) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — luna's ONLY usable rung; see the collapse warning below. |
+| Standard build (CRUD, wiring, templated features, test scaffolds) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — moved off terra at v1.14 (operator-elected on price: 3 points for 6.5×). `gpt-5.6-terra`/`max` ($3.96, 70%) is the escalation, not the default. |
+| Integration / multi-file refactor / non-obvious debugging (agentic build) | `gpt-5.6-sol` | `xhigh` | $4.70, 71% DeepSWE — sol's proven escalation rung (matches `adversarial-review`'s own on-disk default). |
+| Architecture, ambiguous tradeoffs, hard root-cause (deep reasoning) | `gpt-5.6-sol` | `xhigh` | Same cell as agentic build — the lane has no cheaper dedicated deep-reasoning rung. |
+| Linchpin (one-shot irreversible, plan-foundational) | `gpt-5.6-sol` | `max` | $8.39, 73% DeepSWE — sol's ceiling; reserve for the rung that earns it. |
+
+**⚠ Luna collapses below `max`.** `gpt-5.6-luna`'s DeepSWE accuracy falls off a
+cliff as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair
+`gpt-5.6-luna` with any `reasoning` other than `max`; a "cheap" luna session run
+at a lower tier isn't cheaper, it's broken.
 
 Why the baseline shifted to Sonnet 5 (2026-07):
 
@@ -226,7 +250,7 @@ rate, so a higher tier is a real cost multiplier, not a free quality knob.**
 | **Low** | `low` | Minimises thinking; skips it on easy turns. Fastest, cheapest, lightest on rate limits. | **Subagents**, simple / well-defined tasks, high-volume or latency-sensitive work, plain chat: renames, formatting, simple lookups/classification, mechanical batch edits. Pair with an explicit checklist if the task has several parts. |
 | **Medium** | `medium` | Moderate thinking; good results at lower cost. | **Balanced agentic work** — the cost-efficient drop-in for clearly-scoped everyday tasks (Sonnet 5 @ `medium` ≈ Sonnet 4.6 @ `high`). |
 | **High** ⭐ | `high` (the model default) | Always thinks; deep reasoning. Best balance of quality and tokens. | **The default** — complex reasoning, difficult coding, and agentic work; most build, integration, analysis, and writing sessions. |
-| **xhigh** (older pickers: "Extra") | `xhigh` | Always thinks *deeply* with extended exploration; meaningfully more tokens than High. | **The justified escalation for hard coding & agentic work** (Anthropic's doc calls it the coding/agentic starting point; the house standing default is `high` — effort bills at the output rate): genuinely hard long-running (30 min+) async sessions, repeated tool-calling, deep web/KB search, multi-file refactors, big migrations. Effectively a **Sonnet** lever — near-dead on Opus, and on Fable prefer `low` unless a prior round failed. Offered on **Fable 5 / Opus 4.8 / Opus 4.7 / Sonnet 5 only**. |
+| **xhigh** (older pickers: "Extra") | `xhigh` | Always thinks *deeply* with extended exploration; meaningfully more tokens than High. | **The justified escalation for hard coding & agentic work** (Anthropic's doc calls it the coding/agentic starting point; the house standing default is `high` — effort bills at the output rate): genuinely hard long-running (30 min+) async sessions, repeated tool-calling, deep web/KB search, multi-file refactors, big migrations. Effectively a **Sonnet** lever — a DEAD RUNG on Opus 5 (and 4.8), and on Fable prefer `low` unless a prior round failed. Offered on **Fable 5 / Opus 5 / Opus 4.8 / Opus 4.7 / Sonnet 5** — dial availability isn't the same as a live lever. |
 | **Max** | `max` | Maximum depth, no constraints. Slowest, most expensive. | **Genuinely frontier problems only**: gnarly multi-root-cause debugging, novel algorithmic design, high-stakes one-shot decisions. Anthropic's own wording — *significant cost for small gains; can overthink structured output.* **Never pair with Opus** (if `xhigh` isn't enough, that's the switch-to-a-stronger-model signal); **not offered on Haiku.** |
 
 Rule of thumb: **`high` is the coding/agentic default and `xhigh` the
@@ -245,34 +269,36 @@ the dial is a live lever on Sonnet, near-dead on Opus, and inverted on Fable
 
 | Model | Use it for | Notes |
 |---|---|---|
-| **Sonnet 5** ⭐ | The broad workhorse and Claude Code default. Standard build, integration, multi-file refactor, non-obvious debugging, high-volume work. Near-Opus on coding/agentic. | GA 2026-06-30. First Sonnet with `xhigh`. $3/$15 per MTok (intro $2/$10 through 2026-08-31) — ~40% cheaper than Opus. Now absorbs most work that used to escalate to Opus. Pair with `medium` for defined scope, `high`/`xhigh` for integration/debugging. |
-| **Opus 4.8** | The input-heavy alternative + degrade target: very read-dominated deep-reads (in-rate $5 vs Fable's $10/MTok), polished docs/slides; the auto-degrade landing zone when Fable is paywalled/refused. | Shipped 2026-05-28. $5/$25 per MTok. 1M context. Sharper judgment; markedly less likely than 4.7 to leave code flaws unflagged. Default **`high`**; mildly effort-elastic but **DOMINATED** (on our own calibration run: every Opus rung is beaten by a Fable rung at equal or lower $/task) — **never pair with `max`** (dominance, not overthinking: `max` IS Opus's peak, yet Fable·high matches at roughly the same $/task with a clear accuracy edge, and Fable·low matches at a fraction of the cost); when `high` isn't enough, that's the Fable signal, not a crank-Opus signal. |
-| **Fable 5** | The linchpin tier: genuinely hard cross-cutting / irreversible work, gate/verdict sessions where judgment compounds, whole-corpus (1M-ctx) reads. | $10/$50 per MTok **+ usage credits; suspended/paywalled as of 2026-07**. **Default effort `low`** (Mythos-class — low already exceeds Opus @ `xhigh`); `high`/`xhigh` only for unsolved-prior-rounds or large-context synthesis. A failed Fable dispatch **auto-degrades to Opus 4.8 @ `xhigh`**. Reserve for a linchpin that earns the premium. |
+| **Sonnet 5** ⭐ | The broad workhorse and Claude Code default. Standard build, integration, multi-file refactor, non-obvious debugging, high-volume work. Near-Opus on coding/agentic. | GA 2026-06-30. First Sonnet with `xhigh`. $3/$15 per MTok (intro $2/$10 through 2026-08-31) — ~40% cheaper than Opus. Now absorbs most work that used to escalate to Opus. Pair with `medium` for defined scope, `high` for integration/debugging (`xhigh` is a dead rung — from `high`, escalate MODEL). |
+| **Opus 5** | The standing default for ALL judgment work: architecture / novel / security-sensitive design / hard root-cause (`medium`), hard multi-file/agentic build and the plan's linchpin (`high`). | GA 2026-07-24, same $5/$25 per MTok as 4.8. 1M context. Strongly effort-elastic `low`→`medium`→`high` on our own calibration run (58%→69%→73% DeepSWE v1.1) — then the ladder STOPS: `high`→`xhigh` is a DEAD RUNG (no measurable gain for materially higher cost) and `max` is weak (+1pt for ~2× cost; operator-elected only). Dominates Fable at every rung — when `high` isn't enough, that's the Fable escalation signal, not a crank-Opus signal. |
+| **Fable 5** | Escalation apex ONLY — reach it from Opus·`high` when (a) a problem is unsolved after Opus·`high`, or (b) genuine whole-codebase/large-context synthesis (1M ctx). No session KIND defaults to Fable. | $10/$50 per MTok + usage credits (available as a normal model — operator-confirmed 2026-07-26; the old suspended/paywalled note was stale). Effort-elastic `low`→`medium`→`high`, but every rung is paid for by the trigger, never the default. A failed Fable dispatch **auto-degrades to Opus 5 @ `high`** (Opus's own `xhigh` is a dead rung, so the degrade never lands there). |
 | **Haiku 4.5** | Truly trivial, high-throughput sessions: bulk formatting, simple transforms, light classification. | Cheapest/fastest. **Rejects the `effort`/reasoning parameter entirely** — no thinking dial; keep it at Low. Rare as a whole-session choice in a plan. |
 
 ### Which model — the 4-question test + `opusplan` plan/execute
 
 Anthropic's model-selection playbook routes by the work's *nature*, not its
-apparent difficulty:
+apparent difficulty — read across our own calibration data on top of it:
 
 1. **Extended multi-step reasoning, deep code analysis, or nuanced judgment on
-   ambiguous inputs?** → **Fable 5 · `low`** (deep-reasoning default; **Opus
-   4.8 · `high`** for very input-heavy deep-reads, and as the auto-degrade target).
+   ambiguous inputs?** → **Opus 5 · `medium`** (deep-reasoning default — dominates
+   the retired Fable·low pin on both axes; escalate to `high` on the two named
+   triggers, then raise MODEL to Fable only if still unsolved).
 2. **Instruction-following, structured output, tool use, or RAG?** → **Sonnet 5**
    — the default, and roughly 70% of real work.
 3. **Trivial / high-volume / latency-sensitive?** → **Haiku 4.5** (or Sonnet 5 at
    `low`).
-4. **Genuinely frontier / cross-cutting / irreversible linchpin?** → **Fable 5**
-   (auto-degrades to Opus 4.8 @ `xhigh` when paywalled/unavailable).
+4. **Genuinely frontier / cross-cutting / irreversible linchpin?** → **Opus 5 ·
+   `high`** (auto-degrades via `providers.anthropic.degrade` if refused; escalate
+   to Fable 5 only when the two named triggers persist past Opus·`high`).
 
 **Plan/execute is Anthropic's own pattern.** Claude Code's `opusplan` alias
 *"uses `opus` during plan mode, then switches to `sonnet` for execution."* Read
 that across to a multi-session plan: **design / architecture / adjudication /
-synthesis sessions → Opus 4.8 (or a Fable linchpin); build / implementation /
-wiring sessions → Sonnet 5.** Route each session by what it *does*, and
-re-validate any Opus routing against your own evals — Sonnet 5 absorbs most build
-work now. (The Fable→Opus degrade mirrors the `best` alias — *"Fable 5 where
-available, otherwise the latest Opus."*)
+synthesis sessions → Opus 5 · `medium` (linchpin/hard-agentic → `high`; Fable
+only as the escalation apex); build / implementation / wiring sessions →
+Sonnet 5.** Route each session by what it *does*. (The Fable→Opus degrade
+mirrors the `best` alias — *"Fable 5 where available, otherwise the latest
+Opus"* — landing at Opus @ `high`, not `xhigh`.)
 
 ---
 
@@ -282,14 +308,14 @@ Match the session's *dominant* activity, not the easiest sub-task in it.
 
 | Session archetype | Model | Effort | Rationale to write in `why_model` |
 |---|---|---|---|
-| Architecture / design decision, irreversible trade-offs | Fable 5 (→ Opus 4.8 @ xhigh degrade; Opus·high for very input-heavy deep-reads) | **low** | On our own calibration run, Fable·low dominates Opus·high on DeepSWE; every Opus rung is dominated — never `max` on Opus, and escalate MODEL (→Fable) rather than Opus's effort. |
-| Deep research / multi-source synthesis / heavy tool-calling | Sonnet 5 (Opus 4.8 if novel) | **high**→xhigh | Exploratory + agentic — `high` default, `xhigh` when genuinely hard (Sonnet's elasticity makes it a live lever). |
-| Long-running async build, large multi-file refactor, codebase migration | Sonnet 5 | **high**→xhigh | 30 min+ sustained work with many steps — Sonnet 5 absorbs most of this; async runs take `xhigh` freely when the work earns it. Escalate to **Fable 5 · low** for long-horizon/monorepo/stuck agentic loops. |
-| Gnarly debugging (multiple possible root causes) | Opus 4.8 | **high** | Deep reasoning to isolate the cause — Opus @ `high`; if stuck, escalate to Fable, not to `xhigh`/`max`. |
-| Coding / agentic build, heavy tool-calling (async) | Sonnet 5 | **high** | `high` is the house default for coding/agentic; step up to `xhigh` for the genuinely hard tail — async makes its latency free. |
+| Architecture / design decision, irreversible trade-offs | Opus 5 (→ Fable 5 as escalation apex if still unsolved) | **medium**→high | On our own calibration run, Opus 5·medium dominates the retired Fable·low pin on both axes; escalate to `high` on the two named triggers, then raise MODEL to Fable only if `high` still isn't enough. |
+| Deep research / multi-source synthesis / heavy tool-calling | Sonnet 5 (Opus 5 if novel) | **high**→xhigh | Exploratory + agentic — `high` default, `xhigh` when genuinely hard (Sonnet's elasticity makes it a live lever up to `high`; `xhigh` stays a dead rung). |
+| Long-running async build, large multi-file refactor, codebase migration | Sonnet 5 | **high** | 30 min+ sustained work with many steps — Sonnet 5 absorbs most of this at `high` (`xhigh` is a dead rung). Escalate to **Opus 5 · high** for genuinely hard/stuck agentic loops, then Fable 5 as the apex if still unsolved. |
+| Gnarly debugging (multiple possible root causes) | Opus 5 | **high** | Deep reasoning to isolate the cause — Opus @ `high`; if stuck, escalate to Fable as the apex, never to Opus `xhigh`/`max`. |
+| Coding / agentic build, heavy tool-calling (async) | Sonnet 5 | **high** | `high` is the house default for coding/agentic; step up to **Opus 5 · high** for the genuinely hard tail (Sonnet's own `high`→`xhigh` is a dead rung). |
 | Standard build / integration — **bounded, single-pass, not agentic** | Sonnet 5 | **medium**→high ⭐ | Defined scope; Sonnet 5 at medium is the workhorse, high when judgement rises. |
-| Analysis, drafting, structured docs/slides/spreadsheets | Opus 4.8 | **high** | Quality matters; avoid Max here (overthinking risk on structured output). |
-| The plan's linchpin — cross-cutting / irreversible / synthesis the rest rests on | Fable 5 (→ Opus 4.8 @ xhigh if unavailable) | **low** | Mythos-class judgment at Fable's cheapest point — low already exceeds Opus @ `xhigh`; Fable is effort-elastic on long-horizon hard work, so climb `low`→`medium`→`high` only for an exceptionally hard or context-heavy one-shot call. |
+| Analysis, drafting, structured docs/slides/spreadsheets | Opus 5 | **high** | Quality matters; avoid Max here (overthinking risk on structured output, and `max` is a weak rung on Opus regardless). |
+| The plan's linchpin — cross-cutting / irreversible / synthesis the rest rests on | Opus 5 (→ Fable 5 as escalation apex if unsolved or genuinely large-context) | **high** | On our own calibration run, Opus 5·high is the sweet-spot rung (dominates Fable·xhigh); reach Fable only via raise-model from Opus·high on the two named triggers. |
 | Well-scoped refactor / routine CRUD with a clear spec | Sonnet 5 | **medium** | Mechanical enough to trade some depth for cost/speed. |
 | Bulk rename / formatting / simple transforms / classification | Sonnet 5 or Haiku 4.5 | **low** | Trivial, high-volume — optimise for speed and rate limits. Haiku ignores the effort dial. |
 
@@ -335,8 +361,8 @@ nobody asked whether it runs live.
   is an accepted synonym for `xhigh`). It renders as a colour-coded chip beside
   the model chip and the time-estimate chip.
 - `why_model` should justify **both** dials in one sentence — it renders as
-  "Why Opus 4.8 · xhigh effort: …".
-- Each card shows a **picker hint** ("set Cowork picker → Opus 4.8 · High") and
+  "Why Opus 5 · high effort: …".
+- Each card shows a **picker hint** ("set Cowork picker → Opus 5 · High") and
   the session protocol reminds the user that model + effort are *picker settings
   set before pasting the prompt*, not edits to the HTML file.
 - During the interview, **propose a pair for every session** using the framework

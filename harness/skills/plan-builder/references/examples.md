@@ -214,6 +214,41 @@ Once `s01` is DONE, `s02` and `s03` (same `parallel_group`, same `depends_on`)
 fan out in ONE assistant turn with two Task calls and run concurrently. Group
 members MUST share their `depends_on` set — the validator rejects mismatches.
 
+Note the shape: `s01` is the **contract-first** session — it freezes whatever
+`s02` and `s03` both consume — and the two members write **disjoint files**
+(their items' `touches` must not overlap, or the build refuses them). Neither
+member commits: shipping is the group's act, not a member's.
+
+### Contract-first fan-out with worktree isolation
+
+```json
+"items": [
+  {"id": "eng-02", "title": "Auth build", "category": "eng", "touches": "src/auth/, tests/auth/"},
+  {"id": "eng-03", "title": "Sessions migrate", "category": "eng", "touches": "src/sessions/, tests/sessions/"}
+],
+"sessions": [
+  {"id": "s02", "title": "Auth build", "model": "Opus", "items": ["eng-02"], "prompt": "...",
+   "verify": {"gates": ["code-review-gate"]},
+   "dispatch": {"parallel_group": "g1", "isolation": "worktree", "depends_on": ["s01"]}},
+  {"id": "s03", "title": "Sessions migrate", "model": "Sonnet", "items": ["eng-03"], "prompt": "...",
+   "verify": {"gates": ["test-orchestrate"]},
+   "dispatch": {"parallel_group": "g1", "isolation": "worktree", "depends_on": ["s01"]}}
+]
+```
+Each member runs in its own orchestrator-managed git worktree, so the two never
+share a working tree. **You do not write the integration session** —
+`build_plan.py` emits one (`dispatch.integrates_group: "g1"`, `depends_on:
+["s02","s03"]`, `verify.gates: ["code-review-gate","test-orchestrate"]`,
+`post_session.git: "commit"`) whose prompt carries the merge protocol: baseline
+first, containment check, base-ref confirmation, producer-first merge, gates
+re-run on the merged tree, then ship. Declare your own session with
+`integrates_group` only if you want to control it yourself.
+
+Every rule that is refused here — no member commits, no member touches a
+lockfile, every member item declares `touches`, no two members write the same
+path — is in `../plan-execute/references/parallel-group-contract.md`, checked at
+build time and again at dispatch by the same code.
+
 ### Human checkpoint
 
 ```json

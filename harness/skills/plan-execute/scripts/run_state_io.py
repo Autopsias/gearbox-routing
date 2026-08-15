@@ -64,19 +64,51 @@ def save_state(plan_dir, state):
     _atomic_write(Path(plan_dir) / "run_state.json", json.dumps(state, indent=2))
 
 
-def set_halt(plan_dir, reason, by_session):
+def set_halt(plan_dir, reason, by_session, kind=None, detail=None):
+    """Stop the plan. ``kind`` names WHY, for the guards that must treat one
+    flavor differently: a ``"replan"`` halt (S05) is resolved by restructuring
+    the plan, so the mutation commands are allowed through it while `plan` /
+    `begin` still refuse. ``None`` (the default) is the ordinary failure halt
+    that refuses everything until `clear-halt`.
+
+    ``detail`` is optional pre-rendered plain text spliced into HALT_NOTICE.txt
+    under the one-line reason — used by RS-04 to put a BLOCKED session's decision
+    brief (options + recommendation) in front of the operator without them having
+    to open `_closeouts/<sid>.json`. It never enters run_state.json, so it cannot
+    affect any digest.
+    """
     state = load_state(plan_dir)
-    state["halt"] = {"set": True, "reason": reason, "by_session": by_session, "at": _now()}
+    state["halt"] = {
+        "set": True, "reason": reason, "by_session": by_session,
+        "at": _now(), "kind": kind,
+    }
     save_state(plan_dir, state)
     log_event(plan_dir, "halt_set", reason=reason, session_ids=[by_session] if by_session else [])
-    _write_halt_notice(plan_dir, reason, by_session)
+    _write_halt_notice(plan_dir, reason, by_session, detail)
     _run_halt_notify(plan_dir, reason, by_session)
     return state
 
 
+def rewrite_halt_notice(plan_dir, detail):
+    """Re-render HALT_NOTICE.txt for the CURRENT halt with fresh ``detail``.
+
+    The halt itself is unchanged — same reason, same session, same timestamp —
+    so this deliberately writes no state, logs no `halt_set`, and never re-fires
+    the notify hook. Used by RP-08 when a recommendation is recorded against an
+    already-parked REPLAN: the operator's notice must show it, but nothing about
+    the halt has happened twice. Returns False when the plan is not halted.
+    """
+    halt = load_state(plan_dir).get("halt", {})
+    if not halt.get("set"):
+        return False
+    _write_halt_notice(plan_dir, halt.get("reason"), halt.get("by_session"), detail,
+                       at=halt.get("at"))
+    return True
+
+
 def clear_halt(plan_dir):
     state = load_state(plan_dir)
-    state["halt"] = {"set": False, "reason": None, "by_session": None, "at": None}
+    state["halt"] = {"set": False, "reason": None, "by_session": None, "at": None, "kind": None}
     save_state(plan_dir, state)
     notice = Path(plan_dir) / "HALT_NOTICE.txt"
     if notice.exists():
@@ -95,12 +127,13 @@ def record_batch(plan_dir, session_ids, result):
     save_state(plan_dir, state)
 
 
-def _write_halt_notice(plan_dir, reason, by_session):
+def _write_halt_notice(plan_dir, reason, by_session, detail=None, at=None):
     body = (
-        f"PLAN HALTED at {_now()}\n"
+        f"PLAN HALTED at {at or _now()}\n"
         f"Session: {by_session or '(unknown)'}\n"
         f"Reason: {reason}\n\n"
-        f"Inspect with: /plan-execute {plan_dir} --status\n"
+        + (f"{detail.rstrip()}\n\n" if detail and str(detail).strip() else "")
+        + f"Inspect with: /plan-execute {plan_dir} --status\n"
         f"After fixing, clear with: /plan-execute {plan_dir} --clear-halt\n"
     )
     _atomic_write(Path(plan_dir) / "HALT_NOTICE.txt", body)
@@ -469,11 +502,91 @@ def acquire_lock(plan_dir):
     return token
 
 
+def lock_holder(plan_dir):
+    """The LIVE dispatch-lock holder (`{pid, started_at, host}`), or None when
+    the plan is unlocked or the lock is stale. Read-only — the mutation commands
+    use it to refuse restructuring a plan while a batch is in flight."""
+    lp = _lock_path(plan_dir)
+    if not lp.exists():
+        return None
+    try:
+        info = json.loads(lp.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    started = info.get("started_at")
+    age = None
+    if started:
+        try:
+            age = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
+        except ValueError:
+            age = None
+    pid = info.get("pid")
+    alive = _pid_alive(pid) if isinstance(pid, int) else False
+    if (age is not None and age > STALE_LOCK_SECONDS) or not alive:
+        return None
+    return info
+
+
 def release_lock(plan_dir):
     lp = _lock_path(plan_dir)
     if lp.exists():
         lp.unlink()
         log_event(plan_dir, "lock_released")
+
+
+# --------------------------------------------------------------------------
+# Dispatch receipts (TEL-01 attestation handoff) — a background Agent-tool
+# completion carries no usage telemetry of its own, so "which model actually
+# served this session" is only knowable through an explicit correlation step:
+# the orchestrator calls `run.py record-receipt <sid> --agent-id <id>
+# [--transcript <path>]` AFTER the Agent call returns and BEFORE apply/verify
+# resolution. Landing it in run_state.json (rather than a separate file) means
+# it survives crash/compaction/resume exactly like the halt flag and the lock
+# token already do.
+# --------------------------------------------------------------------------
+def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="claude",
+                   attested=None, generation=None, attempt=None):
+    """Persist one dispatch's correlation receipt. `attested` is
+    `{"model": ..., "reasoning": ...}` when served-model evidence was found in
+    `transcript`, else None (the receipt still proves an Agent ID was
+    correlated — `outcomes.py` reads that as `model_ran_source="requested"`).
+
+    `generation`/`attempt` key the receipt to the DISPATCH it was recorded
+    for (TEL-01 finding 1) — the caller passes the same escalation generation
+    and dispatch-attempt ordinal a resolution recorded right now would carry.
+    `outcomes._model_ran` compares them against the resolution it is actually
+    composing and refuses to trust a receipt that does not match: this
+    receipt does not get cleared on re-dispatch (see `get_receipt`), so
+    without this check a skipped `record-receipt` on a later attempt would
+    silently reattribute an EARLIER attempt's served model to this one."""
+    state = load_state(plan_dir)
+    receipts = state.setdefault("dispatch_receipts", {})
+    rec = {
+        "agent_id": agent_id,
+        "transcript": transcript,
+        "backend": backend,
+        "attested": attested,
+        "generation": generation,
+        "attempt": attempt,
+        "recorded_at": _now(),
+    }
+    receipts[session_id] = rec
+    save_state(plan_dir, state)
+    log_event(plan_dir, "receipt_recorded", session_ids=[session_id], agent_id=agent_id,
+              backend=backend, attested=bool(attested), generation=generation, attempt=attempt)
+    return rec
+
+
+def get_receipt(plan_dir, session_id):
+    """This session's most recently recorded dispatch receipt, or None. A
+    redispatch/amend's `escalation.reset` does not clear it — a NEW `begin` is
+    expected to overwrite it with a fresh `record-receipt` call before the next
+    resolution moment; a stale receipt read before that call simply describes
+    the previous attempt, same as any other pre-dispatch state. Callers that
+    attribute a served model to a SPECIFIC resolution must check the receipt's
+    `generation`/`attempt` against that resolution's own — see
+    `outcomes._model_ran`, which is the only place that does."""
+    return (load_state(plan_dir).get("dispatch_receipts") or {}).get(session_id)
 
 
 # --------------------------------------------------------------------------

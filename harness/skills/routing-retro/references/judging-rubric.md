@@ -38,6 +38,29 @@ headline check), cache-miss storms (low cache_read vs input), truncation-retry l
 - **Evidence bar**: the cost figure + the comparison base (median of this scan) + the
   suspected mechanism.
 
+### context-bloat (should-have-forked)
+A session carried a large context across many turns while the WORK DIVERGED — later turns
+paid to re-read history belonging to an earlier, finished task. The remedy is dispatch
+hygiene (finish the task, then start a clean session/worker carrying only the accepted
+result), never a tier or effort change.
+- **Scan signals**: high `context_peak_tokens` (outlier vs this scan's median) AND a high
+  `reread_cost_pct` AND enough `assistant_messages` for the carrying to have repeated.
+- **Evidence bar — the divergence is the finding, not the token count.** You MUST cite ≥2
+  distinct, unrelated task shapes inside the one session (from `first_prompt`, `ai_title`,
+  and a transcript look at where the second topic starts) before flagging. A single long
+  hard task with a large context is CORRECT behaviour and must not be flagged.
+- **Why the count alone proves nothing**: cache reads bill at a fraction of fresh input
+  (see the scanner's `CACHE_READ_X`), so a high re-read share is the *cheap* outcome — the
+  expensive alternative is the same context arriving as fresh input. Never report a token
+  count or a cache-read share as a saving opportunity on its own; quantify in dollars
+  (`reread_cost_usd`) and only against demonstrated irrelevance.
+- **Not this flag**: low `cache_read` against high fresh input is the opposite problem (a
+  cache-miss storm) and belongs to *cost outlier* above.
+- **Sidechain caveat**: a subagent's context lands in the SAME transcript, so a fan-out can
+  set `context_peak_tokens` on a sidechain turn the main thread never carried. Check
+  `sidechain_messages` before attributing a peak to the main conversation — a big
+  sidechain peak is a `fanout_policy` question (worker scope), not a fork-hygiene one.
+
 ### degradation-ladder activation
 A session shows the reactive fallback (dispatched tier refused → next tier down, per SSOT
 `degradation:`). Not a misroute by itself — but ≥2 activations in one window means the
@@ -54,7 +77,8 @@ literally as `peer-gate-miss` — the runbook's promotion owner-gate greps for t
 2. **Recurring** over/under-modeling on one task shape (calibration signal → /routing-update).
 3. One-off misroutes (ledger entries).
 4. Cost outliers with a named mechanism.
-5. Hygiene: missing receipts, settings/env drift, fan-out policy adherence.
+5. Hygiene: missing receipts, settings/env drift, fan-out policy adherence, context-bloat
+   (dispatch hygiene — no SSOT change; it never routes to `/routing-update`).
 
 ## Honesty rules
 

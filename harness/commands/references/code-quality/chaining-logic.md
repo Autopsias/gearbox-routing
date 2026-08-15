@@ -104,13 +104,17 @@ IF "--fix-single-rule" in "$ARGUMENTS":
   if [ -f ~/.claude/scripts/quality/check_function_lengths.py ]; then
       FUNC_LEN_OUT=$(python3 ~/.claude/scripts/quality/check_function_lengths.py --project "$PWD" 2>&1 || true)
   fi
-  HAS_FUNC_LEN=$(echo "$FUNC_LEN_OUT" | grep -cE "BLOCKING|violation|>100 lines" || echo "0")
+  HAS_FUNC_LEN=$(echo "$FUNC_LEN_OUT" | grep -cE "BLOCKING|violation" || echo "0")
 
-  # Check for complexity violations (if available)
+  # Check for complexity violations via ruff C901 (there is no separate checker script;
+  # ruff is the enforcement tool — see analysis-rules.md "Complexity Check")
   HAS_COMPLEXITY=0
-  if [ -f ~/.claude/scripts/quality/check_complexity.py ]; then
-      COMPLEX_OUT=$(python3 ~/.claude/scripts/quality/check_complexity.py --project "$PWD" 2>&1 || true)
-      HAS_COMPLEXITY=$(echo "$COMPLEX_OUT" | grep -cE "complexity|violation" || echo "0")
+  COMPLEX_OUT=""
+  if command -v ruff &> /dev/null; then
+      COMPLEX_OUT=$(ruff check --select C901 --config 'lint.mccabe.max-complexity=12' "$PWD" 2>&1 || true)
+      HAS_COMPLEXITY=$(echo "$COMPLEX_OUT" | grep -c "C901" || echo "0")
+  else
+      echo "⚠️ ruff not found - skipping complexity check"
   fi
   ```
 
@@ -164,7 +168,7 @@ MANDATORY OUTPUT FORMAT - Return ONLY JSON:
     Output: "=== [RULE: FUNCTION-LENGTH] Fixing long functions ==="
 
     # Get list of files with function length violations
-    VIOLATION_FILES=$(echo "$FUNC_LEN_OUT" | grep -E "BLOCKING|>100 lines" | grep -oE "[a-zA-Z0-9_/]+\.py" | sort -u | head -3)
+    VIOLATION_FILES=$(echo "$FUNC_LEN_OUT" | grep -E "BLOCKING" | grep -oE "[a-zA-Z0-9_/]+\.py" | sort -u | head -3)
 
     # DEFENSIVE: Update ralph_state BEFORE Task call
     Update batch state:

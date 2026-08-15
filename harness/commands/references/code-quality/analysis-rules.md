@@ -47,12 +47,43 @@ else
 fi
 ```
 
+```bash
+# Complexity check — enforced via ruff C901 (there is NO separate checker script)
+if command -v ruff &> /dev/null; then
+    echo "Running complexity check (ruff C901)..."
+    ruff check --select C901 --config 'lint.mccabe.max-complexity=12' "$PWD" 2>&1 || true
+else
+    echo "⚠️ ruff not found - skipping complexity check"
+fi
+```
+
+```bash
+# Slop scan (ADVISORY) — patterns typical of agent-authored code:
+# unused imports/variables (F401/F841), bare/blind excepts (E722/BLE001),
+# commented-out code (ERA001). Findings go to linting-fixer, never block.
+if command -v ruff &> /dev/null; then
+    echo "Running slop scan (advisory)..."
+    ruff check --select F401,F841,E722,ERA001,BLE001 "$PWD" 2>&1 || true
+fi
+```
+
 ## Violation Categories
 
 Capture violations into categories:
-- **FILE_SIZE_VIOLATIONS**: Files >500 LOC (production) or >800 LOC (tests)
-- **FUNCTION_LENGTH_VIOLATIONS**: Functions >100 lines
-- **COMPLEXITY_VIOLATIONS**: Functions with cyclomatic complexity >12
+- **FILE_SIZE_VIOLATIONS**: Files >500 LOC (production, blocking) or >800 LOC (tests, blocking)
+- **FUNCTION_LENGTH_VIOLATIONS**: Functions >100 lines (blocking)
+- **COMPLEXITY_VIOLATIONS**: Functions with cyclomatic complexity >12 (ruff C901, blocking)
+- **SLOP_VIOLATIONS**: unused imports/variables, bare/blind excepts, commented-out code (advisory — delegate to `linting-fixer`)
+
+**Targets vs maxima.** The numbers above are the blocking maxima. The refactor agents
+aim lower — file ≤300 LOC, function ≤50 lines, complexity ≤10 (their charter targets).
+An agent reports `fixed` when the result is below the maximum; the target only shapes
+where it aims. Do not report a below-maximum file as a violation.
+
+**Split by responsibility, never by count.** Each extra file costs an agent one tool
+call and tokens, so a cohesive file near the limit beats three fragments spread across
+layers. When a refactor is needed, extract whole responsibilities (vertical slices)
+with unique, grep-able names.
 
 ---
 
@@ -75,10 +106,10 @@ Create structured report in this format:
 | path/to/file.py:125 | _process_job() | 125 | BLOCKING |
 ...
 
-### Test File Warnings (X files)
+### Test File Violations (X files)
 | File | LOC | Limit | Status |
 |------|-----|-------|--------|
-| path/to/test.py | 850 | 800 | WARNING |
+| path/to/test.py | 850 | 800 | BLOCKING |
 ...
 
 ### Summary

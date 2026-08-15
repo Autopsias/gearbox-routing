@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
-<meta name="plan-schema-version" content="2">
+<meta name="plan-schema-version" content="3">
 <title>{{PLAN_TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,6 +92,7 @@
     --opus:     #B55738;  --opus-bg:   rgba(181,87,56,0.10);
     --haiku:    #0F766E;  --haiku-bg:  rgba(15,118,110,0.10);
     --fable:    #6D28D9;  --fable-bg:  rgba(109,40,217,0.10);
+    --codex:    #1F2937;  --codex-bg:  rgba(31,41,55,0.08);
 
     /* session accent — terracotta-adjacent for unified palette */
     --session:    #D97757;  --session-bg: rgba(217,119,87,0.10);
@@ -145,6 +146,7 @@
       --opus:   #E8907A; --opus-bg:   rgba(232,144,122,0.14);
       --haiku:  #5EEAD4; --haiku-bg:  rgba(94,234,212,0.14);
       --fable:  #C4B5FD; --fable-bg:  rgba(196,181,253,0.14);
+      --codex:  #94A3B8; --codex-bg:  rgba(148,163,184,0.16);
       --session: #E8907A; --session-bg: rgba(232,144,122,0.14);
     }
   }
@@ -168,6 +170,7 @@
     --opus:#E8907A; --opus-bg:rgba(232,144,122,0.14);
     --haiku:#5EEAD4; --haiku-bg:rgba(94,234,212,0.14);
     --fable:#C4B5FD; --fable-bg:rgba(196,181,253,0.14);
+    --codex:#94A3B8; --codex-bg:rgba(148,163,184,0.16);
     --session:#E8907A; --session-bg:rgba(232,144,122,0.14);
   }
 
@@ -773,6 +776,7 @@
   .chip.model-opus   { background: var(--opus-bg);   color: var(--opus);   border-color: var(--opus-bg); }
   .chip.model-haiku  { background: var(--haiku-bg);  color: var(--haiku);  border-color: var(--haiku-bg); }
   .chip.model-fable  { background: var(--fable-bg);  color: var(--fable);  border-color: var(--fable-bg); }
+  .chip.model-codex  { background: var(--codex-bg);  color: var(--codex);  border-color: var(--codex-bg); }
   .chip.chip-reasoning   { letter-spacing: .02em; }
   .chip.reasoning-low    { background: rgba(148,163,184,0.14); color: var(--text-subtle); border-color: rgba(148,163,184,0.20); }
   .chip.reasoning-medium { background: rgba(96,165,250,0.16);  color: #2563eb; border-color: rgba(96,165,250,0.24); }
@@ -1378,6 +1382,8 @@
 
 <!-- INSERT_CATEGORY_SECTIONS -->
 
+<!-- INSERT_PLAN_CHANGES -->
+
 </main>
 
 <!-- Floating quick-glance progress pill — auto-derived from data-status -->
@@ -1537,6 +1543,7 @@
         if (modelChip && modelChip.classList.contains('model-opus')) { modelColor = 'var(--opus)'; modelName = 'Opus'; }
         else if (modelChip && modelChip.classList.contains('model-haiku')) { modelColor = 'var(--haiku)'; modelName = 'Haiku'; }
         else if (modelChip && modelChip.classList.contains('model-fable')) { modelColor = 'var(--fable)'; modelName = 'Fable'; }
+        else if (modelChip && modelChip.classList.contains('model-codex')) { modelColor = 'var(--codex)'; modelName = 'Codex'; }
         const isNext = (i === nextIdx);
         html += `<text class="arc-id ${isNext ? 'is-next-text' : ''}" x="${x + segW/2}" y="14" text-anchor="middle">${id.toUpperCase()}</text>`;
         html += `<a href="#${id}">`;

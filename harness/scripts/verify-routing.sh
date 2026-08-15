@@ -112,6 +112,7 @@ STRICT = os.environ["STRICT"] == "1"
 
 failures = []
 unknown_agent_warnings = []
+frontmatter_warnings = []   # strict-YAML hygiene; warn-only (see the scan for why)
 epic_crosscheck_warnings = []
 
 
@@ -183,6 +184,12 @@ def resolve_consumer_path(raw):
 # flow maps) and translate tiers→models for the check-(d) comparison. The legacy
 # flat `degradation:` block is prose-only pending its s03 retirement — while it
 # still exists we cross-check it against the translated anthropic walk below.
+# {tier, effort-INTENT} row shape — used for BOTH the neutral top-level
+# `task_classes:` block (below) and the v1.13 optional per-provider override inside
+# each provider profile (parsed in the loop that follows). ONE regex on purpose: two
+# copies of this grammar is exactly how an override silently stops being parsed.
+tc_row_rx = re.compile(r"^\s*([\w-]+):\s*\{\s*tier:\s*([\w-]+)\s*,\s*effort:\s*(\w+)\s*\}", re.M)
+
 prov_start = ssot_text.find("\nproviders:\n")
 if prov_start == -1:
     print("FATAL: SSOT has no `providers:` block", file=sys.stderr)
@@ -200,6 +207,12 @@ ssot_degrade_efforts = {}    # provider -> {model: effort}  (tier-translated)
 ssot_provider_pbody = {}     # provider -> raw block text (s03: reused by GUARD-01 + reasoning-tier scan)
 ssot_provider_effort_map = {}  # provider -> {tier: {intent: native_or_None}}
 ssot_provider_calibration_status = {}  # provider -> calibration.status
+ssot_provider_task_classes = {}   # provider -> {class: (tier, intent)} — v1.13 per-provider override, {} when absent
+ssot_provider_ceiling = {}        # provider -> {tier: probed native ceiling} — v1.13, {} when the profile declines to declare one
+ssot_provider_degrade_effort_tier = {}  # provider -> {tier: effort} (tier-keyed, unlike ssot_degrade_efforts)
+ssot_provider_effort_ladder = {}  # provider -> {tier: [rung, ...]}
+ssot_provider_ladder_entry = {}   # provider -> {tier: entry rung} — v1.15 escalation.model_ladder_entry, {} when absent
+ssot_provider_ladder_tier = {}    # provider -> {tier: tier} degrade ladder, UNtranslated (ssot_ladders is model-keyed)
 for i, hdr in enumerate(prov_headers):
     pname = hdr.group(1)
     pbody_end = prov_headers[i + 1].start() if i + 1 < len(prov_headers) else len(providers_ssot_block)
@@ -207,21 +220,52 @@ for i, hdr in enumerate(prov_headers):
     ssot_provider_pbody[pname] = pbody
     cal_m = re.search(r"^\s*status:\s*(\w+)", pbody, re.M)
     ssot_provider_calibration_status[pname] = cal_m.group(1) if cal_m else None
-    # effort.map — one `{ intent: level, ... }` flow-map row per tier, used by
-    # GUARD-01 provider completeness (s03) below.
-    em_block = re.search(r"^    effort:[^\n]*\n((?:      [^\n]*\n)+)", pbody, re.M)
-    tier_effort_map = {}
-    if em_block:
-        for tmo in re.finditer(r"^\s*([\w-]+):\s*\{([^}]*)\}", em_block.group(1), re.M):
-            tier = tmo.group(1)
-            cells = dict(re.findall(r"([\w-]+)\s*:\s*(null|[\w-]+)", tmo.group(2)))
-            tier_effort_map[tier] = {k: (None if v == "null" else v) for k, v in cells.items()}
-    ssot_provider_effort_map[pname] = tier_effort_map
     mm = re.search(r"^    models:[^\n]*\n((?:      [^\n]*\n)+)", pbody, re.M)
     if not mm:
         print(f"FATAL: providers.{pname} has no parseable `models:` block", file=sys.stderr)
         sys.exit(2)
     models = dict(re.findall(r"^\s*([\w-]+):\s*([\w.\-]+)", mm.group(1), re.M))
+    # effort.map — one `{ intent: level, ... }` flow-map row per tier, used by
+    # GUARD-01 provider completeness (s03) below. TIER-FILTERED (s12): `effort:` now
+    # also carries the sibling flow map `native_effort_ceiling:`, which has the same
+    # `key: { ... }` shape and would otherwise register as a bogus tier.
+    em_block = re.search(r"^    effort:[^\n]*\n((?:      [^\n]*\n)+)", pbody, re.M)
+    tier_effort_map = {}
+    ceiling = {}
+    if em_block:
+        for tmo in re.finditer(r"^\s*([\w-]+):\s*\{([^}]*)\}", em_block.group(1), re.M):
+            key = tmo.group(1)
+            cells = dict(re.findall(r"([\w-]+)\s*:\s*(null|[\w-]+)", tmo.group(2)))
+            if key == "native_effort_ceiling":
+                ceiling = cells
+            elif key in models:
+                tier_effort_map[key] = {k: (None if v == "null" else v) for k, v in cells.items()}
+    ssot_provider_effort_map[pname] = tier_effort_map
+    ssot_provider_ceiling[pname] = ceiling
+    # v1.13 OPTIONAL per-provider task-class map (indent 4, same {tier, effort} row
+    # shape as the neutral block). Absent => that provider uses the neutral rows.
+    tcm = re.search(r"^    task_classes:[^\n]*\n((?:      [^\n]*\n)+)", pbody, re.M)
+    ssot_provider_task_classes[pname] = (
+        {mo.group(1): (mo.group(2), mo.group(3)) for mo in tc_row_rx.finditer(tcm.group(1))} if tcm else {}
+    )
+    if tcm and not ssot_provider_task_classes[pname]:
+        print(f"FATAL: providers.{pname} declares `task_classes:` but zero {{tier, effort}} rows parsed "
+              f"— an unparseable override would silently fall back to the neutral rows", file=sys.stderr)
+        sys.exit(2)
+    # escalation.effort_ladder — a rung emitted here is a real route, so the ceiling
+    # check below has to see it too (not just effort.map / effort_on_degrade).
+    elm = re.search(r"^      effort_ladder:[^\n]*\n((?:        [^\n]*\n)+)", pbody, re.M)
+    ssot_provider_effort_ladder[pname] = (
+        {mo.group(1): [x.strip() for x in mo.group(2).split(",") if x.strip()]
+         for mo in re.finditer(r"^\s*([\w-]+):\s*\[([^\]]*)\]", elm.group(1), re.M)} if elm else {}
+    )
+    # escalation.model_ladder_entry (v1.15, OPTIONAL) — the effort rung the model
+    # ladder ENTERS a tier on. Same argument as effort_ladder above: a rung named
+    # here is a real dispatched route, so the ceiling check has to see it too.
+    mle = re.search(r"^      model_ladder_entry:\s*\{([^}]*)\}", pbody, re.M)
+    ssot_provider_ladder_entry[pname] = (
+        dict(re.findall(r"([\w-]+)\s*:\s*([\w-]+)", mle.group(1))) if mle else {}
+    )
     # Scope the map search to the `degrade:` sub-block itself (adversarial-review
     # 2026-07-10, Codex MEDIUM): searching the whole provider body would keep
     # finding the child maps even with the `degrade:` header typo'd away, letting
@@ -245,6 +289,8 @@ for i, hdr in enumerate(prov_headers):
     ssot_provider_models[pname] = models
     ssot_ladders[pname] = {models[k]: models[v] for k, v in tier_ladder.items()}
     ssot_degrade_efforts[pname] = {models[k]: v for k, v in tier_eff.items()}
+    ssot_provider_degrade_effort_tier[pname] = tier_eff
+    ssot_provider_ladder_tier[pname] = tier_ladder
 
 # Reasoning-tier lockstep only concerns the ANTHROPIC dial (Claude thinking
 # directives); other providers' native efforts (e.g. openai `max`) never map to
@@ -272,7 +318,6 @@ if tc_start == -1:
     sys.exit(2)
 tc_end = find_next_top_level_key(ssot_text, tc_start + len("\ntask_classes:\n"))
 tc_block = ssot_text[tc_start:tc_end]
-tc_row_rx = re.compile(r"^\s*([\w-]+):\s*\{\s*tier:\s*([\w-]+)\s*,\s*effort:\s*(\w+)\s*\}", re.M)
 ssot_task_classes = {mo.group(1): (mo.group(2), mo.group(3)) for mo in tc_row_rx.finditer(tc_block)}
 if not ssot_task_classes:
     print("FATAL: parsed zero {tier, effort} rows from SSOT `task_classes:` block — parser or SSOT is broken", file=sys.stderr)
@@ -312,6 +357,55 @@ def agent_frontmatter(name):
     return (mo.group(1) if mo else None, eo.group(1) if eo else None)
 
 
+# ---- frontmatter VALIDITY (added 2026-07-26) -------------------------------
+# agent_frontmatter() above greps `model:`/`effort:` line-wise. That is fine for drift
+# detection but BLIND to whether the block is loadable YAML at all: a description
+# containing an unquoted ": " (e.g. `description: dispatch tier: opus at high effort`)
+# invalidates the entire frontmatter, so Claude Code silently does not register the
+# agent — while every grepped line is still present and this guard stays green. That
+# happened to the tier-* agents on their first draft. A green gate over an artifact the
+# runtime cannot load is the exact defect class this repo keeps re-finding, so validity
+# is now checked for EVERY agent file, not only the ones with SSOT rows.
+def frontmatter_error(path):
+    """Return a human-readable reason the frontmatter is unloadable, or None if OK."""
+    t = read(path)
+    if not t.startswith("---"):
+        return "no leading '---' frontmatter block"
+    parts = t.split("---", 2)
+    if len(parts) < 3:
+        return "frontmatter block is not terminated by a second '---'"
+    block = parts[1]
+    try:
+        import yaml
+    except ImportError:
+        # No PyYAML on this box: detect the specific failure mode rather than skip
+        # the check entirely — a skipped check is a green lie.
+        for raw in block.strip().splitlines():
+            line = raw.rstrip()
+            if not line or line.lstrip().startswith(("#", "-")) or ":" not in line:
+                continue
+            key, _, val = line.partition(":")
+            val = val.strip()
+            if len(val) >= 2 and val[0] == val[-1] and val[0] in "'\"":
+                continue
+            if ": " in val:
+                return (f"unquoted value for {key.strip()!r} contains ': ' "
+                        "(invalid YAML — quote it or use an em dash)")
+        return None
+    try:
+        d = yaml.safe_load(block)
+    except Exception as e:
+        return f"YAML parse error: {str(e).splitlines()[0]}"
+    if not isinstance(d, dict):
+        return f"frontmatter parsed to {type(d).__name__}, not a mapping"
+    for required in ("name", "description"):
+        if not d.get(required):
+            return f"missing or empty required key {required!r}"
+    if d.get("name") != os.path.splitext(os.path.basename(path))[0]:
+        return f"frontmatter name {d.get('name')!r} != filename"
+    return None
+
+
 checks = 0
 
 
@@ -338,12 +432,132 @@ _active_calibration = ssot_provider_calibration_status.get(ACTIVE_PROVIDER)
 check(f"providers.{ACTIVE_PROVIDER}.calibration.status is not lane_scoped",
       _active_calibration != "lane_scoped",
       f"status={_active_calibration!r} — lane_scoped facts are transcribed, not calibrated as an execution default; run /routing-update before activating this provider")
-for tc_name, (tier, intent) in sorted(ssot_task_classes.items()):
+# s12: iterate the EFFECTIVE map — the neutral rows with the active provider's own
+# v1.13 `task_classes:` override layered on, exactly as resolve_route._load does.
+# A provider that declares no override (providers.anthropic) yields the neutral rows
+# unchanged, so this loop's output is byte-identical to the pre-v1.13 guard.
+_effective_task_classes = {**ssot_task_classes, **ssot_provider_task_classes.get(ACTIVE_PROVIDER, {})}
+for tc_name, (tier, intent) in sorted(_effective_task_classes.items()):
     check(f"task_classes.{tc_name} tier '{tier}' resolves under providers.{ACTIVE_PROVIDER}.models",
           tier in _active_models, f"providers.{ACTIVE_PROVIDER}.models has no '{tier}' entry")
     tier_map = _active_effort_map.get(tier, {})
     check(f"task_classes.{tc_name} intent '{intent}' present in providers.{ACTIVE_PROVIDER}.effort.map.{tier}",
           intent in tier_map, f"providers.{ACTIVE_PROVIDER}.effort.map.{tier} has no '{intent}' key (has {sorted(tier_map)})")
+print()
+
+# ============================================================================
+# GUARD-02 (s12, v1.13) — PER-PROVIDER TASK-CLASS MAPS + PROBED EFFORT CEILINGS.
+# Runs over EVERY declared provider, not just the active one: an inactive profile's
+# map is what the operator reads when deciding whether to flip the dial, so a wrong
+# row there must fail NOW, not at flip time. GUARD-01 above deliberately inspects the
+# active provider only, which is why these checks live separately rather than being
+# folded into it.
+#   (1) a per-provider row may only re-point a class the NEUTRAL block declares —
+#       the class vocabulary is provider-neutral. A name absent there would look
+#       encoded and silently resolve through the neutral row forever.
+#   (2) its tier must exist in that provider's models:, and its intent must be a key
+#       in that tier's effort.map cell — the GUARD-01 contract, applied per provider.
+#   (3) every NATIVE effort this profile can emit must be within the model's PROBED
+#       ceiling (`effort.native_effort_ceiling`, optional). Emission sites are all
+#       three: effort.map cells, degrade.effort_on_degrade landings, and
+#       escalation.effort_ladder rungs. MEASURED FACT this exists for: gpt-5.5
+#       returns API 400 "Invalid value: 'max'" (2026-07-28, codex-cli 0.145.0) while
+#       the gpt-5.6 family accepts max — so `max` on workhorse is a dispatch-time
+#       crash, and before v1.13 nothing checked for it.
+# ============================================================================
+print("-- GUARD-02 per-provider task-class maps + probed effort ceilings (v1.13) --")
+_EFFORT_RANK = {"low": 0, "medium": 1, "high": 2, "xhigh": 3, "max": 4, "ultra": 5}
+for pname in sorted(ssot_provider_models):
+    _pmodels = ssot_provider_models[pname]
+    _pmap = ssot_provider_effort_map.get(pname, {})
+    # (0) NO TIER ALIASING (v1.15) — two tiers of ONE provider may never resolve to the
+    # same model. Probed failure modes this forbids structurally rather than by
+    # convention: this file flattens tier-keyed ladders into MODEL-keyed dicts (see
+    # ssot_ladders / ssot_degrade_efforts above), so an alias yields a literal
+    # {model: model} degrade SELF-LOOP that check (d) would then force run.py to
+    # encode, AND collapses effort_on_degrade onto one key (last-wins, silently
+    # discarding the other tier's calibrated effort). resolve_route.tier_of() is
+    # additionally first-match, so every session on the aliased model reads as the
+    # LOWER tier and its first degrade hits the floor rule and returns exhausted.
+    _by_model = {}
+    for _tier, _mid in _pmodels.items():
+        _by_model.setdefault(_mid, []).append(_tier)
+    for _mid, _tiers in sorted(_by_model.items()):
+        check(f"providers.{pname}.models: '{_mid}' is declared by exactly one tier",
+              len(_tiers) == 1,
+              f"tiers {sorted(_tiers)} all resolve to '{_mid}' — tier aliasing breaks the model-keyed "
+              "ladder flattening (self-loop), effort_on_degrade (last-wins) and tier_of() (first-match); "
+              "remove the tier instead of pointing two at one model")
+    # (0a) DEGRADE LADDER TERMINATES (v1.15) — walk `degrade.ladder` from EVERY tier
+    # with a visited set; a tier seen twice is a cycle, i.e. a consumer that follows
+    # this ladder to exhaustion never stops. The rescue edge out of the bottom tier is
+    # INCLUDED in the walk on purpose: resolve_route's downward-order check exempts
+    # index 0 (that exemption is exactly what lets a rescue edge through), and
+    # `_degrade_walk`/`_fallback_for` only survive a cycle because each happens to take
+    # exactly ONE step today. The escalation/rework loops this SSOT is growing walk
+    # ladders to exhaustion, so termination has to be structural here rather than an
+    # accident of the current consumers. Fix a hit by making the ladder a DAG (give it
+    # a sink tier), never by capping the walk in one consumer.
+    _lad = ssot_provider_ladder_tier.get(pname, {})
+    _cycle = None
+    for _start in sorted(_pmodels):
+        _seen, _cur = [], _start
+        while _cur in _lad and _cycle is None:
+            if _cur in _seen:
+                _cycle = _seen[_seen.index(_cur):] + [_cur]
+                break
+            _seen.append(_cur)
+            _cur = _lad[_cur]
+        if _cycle:
+            break
+    check(f"providers.{pname}.degrade.ladder terminates from every tier (no cycle)",
+          _cycle is None,
+          f"cycle {' -> '.join(_cycle or [])} — a ladder-walking consumer spins forever here; "
+          "make the ladder acyclic (one sink tier), do not cap the walk in the consumer")
+    # (0b) model_ladder_entry (v1.15): each key must be a declared tier, and its value
+    # must be a RUNG OF THAT TIER'S OWN effort_ladder — otherwise the climb enters on a
+    # rung it cannot then continue from.
+    _entry = ssot_provider_ladder_entry.get(pname, {})
+    for _tier, _rung in sorted(_entry.items()):
+        check(f"providers.{pname}.escalation.model_ladder_entry names a declared tier '{_tier}'",
+              _tier in _pmodels, f"providers.{pname}.models has no '{_tier}' entry (has {sorted(_pmodels)})")
+        _rungs = ssot_provider_effort_ladder.get(pname, {}).get(_tier, [])
+        check(f"providers.{pname}.escalation.model_ladder_entry.{_tier} = '{_rung}' is a rung of that tier's effort_ladder",
+              _rung in _rungs,
+              f"effort_ladder.{_tier}={_rungs!r} — an entry rung outside the ladder leaves the climb "
+              "with nowhere to continue from")
+    for tc_name, (tier, intent) in sorted(ssot_provider_task_classes.get(pname, {}).items()):
+        check(f"providers.{pname}.task_classes.{tc_name} is a class the neutral block declares",
+              tc_name in ssot_task_classes,
+              f"no '{tc_name}' row in the top-level task_classes: block (known: {sorted(ssot_task_classes)}) "
+              "— the class vocabulary is provider-NEUTRAL; this override would never fire")
+        check(f"providers.{pname}.task_classes.{tc_name} tier '{tier}' resolves under providers.{pname}.models",
+              tier in _pmodels, f"providers.{pname}.models has no '{tier}' entry (has {sorted(_pmodels)})")
+        _cell = _pmap.get(tier, {})
+        check(f"providers.{pname}.task_classes.{tc_name} intent '{intent}' present in providers.{pname}.effort.map.{tier}",
+              intent in _cell, f"providers.{pname}.effort.map.{tier} has no '{intent}' key (has {sorted(_cell)})")
+    # (3) ceiling — only for a profile that declares one.
+    _ceil = ssot_provider_ceiling.get(pname, {})
+    for tier, limit in sorted(_ceil.items()):
+        if tier not in _pmodels:
+            check(f"providers.{pname}.effort.native_effort_ceiling names a declared tier '{tier}'",
+                  False, f"providers.{pname}.models has no '{tier}' entry (has {sorted(_pmodels)})")
+            continue
+        emissions = [(f"effort.map.{tier}.{k}", v) for k, v in sorted((_pmap.get(tier) or {}).items())]
+        _dg = ssot_provider_degrade_effort_tier.get(pname, {}).get(tier)
+        if _dg:
+            emissions.append((f"degrade.effort_on_degrade.{tier}", _dg))
+        emissions += [(f"escalation.effort_ladder.{tier}[{i}]", r)
+                      for i, r in enumerate(ssot_provider_effort_ladder.get(pname, {}).get(tier, []))]
+        _ent = ssot_provider_ladder_entry.get(pname, {}).get(tier)
+        if _ent:
+            emissions.append((f"escalation.model_ladder_entry.{tier}", _ent))
+        for site, native in emissions:
+            if native is None:
+                continue
+            check(f"providers.{pname}.{site} = '{native}' is within {_pmodels[tier]}'s probed ceiling '{limit}'",
+                  _EFFORT_RANK.get(native, 99) <= _EFFORT_RANK.get(limit, -1),
+                  f"{_pmodels[tier]} rejects efforts above '{limit}' (probed) — this route would fail at dispatch")
 
 # ---- codex_peer.lane / providers.openai single-source-of-truth cross-check ---
 # v1.8 moved codex_peer.lane's model/degrade facts to providers.openai (single
@@ -393,9 +607,30 @@ for name, (model, effort) in sorted(ssot_agents.items()):
     else:
         check(f"agent '{name}' effort", disk_effort == effort, f"SSOT={effort!r} disk={disk_effort!r}")
 
+# ---- frontmatter hygiene scan (EVERY agent file — see frontmatter_error) ----
+# WARN-ONLY, deliberately. MEASURED 2026-07-26: `epic-test-fixer` has failed
+# yaml.safe_load for a long time (its description carries an unquoted "(Death-A): must"),
+# and Claude Code registers it anyway — so its frontmatter parser is MORE PERMISSIVE than
+# PyYAML, and a strict-YAML failure here does NOT mean the runtime rejects the agent.
+# Hard-failing would block unrelated commits over a non-bug, so this reports hygiene:
+# strict-YAML-invalid frontmatter is fragile (any standard tool that reads it breaks, as
+# this guard's own helper did) and worth fixing, but it is not proof of breakage.
+# Do NOT promote this to a failure without first MEASURING what Claude Code actually
+# rejects — that measurement does not exist yet.
+print("-- agent frontmatter hygiene (warn-only; Claude Code's parser is more permissive than PyYAML) --")
+disk_agent_files = sorted(glob.glob(os.path.join(AGENTS_DIR, "*.md")))
+for fp in disk_agent_files:
+    name = os.path.splitext(os.path.basename(fp))[0]
+    err = frontmatter_error(fp)
+    if err:
+        msg = f"agent '{name}' frontmatter is not strict-YAML — {err} ({fp})"
+        frontmatter_warnings.append(msg)
+        print(f"  [WARN] {msg}")
+if not frontmatter_warnings:
+    print("  [OK ] every agent frontmatter parses as strict YAML")
+
 # ---- unknown-agent scan (disk agents with no SSOT row) --------------------
 print("-- unknown-agent scan --")
-disk_agent_files = sorted(glob.glob(os.path.join(AGENTS_DIR, "*.md")))
 for fp in disk_agent_files:
     name = os.path.splitext(os.path.basename(fp))[0]
     if name not in ssot_agents:
@@ -585,7 +820,8 @@ if MODE == "full":
               f"stamp=v{found_v} SSOT=v{SSOT_VERSION}")
 
 print()
-print(f"{checks} structured checks run; {len(unknown_agent_warnings)} unknown-agent warning(s); "
+print(f"{checks} structured checks run; {len(frontmatter_warnings)} frontmatter-hygiene warning(s); "
+      f"{len(unknown_agent_warnings)} unknown-agent warning(s); "
       f"{len(epic_crosscheck_warnings)} epic cross-check warning(s).")
 
 if STRICT and unknown_agent_warnings:

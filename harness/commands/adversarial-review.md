@@ -186,14 +186,28 @@ Bash({
 })
 ```
 
-**If `CODEX_ENTRY_POINT = "task"` (plans, documents, any non-diff content):**
+**If `CODEX_ENTRY_POINT = "task"` (plans, documents, any non-diff content) — USE THE SUPERVISED RUNNER:**
 ```typescript
 Bash({
-  command: `node "$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)" task --prompt-file /tmp/adversarial-review-input.md --effort xhigh > /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.raw.md 2>&1`,
-  description: "Codex adversarial review (parallel)",
+  command: `python3 "$HOME/.claude/scripts/codex_supervised.py" --prompt-file /tmp/adversarial-review-input.md --out /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.md --effort xhigh --idle-timeout 600 --max-attempts 3 --total-deadline 5400 > /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.status.json 2>&1`,
+  description: "Codex adversarial review (parallel, supervised)",
   run_in_background: true
 })
 ```
+
+This is the **longest single Codex call the command makes** and therefore the one most exposed to the
+mid-run transport stall (Rule 21; openai/codex #31376). The runner kills on `--idle-timeout` of zero
+output growth and RESUMES the same session, so a stall costs the idle window rather than the run.
+Three differences from the companion path, all of which simplify Phase 2c:
+
+- The verdict lands in `--out` **already clean** — it is codex's last message, so there are no `[codex]`
+  progress lines to strip. The JSONL event stream goes to `<out>.jsonl`.
+- The status JSON is the completion signal: `"status": "completed"` means a usable artifact exists;
+  `"failed"` means every attempt stalled or the deadline hit. **`"failed"` is a DEGRADED round, never a
+  finding and never a verdict.**
+- **No `codex_watchdog.py` polling is needed on this path** — idle detection is in-process. Keep the
+  watchdog only for the `adversarial-review --wait` companion path above, which is still unsupervised
+  (the companion builds the git-diff review itself; the runner cannot substitute for it).
 
 **Do not peek at either side's intermediate output.** The fork notification arrives asynchronously; the background Bash is polled non-blockingly.
 
@@ -266,7 +280,16 @@ The fork and the background Bash both run concurrently. Advance only when BOTH a
 2. **Fork completion** arrives as an async user-role notification in a later turn. Never fabricate or predict the fork's result. If the user asks a follow-up before it lands, report status honestly ("fork still running, Codex %s" where %s is the BashOutput status).
 3. Whichever finishes first, keep waiting for the other.
 4. When both the fork notification has arrived AND the Codex shell has exited, proceed to seal-and-sanitize (step below).
-5. **No-OUTPUT watchdog (OR-02, added 2026-07-03) -- run this on EVERY poll turn, not just when the shell looks stuck.** The incident this closes: the Codex sidecar once sat silent for 1h43m at 0% CPU inside a plan-harden run before a human noticed, because the old loop only checked whether the shell had *exited* -- a process can be alive (not exited) yet emit zero bytes indefinitely, and that hang is invisible to a bare `BashOutput` exit-code check. Each poll turn, also run:
+5. **PATH-DEPENDENT LIVENESS CHECK.** Which check applies depends on how Phase 2b launched Codex:
+   - **Supervised path (`CODEX_ENTRY_POINT = "task"`, the default for plans/documents):** nothing to do.
+     Idle detection, the kill, and the resume all happen in-process. Read the status JSON when the shell
+     exits: `"completed"` -> the `--out` artifact is your sealed Codex review, already clean.
+     `"failed"` -> every attempt stalled or the deadline hit; treat it exactly like the `hung` branch
+     below (degrade to Claude-only, notify in-stream). **Never read `"failed"` as a finding or a verdict.**
+   - **Companion path (`CODEX_ENTRY_POINT = "adversarial-review"`, git diffs):** still unsupervised, so the
+     watchdog below is REQUIRED on every poll turn.
+
+6. **No-OUTPUT watchdog (OR-02, added 2026-07-03) -- COMPANION PATH ONLY; run it on EVERY poll turn, not just when the shell looks stuck.** The incident this closes: the Codex sidecar once sat silent for 1h43m at 0% CPU inside a plan-harden run before a human noticed, because the old loop only checked whether the shell had *exited* -- a process can be alive (not exited) yet emit zero bytes indefinitely, and that hang is invisible to a bare `BashOutput` exit-code check. Each poll turn, also run:
    ```
    python3 "$HOME/.claude/scripts/codex_watchdog.py" check /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.raw.md --no-output-window-s 600
    ```
@@ -279,7 +302,11 @@ Do NOT re-enter the coordination loop more than once per orchestrator turn. Do N
 
 ### Seal and sanitize Codex artifact
 
-After the Codex background shell exits successfully:
+**Supervised path:** nothing to seal. `codex_supervised.py --out` already wrote
+`/tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.md` as codex's last message, with no `[codex]`
+progress lines in it. Go straight to the size sanity check.
+
+**Companion path**, after the Codex background shell exits successfully:
 - Read `/tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.raw.md`
 - Strip `[codex]` progress lines
 - Write the cleaned output to `/tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.md`
@@ -453,4 +480,6 @@ If the gate is not met, STOP. Do not mention Phase 3. Do not ask about plan revi
 17. **Read-only every round; deadlock is honest; a blocked resume is not a round.** Verify-loop Codex calls never pass `--write` (the companion enforces a read-only sandbox without it). A `VERDICT: REVISE` at the round cap is reported as a DEADLOCK with its unresolved findings -- never silently upgraded to an approval. A missing or garbled verdict *from a genuine review* is read as REVISE. But a resume refused because a prior task is stuck (`still running` / `/codex:status`) is NOT a verdict at all -- never score it REVISE; fall back to a fresh reviewer thread per Phase 3d step 2 so the loop still gets a real second opinion.
 18. **Review log is the audit trail.** Every verify round is appended to `*-REVIEW-LOG.md` (round, verdict, resolved/unresolved, actions taken). It is the "why" record beside the plan's "what".
 19. **Never hardcode the plugin version in the companion path.** The codex cache dir is version-stamped (`…/openai-codex/codex/<ver>/scripts/codex-companion.mjs`) and keeps a single version, so a plugin update deletes the old path. Always resolve it at call time: `"$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)"` (never re-introduce a literal version anywhere in this file). `installed_plugins.json` is the source of truth for the currently-installed version — check it (`python3 -c "import json;print(json.load(open('$HOME/.claude/plugins/installed_plugins.json'))['plugins'].get('codex@openai-codex'))"`) if the glob ever returns nothing.
+21. **Long Codex calls run under the SUPERVISED runner (`scripts/codex_supervised.py`).** Rule 20's watchdog only fires if the ORCHESTRATOR is polling every turn -- and on 2026-07-26 the orchestrator's own Bash wrapper was killed, so nothing polled while two `xhigh` verify jobs hung for 28 and 20 minutes with `codex-companion status` still reporting `running`. `codex_supervised.py` closes that gap: it supervises the `--json` event stream IN-PROCESS, kills the process GROUP on `--idle-timeout` of zero growth, and RESUMES rather than restarts, bounded by `--max-attempts`/`--total-deadline`. Use it for Phase 2b (wired 2026-07-26 — that call is the longest the command makes) and every verify round. The `adversarial-review --wait` companion path for git diffs stays unsupervised because the companion builds that review itself; the watchdog still covers it. **Never respond to a stall by shrinking the prompt or lowering `--effort`** -- that degrades the review to dodge a transport bug (upstream openai/codex #31376: dead pooled connection, `stream_idle_timeout_ms` never fires), and it does not even help: the smallest prompt tried, 5 KB, hung too. Robustness comes from the supervisor; fidelity stays at `xhigh` with the full document inlined.
+
 20. **Codex no-OUTPUT watchdog (OR-02).** The old failure mode was a live-but-silent Codex process (1h43m observed) that a plain "did the shell exit" check can't see. Phase 2c step 5 runs `codex_watchdog.py check` on every poll turn against the raw-output file's growth, not just its existence — 10 minutes of zero-byte growth is treated as hung: kill the shell, degrade to Claude-only findings, notify the user in-stream. Never silently wait past the window "just in case it's still working" — a live-but-silent process for >10 minutes at 0% CPU IS the definition of hung here.

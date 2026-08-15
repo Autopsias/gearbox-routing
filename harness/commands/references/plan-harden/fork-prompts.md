@@ -89,12 +89,17 @@ If `MEMORY_AVAILABLE=false` from S.3: do NOT spawn Fork A. Record the skip reaso
 
 ### Fork B — external research
 
+*(2026-08-12, RS-02: STEP 0 below adds the prior-art challenge — the anchor and header stay unchanged so the Contents link above keeps resolving.)*
+
 ```
 subagent_type: Explore
 description: "External research for plan-harden Phase 0"
 prompt: |
   You are Fork B in /plan-harden Phase 0. Your job is to surface industry patterns
-  and known anti-patterns relevant to the plan.
+  and known anti-patterns relevant to the plan — AND, whenever the plan already
+  carries prior-art decisions (plan-builder's P8 research pass, RS-01), to
+  adversarially challenge every "build" call: genuinely try to find the thing that
+  already does this, even though the plan already picked build.
 
   AVAILABLE RESEARCH TIERS (orchestrator-detected, do NOT self-introspect):
   <RESEARCH_TIERS_AVAILABLE>   # e.g. ["perplexity", "exa"]
@@ -104,7 +109,37 @@ prompt: |
   <full PLAN_FILE content>
   ---
 
-  STEPS:
+  STEP 0 — prior-art challenge (runs FIRST, only when it applies):
+  Scan the plan's item cards for a "Prior art" block (rendered inside each item's
+  agent-spec by plan-builder when the P8 research pass ran). Collect every item
+  whose recorded decision is "build" — these are the plan's from-scratch calls,
+  the ones worth challenging. Cap at the 3 highest-signal ones (prefer items
+  flagged as a Decision hotspot, then P0/P1 priority, then declaration order) so
+  this step can never crowd out STEP 1's general research below. If the plan has
+  NO build-decision items (or none at all — a plan predating the prior-art pass),
+  skip STEP 0 entirely and go straight to STEP 1; it costs nothing when unused.
+
+  For each capped item, spend ONE adversarial research question: "does a proven,
+  actively-maintained solution already cover <item title / scope>?" Use the SAME
+  tier order as STEP 1 below: first tier only, fall back only on a genuine no-hit.
+  If the item's own recorded source already names and rules out the closest
+  alternative, a repeat hit on that same source is not a new finding — look past
+  it or move on to the next capped item.
+
+  If you find a credible alternative (maintained, plausibly covers the scope), add
+  ONE finding using this exact template, so it reads as a decision downstream:
+
+  `PRIOR-ART CHALLENGE — item <id> ("<item title>") chose "build". Credible
+  alternative: <name> — <one line why it plausibly covers the scope> (source:
+  <url>). Decision: adopt/adapt <name>, or continue building as scoped?`
+
+  Set `confidence` per the normal rule below (>=0.7 only with a citation). If
+  nothing credible turns up for an item after checking, do NOT report a finding
+  for it — a clean "build" call surviving the challenge is an allow, not noise.
+
+  STEP 1 — general research (unchanged; if STEP 0 already spent the research
+  budget on prior-art challenges, one general question is enough — don't pad
+  it back to two just to fill the slot):
   1. Identify 1-2 narrow research questions from the plan (e.g. "what are known
      failure modes of X pattern?", "is Y library still maintained as of 2026?").
      Don't research the plan's whole domain — pick the 1-2 questions where
@@ -121,7 +156,7 @@ prompt: |
     "tier_used": "perplexity|exa-web|exa-deep|ref",
     "findings": [
       {
-        "text": "<one-sentence pattern or anti-pattern + WHY it applies to this plan>",
+        "text": "<one-sentence pattern or anti-pattern + WHY it applies to this plan, OR a PRIOR-ART CHALLENGE line from STEP 0>",
         "confidence": 0.0-1.0,
         "evidence_ref": "<URL or citation>"
       }
@@ -130,12 +165,17 @@ prompt: |
   }
 
   CONSTRAINTS:
-  - Maximum 5 findings.
+  - Maximum 5 findings TOTAL — STEP 0 challenges and STEP 1 general research
+    SHARE this cap; the cap does not raise when STEP 0 applies.
   - Confidence high (>=0.7) ONLY if you have a citation. Speculation gets <=0.5.
-  - Total response budget: ~7k tokens.
+  - Total response budget: ~7k tokens (unchanged — STEP 0 shares it with STEP 1,
+    it does not add to it. If the plan's build-decision count structurally can't
+    fit inside this budget alongside STEP 1, cap harder at STEP 0 rather than
+    silently dropping STEP 1's general research — both duties must survive, even
+    if STEP 0's coverage is partial).
 ```
 
-If `RESEARCH_TIERS_AVAILABLE=[]` from S.3: do NOT spawn Fork B. Skip reason: `"no research MCPs connected — skipping external enrichment"`.
+If `RESEARCH_TIERS_AVAILABLE=[]` from S.3: do NOT spawn Fork B. Skip reason: `"no research MCPs connected — skipping external enrichment"` — and when the plan carries one or more `build`-decision prior-art items, append the count so the gap reads as an explicit notice rather than looking like a clean pass: `"no research MCPs connected — skipping external enrichment (N build-decision item(s) went unchallenged)"`. Counting those items requires no MCP — it's a scan of `PLAN_FILE`'s own "Prior art" blocks, already loaded — so this richer skip reason costs nothing extra even in the no-MCP case.
 
 ### Fork C — edge-case enumeration
 
@@ -277,5 +317,7 @@ If `BLINDSPOT_AVAILABLE=false` from S.3 (including via `--no-blindspot`): do NOT
 **Dossier-to-disk rule (any fork producing long prose):** the four standard forks return ≤5 structured findings inline — that stays as-is. But a fork asked to return a long prose body (a full research dossier, a multi-page scan) intermittently returns an executive summary instead, and the prose is then unrecoverable (observed upstream: compound-engineering-plugin issue #956). If a future fork variant needs to hand back long prose, dispatch it as a general-purpose agent (Explore lacks Write), have it write the full artifact to a scratch file, and return only the path + a ≤5-line gist; downstream readers open the file themselves.
 
 **Agent-fork fallback path only:** forks emit JSON as their final agent message (they do NOT write to `/tmp/` — Explore lacks Write). For each fork return: take the first `{` to the last `}` of the final message and `JSON.parse` it; on parse failure treat as `{"status": "error", "source": "<known>", "errors": ["fork output unparseable"]}` (first-class failure, not silent corruption); if output appears truncated, use what's parseable and append `"truncated"` to errors. Wait for every spawned fork to return, error, or be written off per the ~2-3 min rule before starting Phase 1. Then hold `ENRICHMENT_FINDINGS` in the same shape as above.
+
+**Prior-art challenge findings → decision card (RS-02, 2026-08-12).** A Fork B finding whose `text` starts with `PRIOR-ART CHALLENGE —` names a specific, sourced alternative to one of the plan's `build` decisions. It still enters `ENRICHMENT_FINDINGS.research.findings` like any other Fork B finding and still goes through Phase 4.1's normal severity classification (confidence ≥ 0.7 with a citation reads toward 🔴; a low-confidence hit stays 🟡/🟣) — the decision-card treatment below is presentation, not a bypass of that rule. When Phase 4.3 assembles the final output, render every surviving `PRIOR-ART CHALLENGE` finding in the standard decision-card format already used for §4.0b's parallelization opportunities (at most 3 options, each with its trade-off in one line, a recommendation, and the do-nothing outcome — `~/.claude/commands/references/plan-harden/parallelization-lint.md` → "Step 5 — verdict + decision card"): the options are "adopt/adapt \<alternative\>" and "continue building as scoped" (the do-nothing outcome), with the finding's `evidence_ref` cited as the alternative's source. Fold a merely-`skipped` Fork B run's richer skip reason (the `"(N build-decision item(s) went unchallenged)"` notice above) into the summary block's enrichment line verbatim, so an unchallenged build count is visible in the same run that would otherwise look like a clean pass.
 
 ---

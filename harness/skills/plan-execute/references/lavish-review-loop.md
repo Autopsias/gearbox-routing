@@ -29,8 +29,11 @@ Routine (lavish needs a human at a browser). Use it at two moments:
 2. **Fold the feedback in, then resume.** Annotations are *review intent*, not plan
    writes — you still own every mutation. Apply them the normal way: a scope/dep/
    wording change → edit `spec.json` and `/plan-builder --rebuild --preserve-state`;
-   an "approve, continue" → `/plan-execute <dir> --resume`; a "redo S05 with
-   this change" → re-dispatch that session with the annotation appended. Reply into
+   an "approve, continue" → `--resume` for a **pre-dispatch** gate, or
+   `run.py ack-checkpoint <dir> --session sNN` for a session that already closed and
+   is parked for approval; a "redo S05 with this change" →
+   `run.py redispatch <dir> --session s05 --reason "<the annotation>"`, which resets it
+   (cascading its stale dependents) so the next `plan` dispatches it with the change. Reply into
    the browser with `npx -y lavish-axi poll <…> --agent-reply "<what you changed>"`
    so the conversation stays in the artifact, then `npx -y lavish-axi end <…>` when
    the review is done.

@@ -11,7 +11,7 @@ root, and an event lands in `run.ndjson`.
 | `missing` | No `<plan-execute-closeout>` block found (or only fenced examples) | session → BLOCKED, halt set, note "closeout missing" | Inspect the subagent's output. Re-dispatch the session: `/plan-execute <dir> --session sNN` after `--clear-halt`. |
 | `json_error` | Block found but JSON won't parse, or trailing text after it | session → BLOCKED, halt set | Same — the subagent emitted a malformed block; re-dispatch. |
 | `schema_error` | JSON parses but wrong shape (missing field, bad `result`, non-string ids) | session → BLOCKED, halt set, violations listed | Re-dispatch; if it recurs, the prompt may be mis-teaching the format. |
-| `semantic_error` | Hallucinated item id, completed∩blocked overlap, or DONE without full coverage | session → BLOCKED, halt set, violation named | Investigate whether the subagent actually did the work; re-dispatch or hand-correct. |
+| `semantic_error` | Hallucinated item id, completed∩blocked overlap, DONE without full coverage, or a malformed/unknown-id `plan_impact` on a v3+ plan | session → BLOCKED, halt set, violation named | Investigate whether the subagent actually did the work; re-dispatch or hand-correct. A `plan_impact` naming a session that is in no manifest is a subagent error, never something to quietly drop. |
 
 When a batch member fails, **finish applying the other members' closeouts first**
 (so their work is recorded) — then stop. The halt prevents the *next* batch, not
@@ -24,7 +24,8 @@ the consumption of in-flight siblings.
 | `DONE` | items_completed → DONE, session → DONE. Loop continues. |
 | `PARTIAL` | items_completed → DONE, session → PARTIAL. Loop re-dispatches the session next pass to finish remaining items. |
 | `BLOCKED` | items_blocked → BLOCKED, session → BLOCKED, halt set. Loop stops. |
-| `human_checkpoint_reason` non-null | session → AWAITS_REVIEW, loop halts; continue with `--resume`. |
+| `plan_impact` set (schema v3+) | Session keeps its own result; the PLAN is halted with `kind: "replan"` and a decision brief (invalidated sessions · reason · amend/retire/proceed). Deferred behind a pending verify block or an unacked human checkpoint — reported as `replan_deferred`, never dropped. On schema v5+ record YOUR judgement first — `run.py recommend-replan <dir> --session sNN --recommendation "…"` — it lands in `HALT_NOTICE.txt` beside the options, and `resolve-replan` refuses without it. Then answer with `run.py resolve-replan <dir> --session sNN --decision … --reason "…"` AFTER applying the change through `amend-session`/`retire-session`/`redispatch`. |
+| `human_checkpoint_reason` non-null | session → AWAITS_REVIEW, loop halts. This is the **post-session** flavor (the session already closed): approve it with `run.py ack-checkpoint <dir> --session sNN`. NOT `--resume`, which is for a pre-dispatch gate and would re-run finished work — the loop now refuses to re-dispatch it and surfaces `ack_required` instead. |
 
 ## Structural / environmental failures
 
@@ -33,6 +34,7 @@ the consumption of in-flight siblings.
 | `manifest/HTML mismatch` | A session in manifest.json has no matching `<!-- ARTICLE:id -->` anchor in PLAN.html (stale manifest or hand-edited HTML) | Rebuild: `/plan-builder --rebuild --preserve-state <slug>`. |
 | `expected exactly 1 '<!-- ARTICLE:id:BEGIN -->'` | Anchor count wrong — duplicated/deleted block | The HTML was hand-edited or a prior write corrupted it. Restore from git or rebuild. |
 | `block 'id' missing data-status / pill / notes-content` | Anchor preflight: the article structure was damaged | Same as above. |
+| `refusing to … this plan is HALTED — REPLAN …` | A `plan_impact` closeout parked the plan (`halt.kind == "replan"`) and you ran `plan`/`begin` | Not a failure — a decision. Read the brief (`run.py plan` prints it as JSON and as presentable text in `replan_text`; `status` carries `replan_pending`), record your recommendation with `recommend-replan`, apply the pick, then `resolve-replan`. The mutation commands and `redispatch` are allowed through this halt on purpose. |
 | `plan_schema_version is None/1` | A v1 (Cowork-era) plan | Rebuild via `/plan-builder --rebuild <spec.json>`, or view read-only in a browser. v1 plans can't auto-execute. |
 | lock contention | Another `/plan-execute` is in flight (or a stale `.lock`) | If stale (>1h or dead pid), the helper overwrites it automatically. Otherwise wait, or remove `<dir>/.lock` manually. |
 | `refusing to acquire the plan lock … is on <FS class>` | The plan dir resolves onto a networked/sync FS (iCloud, Google Drive / OneDrive / Dropbox via Finder, NFS/SMB) where the pidfile lock is unreliable (P5) | Move the plan to local disk, or re-run `begin` with `--unsafe-lock` to override (logs a `lock_fs_warning` event and proceeds at your own risk). |

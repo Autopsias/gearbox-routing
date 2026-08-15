@@ -21,8 +21,16 @@ tool. Design to the contracts below.
   (`build_plan.py` warns). For a model-pinned session, use a fresh typed agent.
 - Subagents run to completion and return their final message; the parent does not
   interleave with them. Continue a prior agent with `SendMessage`; a new dispatch
-  starts fresh. `isolation: "worktree"` gives a session its own git worktree (use
-  only when parallel sessions would mutate files and conflict).
+  starts fresh. The Agent tool also offers `isolation: "worktree"` — **do NOT use
+  it to dispatch a plan session.** A measured spike found it silently destroys
+  agent output that lands in an untracked or gitignored path, with no error and
+  no signal to the orchestrator. Plan-session isolation is orchestrator-managed
+  `git worktree add` instead, and note that containment is advisory: putting a
+  dispatched subagent into an existing worktree via `EnterWorktree(path=…)` is
+  REFUSED at the repo root, contrary to that tool's own docs (measured
+  2026-08-12). [`parallel-group-contract.md`](parallel-group-contract.md) is the
+  single statement of record for what a parallel group may and may not do; read
+  it before designing anything around isolation.
 
 ## Workflows ("ultracode")
 

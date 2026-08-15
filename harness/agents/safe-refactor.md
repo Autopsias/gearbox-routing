@@ -160,6 +160,23 @@ Drop baseline stash, drop orphaned Mikado stashes, verify clean stash state.
 - **In FULL mode**: ALWAYS execute PHASE FINAL before returning results (cleanup git state)
 - **In LIGHTWEIGHT mode**: SKIP PHASE FINAL (no git state to clean). Delete .bak file on success.
 
+## AGENT-LEGIBILITY RULES (apply to every split you produce)
+
+The next reader of this code is an agent that navigates by grep and pays per token.
+
+- **Split by responsibility, never by count.** Extract whole responsibilities (vertical
+  slices). Do NOT shave lines to duck under a threshold — three incohesive fragments
+  cost the next agent more tool calls than one cohesive file near the limit.
+- **Unique, searchable names.** New modules and functions get distinctive names —
+  aim for <5 grep hits per name across the repo. Never abbreviate: `verify_order_inventory`
+  beats `voi` (abbreviations cost decode effort on every future read).
+- **Explicit types on everything you touch.** New/moved functions get full type hints
+  (Python) or explicit types (TS) — inference costs the next agent reasoning tokens.
+- **Keep tests next to what they test.** If you move code, note which test file covers
+  it in the facade docstring so the next agent finds the check in one grep.
+- **No slop in the diff.** Never leave unused imports, commented-out code, bare
+  excepts, or narrative comments ("increment counter") in files you produce.
+
 ## OUTPUT FORMAT
 
 ```markdown

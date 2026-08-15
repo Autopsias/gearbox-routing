@@ -7,6 +7,7 @@ Detailed phase-by-phase instructions for developing stories within `/epic-dev`. 
 - [Story Type Detection](#story-type-detection)
 - [UAT Story Handling](#uat-story-handling)
 - [Infrastructure Story Handling](#infrastructure-story-handling)
+- [Shadow Sampling for Verified Delegations](#shadow-sampling-for-verified-delegations)
 - [Phase: CREATE (status == "backlog")](#phase-create-status-backlog)
 - [Phase: DEVELOP (status == "ready-for-dev")](#phase-develop-status-ready-for-dev)
 - [VERIFICATION GATE 2.5: Post-Implementation Test Verification](#verification-gate-25-post-implementation-test-verification)
@@ -15,6 +16,50 @@ Detailed phase-by-phase instructions for developing stories within `/epic-dev`. 
 - [Status Update Pattern (Reusable)](#status-update-pattern-reusable)
 - [Epic Completion (STEP 5)](#epic-completion-step-5)
 
+
+---
+
+## Shadow Sampling for Verified Delegations
+
+This is an observational two-stage hook for an eligible `Agent`/`Task`
+delegation. It is **not** a new gate and must never change the primary prompt,
+result, retry path, or story state. It is inert until the operator has deployed
+the harness and explicitly enabled `~/.dyno/telemetry/shadow-config.json`.
+
+Before dispatching a build or repair `Task` that already has a resolved,
+rerunnable automated pass/fail gate, do this once:
+
+1. Require an explicit gate descriptor with an immutable ID, a direct `argv`
+   array, a cwd below `{project_root}`, a timeout, and an empty
+   `env_allowlist`. Do not convert prose checks, a Skill, a shell pipeline, a
+   test-output excerpt, or a gate with environment dependencies into a shadow
+   candidate. If no such descriptor exists, dispatch normally.
+2. Write the exact primary task prompt and the descriptor JSON only under
+   `~/.dyno/telemetry/epic-registration/`; never put either in this repository
+   or an evidence artifact. Invoke the deployed pure-Python helper:
+
+   ```text
+   ~/.claude/hooks/shadow-sampling.py register-epic \
+     --session "epic-{epic_num}-{story_key}-{phase}-{iteration}" \
+     --prompt-file ~/.dyno/telemetry/epic-registration/<opaque>.prompt \
+     --gate-file ~/.dyno/telemetry/epic-registration/<opaque>.gate.json \
+     --cwd {project_root}
+   ```
+
+3. If the helper prints an opaque marker, append that marker verbatim to the
+   `Task` **description** only. Do not place it in the task prompt, paraphrase
+   it, reuse it, or expose it in a status update. If it prints nothing or exits
+   nonzero, keep the ordinary description and immediately dispatch the primary.
+   Registration failure is observational and must not delay or block work.
+
+The hook accepts only enabled, allowlisted gates and makes its deterministic
+selection from the Claude session ID; it later runs the shadow only after the
+primary completion event (`SubagentStop` for default background Agents, or a
+completed `PostToolUse(Agent)` response for foreground Agents). The shadow's result stays under
+`~/.dyno/telemetry/` and is never a source of story decisions. The production
+shadow lane has no Bash, Agent, Web, Skill, or MCP tools; no agent-initiated
+network; a disposable HOME/state directory; and a disposable worktree. (The
+already-approved model transport is distinct from a shadow agent action.)
 
 ---
 

@@ -9,3 +9,10 @@ claude/skills/_scrub-evidence-s04.log
 
 # OS cruft
 .DS_Store
+
+# plan-execute runtime state (auto-added by plan-builder)
+_plans/*/.lock
+_plans/*/_closeouts/
+_plans/*/run.ndjson
+_plans/*/run_state.json
+_plans/*/HALT_NOTICE.txt

@@ -15,16 +15,20 @@ have run (SSOT `task_classes:`) against what DID run (transcript model mix + rec
 and turn mismatches into ledger entries and calibration proposals.
 
 **Read-only posture.** This skill writes NOTHING except (after explicit per-entry operator
-confirmation) appends to `~/.claude/evals/routing/MISROUTES.md`. Calibration-level changes
-(a class default, an agent pin, an elasticity) are handed to `/routing-update` — one
-apply-path, one guard, one approval protocol.
+confirmation) appends to `~/.claude/evals/routing/MISROUTES.md`, plus `aggregate_outcomes.py`'s
+own `.last-aggregated` bookkeeping stamp (a byte-offset/mtime marker next to the ledger,
+never the ledger or the SSOT itself — see step 1b). Calibration-level changes (a class
+default, an agent pin, an elasticity) are handed to `/routing-update` — one apply-path, one
+guard, one approval protocol.
 
 **Read, never hardcode.** Expected classes, default pairs, and prices come from
 `~/.claude/model-routing.yaml` AT RUN TIME. This skill's prose carries no tier values.
 
-## Checklist (all 5 steps)
+## Checklist (all 6 steps)
 
 - [ ] **Deterministic scan** — run `retro_scan.py`, read the JSON
+- [ ] **Aggregation** (step 1b) — run `aggregate_outcomes.py`, read its JSON (never the raw
+  `outcomes.ndjson` ledger); surface any fired proposal and the `apex_revisit` callout
 - [ ] **Judgment layer** — infer task shape, compare expected vs actual routing
 - [ ] **Report** — ranked findings, each with a recommended action
 - [ ] **Did-it-stick check** — verify prior changes are still in place
@@ -44,10 +48,68 @@ python3 ~/.claude/skills/routing-retro/scripts/retro_scan.py \
 - Useful variants: `--project <substring>` to scope to one project; `--since YYYY-MM-DD`;
   `--last N`.
 - Output per session: model mix %, token breakdown, **cost against SSOT `prices:`**,
+  `context_peak_tokens` + `reread_cost_usd`/`reread_cost_pct` (context carried forward),
   duration, tool/API error counts, `max_tokens` truncations, routing receipts
   (`class -> tier` lines), `/model`·`/effort` switch commands, first prompt, AI title.
 - Read the JSON output, not the transcripts. Only open a raw transcript when a specific
   finding needs verbatim evidence (quote a receipt, confirm an escalation sequence).
+
+### 1b. Aggregation (cohort-level facts + threshold proposals)
+
+`retro_scan.py` reads TRANSCRIPTS (cost, context, receipts — the dispatch-hygiene half).
+`aggregate_outcomes.py` reads the separate outcome LEDGER
+(`evals/routing/outcomes.ndjson`, written by `/plan-execute` at every verify/rework
+resolution) and turns it into per-cell success-rate facts and, only past minimum sample
+sizes, upgrade/downgrade PROPOSALS for `/routing-update`. Run it every retro, before the
+judgment layer:
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/aggregate_outcomes.py > /tmp/aggregate.json
+```
+
+- **Read the JSON, never the raw ledger.** The script groups attempt records into SESSION
+  COHORTS, excludes ungated/administrative/retired outcomes from every rate, and gates
+  proposals on minimum sample size + model attestation — re-deriving any of that by eyeballing
+  `outcomes.ndjson` directly reproduces exactly the bugs it exists to prevent.
+- **An empty `proposals[]` is not a null result.** Read `time_to_signal` for each cell's
+  current N and, when below threshold, the projected earliest date the sample size could be
+  met at the observed cadence — report that in step 3 as "silence expected until ~N months",
+  never as "nothing to see."
+- **`apex_revisit`** — if `callout: true` (five cumulative cohorts carrying a fable-rung
+  escalation), surface it as a named finding in the report: review whether those fable climbs
+  actually converted (the ssot-01 revisit trigger), independent of any upgrade/downgrade
+  proposal.
+- **A fired proposal is evidence, not an instruction.** Carry its `proposal_id`,
+  `first_attempt_pass_rate`/`escalation_rate`, and N into the judgment layer and the report —
+  the apply path is always `/routing-update`, never this skill.
+
+#### Downgrade canary protocol
+
+A DOWNGRADE proposal never adopts from the class-default population alone — it is a
+two-stage, explicit-tag experiment (grill 2026-08-13):
+
+1. **Stage 1 — smoke.** The proposal names a `proposal_id`, the class, and the current
+   (higher) rung. The operator authors the NEXT plan(s) of that class at ONE RUNG LOWER,
+   with plan-builder writing `routing_experiment: {kind: "canary", proposal_id: "<id>"}`
+   into each session's spec (carried through to `manifest.json` and every ledger record
+   that session produces — see `plan-builder/references/schemas.md`'s `routing_experiment`
+   field). Route the next 3 sessions this way, gates on. **Any failure aborts the
+   experiment** — a passing 3-session smoke alone can never adopt (rule of three: at n=3 the
+   95% upper bound on the failure rate is 100%).
+   - A canary session added mid-flight via `add-session` must pass `--infographic-group`
+     explicitly — an ambiguous group resolution silently drops the item from the progress
+     denominator (see `plan-mutation-item-pillar-placement.md`).
+2. **Stage 2 — adoption evidence.** `aggregate_outcomes.py` aggregates every
+   `routing_experiment`-tagged cohort under its `proposal_id` as an explicit CANARY cell
+   (`canaries[]` in the JSON), separate from the normal class-default cells. It reaches
+   `adoption-ready` only at N≥10, first-attempt pass≥0.90, AND attempts-per-success≤1.1 —
+   never on raw success rate alone.
+3. **Judge at the next retro.** Read `canaries[]` for the proposal's `proposal_id`:
+   `smoke-failed` → report the abort and drop the proposal; `smoke-in-progress` /
+   `smoke-passed-awaiting-adoption-evidence` → report progress toward N=10, no action;
+   `adoption-ready` → recommend `/routing-update` to adopt (which also writes the
+   `evals/routing/adoptions.ndjson` boundary the aggregator reads back for did-it-help
+   comparisons on future retros).
 
 ### 2. Judgment layer
 
@@ -59,7 +121,11 @@ Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_p
 2. **Expected class** per SSOT `task_classes:` → expected (model, effort) pair.
 3. **Compare vs actual** model mix + receipts + switches. Flag per the rubric:
    over-modeled, under-modeled (escalation-ladder signatures: repeated failures then a
-   model switch), receipt-vs-actual mismatch, cost outlier, degradation-ladder activation.
+   model switch), receipt-vs-actual mismatch, cost outlier, degradation-ladder activation,
+   context-bloat. The last one is a *dispatch-hygiene* flag, not a routing one — it needs
+   cited evidence that the session's work DIVERGED, never a token count alone (a long hard
+   single task with a big context is correct behaviour), and its remedy is a clean worker,
+   never a tier/effort change.
 4. **Prescriptive-prompt friction (fable-pinned agents only).** Anthropic's Fable-5
    prompting guide warns that skills/agent prompts written for prior models are often too
    prescriptive for Fable and can DEGRADE output. For sessions that dispatched a

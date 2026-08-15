@@ -3,26 +3,99 @@
     "kind": "skill",
     "skill": "eval",
     "args": "--smoke",
-    "probe_flags": ["--smoke"],
+    "probe_flags": [
+      "--smoke"
+    ],
     "timeout": 1200,
     "success_criteria": "the /eval smoke run reports PASS (no metric drop >2% vs the saved baseline)",
-    "fixture_fake": { "returncode": 0, "stdout": "PASS (fixture)" }
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "PASS (fixture)"
+    }
   },
   "code-review-gate": {
-    "kind": "skill",
-    "skill": "code-review",
-    "args": "",
-    "timeout": 1200,
-    "success_criteria": "the review returns NO blocking/critical finding; the orchestrator reports the gate failed (rework) if any blocking finding exists, attaching the findings as the rework feedback",
-    "fixture_fake": { "returncode": 0, "stdout": "no blocking findings (fixture)" }
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "printf '%b\\n' \"$0\" >&2; exit 1",
+      "code-review-gate has NO portable default.\\n\\nThis gate id resolved, but the skill-bundled default cannot review anything: there is\\nno model-invocable working-diff reviewer to bind a gate to. /code-review and /review\\nboth carry disable-model-invocation: true, so a skill-kind mapping to either is\\nunlaunchable -- and because verify-gates.md has the orchestrator judge a skill gate\\n'from its output', an unlaunchable skill gate is indistinguishable from a passing one.\\nThat silent pass shipped twice (2026-07-26 and its remap). This deliberate failure is\\nthe fix: a gate you cannot run must be loud, not green.\\n\\nDefine it in <project>/.claude/eval-gates.json. Project entries win over these\\ndefaults, so a local definition makes this message go away. Prefer kind: argv -- an\\nexit code cannot be self-attested. Worked example (example-project, 2026-07-28):\\n\\n  \\\"code-review-gate\\\": {\\n    \\\"kind\\\": \\\"argv\\\",\\n    \\\"argv\\\": [\\\"bash\\\", \\\"scripts/session-quality-gate.sh\\\"],\\n    \\\"cwd\\\": \\\".\\\", \\\"timeout\\\": 900\\n  }\\n\\nThat script lints, type-checks and import-checks the Python the session actually\\nchanged -- detected from the WORKING TREE, because verify gates run before\\npost_session commits, so any committed-delta detection sees nothing and passes.\\nIf the session genuinely needs an LLM review, make it a require_evidence artifact\\ninstead of a gate."
+    ],
+    "cwd": ".",
+    "timeout": 60,
+    "success_criteria": "FAILS BY DESIGN until the project defines code-review-gate in its own .claude/eval-gates.json. There is no portable reviewer to default to, and a gate that cannot run must be loud rather than green. The id is kept in the bundled vocabulary so existing plans still BUILD (build_plan.py rejects unknown gate ids); only execution fails, with instructions.",
+    "_note": "REWRITTEN 2026-07-28. Was kind: skill -> `code-review`, which is disable-model-invocation and cannot be launched by any agent: silently unrunnable for every session that declared it and had no project-local override. A 2026-07-26 project-side remap to skill `review` reproduced the bug (same flag, and `review` is a routing alias, not a reviewer). Reproduced live 2026-07-27: the same probe plan returned invoke-skill/code-review from outside a .claude root and run-argv from inside a project that defines the gate locally -- i.e. every plan built outside a .claude root inherited the silent no-op."
   },
   "test-orchestrate": {
     "kind": "skill",
     "skill": "test-orchestrate",
     "args": "--run-first --no-chain",
-    "probe_flags": ["--run-first", "--no-chain"],
+    "probe_flags": [
+      "--run-first",
+      "--no-chain"
+    ],
     "timeout": 1800,
     "success_criteria": "all tests pass (exit-zero outcome from test-orchestrate); any remaining failure is a gate failure that triggers rework",
-    "fixture_fake": { "returncode": 0, "stdout": "All tests passing (fixture)" }
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "All tests passing (fixture)"
+    }
+  },
+  "llm-review-low": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --timeout 180"
+    ],
+    "cwd": ".",
+    "timeout": 420,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE"
+    ],
+    "success_criteria": "exit 0. Runs `claude -p \"/code-review low\" --output-format json` against the session's WORKING-TREE diff and parses the reviewer's findings block. PASS REQUIRES A PARSEABLE, EMPTY FINDINGS BLOCK -- exit 0 from the CLI is NOT enough. Three outcomes: 0 = empty findings block; 1 = >=1 finding; 2 = INDETERMINATE (no parseable block after one retry, or empty/invalid stdout, or is_error). 2 is a FAILURE, never a pass: a headless session can exit 0 having emitted nothing, and a gate that cannot tell 'no findings' from 'no output' is the silent-green bug this framework already shipped twice. Intent-into-review: PLAN_EXECUTE_INTENT_FILE (or --intent-file) feeds the session's ## Work text to the reviewer inside UNTRUSTED-DATA markers so a deliberate choice classifies ask-user; the exit code is computed from the findings count alone, so intent can only downgrade an action, never clear a finding.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=low verdict=empty findings=0 (fixture)"
+    },
+    "_note": "ADDED 2026-08-12 (plan-framework-upgrade s10, RV-01) on the strength of s01's BINDABLE probe verdict, which proved main-tree AND in-worktree binding -- both matter, because isolated parallel-group members run their gates inside their own worktree. PROVEN BEFORE INSTALL, not asserted: fixtures/llm-review-gate/rerun.sh plants an off-by-one, runs every INSTALLED level, and exits non-zero if the plant is missed, if the clean allow-control fails, if an intent block claiming the bug is deliberate clears it, or if any of the three captured INDETERMINATE responses (empty result / conversational summary with no findings block / zero-byte stdout, all exit 0) passes. The harness runs under the same restricted env allowlist run_deploy_argv imposes in production. Distinct from code-review-gate ON PURPOSE: that id is the DETERMINISTIC pytest/lint gate and is not overloaded. TIMEOUTS are 4x the slowest wall measured on a ~10-line fixture diff (31s at this level); a real multi-file diff reviews slower, so if this ever times out raise it from a MEASURED run rather than guessing -- a timeout arrives in the feedback file as one line and is indistinguishable from a real finding."
+  },
+  "llm-review-medium": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --timeout 300"
+    ],
+    "cwd": ".",
+    "timeout": 660,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE"
+    ],
+    "success_criteria": "exit 0. Runs `claude -p \"/code-review medium\" --output-format json` against the session's WORKING-TREE diff and parses the reviewer's findings block. PASS REQUIRES A PARSEABLE, EMPTY FINDINGS BLOCK -- exit 0 from the CLI is NOT enough. Three outcomes: 0 = empty findings block; 1 = >=1 finding; 2 = INDETERMINATE (no parseable block after one retry, or empty/invalid stdout, or is_error). 2 is a FAILURE, never a pass: a headless session can exit 0 having emitted nothing, and a gate that cannot tell 'no findings' from 'no output' is the silent-green bug this framework already shipped twice. Intent-into-review: PLAN_EXECUTE_INTENT_FILE (or --intent-file) feeds the session's ## Work text to the reviewer inside UNTRUSTED-DATA markers so a deliberate choice classifies ask-user; the exit code is computed from the findings count alone, so intent can only downgrade an action, never clear a finding.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=medium verdict=empty findings=0 (fixture)"
+    },
+    "_note": "ADDED 2026-08-12 (plan-framework-upgrade s10, RV-01) on the strength of s01's BINDABLE probe verdict, which proved main-tree AND in-worktree binding -- both matter, because isolated parallel-group members run their gates inside their own worktree. PROVEN BEFORE INSTALL, not asserted: fixtures/llm-review-gate/rerun.sh plants an off-by-one, runs every INSTALLED level, and exits non-zero if the plant is missed, if the clean allow-control fails, if an intent block claiming the bug is deliberate clears it, or if any of the three captured INDETERMINATE responses (empty result / conversational summary with no findings block / zero-byte stdout, all exit 0) passes. The harness runs under the same restricted env allowlist run_deploy_argv imposes in production. Distinct from code-review-gate ON PURPOSE: that id is the DETERMINISTIC pytest/lint gate and is not overloaded. TIMEOUTS are 4x the slowest wall measured on a ~10-line fixture diff (61s at this level); a real multi-file diff reviews slower, so if this ever times out raise it from a MEASURED run rather than guessing -- a timeout arrives in the feedback file as one line and is indistinguishable from a real finding."
+  },
+  "llm-review-high": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level high --timeout 660"
+    ],
+    "cwd": ".",
+    "timeout": 1380,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE"
+    ],
+    "success_criteria": "exit 0. Runs `claude -p \"/code-review high\" --output-format json` against the session's WORKING-TREE diff and parses the reviewer's findings block. PASS REQUIRES A PARSEABLE, EMPTY FINDINGS BLOCK -- exit 0 from the CLI is NOT enough. Three outcomes: 0 = empty findings block; 1 = >=1 finding; 2 = INDETERMINATE (no parseable block after one retry, or empty/invalid stdout, or is_error). 2 is a FAILURE, never a pass: a headless session can exit 0 having emitted nothing, and a gate that cannot tell 'no findings' from 'no output' is the silent-green bug this framework already shipped twice. Intent-into-review: PLAN_EXECUTE_INTENT_FILE (or --intent-file) feeds the session's ## Work text to the reviewer inside UNTRUSTED-DATA markers so a deliberate choice classifies ask-user; the exit code is computed from the findings count alone, so intent can only downgrade an action, never clear a finding.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=high verdict=empty findings=0 (fixture)"
+    },
+    "_note": "ADDED 2026-08-12 (plan-framework-upgrade s10, RV-01) on the strength of s01's BINDABLE probe verdict, which proved main-tree AND in-worktree binding -- both matter, because isolated parallel-group members run their gates inside their own worktree. PROVEN BEFORE INSTALL, not asserted: fixtures/llm-review-gate/rerun.sh plants an off-by-one, runs every INSTALLED level, and exits non-zero if the plant is missed, if the clean allow-control fails, if an intent block claiming the bug is deliberate clears it, or if any of the three captured INDETERMINATE responses (empty result / conversational summary with no findings block / zero-byte stdout, all exit 0) passes. The harness runs under the same restricted env allowlist run_deploy_argv imposes in production. Distinct from code-review-gate ON PURPOSE: that id is the DETERMINISTIC pytest/lint gate and is not overloaded. TIMEOUTS are 4x the slowest wall measured on a ~10-line fixture diff (165s at this level); a real multi-file diff reviews slower, so if this ever times out raise it from a MEASURED run rather than guessing -- a timeout arrives in the feedback file as one line and is indistinguishable from a real finding."
   }
 }

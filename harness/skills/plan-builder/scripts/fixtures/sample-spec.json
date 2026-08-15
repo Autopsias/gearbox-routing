@@ -1,6 +1,7 @@
 {
   "title": "Sample plan (schema fixture)",
   "subtitle": "Sample plan used as a schema fixture",
+  "plan_schema_version": 4,
   "categories": [
     {
       "key": "quick-wins",
@@ -50,7 +51,11 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/qw-01.py, tests/test_qw_01.py",
+      "prior_art": {
+        "decision": "adopt",
+        "source": "Synthetic off-the-shelf tool A (https://example.invalid/tool-a)"
+      }
     },
     {
       "id": "qw-02",
@@ -66,7 +71,9 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/qw-02.py, tests/test_qw_02.py",
+      "research_status": "skipped",
+      "research_reason": "Synthetic: no research MCP tier was reachable during authoring."
     },
     {
       "id": "ft-01",
@@ -85,7 +92,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/ft-01.py, tests/test_ft_01.py",
+      "prior_art": {
+        "decision": "build",
+        "source": "Closest match: Synthetic OSS project B (https://example.invalid/project-b)",
+        "note": "Synthetic: project B lacks the feature this item needs, so build was chosen despite the match."
+      }
     },
     {
       "id": "ft-02",
@@ -101,7 +113,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/ft-02.py, tests/test_ft_02.py",
+      "prior_art": {
+        "decision": "adapt",
+        "source": "Synthetic library C (https://example.invalid/lib-c)",
+        "note": "Synthetic: covers most of the scope; the remainder is custom wiring."
+      }
     },
     {
       "id": "ft-03",
@@ -116,7 +133,11 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/ft-03.py, tests/test_ft_03.py",
+      "prior_art": {
+        "decision": "build",
+        "source": "Synthetic: no established solution found for this narrow internal need."
+      }
     },
     {
       "id": "or-01",
@@ -133,7 +154,9 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/or-01.py, tests/test_or_01.py",
+      "research_status": "skipped",
+      "research_reason": "Synthetic: item judged too small to warrant the research question."
     },
     {
       "id": "or-02",
@@ -149,7 +172,11 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/or-02.py, tests/test_or_02.py",
+      "prior_art": {
+        "decision": "adopt",
+        "source": "Synthetic tool D (https://example.invalid/tool-d)"
+      }
     },
     {
       "id": "or-03",
@@ -166,7 +193,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/or-03.py, tests/test_or_03.py",
+      "prior_art": {
+        "decision": "build",
+        "source": "Closest match: Synthetic service E (https://example.invalid/service-e)",
+        "note": "Synthetic: service E requires a paid tier incompatible with this project's constraints."
+      }
     },
     {
       "id": "ps-01",
@@ -183,7 +215,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/ps-01.py, tests/test_ps_01.py",
+      "prior_art": {
+        "decision": "adapt",
+        "source": "Synthetic framework F (https://example.invalid/framework-f)",
+        "note": "Synthetic: framework F needs a thin adapter layer, otherwise fits."
+      }
     },
     {
       "id": "ps-02",
@@ -199,7 +236,11 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/ps-02.py, tests/test_ps_02.py",
+      "prior_art": {
+        "decision": "build",
+        "source": "Synthetic: no established solution found for this narrow internal need."
+      }
     },
     {
       "id": "sh-01",
@@ -216,7 +257,9 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/sh-01.py, tests/test_sh_01.py",
+      "research_status": "skipped",
+      "research_reason": "Synthetic: no research MCP tier was reachable during authoring."
     },
     {
       "id": "sh-02",
@@ -234,7 +277,11 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/sh-02.py, tests/test_sh_02.py",
+      "prior_art": {
+        "decision": "adopt",
+        "source": "Synthetic tool G (https://example.invalid/tool-g)"
+      }
     },
     {
       "id": "sa-01",
@@ -254,7 +301,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/sa-01.py, tests/test_sa_01.py",
+      "prior_art": {
+        "decision": "build",
+        "source": "Closest match: Synthetic library H (https://example.invalid/lib-h)",
+        "note": "Synthetic: library H is unmaintained (no release in 3 years), so build was chosen despite the match."
+      }
     },
     {
       "id": "sa-02",
@@ -270,7 +322,12 @@
         "Synthetic agent instruction line for the sample fixture.",
         "Synthetic agent instruction line for the sample fixture."
       ],
-      "touches": "path/to/touched/file"
+      "touches": "src/sa-02.py, tests/test_sa_02.py",
+      "prior_art": {
+        "decision": "adapt",
+        "source": "Synthetic service I (https://example.invalid/service-i)",
+        "note": "Synthetic: covers most of the scope with light customization."
+      }
     }
   ],
   "sessions": [
@@ -290,7 +347,7 @@
       "prompt": "Do the work described by this session's items. Produce the named evidence artifacts under the session's evidence directory, then write the closeout JSON. Synthetic fixture text.",
       "dispatch": {
         "subagent_type": null,
-        "parallel_group": "wave-a",
+        "parallel_group": null,
         "depends_on": [],
         "requires_human_checkpoint": false
       },
@@ -339,7 +396,7 @@
         ]
       },
       "post_session": {
-        "git": "commit",
+        "git": "none",
         "kind": "ship-ready",
         "skip_if_partial": true
       }
@@ -371,7 +428,7 @@
         "require_evidence": true
       },
       "post_session": {
-        "git": "commit",
+        "git": "none",
         "kind": "ship-ready",
         "skip_if_partial": true
       }
@@ -404,7 +461,7 @@
         "require_evidence": true
       },
       "post_session": {
-        "git": "commit",
+        "git": "none",
         "kind": "spike",
         "skip_if_partial": true
       }
@@ -590,12 +647,14 @@
         "parallel_group": null,
         "depends_on": [
           "s02",
+          "s03",
           "s04",
           "s06",
           "s08"
         ],
         "requires_human_checkpoint": false,
-        "depends_on_policy": "completed_or_terminal"
+        "depends_on_policy": "completed_or_terminal",
+        "integrates_group": "wave-b"
       },
       "verify": {
         "on_fail": "rework",

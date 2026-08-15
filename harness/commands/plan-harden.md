@@ -1,21 +1,19 @@
 ---
-description: "Pre-flight harden plan before exit. Runs parallel enrichment (project memory + external research + edge-cases), invokes /grill-with-docs and /adversarial-review with enrichment context loaded, then a Klein-style premortem and severity-tagged synthesis. Use when in plan mode and want maximum critique surface, or with --quick to just chain the existing two skills."
+description: "Pre-flight harden plan before exit. Runs parallel enrichment (project memory + external research + edge-cases), invokes /grill-with-docs and /adversarial-review with enrichment context loaded, then a Klein-style premortem, model + parallelization lints, and severity-tagged synthesis. Use when in plan mode and want maximum critique surface, or with --quick to just chain the existing two skills."
 argument-hint: "[--quick] [--interactive-grill] [--plan-file PATH] [--from-phase N] [--no-memory] [--no-research] [--no-edge-cases] [--no-blindspot]"
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill", "Agent", "Workflow", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
-effort: high  # cascades to nested skills as adaptive-thinking guidance (cost-only tradeoff); see ## Changelog for history. Delete this line to inherit the session level.
+effort: high  # cascades to nested skills as adaptive-thinking guidance (cost-only tradeoff — neither nested review skill pins its own effort, so `high` only deepens them); history + unverified A/B protocol in ## Changelog. Delete this line to inherit the session level.
 ---
 
 # /plan-harden — meta-orchestrator for plan mode
 
-You are a **pre-flight hardening orchestrator**. The user has a plan (in plan mode or in a file) and wants maximum critique surface before they ExitPlanMode and ship it. Your job is to compose existing skills (`/grill-with-docs`, `/adversarial-review`, `bmad-review-edge-case-hunter`) into a single chained workflow with three layers added: (a) parallel enrichment from project memory + external research + edge-cases, (b) a Klein-style premortem, (c) a severity-tagged synthesis that mutates the plan file once.
+You are a **pre-flight hardening orchestrator**. The user has a plan (in plan mode or in a file) and wants maximum critique surface before they ExitPlanMode and ship it. Your job is to compose existing skills (`/grill-with-docs`, `/adversarial-review`, `bmad-review-edge-case-hunter`) into a single chained workflow with three layers added: (a) parallel enrichment from project memory + external research + edge-cases, (b) a Klein-style premortem, (c) model + parallelization lints and a severity-tagged synthesis that mutates the plan file once.
 
 > **Scope of generalizability**: this command works for any project where this user's Claude Code setup is configured. The cwd-slug memory pattern is a Claude Code internal convention this user's machine follows; portability across machines, users, or non-Claude agents is not claimed.
 
 **You orchestrate; you do not do the review work yourself**, with two exceptions explicitly inlined: the Klein premortem (Phase 3) and the inline edge-case prompt (Phase 0 fork C — always on the Workflow path; on the Agent-fork fallback path only when BMAD is absent).
 
-**Terminology:** a *finding* is raw input from a fork/reviewer/premortem; a *hardening* is a finding actually applied to `PLAN_FILE` (tagged `[HARDENED:...]`); a *flag* (§4.0 only) is a MODEL_LINT rubric violation, never promoted past 🟡/🟠.
-
-**Frontmatter configuration**: `effort: high` (delete the line to inherit the session level). Neither `/grill-with-docs` nor `/adversarial-review` pins its own `effort`; effort is soft adaptive-thinking guidance, so IF the frontmatter cascades to them, `high` only deepens the nested reviews (more cost/latency, never broken correctness) — acceptable for a tool whose whole purpose is maximum critique surface. See `## Changelog` for the dated history of this setting and its unverified A/B protocol.
+**Terminology:** a *finding* is raw input from a fork/reviewer/premortem; a *hardening* is a finding actually applied to `PLAN_FILE` (tagged `[HARDENED:...]`); a *flag* (§4.0/§4.0b only) is a lint result — a MODEL_LINT rubric violation or a PARALLEL_LINT blocker — never promoted past 🟡/🟠.
 
 Args: "$ARGUMENTS"
 
@@ -81,6 +79,8 @@ Build `RESEARCH_TIERS_AVAILABLE = ["perplexity"|"exa"|"ref"|...]`. If empty, For
 
 **Blindspot detection + scan-target derivation**: scan available-skills system message for `blindspot`. Set `BLINDSPOT_AVAILABLE=true|false`. If available, derive `BLINDSPOT_TARGETS` — the concrete code areas (dirs/files/modules) the plan under hardening touches — from the plan's session cards / manifest (`sessions[].touches` or equivalent) or, for a freeform plan file, from explicit file paths named in its "Recommended Approach" / "Touches" sections. If the plan touches no code at all (pure docs/process/research plan — no file paths, no dirs, no modules named), set `BLINDSPOT_TARGETS=[]` and record the skip reason `"plan touches no code — skipping blindspot enrichment"`.
 
+**Early model-lint pass (plan-builder plans only, advisory)** *(2026-08-03)*: on a plan-builder plan, run §4.0's model-lint NOW as well — deterministic and near-free, and a 🔴-class hit (`peer-gate-missing`) discovered only at Phase 4 arrives AFTER the ~50-200k-token Phase 2 spend and forces a re-run; discovered here, it is one grilling branch. Hold as `EARLY_MODEL_LINT`, passed into the Phase 1 args as a fifth enrichment source. The §4.0 pass remains AUTHORITATIVE (Phases 1-2 mutate sessions); never skip it because this pass ran.
+
 Apply user overrides:
 - `--no-memory` → `MEMORY_AVAILABLE=false`
 - `--no-research` → `RESEARCH_TIERS_AVAILABLE=[]`
@@ -143,7 +143,7 @@ The plan file may already have been mutated by hand or by prior runs since Phase
 Print to user (not the full findings — args carry those):
 
 ```
-Phase 1: invoking /grill-with-docs (mode=<interactive|auto-accept>) with <N> enrichment findings loaded (memory: <m>, research: <r>, edge-cases: <e>, blindspot: <b>). Plan: <PLAN_FILE>.
+Phase 1: invoking /grill-with-docs (mode=<interactive|auto-accept>) with <N> enrichment findings loaded (memory: <m>, research: <r>, edge-cases: <e>, blindspot: <b>, early-model-lint: <l | ->). Plan: <PLAN_FILE>.
 ```
 
 ### 1.2: Invoke the grilling skill with enrichment in args
@@ -170,6 +170,10 @@ PRE-GRILL ENRICHMENT FINDINGS (from /plan-harden Phase 0):
 [Territory blindspot] (<status>)
   - <finding 1 text> [confidence X.X, source: <evidence_ref>]
   (or, if skipped: "skipped — <skip_reason>")
+
+[Model lint] (advisory, early pass — authoritative re-run happens at Phase 4)
+  - <EARLY_MODEL_LINT flag: session, issue, recommendation, severity>
+  (omit this source entirely when EARLY_MODEL_LINT is empty or the plan is not a plan-builder plan)
 
 Use these to ground your grilling questions. Reference specific findings where they expose contradictions, unstated assumptions, or known prior failures. The plan to grill is at <PLAN_FILE>.
 
@@ -257,6 +261,8 @@ If `/adversarial-review` returns a hard error or both reviewers fail (no `[HARDE
 
 This is acknowledged inline reasoning, not orchestration delegation.
 
+**Overlap allowance** *(2026-08-03)*: §3.1's independent hypothesis consumes only the plan and Fork D's findings, and Phase 2's Codex verify rounds leave the orchestrator idle for minutes — you MAY form the hypothesis during those waits. Klein independence holds as long as it is committed BEFORE reading Phase 2's findings; the §3.2 reconciliation then runs after Phase 2 lands and may weigh its findings the same way it weighs Fork D's.
+
 ### 3.1: Self-prompt
 
 First, reason through this prompt yourself — independently, before seeing the empirical findings below — using extended thinking where it materially helps:
@@ -315,22 +321,54 @@ external dispatch. **Skip only if this is not a plan-builder plan** (no sibling
 Read the sessions from `manifest.json` (`sessions[].model` / `.reasoning` /
 `.dispatch.subagent_type`) when present, else parse the plan's session cards.
 
-**Full rule set (all 10 flags — Opus+max, Fable escalation, opusplan mismatch, hard
-session at medium, blank reasoning, the 3 s04/SKL-02 structural rules
-pin-conflict / codex-trigger-no-gate / specialist-exists-but-null-subagent, the s07
-`task-class-model-mismatch` rule (task_class as a ROUTING signal — resolves each
-session's task_class through the active provider's effective executor and flags a
-declared `model` that contradicts it), plus the non-model blind-executability rule
-(wargame contract, prose-heuristic over session prompts) — with severity tags and
-rationale for each): `Read
+**Full rule set (all flags — Opus+max, Fable escalation, opusplan mismatch, hard session
+at medium, blank reasoning; the s04/SKL-02 structural rules pin-conflict /
+codex-trigger-no-gate / specialist-exists-but-null-subagent; the s07
+`task-class-model-mismatch` routing rule; the s08/LN-01 Codex-lane rules; and the three
+non-model rules acceptance-review-missing / decision-debt / blind-executability — each
+with severity tag and rationale): `Read
 ~/.claude/commands/references/plan-harden/model-lint.md`.** Apply every flag in that
 file; hold the result as `MODEL_LINT = [{session, issue, recommendation, severity}, …]`
 (empty list if clean). **Non-blocking by design, with ONE exception** — every flag is
 🟡 Polish / 🟣 Known-debt EXCEPT `peer-gate-missing` (a session carrying a non-empty
 structured `peer_triggers` array with no `adversarial-review` gate), which is a 🔴
-plan-killer. That flag alone is deterministic (a declared field, not a heuristic) and
-supplies its own quoted evidence (the `peer_triggers` value), satisfying the §4.1 🔴
-gate. All other model-lint flags remain non-blocking.
+plan-killer: deterministic (a declared field, not a heuristic) and self-evidenced (the
+`peer_triggers` value), satisfying the §4.1 🔴 gate.
+
+If an `EARLY_MODEL_LINT` pass ran at S.3, this pass supersedes it — re-run against the
+CURRENT manifest (Phases 1-2 mutate sessions), and note in the summary any early flag
+that grilling/hardening already resolved.
+
+### 4.0b: Parallelization-opportunity lint (plan-builder plans, advisory)
+
+*(Added 2026-08-03.)* A structural scan for safe concurrency in the plan's session DAG —
+runs HERE, after the last plan mutation, because Phases 1-2 change the DAG itself (a
+hardening pass can add cross-session dependencies, invalidating any grouping computed
+earlier). Near-free (structured-field checks + one prose pass). **Skip only if this is
+not a plan-builder plan** — note `parallel-lint ⊘ (not a plan-builder plan)`.
+
+**Full rule set (isolation eligibility; write-conflict matrix; the deterministic half
+delegated to `parallel_contract.check()` — file-write-conflict / merge-cost /
+member-shipping-declared / integration-session-gap; the judgment half —
+gate-mutates-global-state / tree-scoped-gate / checkpoint-member /
+data-dependency-in-prose; semantic-ordering suppressor; session-split decomposition
+patterns; verdict + decision-card contract): `Read
+~/.claude/commands/references/plan-harden/parallelization-lint.md`.** Hold the result as
+`PARALLEL_LINT = {verdict: linear-optimal|opportunities, blockers, warnings, options}`.
+Three invariants: **never auto-apply** `parallel_group` OR `dispatch.isolation` (the lint
+recommends with evidence; the operator elects — a wrong grouping corrupts a shared-tree
+run, and a silently isolated group also conscripts an integration session the operator
+never agreed to); a `data-dependency-in-prose` hit is a 🟡 correctness finding in its own
+right regardless of verdict; and on `opportunities` the ≤3-option decision card goes in
+the §4.3 output, with the operator's election (including "keep linear") recorded in the
+summary block so no later run silently re-opens it.
+
+*(Re-derived 2026-08-12, S08/PL-04.)* Since the executor honours
+`dispatch.isolation: "worktree"`, a shared write between two ISOLATION-ELIGIBLE sessions
+is a quantified merge cost rather than a blocker, and tree-scoped gates no longer block
+(they run inside the member's worktree). Both revert to their old blocking form for a
+pair that is not isolation-eligible — a pre-v3 manifest, a lockfile touch, or a missing
+integration session. The reference file's rule ledger is the authority on which is which.
 
 ### 4.1: Build the summary block
 
@@ -350,6 +388,7 @@ Pull findings from:
 - The grilling exchange (Phase 1) — extract any explicit "let's add X to the plan" decisions
 - `PREMORTEM` (Phase 3) — including any Fork D landmine it weighed in on
 - `MODEL_LINT` (Phase 4.0) — fold each flag into 🟡 Polish or 🟣 Known-debt per its severity, EXCEPT `peer-gate-missing` which is 🔴 (the one structured, self-evidenced model-lint flag allowed to block — see §4.0)
+- `PARALLEL_LINT` (Phase 4.0b) — the verdict goes in the Phases-run line; any `data-dependency-in-prose` hit lands under 🟡 Polish; the operator's grouping election (or "keep linear") is recorded verbatim
 
 Compose the block:
 
@@ -357,7 +396,7 @@ Compose the block:
 ## /plan-harden Summary
 
 **Run metadata**: timestamp <ISO8601>, version v1.0.0, args `<original $ARGUMENTS>`
-**Phases run**: enrichment <✓ N hits | ⊘ skipped> (memory: <n>, research: <tier>, edge-cases: <n>, blindspot: <n | ⊘ reason>), grill <✓ ~N exchanges (mode=interactive|auto-accept) | ⊘>, adversarial <✓ N hardenings, verify=<approved@rN | converged@rN (M minor) | deadlock@rN (M unresolved) | codex-error | n/a>, log=<path> | ⊘ failed: <reason>>, premortem <✓ | ⊘>, model-lint <✓ N flags | clean | ⊘ (not a plan-builder plan)>
+**Phases run**: enrichment <✓ N hits | ⊘ skipped> (memory: <n>, research: <tier>, edge-cases: <n>, blindspot: <n | ⊘ reason>), grill <✓ ~N exchanges (mode=interactive|auto-accept) | ⊘>, adversarial <✓ N hardenings, verify=<approved@rN | converged@rN (M minor) | deadlock@rN (M unresolved) | codex-error | n/a>, log=<path> | ⊘ failed: <reason>>, premortem <✓ | ⊘>, model-lint <✓ N flags | clean | ⊘ (not a plan-builder plan)>, parallel-lint <linear-optimal | opportunities (elected: <choice>) | ⊘ (not a plan-builder plan)>
 **Token cost**: ~<N>k total (coarse self-estimate)
 
 When auto-accept mode ran (the default), the `N exchanges` count for the grill slot comes from counting `- Q:` lines in the freshly-written `## Grill auto-accept log` section of `PLAN_FILE`.
@@ -417,6 +456,7 @@ Print to user:
 
 Summary section written to: <PLAN_FILE>
 Plan-killers: <n> (recommend_exit_now: <yes|no>)
+Parallelization: <linear-optimal | N opportunities — decision card below | ⊘>
 Total token cost: ~<N>k (coarse self-estimate)
 
 Next steps:
@@ -425,11 +465,11 @@ Next steps:
   (idempotent — will replace the summary, not duplicate it).
 ```
 
+On `opportunities`, follow this block with the §4.0b decision card; `linear-optimal` gets its one line and NO card.
+
 ---
 
 ## --quick mode
-
-Argument: `/plan-harden --quick`
 
 Behavior: skip Phase 0 + Phase 3. Phase 1 runs WITHOUT the enrichment-context print (just invokes `/grill-with-docs` directly). Phase 2 runs as normal. Phase 4 runs and notes the skipped phases as ⊘.
 
@@ -464,6 +504,7 @@ resumption preconditions, and the rough token-budget numbers per phase: `Read
 
 ## Changelog
 
+- **2026-08-03** — Ordering pass + parallelization lint, from the agent-janitor run's evidence. (1) NEW §4.0b `PARALLEL_LINT` (reference: `references/plan-harden/parallelization-lint.md`): deterministic write-conflict/gate/commit blockers + decision-card contract, advisory-only, placed AFTER the last plan mutation because hardening changes the DAG (observed: grilling added a cross-session data dependency). (2) §4.0 model-lint now ALSO runs early at S.3 as advisory grill enrichment — a 🔴 discovered only at Phase 4 arrives after the dominant Phase-2 spend; the Phase-4 pass stays authoritative. (3) Phase 3 premortem may overlap Phase 2's verify-loop waits (hypothesis committed before Phase 2 findings are read; reconciliation may then weigh them). Macro phase order confirmed correct against the same run: grilling before the dual-model pass let Phase 2 attack the improved plan — and catch a CRITICAL that Phase 1 itself introduced, which is the layering working, not an ordering defect.
 - **2026-07-09** — Phase 4.1: 🔴 plan-killer now requires quoted verbatim evidence (else downgraded to 🟡 with note). Companion edits in `/adversarial-review`: decision primer + relitigation suppression (R29) and fix-landed check (R30) in the Codex verify loop, quote-the-line gate at synthesis, fresh-context per-finding validator rule. Source: everyinc/compound-engineering-plugin gap review — ce-doc-review R29/R30 + ce-code-review quote gate.
 - **2026-07-01** — `effort` bumped `medium` → `high` for a deeper Phase-3 premortem + Phase-4 synthesis. Skill/command frontmatter effort is documented-honored and verified in binary 2.1.170 (overrides session effort; `CLAUDE_CODE_EFFORT_LEVEL` env var still wins).
 - **Cascade-to-nested-Skills A/B protocol** (`~/.claude/fixtures/plan-harden-corpus/ab-fork-inheritance-protocol.md`) remains **empirically unverified** — the `claude /usage` measurement scaffolding it depends on has been structurally dead since 2026-06-10 (no headless token output), so the A/B cannot complete.

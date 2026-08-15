@@ -150,11 +150,31 @@ If the gate fails, skip silently to 3e.
    <full current PLAN_FILE content>
    --- END ---
    ```
-2. Re-review the hardened plan with Codex (foreground -- you need the verdict before deciding to loop; read-only). **Prefer resuming the Phase-2 thread** so the SAME reviewer checks its own findings:
+2. Re-review the hardened plan with Codex (read-only). **Run it through the SUPERVISED runner, not a bare companion call** -- verify rounds are the longest Codex calls this command makes and are where the transport stall bites:
    ```bash
-   node "$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)" task --resume-last --prompt-file /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}.md --effort xhigh > /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}-r{round}.raw.md 2>&1
+   python3 "$HOME/.claude/scripts/codex_supervised.py" \
+     --prompt-file /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}.md \
+     --out /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}-r{round}.md \
+     --effort xhigh --idle-timeout 600 --max-attempts 3 --total-deadline 5400
    ```
-   Strip `[codex]` progress lines from the output.
+   The verdict is the `--out` file (codex's last message, already free of `[codex]` progress lines); the
+   JSONL event stream lands beside it at `<out>.jsonl`. The runner prints one JSON status object:
+   `status: "completed"` means a usable verdict exists, `"failed"` means every attempt stalled or the
+   deadline hit -- and `"failed"` is NOT a `REVISE`, it is a degraded round (see the honesty rule in step 3).
+
+   **Why supervised, and why you must not "fix" a stall by shrinking the request** (measured 2026-07-26,
+   plan-harden on profile-a-brain): two `xhigh` verify runs each did ~9-10 min of real work and then went
+   silent; `codex-companion status` still said `running` while the job logs had not grown in 28 and 20
+   minutes. Upstream openai/codex #31376 is the same signature (dead pooled connection in `CLOSE_WAIT`,
+   `stream_idle_timeout_ms` never fires). The instinct to cut the prompt or drop to a lower effort tier
+   degrades the review to dodge a transport bug AND does not work -- the smallest prompt tried (5 KB)
+   hung too. The runner instead makes a stall recoverable: it kills on idle and RESUMES the same session,
+   so a stall costs the idle window, not the work. Keep `xhigh` and keep the full plan inlined.
+
+   **Prefer resuming the Phase-2 thread** so the SAME reviewer checks its own findings: the runner's
+   attempt 1 is a fresh `codex exec`, so to resume Phase 2 explicitly, pass the verify prompt through
+   the companion's `--resume-last` ONCE and fall back to the supervised runner (which inlines the full
+   revised plan, so a fresh thread still reviews correctly) the moment it stalls or is resume-blocked.
 
    **Resume-blocked fallback (REQUIRED -- a blocked resume is NOT a verdict).** The companion refuses `--resume-last` while any earlier Codex task is stuck in `running`/`queued`, emitting a line like `Task <id> is still running. Use /codex:status before continuing it.` -- output that contains no `VERDICT:`. If the raw output matches `still running|/codex:status|No resumable task`, the resume did NOT run: there is no second opinion yet. Do **not** fall through to step 3 and score it `REVISE` -- that silently burns a round and is exactly the bug this fallback fixes. Instead re-review with a FRESH thread for this round:
    ```bash

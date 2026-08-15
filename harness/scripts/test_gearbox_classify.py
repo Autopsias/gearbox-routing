@@ -29,7 +29,37 @@ def is_live(p):
     return any(r.match(p) for r in LIVE)
 
 
+def test_snap_paths_terminates_last_record():
+    """snap_paths must NUL-TERMINATE, not NUL-separate.
+
+    `while IFS= read -r -d ''` in harvest's addable filter drops an unterminated
+    final record, so the last classified path was silently never staged — and
+    harvest still reported success. Exercises the real shell function.
+    """
+    snap = {k: [] for k in ("harness", "live_state", "churn",
+                            "live_untracked", "triage_untracked")}
+    snap["live_untracked"] = ["a/one.md", "b/two.md", "c/three.md"]
+    with tempfile.TemporaryDirectory() as d:
+        snap_file = os.path.join(d, "snap.json")
+        out_file = os.path.join(d, "out.nul")
+        with open(snap_file, "w") as fh:
+            json.dump(snap, fh)
+        script = (
+            f'source "{os.path.join(HERE, "gearbox")}" >/dev/null 2>&1 || true\n'
+            f'SNAP="{snap_file}"\n'
+            f'snap_paths "{out_file}" live_untracked\n'
+            f'n=0\n'
+            f'while IFS= read -r -d "" p; do n=$((n+1)); done < "{out_file}"\n'
+            f'echo "$n"\n'
+        )
+        n = subprocess.run(["bash", "-c", script], capture_output=True,
+                           text=True, check=True).stdout.strip()
+        assert n == "3", f"read loop saw {n} of 3 paths — last record not NUL-terminated"
+
+
 def main():
+    test_snap_paths_terminates_last_record()
+
     # --- [live-state] globs: * stays in a segment, ** crosses them -------------
     assert is_live("projects/-Users-x-example-project/memory/note.md")
     assert is_live("projects/-Users-x-example-project/memory/sub/deep.md")

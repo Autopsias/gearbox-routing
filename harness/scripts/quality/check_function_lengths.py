@@ -60,8 +60,14 @@ def load_config(project_path: Path) -> dict:
     return config
 
 
-def exception_key(rel_path: str, lineno: int, name: str) -> str:
-    return f"{rel_path}:{lineno}:{name}"
+def exception_key(rel_path: str, name: str) -> str:
+    """Identify a grandfathered function by file and name — never by line.
+
+    A line number in the key made the baseline break on contact: inserting one
+    line anywhere above a forgiven function shifted its lineno, missed the key,
+    and re-blocked a function nobody had touched.
+    """
+    return f"{rel_path}:{name}"
 
 
 def load_exceptions(project_path: Path) -> set[str]:
@@ -71,7 +77,12 @@ def load_exceptions(project_path: Path) -> set[str]:
     try:
         with open(exc_file) as f:
             data = json.load(f)
-        return set(data.get("exceptions", {}).keys())
+        # Rebuilt from each entry's own fields, so a baseline written under the
+        # old file:lineno:name scheme keeps working without regeneration.
+        return {
+            exception_key(e["file"], e["name"])
+            for e in data.get("exceptions", {}).values()
+        }
     except Exception:
         return set()
 
@@ -135,7 +146,7 @@ def find_violations(
     for py_file in iter_python_files(project_path, config.get("exclude")):
         rel = str(py_file.relative_to(project_path))
         for lineno, name, length in get_functions(py_file):
-            key = exception_key(rel, lineno, name)
+            key = exception_key(rel, name)
             if key in exceptions:
                 continue
 
@@ -164,7 +175,7 @@ def generate_baseline(project_path: Path, config: dict) -> None:
             pass
 
     new_exceptions = {
-        exception_key(v["file"], v["lineno"], v["name"]): {
+        exception_key(v["file"], v["name"]): {
             "file": v["file"],
             "lineno": v["lineno"],
             "name": v["name"],
@@ -207,13 +218,13 @@ def main() -> None:
         print(json.dumps({"violations": blocking, "warnings": warnings, "config": config}))
         sys.exit(1 if blocking else 0)
 
-    # Human-readable output (skill parses "BLOCKING" and ">100 lines" keywords)
+    # Human-readable output (skill parses the "BLOCKING" keyword)
     if blocking:
         print(f"\n=== Function Length Violations ({len(blocking)} BLOCKING) ===")
         for v in blocking:
             print(
                 f"  {v['file']}:{v['lineno']}  {v['name']}()  "
-                f"{v['lines']} lines [LIMIT={config['limit']}] BLOCKING  >100 lines"
+                f"{v['lines']} lines [LIMIT={config['limit']}] BLOCKING"
             )
 
     if warnings:

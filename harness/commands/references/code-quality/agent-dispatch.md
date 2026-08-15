@@ -16,7 +16,7 @@
 
 ---
 
-Routing to safe-refactor/code-quality-analyzer agents, dependency analysis, cluster identification, and batched execution.
+Routing to `safe-refactor` agents (file-size and function-length work; `code-quality-analyzer` is dispatched only for the complexity rule, from chaining-logic.md), dependency analysis, cluster identification, and batched execution.
 
 ---
 

@@ -1,17 +1,6 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/gearbox-drift-warn.sh",
-            "timeout": 10,
-            "statusMessage": "Checking harness drift"
-          }
-        ]
-      }
-    ],
+    "SessionStart": [],
     "UserPromptSubmit": [],
     "PreToolUse": [
       {
@@ -23,7 +12,10 @@
           }
         ]
       }
-    ]
+    ],
+    "PostToolUse": [],
+    "SubagentStop": [],
+    "SessionEnd": []
   },
   "statusLine": {
     "type": "command",

@@ -156,6 +156,18 @@ fi
 if [[ -n "$MYPY_CMD" ]] && [[ -n "$SRC_DIR" ]]; then
   $MYPY_CMD "$SRC_DIR" --show-error-codes 2>/dev/null | head -20
 fi
+
+# Size gates (ratchet): baselines grandfather legacy violations; NEW ones surface here.
+# BLOCKING output means a size violation not covered by the baseline — do not absorb it
+# into the baseline; fix it (or route to /code_quality --fix) before committing.
+if command -v uv &> /dev/null; then QPY="uv run python"; else QPY="python3"; fi
+if [[ -f ~/.claude/scripts/quality/check_file_sizes.py ]]; then
+  $QPY ~/.claude/scripts/quality/check_file_sizes.py --project "$PWD" 2>/dev/null | grep -E "BLOCKING|Summary" | head -10
+fi
+if [[ -f ~/.claude/scripts/quality/check_function_lengths.py ]]; then
+  $QPY ~/.claude/scripts/quality/check_function_lengths.py --project "$PWD" 2>/dev/null | grep -E "BLOCKING|Summary" | head -10
+fi
+
 git secrets --scan 2>/dev/null || true  # Check for secrets (if available)
 ```
 

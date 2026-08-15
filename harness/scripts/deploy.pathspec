@@ -23,10 +23,11 @@
 # Globs: `*` matches within one path segment, `**` matches across segments.
 #
 # WHAT THIS EXPORTED COPY CARRIES, AND WHAT IT DOES NOT:
-# [live-state] and [settings-churn-keys] are generic categories — glob classes
-# over this harness's own documented runtime surfaces, and the Claude Code
-# binary's own settings keys. They ship real, so this file classifies a live
-# deploy target out of the box.
+# [live-state], [settings-churn-keys], [codex-target] and [codex-render] are
+# generic categories — glob classes over this harness's own documented runtime
+# surfaces, the Claude Code binary's own settings keys, and the standard Codex
+# skills location, which is the same path for everyone. They ship real, so this
+# file classifies a live deploy target out of the box.
 # [mode-0600] does not ship real. That list is a map of which files on a deploy
 # target hold credentials; it is per-deployment and it is nobody else's
 # business, so the names below are FICTIONAL PLACEHOLDERS. `gearbox deploy`
@@ -39,6 +40,9 @@ projects/*/memory/**
 _plans/**
 evals/routing/MISROUTES.md
 evals/routing/results/**
+evals/routing/outcomes.ndjson
+evals/routing/.last-aggregated
+evals/dyno/results/**
 
 # --- MACHINE-CHURN: settings.json keys the binary rewrites on a UI action ------
 # Dotted JSON key paths, one per line; each is a key some UI action rewrites
@@ -58,6 +62,7 @@ theme
 editorMode
 tui
 statusLine
+outputStyle
 permissions.allow
 skillOverrides
 enabledPlugins
@@ -71,6 +76,22 @@ skipDangerousModePermissionPrompt
 skipWorkflowUsageWarning
 showClearContextOnPlanAccept
 voiceEnabled
+
+# --- SECOND DEPLOY TARGET: the rendered Codex skill ports ---------------------
+# `gearbox deploy` renders skills/<name>/codex/ into the Codex skills directory
+# as a path-scoped copy that never deletes anything it did not write. A hand
+# edit to a rendered skill there is a hotfix exactly like one in the primary
+# deploy target: `gearbox drift` names it and `gearbox deploy` refuses until
+# `gearbox harvest` carries it back. Nothing else under the Codex directory is
+# touched, or even read.
+#
+# Both ship real: the target is the standard Codex location, identical for
+# every user, and the render pattern is repo-relative.
+[codex-target]
+~/.codex/skills
+
+[codex-render]
+skills/*/codex
 
 # --- mode-sensitive files: git does not preserve 0600, so deploy re-applies it --
 # FICTIONAL PLACEHOLDERS — replace all of them before you deploy. The categories

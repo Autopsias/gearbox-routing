@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# gearbox — deploy / drift / harvest for the ~/.claude deploy target.
+# gearbox — deploy / drift / harvest for TWO deploy targets:
+#   ~/.claude        the primary target — a git clone, moved by fast-forward.
+#   ~/.codex/skills  the Codex skill ports — NOT a clone, moved by a path-scoped
+#                    render (scripts/gearbox-codex.py). Both are covered by the
+#                    same drift-and-harvest discipline below.
 #
 #   gearbox deploy            fetch the source, sync this tree forward, re-wire the
 #                             guard hooks, re-apply 0600 modes, run the full guard,
-#                             report what changed. Idempotent: a second run is a
-#                             clean no-op.
-#   gearbox drift [--brief]   cheap, offline, read-only: what is dirty here and in
-#                             which class. --brief = one line, only when it matters
-#                             (the SessionStart hook and the weekly loop use it).
+#                             render the Codex ports, report what changed.
+#                             Idempotent: a second run is a clean no-op.
+#   gearbox drift [--brief]   cheap, offline, read-only: what is dirty in either
+#                             target and in which class. --brief = one line, only
+#                             when it matters (SessionStart hook, weekly loop).
 #   gearbox harvest [-m MSG]  carry local edits back to the source repo: commits
 #                             EXPLICITLY classified paths (never `add -A`) and pushes.
+#                             Carries ~/.codex render-target edits back first.
 #
 # The three-tier topology (see README.md): changes are authored in the edit clone
 # ~/your-private-harness, pushed to <your-org>/<your-private-harness>, and fast-forwarded here.
@@ -28,6 +33,7 @@ set -euo pipefail
 CD="${CLAUDE_DIR:-$HOME/.claude}"
 SELF_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CLASSIFY="$SELF_DIR/gearbox-classify.py"
+CODEX="$SELF_DIR/gearbox-codex.py"
 PATHSPEC="$SELF_DIR/deploy.pathspec"
 LOCK="$CD/.gearbox.lock"
 SNAP=""
@@ -69,7 +75,7 @@ snapshot() {
   CLAUDE_DIR="$CD" python3 "$CLASSIFY" --claude-dir "$CD" --pathspec "$PATHSPEC" > "$SNAP" \
     || die 2 "classifier could not inspect $CD — refusing to act on an unknown tree"
 }
-# snap_paths <file> <class>[,<class>...]  -> NUL-separated paths
+# snap_paths <file> <class>[,<class>...]  -> NUL-TERMINATED paths
 snap_paths() {
   python3 - "$SNAP" "$2" > "$1" <<'PY'
 import json, sys
@@ -77,7 +83,12 @@ d = json.load(open(sys.argv[1]))
 out = []
 for k in sys.argv[2].split(","):
     out.extend(d[k.strip()])
-sys.stdout.write("\0".join(out))
+# TERMINATED, not separated: `while read -r -d ''` needs a NUL after the LAST
+# record too, or it silently drops it — a green "nothing to stage" over a path
+# that was never harvested. (`xargs -0` tolerates either, so only the addable
+# filter loop was bitten.) Measured, not assumed; regression-covered in
+# test_gearbox_classify.py::test_snap_paths_terminates_last_record.
+sys.stdout.write("".join(p + "\0" for p in out))
 PY
 }
 snap_count() {
@@ -87,11 +98,24 @@ snap_count() {
 # be the same observation the abort/harvest decisions were made on.
 report() { python3 "$CLASSIFY" --pathspec "$PATHSPEC" --from-json "$SNAP" --text; }
 
+# --- the ~/.codex render target ---------------------------------------------
+# The SECOND target. `gearbox-codex.py` owns the whole policy (which paths it may
+# read or write, and how a difference is classified); this script only decides
+# what to do about the verdict. Exit: 0 clean, 1 blocking drift, 2 uninspectable.
+#
+# `codex_gate` is the exact call `do_deploy` blocks on, factored out so the
+# regression check can exercise the real gate rather than a re-statement of it
+# (scripts/test_gearbox_codex.py — project memory: "gates that cannot fail").
+codex_gate() {
+  CLAUDE_DIR="$CD" python3 "$CODEX" drift --claude-dir "$CD" --pathspec "$PATHSPEC" --text
+}
+
 preflight() {
   command -v git >/dev/null     || die 1 "git not on PATH"
   command -v python3 >/dev/null || die 1 "python3 not on PATH"
   [ -d "$CD/.git" ]             || die 1 "$CD is not a git working tree"
   [ -f "$CLASSIFY" ]            || die 1 "missing $CLASSIFY"
+  [ -f "$CODEX" ]               || die 1 "missing $CODEX"
   [ -f "$PATHSPEC" ]            || die 1 "missing $PATHSPEC"
 }
 
@@ -113,6 +137,19 @@ do_harvest() {
     esac
     shift
   done
+
+  # The ~/.codex render target is not a git tree, so its edits have to be copied
+  # into THIS tree before anything is classified — after which they are ordinary
+  # HARNESS-CODE dirt and the machinery below commits them like any other hotfix.
+  # Skipped under --routine: a render-target edit is never routine, and deploy
+  # has already aborted on it before it gets here.
+  if [ "$routine" = 0 ]; then
+    preflight
+    say ""
+    say "harvest: carrying back ~/.codex render-target edits"
+    CLAUDE_DIR="$CD" python3 "$CODEX" harvest-back --claude-dir "$CD" --pathspec "$PATHSPEC" \
+      || die 2 "harvest: could not inspect the ~/.codex render target — refusing to act on an unknown tree"
+  fi
 
   [ -n "$SNAP" ] || { preflight; snapshot; }
 
@@ -224,7 +261,7 @@ do_drift() {
   preflight
   snapshot
 
-  local harness unpushed
+  local harness unpushed crc=0
   harness="$(snap_count harness)"
   unpushed="$(git -C "$CD" rev-list --count "@{u}..HEAD" 2>/dev/null || echo 0)"
 
@@ -233,6 +270,13 @@ do_drift() {
     if [ "$harness" != "0" ]; then
       warn "[gearbox] DRIFT: $harness harness-source file(s) edited in the deploy target ($CD)."
       python3 -c 'import json,sys;[print("           "+p) for p in json.load(open(sys.argv[1]))["harness"][:5]]' "$SNAP" >&2
+      warn "           Carry them back:  $CD/scripts/gearbox harvest"
+    fi
+    # "$SNAP.codex" so the EXIT trap already cleans it up ("$SNAP".*).
+    codex_gate > "$SNAP.codex" 2>&1 || crc=$?
+    if [ "$crc" != "0" ]; then
+      warn "[gearbox] DRIFT: the ~/.codex render target is not in sync with its source."
+      grep -E '^      ' "$SNAP.codex" | head -5 >&2 || true
       warn "           Carry them back:  $CD/scripts/gearbox harvest"
     fi
     if [ "$unpushed" != "0" ]; then
@@ -246,7 +290,10 @@ do_drift() {
   say "  unpushed local commits: $unpushed"
   say ""
   report
-  [ "$harness" = "0" ] || return 1
+  say ""
+  codex_gate || crc=$?
+  local triage; triage="$(snap_count triage_untracked)"
+  [ "$harness" = "0" ] && [ "$triage" = "0" ] && [ "$crc" = "0" ] || return 1
   return 0
 }
 
@@ -279,17 +326,43 @@ do_deploy() {
   report
   say ""
 
+  # (b2) the SECOND target, classified on the SAME footing. Runs before any
+  # mutation: an edit made by hand in ~/.codex/skills exists nowhere else, and
+  # the render step later in this run would overwrite it.
+  say "-- classify ~/.codex render target --"
+  local crc=0
+  codex_gate || crc=$?
+  [ "$crc" = "2" ] && die 6 "the ~/.codex render target could NOT BE INSPECTED — a harder stop than an observed violation. Do not deploy."
+  say ""
+
   # (c) HARNESS-CODE dirt aborts. Local edits are NEVER clobbered — the operator
-  # decides what a hotfix in the deploy target means.
-  if [ "$(snap_count harness)" != "0" ]; then
+  # decides what a hotfix in the deploy target means. A brand-new UNTRACKED path
+  # outside every known surface (triage_untracked) is included in the same abort:
+  # it is never auto-harvested (guard against silently tracking transcripts/PII —
+  # see do_harvest), but that is a reason not to stage it, not a reason to let a
+  # deploy silently fast-forward past an unclassified path. Fail-closed means both
+  # "modified tracked harness file" AND "new file nobody classified" block.
+  if [ "$(snap_count harness,triage_untracked)" != "0" ] || [ "$crc" != "0" ]; then
     warn ""
-    warn "ABORT: harness source has been edited in the deploy target."
-    warn "This tree is a DEPLOY TARGET; those edits exist nowhere else and a"
-    warn "fast-forward could destroy them. Carry them back first:"
+    warn "ABORT: harness source has been edited, or an unclassified new path exists,"
+    warn "in a deploy target."
+    warn "These trees are DEPLOY TARGETS; those edits exist nowhere else and a"
+    warn "fast-forward (or a re-render) could destroy them. Carry them back first:"
     warn ""
     warn "    $CD/scripts/gearbox harvest"
     warn ""
+    warn "(harvest stages HARNESS-CODE with review, and copies ~/.codex render-target"
+    warn "edits into this tree first; a triage_untracked path is never auto-staged —"
+    warn "remove it, or add it explicitly with \`git add\`, or add an ignore rule.)"
     warn "…then re-run \`gearbox deploy\`. (Authored changes belong in ~/your-private-harness.)"
+    if [ "$crc" != "0" ]; then
+      warn ""
+      warn "For the ~/.codex hits above: harvest KEEPS the copy that is live in"
+      warn "~/.codex. If that copy is instead just stale — you know the source is"
+      warn "newer — overwrite it from source rather than harvesting it:"
+      warn ""
+      warn "    python3 $CODEX render --claude-dir $CD"
+    fi
     exit 3
   fi
 
@@ -386,6 +459,21 @@ do_deploy() {
   CLAUDE_DIR="$CD" bash "$CD/scripts/verify-routing.sh" --full || die 1 "verify-routing FAILED after deploy — the deployed tree is not green."
   say ""
 
+  # (g2) the SECOND target. AFTER the fast-forward and reading from the deployed
+  # tree, so the two targets can never disagree about which revision they carry
+  # (dual-harness-contract.md § 6.2). Failure here is LOUD but NON-FATAL: Codex is
+  # a second consumer and must not be able to abort the primary deploy.
+  say "-- render ~/.codex skills --"
+  if ! CLAUDE_DIR="$CD" python3 "$CODEX" render --claude-dir "$CD" --pathspec "$PATHSPEC"; then
+    warn ""
+    warn "WARNING: the ~/.codex render step FAILED (see above). The ~/.claude deploy"
+    warn "         below is unaffected and green; the Codex skill ports may now be"
+    warn "         stale. Re-run it on its own once the cause is fixed:"
+    warn ""
+    warn "    python3 $CODEX render --claude-dir $CD"
+  fi
+  say ""
+
   # (h) what actually changed
   say "-- changed --"
   if [ "$before" = "$(git -C "$CD" rev-parse HEAD)" ]; then
@@ -403,7 +491,7 @@ case "${1:-}" in
   drift)   shift; do_drift "$@" ;;
   harvest) shift; do_harvest "$@" ;;
   -h|--help|"")
-    sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     ;;
   *) die 1 "unknown subcommand: $1 (deploy | drift | harvest)" ;;
 esac

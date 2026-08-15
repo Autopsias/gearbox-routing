@@ -159,10 +159,24 @@ def find_violations(
 def generate_baseline(project_path: Path, config: dict) -> None:
     blocking, _ = find_violations(project_path, config, set())
     exc_file = project_path / ".file-size-exceptions"
+
+    existing: set[str] = set()
+    if exc_file.exists():
+        try:
+            with open(exc_file) as f:
+                existing = {e["file"] for e in json.load(f).get("exceptions", [])}
+        except Exception:
+            pass
+
     data = {"exceptions": [{"file": v["file"], "loc": v["loc"]} for v in blocking]}
     with open(exc_file, "w") as f:
         json.dump(data, f, indent=2)
-    print(f"Generated baseline: {len(blocking)} exceptions -> {exc_file}")
+
+    removed = len(existing - {v["file"] for v in blocking})
+    print(
+        f"Generated baseline: {len(blocking)} exceptions -> {exc_file}"
+        + (f" ({removed} stale entries removed)" if removed > 0 else "")
+    )
 
 
 def main() -> None:

@@ -1,7 +1,7 @@
 ---
 name: routing-update
-description: Research a model-landscape change and regenerate every routing surface through one operator-approved changeset. Use when the user says "model update", "new model released", "update model routing", "pricing changed", "model deprecated", "model GA'd", "recalibrate routing for <model>", "Claude Code binary bump" (effort-honoring recheck), or any Anthropic model/pricing/deprecation news that should flow into ~/.claude/model-routing.yaml. Not for judging whether current routing WORKS in practice (that's /routing-retro), and not for per-task model picks (the SSOT digest in CLAUDE.md handles those).
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Skill, AskUserQuestion, mcp__exa__web_search_exa, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url]
+description: Research a model-landscape change and regenerate every routing surface through one operator-approved changeset. Use when the user says "model update", "new model released", "update model routing", "pricing changed", "price cut", "model deprecated", "model GA'd", "recalibrate routing for <model>", "Claude Code binary bump" (effort-honoring recheck), "instruction decay", "are our rules still needed on the new model", or reports model/pricing/deprecation news from EITHER provider in our lineup — Anthropic (Claude/Opus/Sonnet/Haiku/Fable) or OpenAI (GPT/Codex/sol/terra/luna) — that should flow into ~/.claude/model-routing.yaml. Covers cost-vs-performance recalibration against the DeepSWE board, and on a model-generation change also the instruction-decay audit (probe whether failure-derived rules still earn their context). Not for judging whether current routing WORKS in practice (that's /routing-retro), and not for per-task model picks (the SSOT digest in CLAUDE.md handles those).
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Skill, AskUserQuestion, WebFetch, WebSearch, mcp__exa__web_search_exa, mcp__exa__crawling_exa, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url]
 effort: high  # SSOT recalibration is judgment-heavy (pricing/tier tradeoffs feed every future dispatch); the mechanical apply is checklist-driven. Verified honored in binary 2.1.170.
 ---
 
@@ -32,11 +32,11 @@ failure or a genuinely new decision discovered mid-apply comes back to the opera
 ## Checklist (all 6 steps)
 
 - [ ] **Snapshot** — read SSOT, runbook, check git status
-- [ ] **Research** — parallel fan-out (`/claude-api` first, then external priors, or binary-bump canary)
-- [ ] **Impact diff** — map findings onto SSOT blocks + consumer surfaces
+- [ ] **Research** — parallel fan-out (`/claude-api` first, then external priors, **then the DeepSWE cost-vs-performance board — mandatory**), or binary-bump canary
+- [ ] **Impact diff** — map findings onto SSOT blocks + consumer surfaces (incl. the three skills' prose CONTENT, not just their stamps)
 - [ ] **Changeset proposal** — write the changeset file, get operator approval (the one gate)
 - [ ] **Apply** — run the full checklist top to bottom, guard-verified
-- [ ] **Post-apply** — eval re-run scope, nudge retro, owner-gate check, memory pointer
+- [ ] **Post-apply** — eval re-run scope, nudge retro, owner-gate check, memory pointer, decay pass (generation change only)
 
 ## Flow
 
@@ -72,6 +72,15 @@ Follow `references/research-protocol.md`. Summary:
   a genuinely new tier) + Perplexity for benchmarks/practitioner signal; `mcp__ref` for
   Anthropic docs deltas (effort doc, models overview, Claude Code model-config).
   Precedent artifact shape: `evals/routing/external-priors-vulcanbench-2026-07.md`.
+- **DeepSWE cost-vs-performance board — MANDATORY for any model/tier/price diff.**
+  https://deepswe.datacurve.ai/ scores Anthropic and OpenAI models on ONE harness with
+  pass@1 *and* $/task side by side — the only way to make a provider-crossing cost-quality
+  claim honestly. The changeset must carry the table for our lineup plus the resulting
+  Pareto frontier. **Fetch with `WebFetch` or `mcp__exa__crawling_exa` — never `curl`**
+  (client-hydrated: curl returns a 230 KB shell with zero model rows, and reads as "no
+  data"). Mind the two toggles, the ± intervals, and the fact that the board's best-config
+  rung is usually not our operating rung. Full protocol + reading rules:
+  `references/research-protocol.md` §Lane 3.
 - **Binary bump path** — run the effort-canary preflight instead; its verdict (dial live
   vs inert per model) IS the research output.
 
@@ -89,9 +98,17 @@ defaults, `effort_policy:` shapes, `agents:` pins, `degradation:` entries,
 3. `~/.claude/settings.json` (`model` + `effortLevel` vs `main_session:` — warn-checked by
    `verify-routing.sh` but user-owned; drift here is a finding even when nothing else changed).
 
+Then map the change onto the **prose CONTENT** of the three skills that carry routing
+advice for both providers — `/plan-builder`, `/plan-harden`, `/plan-execute`. Their stamps
+are guard-checked; their content is not, so this is where the SSOT and reality drift apart.
+List every rubric cell, lint rule and dispatch paragraph the change touches. Run
+`scripts/check_stale_values.py` with the superseded literals to get the mechanical half of
+the list. Details: `references/apply-checklist.md` §Step 7.
+
 **If the diff is empty** (no landscape change found): report "no model-landscape change
 detected", but STILL report any surface drift the walk uncovered (e.g. settings.json vs
-`main_session:`) — that is this skill's built-in regression check, not noise.
+`main_session:`, or a stale-value hit in a consumer skill) — that is this skill's built-in
+regression check, not noise.
 
 ### 4. Changeset proposal — the one operator gate
 
@@ -129,6 +146,12 @@ commit message carries the literal token `routing-pin-change: approved-by-operat
 - **Memory pointer**: if key facts changed (SSOT version, default pairs, new operating
   commands), update `~/.claude/projects/-Users-USER-DeveloperFolder-example-project/memory/reference_model_effort_routing_system_20260703.md`
   and its MEMORY.md index line.
+- **Instruction-decay pass — model-generation changes only.** When the trigger was a new
+  family or a major version of a lineup model, run `references/instruction-decay.md`:
+  probe whether the failure-derived rules in CLAUDE.md and the skills' gotcha sections
+  still earn their context on the new model, and propose retirements through the same
+  changeset gate. Skip for price/deprecation/binary-bump triggers — those change costs
+  and plumbing, not model behavior.
 
 ## Failure modes to refuse
 
@@ -136,6 +159,14 @@ commit message carries the literal token `routing-pin-change: approved-by-operat
   fail, and rightly so — a content change without a version bump is not a supported path).
 - Applying a `prices:` change sourced from memory or a news article alone — `/claude-api`
   verification is mandatory for price rows.
+- Moving a model, tier or effort pin WITHOUT a DeepSWE cost-vs-performance reading in the
+  changeset (§Lane 3) — a pin moved on price alone is a cost decision wearing a quality
+  decision's clothes. Equally: citing a board gap that sits inside the ± confidence
+  interval as if it were a finding.
+- **Bumping a `routing-ssot` stamp without running the step-7 content scan.** The stamp
+  asserts the prose agrees with the SSOT; the guard only checks the number. Bumping it
+  while the prose still recommends the old value is the failure this skill exists to
+  prevent, and it passes every gate we have.
 - Bypassing a red `verify-routing.sh` with `--no-verify` or the recovery env escapes —
   those escapes are for hook-documented recovery cases only, never for landing this skill's
   changes.

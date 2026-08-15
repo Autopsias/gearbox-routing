@@ -45,5 +45,5 @@ keywords = ["YOUR_CLIENT_NAME", "YOUR_ORG", "YOUR_USERNAME"]
 paths = [
   '''^\.gitleaks\.toml$''',
   '''^\.github/workflows/verify\.yml$''',
-  '''^scripts/sync-from-claude\.manifest\.example\.json$''',
+  '''(?:^|/)scripts/sync-from-claude\.manifest\.example\.json$''',
 ]

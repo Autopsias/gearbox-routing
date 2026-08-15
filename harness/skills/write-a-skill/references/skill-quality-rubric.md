@@ -16,11 +16,13 @@ full scoring machinery in its `rubric.md`). Encodes Anthropic's official skill-a
 best practices: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
 (retrieved 2026-07-05). Key official numbers: SKILL.md body under 500 lines; reference files
 over 100 lines need a TOC; descriptions state what + when, third person; one term per concept.
+G5 added 2026-08-12 from "Lessons from building Claude Code: How we use skills"
+(claude.com blog, 2026-06-03).
 
 ## How to apply
 
 For every NEW skill and every UPDATE to an existing skill/command under ~/.claude, walk the
-16 criteria below before finishing. Each scores 0/1/2; nothing ships at 0, target 2.
+17 criteria below before finishing. Each scores 0/1/2; nothing ships at 0, target 2.
 Hard separation rule: a TRIGGER problem is never fixed by a file split, and a STRUCTURE
 problem is never fixed by rewording the description — those are two separate changes.
 
@@ -61,6 +63,12 @@ problem is never fixed by rewording the description — those are two separate c
   review), isolate it — the next step's answer must not be visible in the same context.
 - **G4. Checklists for 4+ step workflows.** Complex sequential workflows carry a copy-paste
   checklist so steering doesn't degrade over a long task.
+- **G5. Failure knowledge captured.** A skill that wraps a tool, workflow, or external
+  surface with observed failure modes carries a gotchas section built from what ACTUALLY
+  went wrong (dated, specific), updated as new failures appear — per Anthropic this is
+  "the highest-signal content in any skill". Score the mechanism, not the count: a young
+  skill with no observed failures yet scores 2 by omitting the section, never by
+  inventing hypotheticals.
 
 ## Area 4 — PRUNING
 

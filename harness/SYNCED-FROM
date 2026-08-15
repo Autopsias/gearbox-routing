@@ -12,5 +12,5 @@
 # Fields here are a closed allowlist enforced by the pre-push scan
 # (check_provenance_stamp in scripts/sync-from-claude.py): adding any other key
 # to this file blocks the push.
-exported_at: 2026-07-26T00:02:52Z
+exported_at: 2026-08-15T01:18:37Z
 pipeline_version: 3

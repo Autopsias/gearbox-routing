@@ -1,5 +1,14 @@
 # /routing-update research protocol — verify the landscape, never assert from memory
 
+## Contents
+
+- [Lane 1 — `/claude-api` skill (mandatory, first)](#lane-1--claude-api-skill-mandatory-first)
+- [Lane 2 — external priors (parallel with lane 1)](#lane-2--external-priors-parallel-with-lane-1)
+- [Lane 3 — DeepSWE cost-vs-performance board (mandatory for any model/tier/price diff)](#lane-3--deepswe-cost-vs-performance-board-mandatory-for-any-modeltierprice-diff)
+- [Binary-bump path (replaces lanes 1–2)](#binary-bump-path-replaces-lanes-12)
+- [What "done researching" means](#what-done-researching-means)
+- [Radar — dated watch items](#radar--dated-watch-items)
+
 The house rule (user CLAUDE.md "Behavior" §1) applies with full force here: **every
 capability, price, or availability claim that lands in the SSOT must be verified via a
 tool at update time** — the SSOT's own `prices:` block says "VERIFIED via the /claude-api
@@ -35,6 +44,80 @@ Write findings to `evals/routing/external-priors-<topic>-<YYYY-MM>.md` (preceden
 instead of a chat transcript. External priors inform *placement hypotheses*; they do NOT
 substitute for the calibration eval when the runbook's re-run triggers demand one — say so
 in the changeset's Confidence section.
+
+## Lane 3 — DeepSWE cost-vs-performance board (MANDATORY for any model/tier/price diff)
+
+**https://deepswe.datacurve.ai/** — the one public battery that scores Anthropic, OpenAI,
+Google, xAI and open-weight models **on the same harness** (`mini-swe-agent`), reporting
+pass@1 *and* average cost per task side by side. That single property is why it is
+mandatory here: our SSOT is provider-abstract, so a cost-vs-performance claim that compares
+providers needs one battery, not two vendors' self-reported cards.
+
+**Every changeset that touches a model, a tier, an effort rung or a price MUST include a
+cost-vs-performance reading from this board.** Not "consulted it" — the changeset carries
+the table for every model in our lineup and names which cells are Pareto-dominated. A diff
+that moves a pin without that table is not ready to propose.
+
+### How to fetch it (verified 2026-07-31 — do not assume, this was probed)
+
+- **No machine-readable endpoint exists.** `/api/leaderboard` → 404, `/leaderboard.json` →
+  404, `/data/leaderboard.json` → 307. Do not go looking again; if one appears, update
+  this section.
+- **`curl` is useless here.** The page is client-hydrated: `curl` returns ~230 KB of shell
+  with **zero** model rows in it (`grep -c luna` → 0). A curl-and-grep step will silently
+  produce nothing and read as "no data".
+- **Use `WebFetch` or `mcp__exa__crawling_exa`.** Both were verified to return the full
+  rendered table and to agree with each other cell-for-cell. Prefer running both — silent
+  disagreement between them is the signal that the page changed shape.
+
+### What to read off it, and the two toggles that change the answer
+
+- **Version selector (`v1.1` / `v1`)** — record which one you read. They are different
+  batteries; mixing them across changesets produces a fake trend.
+- **`Best` / `All effort levels`** — the default `Best` view shows only each model's
+  single strongest configuration. **Our effort maps are calibrated on per-effort curves**
+  (e.g. luna 67% at `max` collapsing to 44%/11% below it), and the default view cannot
+  show that. If the diff touches an `effort.map` cell, a `native_effort_ceiling`, or an
+  `escalation.effort_ladder` rung, you need the per-effort matrix. **Getting it is
+  currently unsolved — budget for that, do not assume a click.** Probed 2026-07-31: the
+  toggle is client-side with no URL parameter, and it did NOT respond to three automated
+  clicks (one by element ref, two by coordinate) — the view stayed on `Best`. The blog
+  index does not carry the matrix statically either. Untried avenues: the site's `Data`
+  and `Run` nav links, or asking Datacurve directly. If you solve it, record how here.
+- **Header line** — task count, config coverage (`48/50`-style) and the "updated <date>"
+  stamp. Quote all three in the changeset; a board reading with no date is not evidence.
+- **Per row**: `Pass@1` **with its ± confidence interval**, `Avg cost`, `Out tok`, `Steps`,
+  and the effort `Setting` the row was run at.
+
+### Reading rules — the ways this board misleads
+
+1. **The `Setting` column is not our operating point.** The board runs each model at
+   whatever rung scores best, which is routinely a rung our own policy forbids as an
+   automatic default (`opus·max`, `sonnet·max`). Never copy a board row into the SSOT as
+   though it described the pin we actually dispatch. Compare like for like, or say plainly
+   that you are comparing a board best-config against our policy rung.
+2. **Respect the confidence interval.** Rows sit within ±2–6 points. A 2-point gap between
+   two models whose intervals overlap is not a finding, and must not be used to justify
+   moving a pin. Say "indistinguishable on this battery" and move on.
+3. **It is ONE battery, and a specific one** — long-horizon agentic SWE, contamination-free,
+   ~5.5× more code per solution than SWE-bench Pro. That maps well onto `agentic_build`
+   and `linchpin`; it maps *poorly* onto `mechanical` and arguably onto `standard_build`
+   (CRUD/wiring/templated work is not long-horizon agentic work). Weight it by class, and
+   say which class you are weighting it for.
+4. **Cost figures move when a vendor reprices, without any re-measurement.** The board
+   re-derives cost from the current rate card, so a cost column can change while pass@1
+   does not. When that happens, say so explicitly — it is a reprice, not a re-measure, and
+   it changes the cost axis only.
+5. **A model absent from the board is not a bad model** — it is an unmeasured one. Never
+   read absence as evidence.
+
+### Recording it
+
+Fold the reading into the same `evals/routing/external-priors-<topic>-<YYYY-MM>.md`
+artifact as lanes 1–2, under a `## Cost-vs-performance (DeepSWE <version>, updated <date>)`
+heading: the table for our lineup, the resulting Pareto frontier ascending by cost, and an
+explicit sentence on which of our current pins the board supports, contradicts, or cannot
+speak to. "Cannot speak to" is a real and common answer — prefer it to a stretched one.
 
 ## Binary-bump path (replaces lanes 1–2)
 
@@ -89,8 +172,8 @@ or explicitly declined with a dated note in a changeset's Confidence section).
 - **gpt-5.3-codex / gpt-5.5-codex manifest discrepancy** (added 2026-07-10,
   v1.5) — absent from the live codex-rs models.json despite blog claims of
   Feb-2027 support. Legacy *-codex shutdown is 2026-07-23. Re-check on the
-  next manifest pull; matters only if the lane's gpt-5.5 degradation rung
-  ever disappears.
+  next manifest pull. **MOOT since 2026-08-13 (SSOT v16):** the lane is 5.6-ONLY,
+  gpt-5.5 is retired and its degradation rung is gone — nothing here can matter now.
 - **Managed agents (multi-agent sessions) beta** (`managed-agents-2026-04-01`, fetched
   from platform.claude.com docs 2026-07-10) — hosted coordinator/roster sessions, cap
   20 roster agents, 25 concurrent threads, delegation depth 1 (no sub-delegation from a
