@@ -27,7 +27,7 @@ All notable changes to the Gearbox routing policy and framework. Format follows
     its review reads only the paths it owns, even while another plan is
     live in the same repo.
   - **Gate timing.** Every gate run is logged with its duration, and
-    `scripts/gate_durations.py` prints runs, median and longest time per
+    `harness/skills/plan-execute/scripts/gate_durations.py` prints runs, median and longest time per
     gate and repo.
   - **New tier agents.** `tier-opus-low`, `tier-opus-xhigh`, `tier-opus-max`,
     `tier-sonnet-low` and `tier-sonnet-max` bind more model and effort
