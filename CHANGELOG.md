@@ -7,6 +7,36 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 ## [Unreleased]
 
 ### Changed
+- **`harness/` refreshed from the private deployment (2026-10-08).** Seven
+  weeks of work on the plan runner (`/plan-execute`), the plan builder, the
+  routing skills and the agents. What a reader will notice:
+  - **Plan isolation.** Each plan now runs on its own git branch, in its own
+    worktree under `.plan-worktrees/`, so two plans can run in one repo
+    without editing each other's files. The rules are in
+    `skills/plan-execute/references/plan-isolation-contract.md`.
+  - **A land stage.** When every session is done, `land` merges the plan
+    branch back to the default branch, runs the gates again on the merged
+    tree, and can repair a failure before it pushes. `finish` then checks
+    that the whole plan record reached the default branch and reports CI's
+    verdict (`references/finish-contract.md`).
+  - **Gates are judged on their output.** A gate can declare an `expect`
+    pattern, and it passes only when its output matches, not on exit code
+    alone. A review gate passes only on a verdict with no blocking finding.
+    A review scope that matches zero files fails instead of passing.
+  - **Per-session review scope.** A session can declare `review_scope`, so
+    its review reads only the paths it owns, even while another plan is
+    live in the same repo.
+  - **Gate timing.** Every gate run is logged with its duration, and
+    `scripts/gate_durations.py` prints runs, median and longest time per
+    gate and repo.
+  - **New tier agents.** `tier-opus-low`, `tier-opus-xhigh`, `tier-opus-max`,
+    `tier-sonnet-low` and `tier-sonnet-max` bind more model and effort
+    pairs. `session-effort-worker` runs a session at the caller's own effort
+    when no tier agent fits. A `general-purpose` agent replaces the built-in
+    one so that it gets an effort of its own instead of copying the
+    session's.
+
+### Changed
 - **`claude/model-routing.yaml` → v2.3.0 — the shipped EXAMPLE grid was
   deliberately DE-CALIBRATED (MINOR: example-profile shape only, no vocabulary
   or schema change).** The previous revision published a grid that read like a
