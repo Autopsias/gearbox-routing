@@ -24,6 +24,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import proc_group as pg
+
 SKIP_ENV = "PLAN_EXECUTE_SKIP_BROWSER_CHECKS"
 
 _CHROME_CANDIDATES = [
@@ -82,22 +84,37 @@ def check(plan_dir, timeout=20):
         }
 
     url = html_path.resolve().as_uri()
+    # Own process group, killed whole on EVERY exit: subprocess.run(timeout=)
+    # kills only Chrome's main process, and its forked helpers were found
+    # reparented to PID 1 and still running 23 h after a test (2026-09-27).
+    proc = None
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             [
-                chrome, "--headless=new", "--disable-gpu", "--dump-dom",
+                # --use-mock-keychain: under an empty HOME (CI), macOS
+                # otherwise shows a "Keychain Not Found" desktop dialog.
+                chrome, "--headless=new", "--disable-gpu", "--use-mock-keychain",
+                "--dump-dom",
                 "--virtual-time-budget=4000", url,
             ],
-            capture_output=True, text=True, timeout=timeout,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            start_new_session=True,
         )
+        dom, _ = proc.communicate(timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         return {
             "status": "unavailable",
             "reason": f"render-verify unavailable — headless Chrome failed to run ({e}); "
             "structural gate passed, visual unconfirmed",
         }
+    finally:
+        if proc is not None:
+            # kill_group never raises: macOS killpg can return EPERM, not
+            # ESRCH, once the group holds only zombies (seen under 65 shards).
+            pg.kill_group(proc)
+            proc.wait()
 
-    dom = proc.stdout or ""
+    dom = dom or ""
     m = re.search(r'<div[^>]*id="layout-audit-banner"[^>]*>', dom)
     if not m:
         return {"status": "not_applicable", "reason": "no #layout-audit-banner in this template"}

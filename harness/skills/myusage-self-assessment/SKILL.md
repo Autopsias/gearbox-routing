@@ -12,6 +12,7 @@ description: >-
   fixes their transcript history justifies building. This is the DECISION layer
   over raw usage facts — reach for it even when the user only hints at wanting a
   data-driven verdict on their tooling rather than naming the skill.
+disable-model-invocation: true
 ---
 
 # Self-assessment: mine your sessions, decide what to build
@@ -152,7 +153,7 @@ sitting as blocking drift.
 
 When the ranked verdicts are decision-shaped (a small set of skill/automation/
 fix/nothing calls the user will accept/reject), also emit them as a decision-card
-one-pager per `~/.claude/commands/references/shared/decision-card-html.md`.
+one-pager per `~/.claude/references/shared/decision-card-html.md`.
 
 ### Phase 5 — Re-measure the prior run
 

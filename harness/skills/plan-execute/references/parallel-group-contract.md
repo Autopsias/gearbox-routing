@@ -1,4 +1,4 @@
-# Parallel-group manifest contract — FROZEN 2026-08-12 (contract v1)
+# Parallel-group manifest contract — AMENDED 2026-08-21 (contract v3; supersedes v2, v1)
 
 **This file is the single statement of record for what a `parallel_group` may and
 may not do.** Where any other document (including
@@ -6,11 +6,13 @@ may not do.** Where any other document (including
 appears to say something different about worktree isolation in the plan dispatch
 path, this file wins.
 
-Frozen by plan session S06 (`_plans/plan-framework-upgrade-2026-08-12/`, item
-PL-02) *before* the executor (S06B) and builder (S07) implement against it. It
-changes by decision — a superseding plan session that bumps the contract version
-in this heading — never by drift from an implementation that found it
-inconvenient.
+Originally frozen by plan session S06 (`_plans/plan-framework-upgrade-2026-08-12/`,
+item PL-02) *before* the executor (S06B) and builder (S07) implement against it.
+Contract v2 is the 2026-08-15 amendment that makes the already-built
+orchestrator-managed worktree lifecycle harness-neutral: Claude and Codex both
+honour the same declaration. It changes by decision — a superseding plan session
+that bumps the contract version in this heading — never by drift from an
+implementation that found it inconvenient.
 
 ## Contents
 
@@ -24,12 +26,19 @@ inconvenient.
 - [6. Version gate](#6-version-gate)
 - [7. What these gates do NOT catch](#7-what-these-gates-do-not-catch)
 - [8. Supersession](#8-supersession)
+- [9. Contract v3 amendment (2026-08-21) — groups under plan isolation](#9-contract-v3-amendment-2026-08-21--groups-under-plan-isolation)
 
 ## Verdict: ROUTE A, scoped to orchestrator-managed worktrees
 
 **A parallel group MAY declare worktree isolation. The mechanism is
 orchestrator-managed `git worktree add` — never the Agent tool's
 `isolation: "worktree"`, which is barred by name.**
+
+The lifecycle is harness-neutral. Claude member dispatch is given the member
+worktree in its prompt; Codex member dispatch starts its `codex exec` command in
+that checkout and places the prompt plus `--output-last-message` receipt under
+its ignored `.plan-worktrees/codex/` runtime directory. The integration session
+always runs in the shared checkout after producer branches merge into it.
 
 The two mechanisms are not interchangeable, and the difference is the whole
 verdict:
@@ -84,6 +93,7 @@ is labelled as such — an implementer may not promote a "documented" row to a
 | 10 concurrent `git worktree add` + commit: 10/10 survived | **measured**, environment-specific | S02 §3 (its own "honest limitation" applies) |
 | `git worktree add -b` with no start-point bases on local `HEAD`, not `origin/<default>` | **measured** | S02 §4 |
 | A fresh worktree is tracked-files-only; untracked/ignored never carry over | **measured** | S02 §5 |
+| Codex `exec` exposes `-C/--cd`, `workspace-write`, and `--output-last-message` for a worktree-rooted dispatch | **measured** | dual-harness P0; 2026-08-15 Codex worktree dispatch regression |
 | Producer-first merges land clean; a same-line conflict fails loudly (exit 1, `UU`, markers) | **measured** | S02 §7 |
 | `EnterWorktree(path=…)` from a dispatched subagent at repo root is REFUSED | **measured** | S06 probe, quoted above |
 | A dispatched subagent honours a prompt-directed working directory | **observed**, not enforced | S06/S06B lane sessions ran correctly in orchestrator-created worktrees |
@@ -156,7 +166,10 @@ patterns `requirements*.txt` and `*.lock`.
 ### M2a — `touches` is MANDATORY for a member's items, and the gate FAILS CLOSED
 
 Every item owned by a member MUST declare a non-empty `touches`, and
-`manifest.json` MUST carry it.
+`manifest.json` MUST carry it. The one exception is an explicit empty list
+`[]` (schema v8): it declares that the item writes nothing, so it passes M2a
+and cannot trip M2 or M5. A missing key, `null`, or an empty or blank string
+is still refused.
 
 This rule exists because the contract was nearly frozen with a gate that could
 never fire. `touches` is optional in the spec schema and, at freeze time,
@@ -188,12 +201,14 @@ meaning **orchestrator-managed `git worktree add`**. Refusal keys on **key
 presence and value**, never on truthiness, so a typo or an unknown mechanism is
 refused rather than quietly treated as "no isolation".
 
-The executor MUST refuse `"worktree"` while its own build cannot honour it —
-with a message saying so — rather than accept the declaration and provide
-nothing. Accepting an inert isolation flag would let a plan believe it is
-protected when it is not, which is the exact failure this contract was written
-to end. S06B flips that refusal into support when the mechanism lands; until
-then the plan gets a loud refusal, never a silent shared tree.
+The executor MUST honour `"worktree"` for both plan-execute harnesses using the
+orchestrator-managed lifecycle above. It MUST refuse before status mutation if
+worktree preparation, base verification, prompt/receipt placement, merge, or
+containment checks fail; it may not silently fall back to the shared tree. A
+Codex member's command MUST `cd` into its member checkout, and its prompt and
+receipt MUST be inside that checkout so `workspace-write` cannot be asked to
+write outside its sandbox. The integration command has no member worktree and
+MUST run from the shared checkout after the producer-first merge.
 
 The Agent tool's own `isolation: "worktree"` parameter MUST NOT be used to
 dispatch a plan session, for the reason in the verdict.
@@ -310,7 +325,7 @@ imports the same module. No rule gets a third implementation.
 | M1 no commit/push | refuse | refuse | v3+ |
 | M2 no dependency/lockfile touch | refuse | refuse | v3+ |
 | M2a `touches` present (fail closed) | refuse | refuse | v3+ |
-| M3 isolation value / unhonourable mechanism | refuse | refuse | v3+ |
+| M3 isolation value / unhonourable mechanism | refuse | enforce; refuse on preparation/dispatch failure | v3+ |
 | M4 gate concurrency-safety | **not machine-enforced** — author judgment + `plan-harden` lint | same | n/a |
 | M5 overlapping writes | refuse (shared) / warn (isolated) | refuse (shared) / warn (isolated) | v3+ |
 | §3 integration session rules 1–4 | refuse (isolated) / warn if absent (shared) | same | v3+ |
@@ -371,9 +386,155 @@ Stated plainly so no one mistakes the enforcement table for a guarantee:
 
 ## 8. Supersession
 
-This is contract **v1**. A successor bumps the version in the heading and names
-what it replaces. Route A is already the position of record here; a future
+This is contract **v2**, which supersedes v1 only on the harness boundary: the
+same Route A lifecycle now applies to Claude and Codex dispatch. A future
 revision that, say, gains harness-enforced containment would supersede the
 verdict's advisory-containment paragraph and §3 rule 6, and leave the rest
 standing. "Frozen" means an implementer may not change it; it does not mean a
 later decision cannot.
+
+**Contract v3 (2026-08-21)** supersedes v2 on one axis only — where a group's
+branches and worktrees live when the plan itself is isolated — and is stated in
+full in §9. Every v2 rule (M1–M5, §3's integration rules, §4's lifecycle, §5's
+enforcement table, §6's version gate) stands unchanged. v3 is the amendment
+`plan-isolation-contract.md` §16 names as its companion; it exists because that
+contract's §1 nests group branches under a plan branch, which is a change to this
+file, and this file declares itself frozen against implementer change.
+
+
+## 9. Contract v3 amendment (2026-08-21) — groups under plan isolation
+
+Written by plan session S04 of `_plans/plan-level-git-isolation-2026-08-20/`
+(item CON-01), alongside `plan-isolation-contract.md` v1. It is a **decision**,
+in the sense §8 requires: it changes this contract because a plan-level
+authority now exists above it, not because an implementation found v2
+inconvenient.
+
+Three rules, then a verdict.
+
+### V3-1 — Group branches and worktrees nest under the plan's
+
+When the enclosing plan is isolated (`plan_schema_version >= 7`, or
+`--isolate`), a group member's branch and worktree are:
+
+| | v2 (unchanged for non-isolated plans) | **v3, isolated plan** |
+|---|---|---|
+| Member branch | `plan/<group>/<sid>` | `plan/<plan-slug>__<group>__<sid>` |
+| Member worktree | `.plan-worktrees/<group>/<sid>/` | `.plan-worktrees/<plan-slug>__<group>__<sid>/` (a **sibling** of the plan worktree, never nested inside it — `plan-isolation-contract.md` §1.1a) |
+| Member base | repository `HEAD` | the **plan branch** `plan/<plan-slug>` |
+| Integration merges into | the shared checkout | the **plan worktree** |
+
+`worktree.py`'s `member_branch()` and `member_path()` are the two call sites; both
+gain the plan slug **only** above the version gate, so every existing plan keeps
+`plan/<group>/<sid>` exactly as measured today at `worktree.py:51-52` and `:292`.
+
+**AMENDED 2026-08-22 (operator decision, s07).** This row first read
+`plan/<plan-slug>/<group>/<sid>` — a name git cannot create. Git will not hold a
+ref and a ref-directory of the same name, so `refs/heads/plan/<slug>/<group>/<sid>`
+is refused (exit 128) while the plan's own branch `refs/heads/plan/<slug>` exists,
+and `git worktree add -b` fails the same way at exit 255. Measured as loose refs
+and after `git pack-refs --all`; transcript in
+`_plans/plan-level-git-isolation-2026-08-20/_evidence/s07/v3-member-branch-refused-by-git.txt`.
+Under the nested name that collision was not a rare legacy case but the shape of
+**every** group of **every** isolated plan, so the rule refused the design it
+belongs to. The member branch therefore uses the same `__` separator §1.1a already
+uses for the member worktree path: one flat ref per member, the plan slug retained,
+every other row of this table unchanged.
+
+**A ref-namespace collision is still a refusal, not a warning**, and one case
+remains: a legacy group whose branch `plan/<X>/<sid>` collides with a new plan
+whose own branch is `plan/<X>`. `begin` refuses, naming the conflicting ref. See
+`plan-isolation-contract.md` §1.4.
+
+**Ownership is still never inferred from the name** (`plan-isolation-contract.md`
+§1.5, ADR-0002). A branch matching `plan/<plan-slug>__<group>__<sid>` that maps to
+no plan state file is UNKNOWN and untouchable; one claimed by two plans is
+CONFLICT. The nesting makes names *more* legible, which is precisely why it must
+not be allowed to become an ownership signal.
+
+### V3-2 — "The shared tree" means the PLAN WORKTREE
+
+Every v2 rule that says "the shared tree", "the shared checkout" or "the
+repository checkout" now reads **"the plan worktree"** when the enclosing plan is
+isolated. Concretely:
+
+- **§2 M1** — a member still MUST NOT commit or push. Under isolation its stray
+  commit lands on `plan/<plan-slug>__<group>__<sid>`, contained inside the plan
+  branch rather than on the operator's tree.
+- **§2 M4** — a gate reading `git status --porcelain` in a member worktree now
+  sees only that member. The plan worktree bounds it a second time, so the "gate
+  tests its peers' half-finished edits" failure needs both isolations to be off.
+  Derive the file set as `plan-isolation-contract.md` §10 requires — including
+  untracked files, never `git diff HEAD`.
+- **§2 M5** — an overlap between two members stays a WARNING under isolation and
+  a REFUSAL on a shared-tree group. Unchanged; only the tree it is measured
+  against moves.
+- **§3 rule 5** — the integration session merges member branches producer-first
+  **into the plan worktree**, on `plan/<plan-slug>`, never into `main` and never
+  into the primary checkout. Landing on `main` is the plan's land stage, and it
+  belongs to `plan-isolation-contract.md` §4 alone.
+- **§3 rules 6–7** — containment and baseline are checked against the **plan
+  worktree's** HEAD and dirty state, not the primary checkout's.
+- **§4** — worktree cleanup ordering gains
+  `plan-isolation-contract.md` §12.3: `unlock` → `remove` → `prune`, because
+  `git worktree prune` skips locked worktrees and the plan worktree is created
+  locked.
+
+**What does NOT move:** the plan's own `_plans/<plan-slug>/` directory. The
+orchestrator writes the **primary checkout's** copy for the whole run, and no
+commit from inside any plan or member worktree stages a `_plans/` path
+(`plan-isolation-contract.md` §8). A member worktree's copy of `_plans/` is
+frozen twice over — once at the plan worktree, once at the member's — and is
+never the plan's record.
+
+### V3-3 — The Agent tool's native `isolation: "worktree"` STAYS BARRED, BY NAME
+
+§2 M3 and the v2 verdict bar it; v3 restates the bar rather than letting the
+arrival of plan-level worktrees be read as a relaxation.
+
+**S02 measured the Agent tool's task-level `isolation: "worktree"` silently
+destroying real on-disk agent output living in an untracked or gitignored path —
+on the first zero-contention attempt, with no error and no signal to the
+orchestrator** (`_evidence/s02/worktree-spike.md` §6 probe 1; §9 row *Auto-cleanup
+safety*: "Confirmed unsafe").
+
+Nothing in plan-level isolation changes that measurement, and plan-level
+isolation makes the temptation *worse*, not better: once a plan runs in a
+worktree, "the harness already has a worktree mechanism, use that one" is the
+obvious-looking simplification. It is the wrong one. The two mechanisms differ on
+the only axis that matters — orchestrator-managed `git worktree add` **never
+auto-removes** (S02 §9: "cleanup is always an explicit, orchestrator-issued
+command"), and the task-level mechanism removes on task end, taking git-invisible
+output with it.
+
+The bar is on the **named parameter**: `isolation: "worktree"` on the Agent tool
+MUST NOT be used to dispatch a plan session, a group member, or an integration
+session, at any schema version, isolated plan or not.
+
+### Verdict: nest the branches, move the tree, keep the bar
+
+**Group isolation nests inside plan isolation rather than sitting beside it.**
+A member's branch and worktree are addressed by `(plan-slug, group, sid)`, the
+member's base is the plan branch, and the integration session merges into the
+plan worktree — so a group's entire lifecycle happens below `plan/<plan-slug>`
+and reaches `main` only through the plan's single land (`plan-isolation-contract.md`
+§4).
+
+Three consequences worth stating plainly:
+
+1. **Every v2 tree-protecting rule gets stronger, and none gets weaker.** The
+   rules are unchanged; the tree they protect is smaller and no longer the
+   operator's.
+2. **`begin` gains one new refusal** — the `plan/<slug>` vs `plan/<slug>/<sid>`
+   ref collision between a new plan and a LEGACY group of that name (V3-1). It is
+   a refusal because git itself cannot represent both, so a warning would be a
+   warning about something that is already broken. V3's own member names cannot
+   produce this pair: they are flat (`plan/<slug>__<group>__<sid>`).
+3. **The Agent tool's native worktree isolation is barred by name and stays
+   barred.** A mechanism that can lose an agent's work is not viable regardless
+   of how conveniently it now rhymes with the plan's own worktree.
+
+Below the version gate nothing in §9 applies: a non-isolated plan's groups keep
+`plan/<group>/<sid>`, `.plan-worktrees/<group>/<sid>/`, and the shared checkout,
+exactly as v2 specifies and as measured on all 28 manifests on disk today, of
+which 0 are at `plan_schema_version >= 7`.

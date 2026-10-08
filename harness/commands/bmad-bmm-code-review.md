@@ -10,7 +10,7 @@ disable-model-invocation: true
      (agents/epic-code-reviewer.md, references/epic-dev/full/phase-5-code-review.md)
      invoke it via Skill(skill='bmad-bmm-code-review') for the BMAD story-review flow.
      Do NOT type this directly for ad-hoc review — use /adversarial-review.
-     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. Removal decided in s09. -->
+     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. s09 (2026-06-21) did not remove it. -->
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
 

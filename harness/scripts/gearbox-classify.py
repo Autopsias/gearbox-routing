@@ -89,17 +89,42 @@ def changed_key_paths(a, b, prefix=""):
         for k in sorted(set(a) | set(b)):
             p = f"{prefix}.{k}" if prefix else k
             if k not in a or k not in b:
-                yield p
+                # A non-empty block on one side only is reported by its LEAVES:
+                # the first /effort on a new model id adds the whole
+                # `modelSettings.<id>` block, and `modelSettings.*.effortLevel`
+                # only matches the leaf. Reported as the block, it aborted a deploy.
+                side = a[k] if k in a else b[k]
+                if isinstance(side, dict) and side:
+                    yield from changed_key_paths(a.get(k, {}), b.get(k, {}), p)
+                else:
+                    yield p
             else:
                 yield from changed_key_paths(a[k], b[k], p)
     elif a != b:
         yield prefix or "<root>"
 
 
+def _pattern_matches(pattern, parts):
+    """A declared key, split on dots, against the key path's leading segments.
+
+    ONE WILDCARD SEGMENT, `*`, matching exactly one segment and never a dot.
+    It exists for keys the binary indexes BY MODEL ID —
+    `modelSettings.<model>.effortLevel` — where naming each id would decay
+    silently: a new model id would read as harness drift and block a deploy,
+    and the fix would look identical to a real refusal. `*` is deliberately not
+    a prefix match: `modelSettings` alone would make the WHOLE subtree churn,
+    and this is the one file where over-broad classification is dangerous.
+    """
+    pat = pattern.split(".")
+    if len(pat) > len(parts):
+        return False
+    return all(p == "*" or p == q for p, q in zip(pat, parts))
+
+
 def is_churn_key(keypath, churn_keys):
     """Churn iff the key path, or any dotted ancestor of it, is declared churn."""
     parts = keypath.split(".")
-    return any(".".join(parts[: i + 1]) in churn_keys for i in range(len(parts)))
+    return any(_pattern_matches(pattern, parts) for pattern in churn_keys)
 
 
 def classify_settings(claude_dir, relpath, churn_keys, errors):

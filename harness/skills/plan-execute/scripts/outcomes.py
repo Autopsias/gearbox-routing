@@ -36,18 +36,19 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import attestation
 import closeout_pipeline as cp
 import escalation as esca
 import manifest_io as mio
+import ran_cell
+from ran_cell import SOURCE_ATTESTED, SOURCE_REQUESTED, SOURCE_UNKNOWN  # noqa: F401 (re-exported)
+import route_at_dispatch as rad
 import run_state_io as rsi
 
 KILL_SWITCH_ENV = "PLAN_EXECUTE_NO_OUTCOME_LEDGER"
 LEDGER_PATH_ENV = "PLAN_EXECUTE_OUTCOME_LEDGER"  # allow-listed test/override var
 
 RESULTS = {"passed", "rework", "exhausted", "blocked", "done_unverified", "wontfix"}
-SOURCE_ATTESTED = "attested"
-SOURCE_REQUESTED = "requested"
-SOURCE_UNKNOWN = "unknown"
 
 _MAX_RECORD_BYTES = 4000  # hygiene only (PIPE_BUF governs pipes, not regular files)
 _GATES_FAILED_MAX = 3
@@ -168,11 +169,18 @@ def _ssot_version_ran():
         return None
 
 
-def _routing_provenance(plan_dir, session, task_class, backend, model_authored, reasoning_authored):
+def _routing_provenance(plan_dir, session, task_class, backend, model_authored, reasoning_authored,
+                        manifest=None):
     """default_resolved | pinned_override | experimental — derived at write time.
 
     `experimental` wins outright (a canary-tagged session is never "just the
-    default"). Otherwise the authored cell is compared against
+    default"). At schema v8 the answer is what the author WROTE
+    (`route_at_dispatch.provenance`): no model is `default_resolved`, an override
+    is `pinned_override` even when it equals the class default. That path has no
+    try/except, so it cannot fall into the silent `pinned_override` below — the
+    failure mode that once mislabelled 114 of 114 records (3b2e26fb).
+
+    Below v8 the authored cell is compared against
     `resolve_route.resolve(task_class, EFFECTIVE_PROVIDER)`'s baseline, where the
     effective provider is backend-aware — the SAME mapping `run.py` dispatch
     uses (`anthropic` for the claude lane, `openai` for the codex one). Any
@@ -182,12 +190,16 @@ def _routing_provenance(plan_dir, session, task_class, backend, model_authored, 
     the aggregator computes from this field."""
     if session.get("routing_experiment"):
         return "experimental"
+    v8 = rad.provenance(manifest, session)
+    if v8:
+        return v8
     if not task_class or not model_authored:
         return "pinned_override"
     try:
+        import provider_lane as pl  # noqa: PLC0415
         import run as _run  # noqa: PLC0415
 
-        effective_provider = _run._ESCALATION_PROVIDER.get(backend, "anthropic")
+        effective_provider = pl.escalation_provider(backend)
         rr = _run._import_resolver()
         baseline = rr.resolve(task_class, effective_provider,
                               ssot_path=str(_run._routing_ssot_path()))
@@ -200,11 +212,28 @@ def _routing_provenance(plan_dir, session, task_class, backend, model_authored, 
         return "pinned_override"
 
 
-def _effort_mechanism(session):
-    """tier_agent | agent_definition | prompt_directive_advisory — the same
-    three-way classification `cmd_begin` computes at dispatch (mirrored here,
-    not re-imported, since the dispatch-time value is not persisted anywhere a
-    later resolution moment can read)."""
+def _effort_mechanism(plan_dir, session, session_id):
+    """tier_agent | agent_definition | prompt_directive_advisory — HOW the effort
+    tier was actually bound for the dispatch this resolution is about.
+
+    READ FROM THE DISPATCH, not re-derived. `cmd_begin` logs `dispatch_effort`
+    with the value it computed, and the LAST one is this session's current
+    dispatch. The manifest derivation below is only the fallback, for a plan whose
+    run predates that event (and for the codex lane, which reports
+    `effort_fidelity` instead).
+
+    WHY THE FALLBACK IS NOT ENOUGH ON ITS OWN: an ESCALATED session has no
+    `dispatch.subagent_type` in the manifest — the climb resolves a `tier-*` agent
+    at dispatch time and binds it — so re-deriving filed every escalated rung as
+    `prompt_directive_advisory`. Those are exactly the rungs the whole
+    outcome-learning objective wants to ask "did the effort bind?" about, and the
+    answer was wrong on all of them (measured 2026-08-15, s08 acceptance review).
+    """
+    evs = _events(plan_dir, "dispatch_effort", session_id)
+    if evs:
+        recorded = (evs[-1].get("mechanisms") or {}).get(session_id)
+        if recorded:
+            return recorded
     agent = ((session.get("dispatch") or {}).get("subagent_type") or "").strip()
     if not agent:
         return "prompt_directive_advisory"
@@ -228,100 +257,31 @@ def _dispatch_ordinal(plan_dir, session_id):
     return len(_events(plan_dir, "dispatch_started", session_id))
 
 
-def _model_ran(plan_dir, session_id, model_authored, reasoning_authored, escalated_from,
-               degraded_from, generation):
-    """(model_ran, reasoning_ran, model_ran_source) — STRICTLY receipt-gated.
+def _orchestrator_ctx_tokens(plan_dir, session_id):
+    """TH-01 — the orchestrator's context size AT DISPATCH, int or None.
 
-    No `record-receipt` for this session at all -> ("unknown", "unknown",
-    "unknown"), full stop, even if the closeout claims an `escalated_from` or
-    `degraded_from` substitution: those are honest reports of what the
-    ORCHESTRATOR asked for, never proof of what actually served the request
-    (see module docstring).
+    READ OFF THE LAST `dispatch_started`, never re-measured here. This record is
+    written at RESOLUTION — minutes to hours after the dispatch, with the whole
+    batch's output already in the orchestrator's context — so a fresh reading
+    would answer a different question than the one the field names.
 
-    TEL-01 finding 1 — a receipt does NOT get cleared on re-dispatch
-    (`run_state_io.get_receipt`'s own docstring says so): if `record-receipt`
-    is skipped on a later attempt, the receipt still on file describes an
-    EARLIER attempt. `record_receipt` stamps the (generation, dispatch
-    ordinal) it was recorded for; if those don't match what THIS resolution
-    is actually about, the receipt is stale evidence for a different
-    dispatch and must degrade to `unknown` exactly like having no receipt at
-    all — never silently carry an old attempt's model forward."""
+    Only the LAST event is consulted. Falling back to an older event's number
+    when the newest dispatch could not measure would hand the retro a reading
+    taken at some other point in the run and label it as this one's.
+    """
+    events = _events(plan_dir, "dispatch_started", session_id)
+    value = events[-1].get("orchestrator_ctx_tokens") if events else None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _fresh_receipt(plan_dir, session_id, generation):
+    """This session's receipt only when it was recorded for THE dispatch this
+    resolution is about (same generation and dispatch ordinal), else None."""
     receipt = rsi.get_receipt(plan_dir, session_id)
-    if not receipt:
-        return "unknown", "unknown", SOURCE_UNKNOWN
-    if (receipt.get("generation") != generation
-            or receipt.get("attempt") != _dispatch_ordinal(plan_dir, session_id)):
-        return "unknown", "unknown", SOURCE_UNKNOWN
-    attested = receipt.get("attested")
-    if attested and attested.get("model"):
-        return attested["model"], attested.get("reasoning") or reasoning_authored, SOURCE_ATTESTED
-    # Receipt exists (an Agent ID was correlated) but no served-model evidence —
-    # the best honest claim is "what we asked for", which is the escalated/
-    # degraded cell when one applies, else the authored one.
-    if escalated_from and isinstance(escalated_from, dict):
-        ran = escalated_from.get("ran") or {}
-        if ran.get("model"):
-            return ran["model"], ran.get("reasoning") or reasoning_authored, SOURCE_REQUESTED
-    if degraded_from and isinstance(degraded_from, dict) and degraded_from.get("ran"):
-        return degraded_from["ran"], degraded_from.get("reasoning") or reasoning_authored, SOURCE_REQUESTED
-    return model_authored or "unknown", reasoning_authored, SOURCE_REQUESTED
-
-
-# --------------------------------------------------------------------------
-# Served-model attestation from a dispatch transcript — PER BACKEND, per the
-# plan's explicit finding: a codex member is a Claude Agent wrapper around an
-# inner `codex exec`, so attesting the outer Agent says nothing about the model
-# that actually did the work.
-# --------------------------------------------------------------------------
-def attest_from_transcript(backend, transcript_path):
-    """Served-model evidence from `transcript_path`, or None. Never raises.
-
-    CLAUDE backend: the one PROVEN telemetry source in this repo is headless
-    `claude -p --output-format json`'s `modelUsage` block (s09's capability
-    probe; an in-session Agent-dispatch transcript handle is UNPROVEN — never
-    assumed). `modelUsage`'s keys can include a background `claude-haiku-4-5`
-    title/fast-mode helper alongside the task model
-    (evals/routing/harness/lib_common.py `attest_served_model`) — excluded here
-    the same proven way: drop any key containing "haiku", keep the rest.
-
-    CODEX backend: the `codex exec --json` event stream carries usage but NO
-    served-model field in any envelope on the version probed
-    (evals/routing/graders/judge.py:8) — this always returns None for codex.
-    That is the honest, MEASURED cap this plan names (codex cohorts stay at
-    `model_ran_source="requested"`), not a gap to paper over by guessing.
-
-    When `modelUsage` holds more than one non-haiku entry, the one that did
-    the most WORK — highest `inputTokens + outputTokens` — is the served
-    model; a tied max is genuinely ambiguous and this refuses to guess,
-    returning None so the caller stays at `model_ran_source="requested"`
-    rather than naming an arbitrary key with false confidence."""
-    if backend == "codex" or not transcript_path:
-        return None
-    try:
-        data = json.loads(Path(transcript_path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    mu = data.get("modelUsage") if isinstance(data, dict) else None
-    if not isinstance(mu, dict) or not mu:
-        return None
-    non_helper = [k for k in mu if "haiku" not in k.lower()]
-    if not non_helper:
-        return {"model": next(iter(mu)), "reasoning": None}
-    if len(non_helper) == 1:
-        return {"model": non_helper[0], "reasoning": None}
-
-    def _tokens(k):
-        usage = mu.get(k) or {}
-        try:
-            return int(usage.get("inputTokens") or 0) + int(usage.get("outputTokens") or 0)
-        except (TypeError, ValueError):
-            return 0
-
-    ranked = sorted(non_helper, key=_tokens, reverse=True)
-    top_tokens = _tokens(ranked[0])
-    if len(ranked) > 1 and _tokens(ranked[1]) == top_tokens:
-        return None  # tied max — genuinely ambiguous, refuse rather than guess
-    return {"model": ranked[0], "reasoning": None}
+    if receipt and receipt.get("generation") == generation and (
+            receipt.get("attempt") == _dispatch_ordinal(plan_dir, session_id)):
+        return receipt
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -335,8 +295,9 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
     session = mio.session_by_id(manifest).get(session_id) or {"id": session_id}
     task_class = (session.get("task_class") or "").strip().lower() or None
 
+    # v8: an unpinned session's "authored" cell is the class default begin froze.
     backend, model_authored, reasoning_authored = _backend_and_authored(
-        plan_dir, manifest, session, task_class,
+        plan_dir, manifest, rad.effective_session(plan_dir, manifest, session), task_class,
     )
     tier_authored = esca.rung_key(model_authored, reasoning_authored)
 
@@ -357,9 +318,9 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
 
     generation = esca.session_state(plan_dir, session_id)["generation"]
 
-    model_ran, reasoning_ran, model_ran_source = _model_ran(
-        plan_dir, session_id, model_authored, reasoning_authored, escalated_from, degraded_from,
-        generation,
+    model_ran, reasoning_ran, model_ran_source = ran_cell.ran_cell(
+        (_fresh_receipt(plan_dir, session_id, generation) or {}).get("attested"),
+        model_authored, reasoning_authored, escalated_from, degraded_from,
     )
     tier_ran = esca.rung_key(model_ran, reasoning_ran) if model_ran != "unknown" else "unknown"
 
@@ -378,12 +339,15 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
         "reasoning_ran": reasoning_ran,
         "tier_ran": tier_ran,
         "model_ran_source": model_ran_source,
-        "effort_mechanism": _effort_mechanism(session),
+        "effort_mechanism": _effort_mechanism(plan_dir, session, session_id),
+        "orchestrator_ctx_tokens": _orchestrator_ctx_tokens(plan_dir, session_id),
+        "usage": attestation.ledger_usage(_fresh_receipt(plan_dir, session_id, generation)),
         "degraded_from": degraded_from,
         "escalated_from": escalated_from,
         "routing_experiment": session.get("routing_experiment"),
         "routing_provenance": _routing_provenance(
             plan_dir, session, task_class, backend, model_authored, reasoning_authored,
+            manifest=manifest,
         ),
         "ssot_version_ran": _ssot_version_ran(),
         "attempt": int(attempt or 1),

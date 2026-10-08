@@ -62,6 +62,108 @@ def ready_sessions(manifest, statuses, resume=False, post_session_parked=()):
     return out
 
 
+def _no_ready_action(_ret, manifest, parked, resume, statuses):
+    """Nothing is ready to dispatch: say WHY — awaiting a checkpoint ack, waiting on
+    a dependency, or genuinely complete. Returns the action dict, or None to fall
+    through."""
+    # Anything pending at all? If everything is terminal/done -> complete.
+    pending = [
+        s["id"]
+        for s in manifest["sessions"]
+        if statuses.get(s["id"], "TODO") not in DONE_STATES
+    ]
+    awaiting = [
+        s["id"] for s in manifest["sessions"] if statuses.get(s["id"]) == "AWAITS_REVIEW"
+    ]
+    awaiting_parked = [sid for sid in awaiting if sid in set(parked)]
+    if awaiting_parked:
+        # These are FINISHED sessions parked for an ack. `--resume` must not
+        # re-run them, so say the one thing that actually clears the gate.
+        return _ret(
+            {
+                "action": "checkpoint",
+                "sessions": awaiting_parked,
+                "message": "post-session checkpoint awaiting approval — approve with "
+                "`run.py ack-checkpoint <plan-dir> --session sNN` (--resume will NOT "
+                "re-dispatch an already-finished session)",
+            }
+        )
+    if awaiting and not resume:
+        return _ret(
+            {
+                "action": "checkpoint",
+                "sessions": awaiting,
+                "message": "awaiting human review",
+            }
+        )
+    verifying = [
+        s["id"] for s in manifest["sessions"]
+        if statuses.get(s["id"]) == "DOING" and s.get("verify")
+    ]
+    if verifying:
+        return _ret(
+            {
+                "action": "verify-pending",
+                "sessions": verifying,
+                "message": "session closed DONE but its verify block has not run — "
+                "`run.py verify-begin <plan-dir> --session sNN`, then `verify-run` per gate, "
+                "then `verify-finalize`",
+            }
+        )
+    if pending:
+        return _ret(
+            {
+                "action": "blocked",
+                "sessions": pending,
+                "message": "no ready sessions but work remains (check deps/checkpoints)",
+            }
+        )
+    return _ret({"action": "complete"})
+
+
+def _explicit_target_action(_ret, by_id, only_session, parked, resume, statuses):
+    """An explicitly named session: resolve it, or say why it cannot run. Returns the
+    action dict, or None to fall through to normal readiness."""
+    s = by_id.get(only_session)
+    if not s:
+        return _ret({"action": "error", "message": f"unknown session {only_session!r}"})
+    st = statuses.get(only_session, "TODO")
+    if st in DONE_STATES:
+        # A scoped answer (`scope: session`) appears only while other sessions are
+        # still open. When every session is terminal, fall through to the whole-plan
+        # answer so land_action / finish_action can turn it into land or finish.
+        if all(statuses.get(x) in DONE_STATES for x in by_id):
+            return None
+        return _ret({"action": "complete", "scope": "session",
+                     "message": f"{only_session} already {st}"})
+    if st == "AWAITS_REVIEW" and only_session in parked:
+        # Explicitly targeting a finished-and-parked session must not re-run
+        # it either — the ack is still the only thing that clears this gate.
+        return _ret(
+            {
+                "action": "checkpoint",
+                "sessions": [only_session],
+                "message": f"{only_session} already finished and is parked for approval — "
+                "approve with `run.py ack-checkpoint <plan-dir> --session "
+                f"{only_session}` rather than re-dispatching it",
+            }
+        )
+    if not _deps_satisfied(s, statuses) and not resume:
+        unmet = [
+            d
+            for d in s.get("dispatch", {}).get("depends_on", [])
+            if statuses.get(d) not in DONE_STATES
+        ]
+        return _ret(
+            {
+                "action": "blocked",
+                "sessions": unmet,
+                "message": f"{only_session} has unmet deps: {unmet}",
+            }
+        )
+    return _ret(_dispatch_or_checkpoint([s], statuses, resume))
+
+
 def next_action(manifest, statuses, *, resume=False, only_session=None, post_session_parked=()):
     """Return a dict describing what /plan-execute should do next.
 
@@ -93,82 +195,17 @@ def next_action(manifest, statuses, *, resume=False, only_session=None, post_ses
 
     # Explicit single-session target.
     if only_session:
-        s = by_id.get(only_session)
-        if not s:
-            return _ret({"action": "error", "message": f"unknown session {only_session!r}"})
-        st = statuses.get(only_session, "TODO")
-        if st in DONE_STATES:
-            return _ret({"action": "complete", "message": f"{only_session} already {st}"})
-        if st == "AWAITS_REVIEW" and only_session in parked:
-            # Explicitly targeting a finished-and-parked session must not re-run
-            # it either — the ack is still the only thing that clears this gate.
-            return _ret(
-                {
-                    "action": "checkpoint",
-                    "sessions": [only_session],
-                    "message": f"{only_session} already finished and is parked for approval — "
-                    "approve with `run.py ack-checkpoint <plan-dir> --session "
-                    f"{only_session}` rather than re-dispatching it",
-                }
-            )
-        if not _deps_satisfied(s, statuses) and not resume:
-            unmet = [
-                d
-                for d in s.get("dispatch", {}).get("depends_on", [])
-                if statuses.get(d) not in DONE_STATES
-            ]
-            return _ret(
-                {
-                    "action": "blocked",
-                    "sessions": unmet,
-                    "message": f"{only_session} has unmet deps: {unmet}",
-                }
-            )
-        return _ret(_dispatch_or_checkpoint([s], statuses, resume))
+        _a = _explicit_target_action(_ret, by_id, only_session, parked, resume, statuses)
+        if _a is not None:
+            return _a
 
     ready = ready_sessions(
         manifest, statuses, resume=resume, post_session_parked=post_session_parked
     )
     if not ready:
-        # Anything pending at all? If everything is terminal/done -> complete.
-        pending = [
-            s["id"]
-            for s in manifest["sessions"]
-            if statuses.get(s["id"], "TODO") not in DONE_STATES
-        ]
-        awaiting = [
-            s["id"] for s in manifest["sessions"] if statuses.get(s["id"]) == "AWAITS_REVIEW"
-        ]
-        awaiting_parked = [sid for sid in awaiting if sid in set(parked)]
-        if awaiting_parked:
-            # These are FINISHED sessions parked for an ack. `--resume` must not
-            # re-run them, so say the one thing that actually clears the gate.
-            return _ret(
-                {
-                    "action": "checkpoint",
-                    "sessions": awaiting_parked,
-                    "message": "post-session checkpoint awaiting approval — approve with "
-                    "`run.py ack-checkpoint <plan-dir> --session sNN` (--resume will NOT "
-                    "re-dispatch an already-finished session)",
-                }
-            )
-        if awaiting and not resume:
-            return _ret(
-                {
-                    "action": "checkpoint",
-                    "sessions": awaiting,
-                    "message": "awaiting human review",
-                }
-            )
-        if pending:
-            return _ret(
-                {
-                    "action": "blocked",
-                    "sessions": pending,
-                    "message": "no ready sessions but work remains (check deps/checkpoints)",
-                }
-            )
-        return _ret({"action": "complete"})
+        _a = _no_ready_action(_ret, manifest, parked, resume, statuses)
+        if _a is not None:
+            return _a
 
     # Build the next batch: the first ready session + any ready peers sharing its
     # parallel_group.
@@ -194,6 +231,9 @@ def _dispatch_or_checkpoint(batch, statuses, resume):
             # orchestrator presents it to the operator verbatim. None on
             # legacy (pre-brief) manifests.
             "checkpoint": head.get("dispatch", {}).get("checkpoint"),
+            "resume_with": "write the owner's words verbatim to <plan dir>/_decisions/"
+            f"{head['id']}.md, then `plan <plan dir> --resume --answer-file <that file>` "
+            "(or `--no-answer` when the owner gave none)",
         }
     return {
         "action": "dispatch",

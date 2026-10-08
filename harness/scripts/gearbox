@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# gearbox — deploy / drift / harvest for TWO deploy targets:
+# gearbox — deploy / drift / harvest for the live harness and both Codex skill roots:
 #   ~/.claude        the primary target — a git clone, moved by fast-forward.
 #   ~/.codex/skills  the Codex skill ports — NOT a clone, moved by a path-scoped
-#                    render (scripts/gearbox-codex.py). Both are covered by the
-#                    same drift-and-harvest discipline below.
+#                    render (scripts/gearbox-codex.py), covered by the same
+#                    drift-and-harvest discipline below.
+#   ~/.agents/skills generic mirrors of the remaining Claude skills, refreshed by
+#                    skills/codex-skill-sync after a successful port render.
 #
 #   gearbox deploy            fetch the source, sync this tree forward, re-wire the
 #                             guard hooks, re-apply 0600 modes, run the full guard,
-#                             render the Codex ports, report what changed.
+#                             render the Codex ports, sync the generic Codex skill
+#                             mirror, report what changed.
 #                             Idempotent: a second run is a clean no-op.
 #   gearbox drift [--brief]   cheap, offline, read-only: what is dirty in either
 #                             target and in which class. --brief = one line, only
@@ -179,7 +182,19 @@ do_harvest() {
     git -C "$CD" fetch --quiet "$(git -C "$CD" config --get "branch.$(git -C "$CD" rev-parse --abbrev-ref HEAD).remote" || echo origin)" \
       || die 1 "harvest: fetch failed"
     if [ "$(git -C "$CD" rev-list --count "HEAD..$up")" != "0" ]; then
-      die 5 "harvest: $up is ahead of this tree — run \`gearbox deploy\` first (it harvests, syncs and pushes in one pass)."
+      # Behind is the NORMAL case, not an error: another tree pushed. Fast-forward
+      # and carry on.
+      #
+      # This used to send the operator to `gearbox deploy`, which CANNOT do the job
+      # harvest exists for: deploy's routine harvest stages classes
+      # churn,live_state — TRACKED modifications only — so a brand-new file under a
+      # [live-state] path was never picked up by either command. Measured 2026-08-23:
+      # 28 auto-memory files for one project existed only in the deploy target, and
+      # the first explicit harvest after this fix committed 83 untracked runtime
+      # files. Both commands had been exiting 0 the whole time.
+      say "harvest: behind $up — fast-forwarding first"
+      git -C "$CD" merge --ff-only "$up" \
+        || die 5 "harvest: fast-forward refused — this tree has its own commits. Resolve in the source repo; never force."
     fi
   fi
 
@@ -464,13 +479,34 @@ do_deploy() {
   # (dual-harness-contract.md § 6.2). Failure here is LOUD but NON-FATAL: Codex is
   # a second consumer and must not be able to abort the primary deploy.
   say "-- render ~/.codex skills --"
+  local codex_render_ok=1
   if ! CLAUDE_DIR="$CD" python3 "$CODEX" render --claude-dir "$CD" --pathspec "$PATHSPEC"; then
+    codex_render_ok=0
     warn ""
     warn "WARNING: the ~/.codex render step FAILED (see above). The ~/.claude deploy"
     warn "         below is unaffected and green; the Codex skill ports may now be"
     warn "         stale. Re-run it on its own once the cause is fixed:"
     warn ""
     warn "    python3 $CODEX render --claude-dir $CD"
+  fi
+  say ""
+
+  # (g3) Mirror every remaining Claude skill into Codex's generic skill root.
+  # Port render MUST succeed first: otherwise a newly-added hand-authored port
+  # could be installed here as a generic mirror before ~/.codex owns its name.
+  # Like the port render, this is loud but non-fatal to the primary Claude deploy.
+  say "-- sync ~/.agents skills --"
+  local mirror_sync="$CD/skills/codex-skill-sync/scripts/sync_from_claude.py"
+  if [ "$codex_render_ok" != "1" ]; then
+    warn "   SKIPPED: ~/.codex render failed, so port precedence is not trustworthy."
+  elif [ ! -f "$mirror_sync" ]; then
+    warn "   WARNING: missing $mirror_sync; Codex's generic skill mirror may be stale."
+  elif ! CLAUDE_DIR="$CD" python3 "$mirror_sync" --apply; then
+    warn ""
+    warn "WARNING: the ~/.agents skill sync FAILED (see above). The ~/.claude deploy"
+    warn "         remains green; re-run the sync after fixing the cause:"
+    warn ""
+    warn "    python3 $mirror_sync --apply"
   fi
   say ""
 

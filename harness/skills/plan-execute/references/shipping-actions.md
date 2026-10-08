@@ -23,9 +23,22 @@ After `apply` reports a non-null `post_session`:
    - `failed` — surface `reason` + the **redacted** `stderr_excerpt`; the plan is halted. STOP. The operator fixes the root cause and resumes (shipping resumes at the failed step — it never re-runs the session).
    - `confirm-required` (`reason: deploy-auth-stale`) — an intervening session changed what this deploy ships, so the pre-authorization was downgraded. Surface the `rollback_hint` and the stale deploy, ask the operator, then re-run with `--resume`/`--confirm-stale` to proceed.
    - `invoke-skill` `{skill, args, step}` — invoke that skill via the Skill tool: `Skill(skill="<skill>", args="<args>")` (copy the `/plan-harden` → `/grill-with-docs` invocation pattern). Write the skill's final message to a temp file, then record the outcome: `PYBP ship-record <dir> --session sNN --step <step> --status done|failed [--result-file /tmp/<step>.txt]`. (A failure's stderr is redacted by the helper before it touches `run.ndjson`.)
-   - `run-argv` `{step}` — an argv-kind step (a `deploy_argv` / argv registry target or gate). The helper runs it itself: `PYBP ship-run <dir> --session sNN --step <step>`.
+   - `run-argv` `{step}` — an argv-kind step (a `deploy_argv` / argv registry target or gate, **and every git sub-step of an ISOLATED plan** — see below). The helper runs it itself: `PYBP ship-run <dir> --session sNN --step <step>`.
    - `done` — finalize: `PYBP ship-finalize <dir> --session sNN`.
 2. Each `ship-record` / `ship-run` returns the NEXT directive. Loop until `done` (then `ship-finalize`) or a terminal `failed`/`deferred`/`confirm-required`.
+
+**Under plan isolation the git sub-steps are `run-argv`, not `invoke-skill`.** A
+plan on its own branch and worktree (ISO-02) must commit and push INSIDE that
+checkout, and `/commit-orchestrate` is a Skill directive executed by this
+conversation — its cwd is the conversation's cwd and it takes no directory
+argument, so it would commit the shared checkout. `shipping.compute_steps` therefore
+resolves `commit`/`push`/`pr` through `plan_ship.git_step`, which returns an argv
+step whose `cwd` is the plan worktree, stages with an explicit `:(exclude)_plans`
+pathspec (contract §8.b), sets upstream on the first push (§2.2) and targets the
+plan branch for a PR. You do nothing differently: `ship-run` is already the
+directive you follow. An unisolated plan is unchanged — same `/commit-orchestrate`
+invocation it always had. If a plan CLAIMS a worktree whose directory is gone, the
+step REFUSES rather than falling back to the shared checkout.
 
 **Announce before you ship.** Before running the sub-loop for a session, print its
 declared shipping actions to the terminal stream — e.g. `s03 will run:
@@ -84,3 +97,7 @@ need operator judgement, not a blind re-run:
   what this deploy ships. The `rollback_hint` for the prior deploy is surfaced.
   Confirm the deploy is still correct, then re-run with `--resume`/`--confirm-stale`.
   Rollback execution itself stays manual.
+
+## Finish
+
+Every plan ends with `PYBP finish <dir>`, after the last session (and the land, for an isolated plan) and before `complete`. It commits the plan's leftover record, clears leftovers, brings the checkout level with the default branch and reports CI. It is separate from the per-session shipping above; see `finish-contract.md`.

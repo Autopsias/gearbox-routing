@@ -281,6 +281,16 @@ def carry_over_state(old_html, new_html):
         new_html = _CHANGES_LIST_RE.sub(
             lambda _m, _p=prior_changes: _p.group(0), new_html, count=1
         )
+    # The nav strip chips are runtime state too, and they live OUTSIDE every
+    # article block, so the per-article carry above never reached them. That is
+    # the whole reason 20 of 20 dashboards read TODO in the strip on 2026-08-21
+    # while their articles read DONE: build_plan writes every chip TODO, and a
+    # --rebuild --preserve-state re-rendered fresh TODO chips over the real ones.
+    # Repaint each chip from the status now on its own article, so the strip and
+    # the cards can never disagree — a session with no article keeps its render.
+    statuses = read_all_statuses(new_html)
+    for aid, status in statuses.items():
+        new_html = _set_chip_status(new_html, aid, status)
     return new_html
 
 
@@ -324,6 +334,85 @@ def update_shipping_badge(html_path, aid, badge):
     return True
 
 
+def chip_status(html_text, aid):
+    """The nav chip's declared status for `aid`, or None when it has no chip.
+
+    None and "TODO" are DIFFERENT answers: items legitimately have no chip,
+    while a session whose chip says TODO after a DONE apply is the defect.
+    Returning None for both would have hidden exactly the bug this exists for.
+    """
+    for m in re.finditer(r"<a\b[^>]*>", html_text):
+        tag = m.group(0)
+        if "strip-chip" in tag and f'data-session="{aid}"' in tag:
+            found = re.search(r'data-status="([^"]*)"', tag)
+            return found.group(1) if found else None
+    return None
+
+
+_PILL_RE = re.compile(r'<span class="pill status-\w+[^>]*>([^<]*)</span>')
+
+
+def visible_desyncs(html_text, aid, status):
+    """Warnings for every VISIBLE surface that disagrees with `status`.
+
+    The attribute is the authoritative signal — the pipeline reads it — so
+    nothing here is a hard mismatch. These are the surfaces a HUMAN reads, and
+    each has drifted in production:
+
+    * the header pill, when `_mutate_block`'s narrower regex misses;
+    * the nav strip chip, which no code touched at all until 2026-08-21 — by
+      then 20 of 20 dashboards on this machine showed every session TODO in the
+      strip over DONE and BLOCKED cards, with six colour rules that had never
+      fired.
+
+    Both live here, beside the writers that keep them in step, so a check and
+    its repaint cannot drift apart in separate files. An id with no article, or
+    no chip, contributes nothing rather than a phantom warning.
+    """
+    out = []
+    try:
+        _, _, block = extract_block(html_text, aid)
+    except AnchorError:
+        return out
+    m = _PILL_RE.search(block)
+    if m and m.group(1) != status:
+        out.append(f"{aid}: data-status={status!r} landed but the visible pill still "
+                   f"reads {m.group(1)!r}")
+    chip = chip_status(html_text, aid)
+    if chip is not None and chip != status:
+        out.append(f"{aid}: data-status={status!r} landed but the nav strip chip still "
+                   f"reads {chip!r} — the session strip shows a state nobody measured")
+    return out
+
+
+def _set_chip_status(html_text, aid, status):
+    """Keep the nav chip in step with the article it links to.
+
+    The chip is written once at build time as TODO, and the mutation path never
+    touched it. Measured across every plan on this machine 2026-08-21: 20 of 20
+    dashboards showed EVERY session as TODO in the navigation strip while the
+    articles carried DONE, BLOCKED, WONTFIX. The stylesheet has shipped rules
+    for DONE / BLOCKED / WONTFIX / DEFERRED / PARTIAL / AWAITS_REVIEW the whole
+    time and not one of them had ever fired — a colour-coded status display
+    reporting a state it never measured.
+
+    Order-independent on the tag's attributes, because the only thing that
+    identifies the chip is that it carries BOTH `strip-chip` and this aid; a
+    regex pinned to today's attribute order would unpin itself the next time
+    the builder's f-string is reflowed.
+
+    Items have no chip. A miss is normal and silent here — `structural_gate` is
+    what refuses a SESSION whose chip failed to follow.
+    """
+    for m in re.finditer(r"<a\b[^>]*>", html_text):
+        tag = m.group(0)
+        if "strip-chip" not in tag or f'data-session="{aid}"' not in tag:
+            continue
+        new = re.sub(r'data-status="[^"]*"', f'data-status="{status}"', tag, count=1)
+        return html_text[:m.start()] + new + html_text[m.end():]
+    return html_text
+
+
 def mutate_text(html_text, aid, *, status, note=None, updated=None):
     """Pure: return `html_text` with `aid`'s block updated. Writes nothing.
 
@@ -334,7 +423,8 @@ def mutate_text(html_text, aid, *, status, note=None, updated=None):
     preflight(html_text, aid)
     start, end, block = extract_block(html_text, aid)
     new_block = _mutate_block(block, status=status, updated=updated or _today(), note=note)
-    return html_text[:start] + new_block + html_text[end:]
+    out = html_text[:start] + new_block + html_text[end:]
+    return _set_chip_status(out, aid, status)
 
 
 def apply_mutation(html_path, aid, *, status, note=None, updated=None):

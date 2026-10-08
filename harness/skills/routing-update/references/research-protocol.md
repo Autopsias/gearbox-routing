@@ -32,7 +32,7 @@ question, chase the live doc via `mcp__ref` before writing the diff.
 
 For a NEW model/tier where the SSOT needs quality-vs-cost placement, not just prices:
 
-- `mcp__exa__web_search_exa` (or `deep_researcher_start` for a genuinely new family) —
+- `mcp__exa__web_search_exa` (or `mcp__exa__agent_run` for a genuinely new family) —
   benchmarks, practitioner reports, head-to-head evals.
 - `mcp__perplexity-ask__perplexity_ask` — cross-check the same questions; disagreement
   between lanes is signal to keep digging, not to average.
@@ -66,7 +66,7 @@ that moves a pin without that table is not ready to propose.
 - **`curl` is useless here.** The page is client-hydrated: `curl` returns ~230 KB of shell
   with **zero** model rows in it (`grep -c luna` → 0). A curl-and-grep step will silently
   produce nothing and read as "no data".
-- **Use `WebFetch` or `mcp__exa__crawling_exa`.** Both were verified to return the full
+- **Use `WebFetch` or `mcp__exa__web_fetch_exa`.** Both were verified to return the full
   rendered table and to agree with each other cell-for-cell. Prefer running both — silent
   disagreement between them is the signal that the page changed shape.
 
@@ -146,12 +146,29 @@ than rediscover from scratch. Each entry: what it is, why it's not a diff yet, a
 would flip it into one. Remove an entry once it's been evaluated (converted to a diff,
 or explicitly declined with a dated note in a changeset's Confidence section).
 
+- *(RESOLVED 2026-08-23, v20 changeset — kept one cycle as precedent, then delete.)*
+  **Opus effort-dial attenuation on the trivial canary** (added 2026-08-18, v17):
+  the 2.1.241 bump re-measured it, exactly as the flip condition asked. Trivial
+  canary read opus INERT (0.956); a harder-prompt probe the same day (all four
+  opus tiers, sonnet positive control, n=6/cell) read the dial LIVE at 2.44 with
+  a monotonic staircase — the attenuation was Opus 5's adaptive-thinking
+  engagement floor rising over a memorized prompt, not the dial dying.
+  `preflight_check.py` is now two-stage (a trivial INERT re-probes with the hard
+  prompt pair before a verdict is written; the status file records the deciding
+  stage). Evidence: `harness/hard-probe-20260823/REPORT.json`, SSOT DECISION
+  HISTORY v1.19.
+- **Claude Code Fast mode pricing** (added 2026-08-18, v17) — `/fast` runs Claude
+  Opus 5 at $10/$50 per MTok (2× standard opus) for up to 2.5× output speed;
+  research preview, Opus 5/4.8 only, first-party API only. Not a `prices:` row —
+  it is an interactive operator toggle, not a dispatchable routing rung. Flip to
+  a diff if fast mode becomes dispatchable per-subagent/session config, or the
+  operator uses `/fast` routinely enough that $/outcome math should price it.
 - **Advisor tool beta** (`advisor-tool-2026-03-01`, fetched from platform.claude.com
   docs 2026-07-10) — executor+advisor model pairing inside ONE Messages request.
   Advisor tokens are billed at the advisor model's own rate via `usage.iterations[]`
   (not the executor's rate) — a genuinely different cost shape than a separate advisor
   dispatch. NOT available on Bedrock/GCP/Vertex/Foundry — Anthropic-API-only. Relevant
-  to any API-side project this harness's routing touches (e.g. the health-advisor
+  to any API-side project this harness's routing touches (e.g. a private
   pipeline), NOT to Claude Code sessions themselves (Claude Code doesn't call the raw
   Messages API this way). Watch for: GA / non-beta header, Bedrock/GCP parity, or a
   first API-side project in this harness's scope that could use it — any of those is

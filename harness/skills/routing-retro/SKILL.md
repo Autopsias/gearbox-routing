@@ -24,13 +24,17 @@ guard, one approval protocol.
 **Read, never hardcode.** Expected classes, default pairs, and prices come from
 `~/.claude/model-routing.yaml` AT RUN TIME. This skill's prose carries no tier values.
 
-## Checklist (all 6 steps)
+## Checklist (all 7 steps)
 
 - [ ] **Deterministic scan** — run `retro_scan.py`, read the JSON
 - [ ] **Aggregation** (step 1b) — run `aggregate_outcomes.py`, read its JSON (never the raw
   `outcomes.ndjson` ledger); surface any fired proposal and the `apex_revisit` callout
 - [ ] **Judgment layer** — infer task shape, compare expected vs actual routing
-- [ ] **Report** — ranked findings, each with a recommended action
+- [ ] **Report** — render the one-pager (`render_report.py`) + a decision card of at most 3
+  proposed changes, each with a recommended action
+- [ ] **Did-it-help check** (step 3a) — before/after cohorts for the last adopted proposal
+- [ ] **Compaction did-it-help** (step 3b) — per-intervention cohorts from the activation
+  ledger, plus `arming_check.py` before any deferred verdict is re-judged
 - [ ] **Did-it-stick check** — verify prior changes are still in place
 - [ ] **Close** — state the next evidence-tied cadence
 
@@ -103,7 +107,11 @@ two-stage, explicit-tag experiment (grill 2026-08-13):
    `routing_experiment`-tagged cohort under its `proposal_id` as an explicit CANARY cell
    (`canaries[]` in the JSON), separate from the normal class-default cells. It reaches
    `adoption-ready` only at N≥10, first-attempt pass≥0.90, AND attempts-per-success≤1.1 —
-   never on raw success rate alone.
+   never on raw success rate alone. A Claude-lane cohort counts only when its first
+   attempt ran through a tier agent (`effort_mechanism: tier_agent`); any other cohort
+   ran at the orchestrator's effort, not the rung under test, and is reported as
+   `excluded.effort_unbound` (v25, 2026-09-11). Before authoring a canary, confirm
+   `agents/tier-<model>-<effort>.md` exists.
 3. **Judge at the next retro.** Read `canaries[]` for the proposal's `proposal_id`:
    `smoke-failed` → report the abort and drop the proposal; `smoke-in-progress` /
    `smoke-passed-awaiting-adoption-evidence` → report progress toward N=10, no action;
@@ -139,9 +147,29 @@ as *inferred* (settings.json `effortLevel`, `CLAUDE_CODE_EFFORT_LEVEL` env, `/ef
 switches seen in transcripts, receipts) and label it "inferred" in every finding — never
 claim effort as measured. (`verify-routing.sh` check (g) shows current env overrides.)
 
-### 3. Report — biggest wins first, every finding gets a recommended action
+### 3. Report — one rendered one-pager + a decision card, every retro, the house way
 
-Short report, ranked by impact (lead with a recommendation, never neutral):
+Render the retro's report as ONE self-contained HTML one-pager, not chat prose — same
+contract as every other eval cycle in this house (`references/shared/decision-card-html.md`):
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/aggregate_outcomes.py > /tmp/aggregate.json
+python3 ~/.claude/skills/routing-retro/scripts/render_report.py /tmp/aggregate.json -o /tmp/routing-retro-report.html
+```
+
+- **Decision card, top of page, at most 3 proposed routing changes.** `render_report.py`
+  ranks `aggregate.json`'s `proposals[]` (fired cell upgrades/downgrades + adoption-ready
+  canaries) and shows the top 3; the rest are named and deferred, never silently dropped.
+  Never present a 4th option or "it depends" prose in place of a pick.
+- **Cell table inline** — every class/cell's N, first-attempt pass rate, escalation rate,
+  and status, straight from `aggregate.json`'s `cells[]`.
+- **Did-it-help check inline** — `aggregate.json`'s `did_it_help[]` (see step 3a below)
+  renders as its own table: before/after N and pass rate per adopted proposal, always with
+  a verdict (`helped` / `no_improvement` / `underpowered`).
+- Share the rendered file path (or publish it as an Artifact if the environment supports
+  it) — never a bare multi-page markdown dump in its place.
+
+Below the one-pager, a short prose summary still applies:
 
 - **Misroute instances** → propose appending to `evals/routing/MISROUTES.md` in its
   documented schema (`### YYYY-MM-DD — <task shape>` / expected class / actual / cost
@@ -156,9 +184,86 @@ Short report, ranked by impact (lead with a recommendation, never neutral):
 - **Trigger check**: after any appends, count MISROUTES entries dated since the SSOT's
   `last_reviewed:` — if ≥2, surface the runbook's full-eval re-run recommendation
   (`evals/routing/README.md` §Re-run triggers) explicitly.
-- When the findings boil down to a short decision-shaped set (accept/reject a misroute
-  append, run `/routing-update` or not), the report may instead be shipped as a
-  decision-card one-pager per `~/.claude/commands/references/shared/decision-card-html.md`.
+
+### 3a. Did-it-help — did the last adopted change actually help?
+
+`aggregate_outcomes.py`'s `did_it_help[]` compares, for every ADOPT recorded in
+`evals/routing/adoptions.ndjson` (written by `/routing-update`'s apply step — see its
+SKILL.md), the affected class's VERIFIED cohorts (gate-checked passed/exhausted) before vs
+after the SSOT version that adoption produced — **by `ssot_version_ran`, never by calendar
+date** [HARDENED:codex-verify-r3]: a source adoption isn't live in the ledger until
+`gearbox deploy` ships it, so a record dated after the adoption but still carrying the OLD
+`ssot_version_ran` belongs in "before", not "after". Canary cohorts for the same
+`proposal_id` are reported separately in `canaries[]` (step 1b) — did-it-help is the
+class-wide default-population comparison. Always report N on both sides; below the
+aggregator's floor (`DID_IT_HELP_MIN_N`) on either side, the verdict reads "underpowered" —
+report that honestly rather than picking a direction from too little data.
+
+### 3b. Did the compaction work help? (per intervention, never "since the deploy")
+
+The compaction changes (a PreCompact veto, a trimmed base context, a routing SSOT
+bump, a three-repo diet) went live at DIFFERENT MOMENTS, and two of them usually
+share one deploy. `~/.dyno/compaction/activations.ndjson` is the sole authority on
+when each went live — never `git log`, because a commit date is not a deploy date.
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/retro_scan.py \
+  --last 1500 --since YYYY-MM-DD --include-sdk > /tmp/retro-scan.json
+python3 ~/.claude/skills/routing-retro/scripts/compaction_report.py \
+  --scan /tmp/retro-scan.json \
+  --plans-glob '~/.claude/_plans/*/_closeouts/*.json' -o /tmp/compaction.json
+python3 ~/.claude/skills/routing-retro/scripts/render_report.py \
+  --only-compaction --compaction /tmp/compaction.json -o did-it-help.html
+```
+
+- **Keep `--plans-glob` single-quoted.** The pattern must reach the script whole,
+  so the shell expands neither the `*`s nor the `~`; the script expands `~` itself.
+  Unquoted it becomes many argv entries; quoted WITHOUT the script expanding `~` it
+  matched 0 files (vs 109) and the closeout half of the counter-metric silently
+  rendered `n/a` — a measurement that reads nothing looks exactly like a clean result.
+- `--include-sdk` is REQUIRED here and nowhere else: the compaction hooks fire in
+  dispatched subagent sessions too, and the routing retro's default skip would hide
+  most of the instrument's own denominator.
+- **Exposure is per intervention.** A session is `before`, `after` or `spanning` for
+  each intervention independently; `end == activation` is before, `start == activation`
+  is after, and a session that straddles one belongs to NO cohort. One session is
+  legitimately after for the hooks and before for base_context.
+- **The denominator is sessions observed**, from `sessions.ndjson`, not compaction
+  records — a successful rollout thins the ledger, so records alone cannot tell success
+  from a hook that stopped firing. A scanned transcript with no heartbeat is `unknown`
+  and is excluded from every verdict, with its count printed.
+- **One vocabulary**: `helped` / `no_improvement` / `underpowered` / `confounded` /
+  `no_baseline` / `no_exposure` / `activation_unknown`. `prediction_met` is a FLAG BESIDE the
+  verdict, never one of those words: `true`/`false` only when a forecast and a
+  realized number were both measurable, `null` (printed `n/a`) when no comparison
+  was possible — a missing measurement is not a missed forecast.
+  `underpowered` means the after side is still too small, and waiting helps;
+  `no_baseline` means fewer than 6 observed sessions started before the activation —
+  the before cohort closed when it went live, so waiting can never fill it;
+  `no_improvement` means it answered no. `no_exposure` means the clock never started.
+- **Give the next intervention a baseline.** Before you write an activation row, confirm
+  at least 6 sessions with a heartbeat in `sessions.ndjson` started since the previous
+  activation. All five August interventions went live with none (the heartbeat ledger
+  began 28 minutes before the first), so they can never get a before/after verdict
+  (retired 2026-09-22; the forward compact-turn re-measure still runs).
+- **Say the attribution limit out loud.** Two interventions activated in one deploy
+  have identical cohorts forever; more data cannot separate them. The report names the
+  bundle rather than crediting a component, and the decision card offers the only fix:
+  staggered re-activation, one intervention per deploy.
+- **Known limit, unfixed by design:** neither `decisions.ndjson` nor `sessions.ndjson`
+  records a working directory, so no ledger line can be attributed to a repository —
+  a `repo_diet` cohort counts sessions that may never have opened the covered repos.
+
+Before re-judging any deferred verdict, run the arming check — it says PER CRITERION
+whether the evidence can exist yet, against that criterion's own intervention:
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/arming_check.py --scan /tmp/retro-scan.json
+```
+
+It prints per-ledger reject counts, per-intervention before/after/spanning, per-criterion
+ARMED, and one of `ANY ARMED` / `PARTIAL` / `BLOCKED`. `BLOCKED` is only for a genuinely
+empty activation ledger; a malformed-only ledger is `activation_unknown` + `PARTIAL`.
 
 ### 4. "Did it stick" check
 

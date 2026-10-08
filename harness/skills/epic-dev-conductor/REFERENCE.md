@@ -122,7 +122,7 @@ Pass `{ epic: N }` as the Workflow `args`. Present the returned verdict to the o
 
    <1–3 line summary: what shipped + key verdict/coverage>
 
-   Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+   Co-Authored-By: <active model name/version> <noreply@anthropic.com>
    ```
    (Use the project's required co-author trailer from its git rules.) If the build runs on a branch, that is fine; keep one branch per build unless the project policy says PR-per-story.
 3. **Push** the current branch to `origin`. If there is no remote, record "no remote — local commit only" and proceed (CI is then vacuously satisfied; flag it so the operator can add a remote).

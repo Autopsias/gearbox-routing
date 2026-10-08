@@ -5,9 +5,10 @@ description: Review the current conversation and recent session history to sugge
 
 # Retrospective
 
-Review conversation + recent history, cross-reference against config files, present improvement suggestions one at a time.
+Review conversation + recent history, cross-reference against config files, present improvement suggestions as one numbered list with one question for the set.
 
 **Checklist (8 top-level phases):**
+0. [ ] Mode check — audit mode or default sweep (see Modes)
 1. [ ] Load Learnings
 2. [ ] Scope Selection
 3. [ ] Phase 1 & 2 — Discovery + History Scan (background, parallel)
@@ -21,14 +22,37 @@ Review conversation + recent history, cross-reference against config files, pres
 
 **Arguments = targeted feedback.** Always full sweep. Args get highest priority but don't limit scope. Works mid-conversation or end-of-session.
 
+## Modes — check before anything else
+
+**Default:** the retrospective below. It hunts for what is MISSING.
+
+**`/improve audit` — relevance audit.** Scores what ALREADY exists (every memory,
+every CLAUDE.md rule, every skill description) against recent transcripts, and is the
+only path that proposes deletions and demotions. Also triggered without the argument
+when the user asks to re-validate, re-score, prune or spring-clean existing rules,
+memories or skills — "are these rules still true?", "what can we delete?", "which of
+these ever fire?".
+`Read ~/.claude/references/improve/relevance-audit.md` and follow it INSTEAD
+of Phases 1–5. Load Learnings, the Phase 5 evidence gates, **Phase 6 Apply Changes**
+and Save Learnings still apply — an accepted deletion or demotion is applied through
+Phase 6 like any other accepted finding, and produces the same Changes Applied summary.
+Its recipes are in `apply-changes.md`; the audit-only carve-outs are in the audit
+file's Step 6.
+
 ## Load Learnings
 
 Before scope selection, read `~/.claude/improve-learnings.md` if it exists. This file tracks patterns from prior runs: acceptance rates by category, modify signals, user preferences.
 
-- **Deprioritize** finding types consistently rejected across runs
-- **Boost** categories consistently accepted
+- **Deprioritize** finding types consistently rejected across runs, **Boost** categories consistently accepted. Count only individually answered findings; a batch answer ('Apply all' / 'Apply none') is not evidence about one category.
 - **Adapt** rule-writing style based on modify signals (e.g., if user repeatedly softens NEVER to Avoid, propose softer language for non-critical rules)
 - If file doesn't exist, proceed normally — it will be created at the end of this run
+
+**Also read the evidence ledger `~/.claude/improve-ledger.json`** — it carries gap
+sightings and past rejections across runs, and Phase 5's three evidence gates cannot
+run without it. Apply the 90-day expiry on read, and treat a missing, unparseable or
+wrong-shaped file as an empty ledger and SAY SO in the run summary.
+`Read ~/.claude/references/improve/evidence-ledger.md` for the schema, the
+lifecycle rules and the failure handling — that file is the contract.
 
 ## Scope Selection
 
@@ -56,7 +80,7 @@ Prompt the agent to search for and catalog ALL config-like files at BOTH project
 - .claude/agents/ directory
 - .claude/rules/ directory (project-level)
 - Shared frameworks, guardrails, style guides (shared/, frameworks/, etc.)
-- Memory files at BOTH ~/.claude/projects/[project-path]/memory/ AND ~/.claude/projects/-Users-terence/memory/ (global)
+- Memory files: this project's `~/.claude/projects/[project-path]/memory/`, AND every other `~/.claude/projects/*/memory/` directory (cross-project memory)
 - Settings files: project .claude/settings.json, .claude/settings.local.json, global ~/.claude/settings.json, ~/.claude/settings.local.json
 - Voice/brand files (vault/, brand/, etc.)
 - Any other instruction-like .md files governing behavior
@@ -66,10 +90,12 @@ Return a "config map": list of files with purpose, organized by type AND level (
 ### History Scan + Prior-Improve Cross-Check Agents (full scope only)
 
 Full-scope-only branch (never runs in "Current conversation only" scope):
-`Read ~/.claude/commands/references/improve/full-scope-history-agents.md` for the
+`Read ~/.claude/references/improve/full-scope-history-agents.md` for the
 History Scan Agent prompt (background, cross-session feedback extraction) and the
 Prior-Improve Cross-Check Agent prompt (audits whether prior `/improve` runs' accepted
 changes actually landed). Launch both per that file, in parallel with Discovery.
+
+Full scope also runs the 'Question-class check' in that file: it proposes a 'Standing default' finding for a class of question you answer the same way almost every time.
 
 ## Phase 3: Current Conversation Analysis (Foreground)
 
@@ -88,6 +114,17 @@ Analyze the conversation already in context for:
 | **Repeated workflows** | Multi-step manual processes that could become a skill |
 | **Techniques discovered** | Novel approaches that worked well — new methods, clever tool usage |
 | **User interaction patterns** | User prompting styles that led to better/worse results |
+
+**Capture the quote as you go.** Record every signal with the word-for-word text that
+produced it — never a paraphrase. A finding with no quote cannot be presented (Phase 5,
+gate 1), so a quote not captured here is a finding lost later.
+
+**Then score the agent's own conduct.** The table above reads the user's signals; the
+conversation also shows the agent's. Read
+`~/.claude/references/improve/transcript-scoring.md` and score the current
+conversation against both rubrics — session waste, and artifact quality where code
+was edited. Convert scores to finding candidates per that file's "From score to
+finding" — a session with zero user complaints can still yield a Critical finding.
 
 **Low-signal:** If minimal feedback in current conversation, say "No significant findings from this session" and proceed to history/config findings.
 
@@ -115,16 +152,26 @@ After waiting for agents to complete, validate each result before proceeding:
 
 **Key principle:** Never silently proceed with incomplete data — always tell the user what was skipped and why.
 
+**Stamp the full-scope run.** Only when scope is still "Historical + current conversation" here (no fallback to current-conversation scope for any reason, including a Prior-Improve agent failure) and the History Scan agent reported BOTH `TRANSCRIPT SCAN: complete` and `REVIEW-FINDINGS SCAN: complete` (an empty but successful scan counts; a failed or unreadable one does not), run `mkdir -p ~/.dyno/improve && touch ~/.dyno/improve/last-full-scope`. Do not touch it after a current-conversation run or after a fallback. `hooks/improve-nudge.py` reads this path.
+
 Then read each config file from the config map.
 
 ### 4a: Enforcement Gap Detection
 
 For each existing rule in config files, check if the current conversation shows it being violated.
 
+**First, for every violated rule, ask: can the thing that makes the mistake possible be
+removed or restructured** — a stale file, an unpinned default, a shell option? If yes,
+propose **"Remove the cause"** with the exact change (the file to delete, the default to
+pin, the option to drop), and stop there for that rule: do not also propose strengthening
+it or converting it to a hook. The two branches below, and the "generate the complete
+implementation" hook instructions, run **only when removal is not possible** for that
+rule:
+
 - If the rule was violated once: suggest strengthening (emphasis, position, examples) — not removal
 - If the rule shows a pattern of repeated violation (across sessions in full scope, OR multiple times within the current conversation in current-only scope): suggest **converting to a hook** instead — hooks are deterministic enforcement, while CLAUDE.md instructions are probabilistic (~80% compliance)
 
-When suggesting "convert to hook", **generate the complete implementation**:
+When suggesting "convert to hook" (removal not possible), **generate the complete implementation**:
 
 - Detect the right hook event based on rule type:
   - `PreToolUse` with `Bash` matcher: for command gating rules
@@ -135,26 +182,8 @@ When suggesting "convert to hook", **generate the complete implementation**:
 - Include the shell command/script that enforces the rule
 - Note: "This rule is currently advisory (~80% compliance as a CLAUDE.md instruction). As a hook, it becomes 100% deterministic."
 
-**Hook config template (for reference during generation):**
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'HOOK_SCRIPT_HERE'"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-When presenting enforcement gap findings in Phase 5, offer three options:
+When presenting enforcement gap findings in Phase 5, offer four options:
+- "Remove the cause" — delete or restructure the thing that makes the mistake possible (the stale file, the unpinned default, the shell option), naming the exact change. Presented alone when removal is possible; the other options do not apply to that finding.
 - "Strengthen rule" — rewrite with NEVER/ALWAYS emphasis, move to top of file
 - "Convert to hook" — create a hook that enforces the rule deterministically. Include the generated JSON config in the finding. Follow up with a second AskUserQuestion: "Which scope should this hook be configured at?" with options: "Project (.claude/settings.json)", "Global (~/.claude/settings.json)", "Project local (.claude/settings.local.json)"
 - "Both" — strengthen the rule AND add a hook as backup enforcement
@@ -162,119 +191,54 @@ When presenting enforcement gap findings in Phase 5, offer three options:
 ### 4b: Progressive Evolution (Pattern Promotion) — full scope only
 
 **Skip this sub-phase entirely in current-only scope** (requires cross-session history).
-Full content (the promotion rules): `Read ~/.claude/commands/references/improve/full-scope-history-agents.md`.
+Full content (the promotion rules): `Read ~/.claude/references/improve/full-scope-history-agents.md`.
 
 ### 4c: Config Health & Consolidation
 
 Run ALL sub-checks against BOTH project-level and global-level configs from the Discovery Agent config map.
 
-#### Size Thresholds
-Measure CLAUDE.md (both project and global) line count and character count.
-- **Warning:** >100 lines or >20K characters
-- **Critical:** >150 lines or >40K characters (known performance degradation point)
-- Also count total memory files — flag if >20 files in a single project's memory directory
+#### CLAUDE.md Budget — measured every run
 
-#### Memory Consolidation
-- Read all memory files and group by topic similarity
-- Flag duplicates or heavily overlapping files (e.g., two feedback files covering the same rule) — recommend merging
-- Flag memory files with stale references: files, functions, or features mentioned in the memory that no longer exist in the codebase
-- Flag memory files with relative dates that were never converted to absolute
+The global CLAUDE.md has a budget of **5,000 estimated tokens**. The estimator is
+**bytes ÷ 4** — one command, no tokenizer, same arithmetic every run:
 
-#### Rule Extraction
-- Scan CLAUDE.md for file-type-specific or path-specific instructions (patterns like "for *.test.ts files", "in API routes", "when editing components/", etc.)
-- Suggest migrating these to `.claude/rules/` with path-scoping globs in frontmatter
-- Rules only load when Claude touches matching files, reducing always-on context cost
+```bash
+wc -c ~/.claude/CLAUDE.md      # bytes; ÷ 4 = estimated tokens; budget 5,000
+```
 
-#### Skill Extraction
-- Flag CLAUDE.md sections longer than ~20 lines that read like procedures or multi-step workflows
-- Suggest converting to skills (on-demand loading: ~100 tokens metadata cost vs full content always in context)
-- Good candidates: step-by-step processes, detailed how-to instructions, decision trees
+Measure the **deployed** file — that is the one loaded into every session, not a
+source copy — by running the command in THIS run. Never carry a figure forward from a
+previous run, from this file, or from memory.
 
-#### Skill Consolidation
-- Check ALL skills at both project (`<project>/.claude/commands/`, `<project>/.claude/skills/`) and global (`~/.claude/commands/`) levels
-- Flag overlapping skills: two skills that cover similar functionality or could be merged
-- Flag oversized skills: skills that have grown beyond their original purpose
-- Flag stale skills: skills referencing files, APIs, or patterns that no longer exist in the codebase
-- Flag shadowed skills: a project skill with the same name as a global skill (intentional override or accidental?)
+**Report the measured figure in every run's config-health note, whatever it says:**
+`global CLAUDE.md: 13,477 bytes ≈ 3,369 est. tokens — 67% of the 5,000 budget
+(wc -c ~/.claude/CLAUDE.md)`. A run that reports no figure has not measured.
 
-#### Cross-Skill Consistency
+- **Under budget** — no finding. Additions are proposed normally; the figure is still
+  shown.
+- **At or over budget** — one Maintenance-tier finding carrying the measured number,
+  and the zero-sum rule below is live.
 
-After reading all skill files from the Discovery Agent, review them holistically for contradictions. Check these 5 patterns:
+**Zero-sum rule (applies while the file is at or over budget).** Every finding whose
+edit ADDS text to the global CLAUDE.md must name, in that same finding, the removal or
+extraction that pays for it: the exact lines to delete, or the section to move into a
+skill / `.claude/rules/` file / memory, with its own byte count. "Trim it later" is
+not a payment. A finding that cannot name one is **not presented** — say so in the run
+summary ("held: <finding> — CLAUDE.md over budget, no offset found"). Accepting such a
+finding applies the addition and its payment together in Phase 6, never just the
+addition.
 
-- **Conflicting directives:** One skill says "ALWAYS do X" while another says "NEVER do X" or "avoid X"
-- **Overlapping trigger conditions:** Two skills with descriptions claiming the same activation context (e.g., both say "Use when debugging")
-- **Inconsistent terminology:** Skills using different terms for the same concept (e.g., "sub-agent" vs "task" vs "background agent")
-- **Process conflicts:** Skills prescribing different procedures for the same scenario (e.g., one says "ask before acting" while another says "act then verify")
-- **Skills vs CLAUDE.md:** CLAUDE.md establishes a rule but a skill contradicts or overrides it without acknowledgment
+Measured here too, same estimator and reported the same way: any project-level
+CLAUDE.md (the same 5,000-token budget is a sane default for one), and the memory-file
+count — flag if >20 files in a single project's memory directory.
 
-Present contradictions as Critical-tier findings with both sources cited (file paths + relevant lines).
+#### The remaining config-health sub-checks
 
-#### Content Placement Audit
-
-Check 5 directions for misplaced content:
-
-**Direction 1: CLAUDE.md → Skill Files**
-- Scan CLAUDE.md for sections that reference specific skills by name
-- If a section only applies when a specific skill is active, flag it: "This guidance only matters during [skill] — consider moving it into the skill file itself"
-- **Secondary detection:** also flag sections describing procedures only relevant during a specific workflow type (brainstorming, reviewing, debugging, planning) even without a skill name mention — these are implicitly skill-specific
-
-**Direction 2: Memory → Skills**
-- Scan memory files for entries with type `feedback` or `project` that contain multi-step procedures, decision trees, or workflow descriptions
-- If a memory file reads more like a how-to than a fact, flag it: "This memory contains procedural knowledge — consider converting to a skill"
-
-**Direction 3: Skill Files → CLAUDE.md**
-- Scan each skill for universal behavioral rules — rules about general Claude behavior across sessions/tasks
-- **Only flag rules that apply universally**, NOT rules about what to do within the skill's own procedure. Example: "ALWAYS present findings one at a time" is skill-internal (don't flag), while "ALWAYS use AskUserQuestion for decisions" is universal (flag)
-- If found: "This rule in [skill] applies universally — consider promoting to CLAUDE.md"
-
-**Direction 4: CLAUDE.md → Memory**
-- Scan CLAUDE.md for factual/reference content that isn't a behavioral instruction (project facts, external system pointers, user preferences that don't change behavior)
-- These are better as memory entries — they persist across sessions but don't consume always-on instruction budget
-
-**Direction 5: Between Skills**
-- If two skills share identical or near-identical sections (copy-pasted patterns), flag for extraction into a shared reference or CLAUDE.md rule
-
-#### Skill Budget Monitoring
-
-Calculate total character count across ALL skill `description` fields (from frontmatter of all skill/command files at both project and global levels).
-
-Community research suggests a ~16K character budget for skill metadata — skills beyond this may be silently invisible (cannot be discovered or invoked). **Note: this figure is community-discovered, not officially documented by Anthropic, and may change.**
-
-- **Warning:** >12K chars (~75% of estimated budget)
-- **Elevated:** >15K chars (~94% of estimated budget)
-- If over warning: list all skills sorted by description length, suggest compression targets (ideal: 130 chars per description)
-- If over elevated: identify which skills are likely invisible and suggest investigation
-- **Always present as Maintenance-tier** regardless of threshold — this is informational monitoring based on unofficial data. Only escalate to Critical if the user reports actually experiencing invisible skills.
-
-#### Skill Description Quality Audit
-
-For each skill, check its description against activation best practices:
-
-- **Third person?** ("Processes files" not "I process files" or "You should use this to...")
-- **Trigger conditions?** ("Use when..." or "Triggers when...")
-- **Appropriate length?** (130-263 chars ideal range)
-- **Specific enough?** (has concrete keywords, not vague "helps with things")
-
-Research showed activation rates range from 20% (bad description) to 90% (optimized). Present as Maintenance-tier findings with suggested rewrites.
-
-#### CLAUDE.md Structural Validation
-
-Check if CLAUDE.md sections follow the WHAT/WHY/HOW framework:
-- **WHAT**: Project context, tech stack, repo structure
-- **WHY**: Principles, conventions, anti-patterns
-- **HOW**: Workflows, commands, operational procedures
-
-Flag sections that mix categories (a HOW section buried in WHY context). Light-touch — suggest reorganization only if structure is genuinely unclear, not for stylistic preference. Present as Maintenance-tier findings.
-
-#### Cross-Level Analysis
-- Check for duplicated rules between project and global CLAUDE.md
-- Flag contradictory instructions across levels (project rule says X, global rule says Y)
-- Flag memory files that belong at the other level (e.g., project-specific feedback stored in global memory, or cross-project feedback stored in project memory)
-- Flag skills that exist at both levels with different content
-
-#### Structure
-- Files grown organically without clear organization?
-- Sections in CLAUDE.md that belong in different files?
+Memory consolidation, rule and skill extraction, skill consolidation, cross-skill
+consistency, the five-direction Content Placement Audit, skill budget monitoring,
+skill description quality, CLAUDE.md structural validation and cross-level analysis:
+`Read ~/.claude/references/improve/config-health-checks.md` and run every
+check in it. Their findings enter Phase 5 like any other.
 
 ### 4d: Categorize All Findings
 
@@ -309,7 +273,64 @@ Confidence doesn't change priority order (Critical still beats Improvement regar
 
 ## Phase 5: Present Findings
 
-**Announce:** "Found N findings across M categories. Presenting one at a time, most impactful first."
+**Announce:** "Found N findings across M categories. Listing them most impactful first, then one question for the set."
+
+### Evidence Gates — run on EVERY finding before it is presented
+
+Three gates, in order. A finding that fails any one is **not shown to the user**.
+Full rules, edge cases and the ledger's failure handling:
+`Read ~/.claude/references/improve/evidence-ledger.md`.
+
+1. **Verbatim quote (all findings).** Every finding presented MUST carry a
+   word-for-word excerpt from a real source, cited. Three source kinds count, and which
+   one applies is decided by where the finding came from:
+   - **Conversation-derived** (Phases 3, 4a, 4b — signals, corrections, patterns): a
+     quote from a real transcript or the current conversation, cited with its session.
+   - **File-derived** (Phase 4c Config Health, Content Placement, Cross-Skill
+     Consistency — findings produced by *reading config*, not by a user signal): the
+     excerpt is the config text itself — the contradicting line, the stale reference,
+     the misplaced section — cited as `path:line`. A pure measurement (a line count, a
+     file count) cites the measured file and the number, and states the command that
+     produced it.
+   - **Review-ledger-derived** (the History Scan's 'Plan review findings' step, for
+     'Remove the cause' candidates): the excerpt is the finding's `summary` field word
+     for word, cited as `_plans/<plan>/_verify_state/<file>.findings.ndjson:<line>`
+     plus its `fid`.
+
+   A finding with no such excerpt is **DISCARDED — never softened, never presented
+   with hedged wording**. "I noticed a pattern" is not evidence. This gate demands a
+   citation, not a user complaint: it does not remove the Low confidence tier, it
+   forces a Low-confidence finding to point at the exact text it was inferred from.
+2. **Two-session corroboration (new-rule findings only).** A finding whose edit only
+   ADDS text — a new rule, memory file, skill or section — needs **2 distinct sessions**
+   behind it. **Record this run's sighting FIRST, then count** the distinct `session`
+   values among that gap's live sightings — this run's included. ("Record" means into
+   the live ledger held in memory since Load Learnings; Save Learnings writes it to
+   disk at the end of the run.)
+   Order matters: counting before recording would demand two PRIOR sessions and make
+   the gate fire on the third run, not the second. 2 or more → present. Below that, do
+   not present it: say so in the run summary, naming the gap and the count ("1st
+   sighting of `<key>` — needs a second independent session"). This is a hold, not a
+   rejection; it graduates on a later run. Findings that strengthen, reword, move or
+   delete existing text are exempt.
+
+   The count is only as good as the gap key. Before minting a new slug, scan the
+   ledger's existing keys for one naming the same gap and reuse it — see the ledger
+   reference's "Matching a finding to a gap key".
+3. **Rejection check (all findings).** Compare against the ledger's `rejections`. A
+   match — same target file, substantially the same edit — is re-proposed ONLY with
+   materially new evidence: a quote that is neither in that rejection's
+   `evidence_then` nor from a session already represented there. If it clears the bar,
+   state it explicitly in the finding ("rejected <date> because <reason>; new evidence
+   since: <quote>"). If it does not, drop the finding.
+
+**Budget check (not a fourth gate — the ledger is not involved).** While the global
+CLAUDE.md is at or over its 5,000-token budget, a finding that adds text to it is
+presented only with its offset named, per 4c's zero-sum rule. Findings targeting any
+other file are unaffected.
+
+Count what each gate removed — and what the budget check held — and report it with the
+finding count, so a quiet run is visibly a filtered run rather than an empty one.
 
 ### Rule-Writing Quality Standards
 
@@ -325,21 +346,24 @@ All proposed rule changes MUST:
 **FIRST — Audit of Prior `/improve` Runs (full scope only)**
 
 **Skip this section entirely in current-only scope.** Go straight to presenting findings.
-Full scope: `Read ~/.claude/commands/references/improve/full-scope-history-agents.md` for
+Full scope: `Read ~/.claude/references/improve/full-scope-history-agents.md` for
 the audit table format and the full-scope presentation order (it adds two leading
 buckets — Drifted, Re-surfaced — before Targeted).
 
-**THEN — Present Each Finding via AskUserQuestion**
+**THEN — List All Findings, Ask One Question (default mode; `/improve audit` is in step 5)**
 
-**Question format:** "[Tier | Confidence] — [Source: current conversation / past session date] — [Description of finding and proposed change]. File: [full path]. Proposed: [what to add/modify/remove]"
-
-**Options:** Accept / Reject / Modify
+1. **Print every finding as a numbered list in the chat.** Each entry keeps these fields: "[Tier | Confidence] — [Source: current conversation / past session date] — [Description and proposed change]. Evidence: "[verbatim quote, or cited config excerpt `path:line`]". File: [full path]. Proposed: [what to add/modify/remove]". Mark each entry `[batch]` or `[own question]`. Decide it from the first option the finding lists (the one 'Apply all' would apply) BEFORE you count: an enforcement-gap finding whose first option is a 'Remove the cause' that deletes is `[own question]`. List `[own question]` findings last, under the heading 'Asked one by one'.
+2. **Ask ONE AskUserQuestion:** 'Apply all N (Recommended)' / 'Review one by one' / 'Apply none'. N counts the `[batch]` findings only. If N is 0, skip this question and ask each `[own question]` finding on its own. A free-text answer that names numbers ('all except 3 and 7') applies the rest of the batchable findings and treats the named ones as excluded.
+3. **What each answer does.**
+   - 'Apply all N': apply each batchable finding as its 'Proposed:' line says. For an enforcement-gap finding that is the first option the finding lists ('Remove the cause' when removal is possible, else 'Strengthen rule'). 'Modify' is never part of 'Apply all'. Then ask each exception finding on its own, one question each (Accept / Reject / Modify), in presentation order.
+   - 'Review one by one': ask every finding, exceptions included, with Accept / Reject / Modify. If 8+ findings, after presenting 5, ask: "Continue with remaining findings, or apply what we have so far?"
+   - 'Apply none': apply nothing from the whole list, exceptions included, and ask nothing more. Say in the run summary 'T findings declined as a set (B batch, E own question)'.
+4. **Keeps its own question.** Write this as one short block under the list. A finding keeps its own question when its edit (a) removes, demotes or moves existing text or a file out of where it lives: a deleted file or memory, a deleted or demoted rule, a Content Misplacement move, a 'Remove the cause' that deletes; or (b) changes a hook, a permission or a deny entry in any settings file, including 'Convert to hook' and 'Both' (their scope follow-up question stays); or (c) is a 'Standing default' finding: its question names the default text and the target file, and its first option starts with 'Apply this default (Recommended)'. An exception is applied only after its own yes; 'Apply none' declines it with the set.
+5. **`/improve audit` never offers 'Apply all'.** Each audit deletion, demotion and correction keeps its own question (see `relevance-audit.md`).
 
 **Order (current-only scope; full scope's order is in the reference file above):**
 1. Targeted (from /improve args)
 2. Critical → Promotion → Content Misplacement → Improvement → Technique → Maintenance → Reinforcement → New Skill → User Coaching
-
-If 8+ findings, after presenting 5, ask: "Continue with remaining findings, or apply what we have so far?"
 
 ## Phase 6: Apply Changes
 
@@ -355,39 +379,14 @@ directly where found.
 1. Group approved changes by file
 2. Edit existing files with approved modifications
 3. Create new files if needed (new memory entries, new skill stubs)
-4. For hook conversions:
-   - Read the target settings.json file (project or global, per user's scope choice)
-   - Add the hook configuration under the appropriate event key (PreToolUse, PostToolUse, etc.)
-   - If the hooks key doesn't exist yet, create it
-   - Preserve all existing hooks — append, never replace
-5. For rule extractions:
-   - Create the `.claude/rules/` directory if it doesn't exist
-   - Write the extracted rule to a new `.md` file with path-scoping glob in frontmatter
-   - Remove the extracted section from CLAUDE.md
-6. For memory file merges:
-   - Combine the content of overlapping memory files into one
-   - Update the frontmatter (name, description) to reflect the merged scope
-   - Delete the duplicate file
-   - Update MEMORY.md index to remove the deleted entry and update the surviving entry
-7. For skill extractions:
-   - Create the new skill `.md` file with proper frontmatter (name, description)
-   - Move the procedural content from CLAUDE.md into the skill
-   - Replace the CLAUDE.md section with a one-line reference: "See /skill-name for details"
-8. For feedback-type findings, ALSO save as memory files:
-   - File: `feedback_[topic].md` in project's memory directory
-   - Frontmatter: name, description, type: feedback
-   - Content: rule + **Why:** + **How to apply:**
-9. Update MEMORY.md index if new memory files created
-10. For Content Misplacement findings:
-    - Remove content from the source file
-    - Add it to the destination file in the appropriate section
-    - If moving TO a skill file: place in the most relevant section, adjust formatting to match the skill's style
-    - If moving FROM a skill to CLAUDE.md: place in the most relevant existing section
-    - Preserve meaning — only adjust formatting and context references
-11. For Skill Description rewrites:
-    - Edit the `description` field in the skill's frontmatter
-    - Preserve the original intent, improve clarity and activation keywords
-12. Present a summary table in the conversation:
+4. Apply each approved finding by its type. Hook conversions, rule extractions,
+   memory merges, skill extractions, feedback memories, Content Misplacement moves
+   and Skill Description rewrites each touch a second file (a settings file, the
+   MEMORY.md index, the source the text left) and each has its own sequence:
+   `Read ~/.claude/references/improve/apply-changes.md` and follow the
+   recipe for every approved finding whose type appears there. A plain edit to an
+   existing file needs nothing from that file.
+5. Present a summary table in the conversation:
 
     ## Changes Applied
 
@@ -400,16 +399,37 @@ directly where found.
     - **File**: short relative path (not full absolute)
     - **Change**: concise action (e.g. "Added rule: …", "Strengthened: X → Y", "New memory: …", "Hook added: …", "Rule extracted: …", "Memory merged: …", "Skill created: …", "Content moved: …", "Description rewritten: …")
     - **Category**: tier from Phase 4d (Critical, Promotion, Content Misplacement, Improvement, etc.)
-13. Ask if user wants to commit changes
+6. Record every outcome in the evidence ledger (written in Save Learnings) — in audit
+   mode, with that mode's two carve-outs (`relevance-audit.md` Step 6):
+    - **Batch answers:** every finding applied by 'Apply all' is an Accepted outcome. A number named in a free-text answer is a Reject with the reason 'excluded by number, no reason given'. 'Apply none' is NOT a rejection: write no entry to `rejections`, keep the gap sightings.
+    - **Accepted** (or Modified — a Modify is an acceptance, not a rejection): set that
+      gap's `retired` to today. The rule now covers it.
+    - **Rejected**: append to `rejections` — the edit summary naming the target file,
+      today's date, every verbatim quote that supported it this run (`evidence_then`),
+      and the user's stated reason ("no reason given" if they gave none, never invented).
+7. Ask if user wants to commit changes
 
 ## Save Learnings
 
-After Phase 6 completes (regardless of whether any changes were applied), update `~/.claude/improve-learnings.md`:
+After Phase 6 completes (regardless of whether any changes were applied), write BOTH
+files — the ledger first.
+
+**1. Evidence ledger `~/.claude/improve-ledger.json`.** Write back the live ledger
+loaded in Load Learnings, including this run's new sightings (gate 2), retirements and
+rejections (Phase 6 step 6). **Write it even when nothing was applied and even when no
+finding was presented** — the held-back sightings are the whole point, and a run that
+only saves on success loses them. Schema and rules:
+`~/.claude/references/improve/evidence-ledger.md`.
+
+**Full-scope stamp:** already touched in Phase 4 after Agent Failure Handling (`~/.dyno/improve/last-full-scope`); nothing to do here, and never touch it after a fallback or current-conversation run.
+
+**2. Learnings `~/.claude/improve-learnings.md`:**
 
 1. Read current file (or create if first run)
 2. Append new entry under `## Recent Runs`:
    - Date of run
-   - Acceptance rate by category (e.g., "Critical: 3/3 accepted, User Coaching: 0/2 accepted")
+   - Acceptance rate by category (e.g., "Critical: 3/3 accepted, User Coaching: 0/2 accepted"), counting individually answered findings only
+   - Batch-accepted findings as their own count (e.g., "Batch: 14 accepted"), apart from the per-category rates
    - Any "Modify" choices that reveal preferences (e.g., "user softened NEVER→SHOULD for style rules")
    - Detected patterns (e.g., "user prefers hooks over rule strengthening")
 3. If file exceeds 80 lines: summarize oldest raw entries into `## Patterns` section at the top (e.g., "3 runs rejected User Coaching tier → pattern: deprioritize"), then delete those raw entries

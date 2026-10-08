@@ -21,6 +21,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import closeout_pipeline as cp  # noqa: E402
+import plan_scope as ps  # noqa: E402
 import run  # noqa: E402
 from test_shipping import make_plan  # noqa: E402  (reuse the plan fixture builder)
 
@@ -148,7 +149,11 @@ def test_shadow_marker_is_emitted_only_as_task_description(tmp_path, capsys, mon
     member = json.loads(capsys.readouterr().out)["batch"][0]
 
     assert member["dispatch_description"] == marker
-    assert member["prompt_text"] == original_prompt
+    # HARNESS-01: every Claude dispatch now carries the Fable 5.1 guidance
+    # lines ahead of the session's own prompt (plan_scope.CLAUDE_DISPATCH_GUIDANCE);
+    # the invariant under test is narrower than byte-identity — telemetry must
+    # never leak into the work instructions, not that nothing else may.
+    assert member["prompt_text"] == ps.CLAUDE_DISPATCH_GUIDANCE + original_prompt
     assert marker not in member["prompt_text"]
     run.cmd_release(plan_dir)
 

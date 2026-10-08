@@ -38,6 +38,7 @@ import article_block as ab  # noqa: E402
 import build_plan  # noqa: E402
 import closeout_pipeline as cp  # noqa: E402
 import manifest_io as mio  # noqa: E402
+import attestation  # noqa: E402
 import outcomes as outc  # noqa: E402
 import run  # noqa: E402
 import run_state_io as rsi  # noqa: E402
@@ -135,8 +136,10 @@ def test_record_shape_is_schema_valid(tmp_path):
     assert rec["session"] == "s01"
     assert rec["plan"] == "fixture"
     assert len(rec["gates_failed"]) == 3          # truncated to 3
-    assert rec["model_ran_source"] == outc.SOURCE_UNKNOWN  # no receipt recorded
-    assert rec["model_ran"] == "unknown"
+    # OPERATOR DECISION 2026-08-15: no receipt no longer collapses to `unknown`;
+    # the honest claim is what was ASKED for, recorded as `requested`.
+    assert rec["model_ran_source"] == outc.SOURCE_REQUESTED  # no receipt recorded
+    assert rec["model_ran"] == rec["model_authored"]
     json.dumps(rec)  # must be JSON-serializable end to end
     assert "cost_usd" not in rec
     assert "context_reset" not in rec
@@ -193,6 +196,7 @@ def test_verify_rework_writes_one_record_per_attempt(tmp_path, isolated_ledger):
 
     # A SECOND rework attempt (re-dispatch -> fresh verify pass) still produces
     # its OWN record — the ledger counts every attempt.
+    write_closeout(plan_dir, "s01")                    # the re-dispatch applied a new closeout
     vfy.verify_begin(plan_dir, "s01")
     out2 = vfy.verify_run_argv(plan_dir, "s01", "gate:redx")
     assert out2["action"] == "halted"  # max_rework=1 exhausted on the 2nd failure
@@ -374,19 +378,31 @@ def test_record_receipt_no_transcript_is_requested_not_attested(tmp_path, isolat
     assert out["written"] is True
 
 
-def test_stale_receipt_from_earlier_attempt_degrades_to_unknown(tmp_path, isolated_ledger):
-    """TEL-01 finding 1 — a receipt recorded for attempt 1 must NOT be read as
-    proof for attempt 2's resolution just because `record-receipt` was
-    skipped on the re-dispatch. Without the (generation, dispatch-ordinal)
-    check this fails: the stale attempt-1 receipt would be read as
-    `model_ran_source="requested"` carrying attempt 1's model, instead of
-    degrading honestly to `unknown`."""
+def test_stale_receipt_never_contributes_attestation(tmp_path, isolated_ledger):
+    """TEL-01 finding 1, still enforced after the 2026-08-15 operator decision.
+
+    A receipt recorded for attempt 1 must NOT be read as PROOF for attempt 2's
+    resolution just because `record-receipt` was skipped on the re-dispatch. What
+    changed is only the fallback: the record now reads `requested` + THIS
+    resolution's cell instead of `unknown`. What did NOT change, and is the point
+    of the (generation, dispatch-ordinal) check, is that a stale receipt can never
+    contribute ATTESTED — attempt 1's proof is not attempt 2's."""
     plan_dir = make_plan(tmp_path, [SESS])  # no verify block
     run.cmd_begin(plan_dir, ["s01"])  # dispatch #1
-    run.cmd_record_receipt(plan_dir, "s01", "agent-attempt-1", None, "claude")
+    # Attempt 1's receipt must CARRY ATTESTATION, or this test cannot fail: with a
+    # bare receipt both the fresh and the stale path yield `requested`, so removing
+    # the freshness check would change nothing and the assertion below would pass
+    # over the very defect it exists to catch. (Caught by probing, 2026-08-15.)
+    transcript = tmp_path / "attempt-1-headless.json"
+    transcript.write_text(json.dumps({"modelUsage": {
+        "claude-haiku-4-5": {"inputTokens": 10, "outputTokens": 5},
+        "claude-opus-4-6": {"inputTokens": 900, "outputTokens": 400},
+    }}))
+    run.cmd_record_receipt(plan_dir, "s01", "agent-attempt-1", str(transcript), "claude")
     receipt = rsi.get_receipt(plan_dir, "s01")
     assert receipt["generation"] == 0
     assert receipt["attempt"] == 1
+    assert (receipt.get("attested") or {}).get("model")   # the fixture really attests
 
     # Attempt 2: a re-dispatch happens (another `begin`) but the orchestrator
     # skips `record-receipt` this time — the stale attempt-1 receipt is still
@@ -404,9 +420,11 @@ def test_stale_receipt_from_earlier_attempt_degrades_to_unknown(tmp_path, isolat
 
     recs = _read_ledger(isolated_ledger)
     assert len(recs) == 1
-    assert recs[0]["model_ran_source"] == outc.SOURCE_UNKNOWN
-    assert recs[0]["model_ran"] == "unknown"
-    assert recs[0]["reasoning_ran"] == "unknown"
+    assert recs[0]["model_ran_source"] == outc.SOURCE_REQUESTED
+    assert recs[0]["model_ran_source"] != outc.SOURCE_ATTESTED   # the property that matters
+    assert recs[0]["model_ran"] == recs[0]["model_authored"]
+    # and specifically NOT attempt 1's attested model leaking into attempt 2
+    assert "opus" not in str(recs[0]["model_ran"]).lower()
 
 
 def test_record_receipt_with_modelusage_transcript_attests(tmp_path, isolated_ledger):
@@ -438,7 +456,7 @@ def test_attest_picks_highest_token_model_not_arbitrary_key(tmp_path):
             "claude-sonnet-4-6": {"inputTokens": 900, "outputTokens": 400},
         }
     }))
-    attested = outc.attest_from_transcript("claude", str(transcript))
+    attested = attestation.attest_from_transcript("claude", str(transcript))
     assert attested == {"model": "claude-sonnet-4-6", "reasoning": None}
 
 
@@ -452,19 +470,21 @@ def test_attest_refuses_to_guess_on_a_genuine_tie(tmp_path):
             "claude-sonnet-4-6": {"inputTokens": 500, "outputTokens": 200},
         }
     }))
-    assert outc.attest_from_transcript("claude", str(transcript)) is None
+    assert attestation.attest_from_transcript("claude", str(transcript)) is None
 
 
 def test_codex_backend_never_attests_even_with_a_transcript(tmp_path):
     """MEASURED (judge.py): the codex exec --json stream carries no served-model
     field in any envelope — the cap is real, not a missing feature."""
     fake_stream = "does not matter — codex attestation is never attempted"
-    assert outc.attest_from_transcript("codex", fake_stream) is None
+    assert attestation.attest_from_transcript("codex", fake_stream) is None
 
 
-def test_no_receipt_at_all_degrades_to_unknown_even_with_escalated_from(tmp_path, isolated_ledger):
-    """Do NOT trust a closeout's own escalated_from claim as proof of what
-    served the request — only a receipt earns anything above `unknown`."""
+def test_no_receipt_records_what_was_asked_for_never_attested(tmp_path, isolated_ledger):
+    """A closeout's own `escalated_from` is still not PROOF — only a fresh receipt
+    earns `attested`. After the 2026-08-15 operator decision it does, however, earn
+    `requested`: the escalated cell is what the orchestrator actually asked for, so
+    that is what the ledger records."""
     plan_dir = make_plan(tmp_path, [SESS])
     write_closeout(plan_dir, "s01", extra={
         "escalated_from": {"authored": {"model": "sonnet", "reasoning": "high"},
@@ -472,8 +492,9 @@ def test_no_receipt_at_all_degrades_to_unknown_even_with_escalated_from(tmp_path
                            "attempt": 3, "rung": 2, "generation": 0},
     })
     rec = outc.compose(plan_dir, "s01", resolution="unit", result="done_unverified", verified=False)
-    assert rec["model_ran_source"] == outc.SOURCE_UNKNOWN
-    assert rec["model_ran"] == "unknown"
+    assert rec["model_ran_source"] == outc.SOURCE_REQUESTED
+    assert rec["model_ran_source"] != outc.SOURCE_ATTESTED   # never proof
+    assert rec["model_ran"] == "fable"                       # what was ASKED for on this attempt
     assert rec["escalated_from"]["ran"]["model"] == "fable"  # still carried through verbatim
 
 
@@ -648,3 +669,101 @@ def test_terminal_and_retire_records_never_fabricate_a_rework_count(tmp_path, mo
     assert src.count("rework_count=0") >= 2, (
         "both apply_terminal and administrative_retire must record zero reworks"
     )
+
+
+# --------------------------------------------------------------------------
+# TH-01 — orchestrator context size carried from dispatch to ledger line
+# --------------------------------------------------------------------------
+def test_orchestrator_ctx_tokens_carries_the_dispatch_time_int(tmp_path):
+    plan_dir = make_plan(tmp_path, [SESS])
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"],
+                  orchestrator_ctx_tokens=123456)
+    rec = outc.compose(plan_dir, "s01", resolution="unit", result="passed", verified=True)
+    assert rec["orchestrator_ctx_tokens"] == 123456
+
+
+def test_orchestrator_ctx_tokens_is_null_when_the_dispatch_could_not_measure(tmp_path):
+    plan_dir = make_plan(tmp_path, [SESS])
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"],
+                  orchestrator_ctx_tokens=None)
+    rec = outc.compose(plan_dir, "s01", resolution="unit", result="passed", verified=True)
+    assert "orchestrator_ctx_tokens" in rec          # the FIELD is always present
+    assert rec["orchestrator_ctx_tokens"] is None
+
+
+def test_orchestrator_ctx_tokens_never_carries_an_earlier_dispatchs_reading(tmp_path):
+    """A re-dispatch that could not measure must read null, not the previous
+    attempt's number — that number was taken at a different point in the run."""
+    plan_dir = make_plan(tmp_path, [SESS])
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"],
+                  orchestrator_ctx_tokens=99000)
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"],
+                  orchestrator_ctx_tokens=None)
+    rec = outc.compose(plan_dir, "s01", resolution="unit", result="passed", verified=True)
+    assert rec["orchestrator_ctx_tokens"] is None
+
+
+def test_begin_stamps_the_field_on_every_dispatch_started(tmp_path, monkeypatch):
+    """The end-to-end half: a REAL `begin` writes the field (int or null), so a
+    plan run after this ships has it on every dispatch record."""
+    plan_dir = make_plan(tmp_path, [SESS])
+    monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
+    run.cmd_begin(plan_dir, ["s01"])
+    run.cmd_release(plan_dir)
+    events = [json.loads(ln) for ln in (plan_dir / "run.ndjson").read_text().splitlines()
+              if ln.strip()]
+    started = [e for e in events if e["event"] == "dispatch_started"]
+    assert started, "begin wrote no dispatch_started event"
+    assert "orchestrator_ctx_tokens" in started[-1]
+    assert started[-1]["orchestrator_ctx_tokens"] is None   # env deliberately unset
+
+
+# --------------------------------------------------------------------------
+# routing_provenance — the VALUE, not just the key
+# --------------------------------------------------------------------------
+# REGRESSION 2026-09-04: SSOT v22 (commit 8303082) replaced this function's
+# `import run as _run` with `import provider_lane as pl` and left three `_run`
+# uses below it. Every call raised NameError, the bare `except` swallowed it,
+# and the fallback labelled 114/114 records `pinned_override` — so the
+# aggregator's proposal pool was empty for five days while
+# test_record_shape_is_schema_valid stayed green on the key's mere presence.
+# A known POSITIVE is what that test lacked.
+@pytest.mark.parametrize(("task_class", "backend", "model", "reasoning", "expected"), [
+    ("deep_reasoning", "claude", "opus", "medium", "default_resolved"),
+    ("agentic_build", "claude", "opus", "high", "default_resolved"),
+    ("standard_build", "claude", "sonnet", "medium", "default_resolved"),
+    ("mechanical", "claude", "haiku", None, "default_resolved"),
+    ("agentic_build", "codex", "gpt-5.6-sol", "xhigh", "default_resolved"),
+    ("mechanical", "claude", "sonnet", "max", "pinned_override"),      # zai cell, claude lane
+    ("deep_reasoning", "claude", "opus", "low", "pinned_override"),    # canary rung
+])
+def test_routing_provenance_resolves_the_class_default(task_class, backend, model,
+                                                       reasoning, expected):
+    assert outc._routing_provenance(None, {}, task_class, backend, model, reasoning) == expected
+
+
+def test_routing_provenance_experimental_wins_over_the_default_cell():
+    sess = {"routing_experiment": {"kind": "canary", "proposal_id": "4abfa765d726"}}
+    assert outc._routing_provenance(None, sess, "deep_reasoning", "claude",
+                                    "opus", "medium") == "experimental"
+
+
+def test_attested_model_without_reasoning_keeps_the_climbed_effort(tmp_path, isolated_ledger):
+    """A transcript names the served model but not the effort. After a climb
+    (authored sonnet@medium, dispatched sonnet@high) the attested row must read
+    the effort the attempt was DISPATCHED at, not the authored one — otherwise
+    /routing-retro books the climbed attempt under the wrong cell."""
+    plan_dir = make_plan(tmp_path, [dict(SESS, reasoning="medium")])
+    transcript = tmp_path / "headless-result.json"
+    transcript.write_text(json.dumps({"modelUsage": {
+        "claude-sonnet-4-6": {"inputTokens": 900, "outputTokens": 400}}}))
+    run.cmd_record_receipt(plan_dir, "s01", "agent-123", str(transcript), "claude")
+    write_closeout(plan_dir, "s01", extra={
+        "escalated_from": {"authored": {"model": "sonnet", "reasoning": "medium"},
+                           "ran": {"model": "sonnet", "reasoning": "high"},
+                           "attempt": 2, "rung": 1, "generation": 0},
+    })
+    rec = outc.compose(plan_dir, "s01", resolution="unit", result="done_unverified", verified=False)
+    assert rec["model_ran_source"] == outc.SOURCE_ATTESTED
+    assert rec["reasoning_authored"] == "medium"
+    assert rec["reasoning_ran"] == "high"

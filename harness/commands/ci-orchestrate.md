@@ -25,7 +25,7 @@ Use TaskList tools to track CI category fixes and provide visibility into orches
 
 ### Mode 2: STRATEGIC (Flag-triggered or Auto-escalated)
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/strategic-mode.md` and follow all steps.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/strategic-mode.md` and follow all steps.
 
 **Triggers:** `--strategic`, `--research`, `--docs`, `--force-escalate` flags, or auto-detect phrases ("comprehensive", "strategic", "root cause"), or auto-escalate after 3+ CI fix commits on branch.
 
@@ -37,11 +37,11 @@ Skip earlier CI stages when debugging a specific stage failure. Detects CI platf
 
 ## CRITICAL ORCHESTRATION CONSTRAINTS
 
-Canonical wording: `Read ~/.claude/commands/references/shared/pure-orchestrator-invariant.md`
+Canonical wording: `Read ~/.claude/references/shared/pure-orchestrator-invariant.md`
 (shared across the pure-orchestrator commands — same invariant, no per-command drift).
 No exceptions apply to this command.
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/troubleshooting.md` for full guard rails, prohibited actions, and delegation requirements.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/troubleshooting.md` for full guard rails, prohibited actions, and delegation requirements.
 
 You must now execute the following CI/CD orchestration procedure for: "$ARGUMENTS"
 
@@ -112,17 +112,17 @@ END IF
 
 **STEP 0.2: Check for Auto-Escalation**
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/strategic-mode.md` for auto-escalation check and all strategic phases.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/strategic-mode.md` for auto-escalation check and all strategic phases.
 
 **STEP 0.3: Execute Strategic Mode (if triggered)**
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/strategic-mode.md` and follow all strategic phases (Research, Infrastructure, Documentation).
+**Instructions:** Read `~/.claude/references/ci-orchestrate/strategic-mode.md` and follow all strategic phases (Research, Infrastructure, Documentation).
 
 ---
 
 ## STEP 0.4: Category-Level Mode Detection
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/category-detection.md` and follow all steps for `--fix-single-category` mode or proceed to all-categories mode.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/category-detection.md` and follow all steps for `--fix-single-category` mode or proceed to all-categories mode.
 
 ---
 
@@ -134,7 +134,7 @@ Also parse `--intent=<block>` = the change's INTENT (what it was meant to do, in
 choices), passed by the ship-tail CI-loop on red. Forward it VERBATIM into every CI-specialist
 agent prompt's `## Change intent` heading so fixers classify deliberate-choice (`intent_touched:
 true` → ask-user) vs mistake (auto-fix). See `references/ci-orchestrate/agent-routing.md` and
-`~/.claude/commands/references/shared/intent-into-review.md`.
+`~/.claude/references/shared/intent-into-review.md`.
 
 **Intent-into-review engagement (deterministic log).** Emit exactly one of:
 ```bash
@@ -170,13 +170,13 @@ Pass `$SHARED_CONTEXT` to ALL agent prompts instead of each agent discovering in
 
 **STEP 4-5: Failure Detection, Agent Mapping & Parallel Dispatch**
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/agent-routing.md` and follow all steps for failure type detection, agent mapping, work package analysis, parallel dispatch, conflict avoidance, and refactoring safety gate.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/agent-routing.md` and follow all steps for failure type detection, agent mapping, work package analysis, parallel dispatch, conflict avoidance, and refactoring safety gate.
 
 CRITICAL: Launch multiple Task agents simultaneously in a SINGLE response. NEVER execute Task calls sequentially.
 
 **STEP 6-7: Verification & Result Collection**
 
-**Instructions:** Read `~/.claude/commands/references/ci-orchestrate/troubleshooting.md` for CI pipeline verification, result validation, and chain invocation steps.
+**Instructions:** Read `~/.claude/references/ci-orchestrate/troubleshooting.md` for CI pipeline verification, result validation, and chain invocation steps.
 
 ---
 
@@ -200,7 +200,7 @@ CRITICAL: Launch multiple Task agents simultaneously in a SINGLE response. NEVER
 ## Findings output: the Uniform Findings Contract
 
 **This orchestrator emits the shared Uniform Findings Contract.**
-`Read ~/.claude/commands/references/shared/findings-contract.md` — the single canonical
+`Read ~/.claude/references/shared/findings-contract.md` — the single canonical
 findings envelope (action `no-op | auto-fix | ask-user` + severity `error | warning | info`
 + the finding-vs-suggestion split + lifecycle fields), mapped to epic-dev's
 PASS/CONCERNS/FAIL. This supersedes the old flat `fixed|partial|failed` status.

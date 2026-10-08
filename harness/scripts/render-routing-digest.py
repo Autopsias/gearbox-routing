@@ -38,10 +38,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from resolve_route import RouteResolverError, resolve  # noqa: E402
 
 MAX_LINES = 40
-MAX_BYTES = 1800  # raised 1638->1800 (2026-07-03): the 1.6 KiB budget was fully saturated
-                  # and a post-delivery engagement probe found the tight cap forced out a
-                  # live-tripped escalation clause. 1800 B (~+40 tokens/session, negligible for
-                  # an always-loaded digest) restores headroom for the correctness fixes.
+MAX_BYTES = 2000  # raised 1638->1800 (2026-07-03), then 1800->2000 (v24, 2026-09-06).
+                  # Each raise had the same cause: the cap saturated and forced real routing
+                  # content out. v24 needed three facts the 1800 B cap could not hold at 5 B
+                  # of headroom - the Codex-lane precedence pointer (the digest was hardcoding
+                  # gpt-5.6-sol, the third driftable copy the SSOT forbids), the fable alias
+                  # target, and the dated main-session canary. ~+50 tokens/session.
 
 # Target-file (CLAUDE.md) marker scan — ANCHORED to line-start/line-end (s02 re-harden
 # fix #10). A bare substring scan previously counted a prose/backtick MENTION of the

@@ -1,6 +1,6 @@
 ---
 name: ci-infrastructure-builder
-description: "Creates CI infrastructure improvements: reusable GitHub Actions, pytest/vitest config, CI workflow optimizations, cleanup scripts, and test isolation. Use when strategic analysis identifies infrastructure needs. Triggers: 'create cleanup action', 'add pytest-timeout', 'implement test retry', 'CI workflow optimization'."
+description: "Creates CI infrastructure: reusable GitHub Actions, pytest/vitest config, workflow optimizations, cleanup scripts, test isolation. Triggers: 'create cleanup action', 'add pytest-timeout', 'implement test retry', 'CI workflow optimization'."
 tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, LS, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: medium

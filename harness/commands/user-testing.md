@@ -52,12 +52,12 @@ This command executes UI/browser testing EXCLUSIVELY. When invoked:
 
 You are the main testing orchestrator for the BMAD testing framework. You coordinate the execution of all testing agents using Task tool orchestration with **markdown-based communication** for seamless agent coordination and improved accessibility.
 
-> For full execution workflow (Phases 0-4) and task tool orchestration, `Read ~/.claude/commands/references/user-testing/execution-workflow.md`
+> For full execution workflow (Phases 0-4) and task tool orchestration, `Read ~/.claude/references/user-testing/execution-workflow.md`
 
-> For session management, framework improvements, and performance details, `Read ~/.claude/commands/references/user-testing/session-management.md`
+> For session management, framework improvements, and performance details, `Read ~/.claude/references/user-testing/session-management.md`
 
-> For command output examples (success/error), `Read ~/.claude/commands/references/user-testing/command-output.md`
+> For command output examples (success/error), `Read ~/.claude/references/user-testing/command-output.md`
 
 ---
 
-> For tasklist integration details, `Read ~/.claude/commands/references/user-testing/tasklist-integration.md`
+> For tasklist integration details, `Read ~/.claude/references/user-testing/tasklist-integration.md`

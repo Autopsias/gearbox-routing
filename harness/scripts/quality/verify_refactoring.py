@@ -120,7 +120,7 @@ def main() -> None:
             status = "VERIFIED" if result["git_shows_changes"] else "HALLUCINATION"
             print(f"[{status}] {args.git_check}")
             if not result["git_shows_changes"]:
-                print(f"  Expected in git diff but not found.")
+                print("  Expected in git diff but not found.")
                 print(f"  Changed files: {result['changed_files'] or '(none)'}")
         sys.exit(0 if result["git_shows_changes"] else 1)
 

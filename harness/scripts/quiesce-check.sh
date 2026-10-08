@@ -126,9 +126,30 @@ fi
 # its own churn probe. Measured 2026-07-25T16:25Z: the newest mtime on the tracked
 # surface WAS a foreign session's auto-memory file, so an unscoped Q2 reds on exactly
 # the writes narrow mode exists to tolerate.
+# A tracked file DELETED on disk is an OBSERVABLE FACT, not an inspection failure —
+# but `stat` exits non-zero on it and, under `set -o pipefail`, that killed the whole
+# probe and returned exit 2 "cannot inspect the tracked surface". So ANY benign unstaged
+# deletion anywhere in the tree BLINDED this gate instead of being seen by it. Measured
+# 2026-08-22: four auto-memory files under projects/*/memory/, already consolidated into
+# a successor note by the session that owned them, blocked every `gearbox deploy` this
+# way — and the message named the gate, not the deletion, so the cause was invisible.
+# Excluding them keeps the probe able to LOOK. It tolerates nothing: Q1 renders the
+# verdict on tracked dirt, deletions included, under the same narrow/strict scope. A
+# stat failure on a file that EXISTS is still fatal — that is a real inspection error.
+# The filter is python3 (already a hard dependency above), NOT awk: this platform's awk
+# does not honour RS='\0', so a NUL-separated filter silently emits NOTHING and the gate
+# dies "probe returned nothing" on every run — measured here 2026-08-22 while writing
+# this fix, and caught only because the known-positive probe ran the CLEAN-tree control
+# too. `lexists` is the exact condition `stat` cares about, and it covers any missing
+# path, not only a git-known deletion.
+deleted_tracked=$(git -C "$CD" ls-files -z --deleted \
+  | python3 -c 'import sys; print(sum(1 for p in sys.stdin.buffer.read().split(b"\0") if p))')
 probe() {
-  git -C "$CD" ls-files -z \
-    | (cd "$CD" && xargs -0 stat -f '%m %N') \
+  ( cd "$CD" && git ls-files -z \
+      | python3 -c 'import os, sys
+paths = sys.stdin.buffer.read().split(b"\0")
+sys.stdout.buffer.write(b"\0".join(p for p in paths if p and os.path.lexists(p)))' \
+      | xargs -0 stat -f '%m %N' ) \
     | awk -v re="$RUNTIME_RE" -v mode="$MODE" '
         { p = substr($0, index($0, " ") + 1)
           if (mode == "narrow" && p ~ re) next
@@ -150,6 +171,10 @@ else
   echo "         t0: $a"
   echo "         t1: $b"
   FAIL=1
+fi
+if [ "$deleted_tracked" != "0" ]; then
+  echo "         note: $deleted_tracked tracked file(s) deleted on disk, excluded from the"
+  echo "               mtime probe so it can still inspect — Q1 holds the verdict on them"
 fi
 
 # --- Q3 foreign live sessions (WARN in narrow, HARD in strict) --------------

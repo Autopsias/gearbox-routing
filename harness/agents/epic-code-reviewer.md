@@ -82,7 +82,7 @@ State the **finding** — the defect and why it's wrong — precisely; that is a
 
 > **Findings contract (Lane A):** this agent's output shape below is a documented
 > projection of the system-wide **Uniform Findings Contract**
-> (`~/.claude/commands/references/shared/findings-contract.md`). The contract's **Lane-A
+> (`~/.claude/references/shared/findings-contract.md`). The contract's **Lane-A
 > adapter** maps `high/medium/low_issues -> severity error/warning/info` and
 > `auto_fixable -> action auto-fix|ask-user`, so a Lane-A gate and a Cluster-C ship-tail
 > report speak the same PASS/CONCERNS/FAIL language. Keep emitting the shape below until the

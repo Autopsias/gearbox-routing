@@ -18,11 +18,14 @@ type: reference
 - Use literal code patterns (e.g., `useState(`, `async function`)
 - NOT keywords (e.g., "react tutorial")
 
-**Exa Deep Research** (`deep_researcher_start` + `deep_researcher_check`)
+**Exa Agent** (`agent_run`)
 - User explicitly requests "deep research" or "comprehensive analysis"
 - Complex technical decisions requiring multiple sources
 - Market research or detailed comparative analysis
-- Use `model="exa-research-pro"` for complex topics
+- Pass `query` and `effort` (default `low`); prefer `medium`. Measured 2026-09-03 on one question: `medium` $0.10 in 60 s, `high` $0.50 in 131 s with no extra sources
+- A long run returns a run ID; call again with `runId` to wait for it, never start a duplicate
+- Replaces `deep_researcher_start` + `deep_researcher_check`: Exa retired its Research API (HTTP 410 `RESEARCH_RETIRED`, 2026-09-03)
+- Missing from the tool list? `exa-mcp-server` 3.4.1 registers it only when `ENABLED_TOOLS` in the server's env names `agent_run`
 
 **Exa Web Search** (`web_search_exa`)
 - Technical implementation details
@@ -53,7 +56,7 @@ type: reference
 
 1. Simple question → **Perplexity**
 2. Code examples → **GitHub Grep**
-3. "Deep research" request → **Exa Deep Researcher**
+3. "Deep research" request → **Exa Agent** (`agent_run`)
 4. Technical details → **Exa Web Search**
 5. Docs verification → **Ref** (last resort)
 6. Security scanning → **Semgrep** (before commits)

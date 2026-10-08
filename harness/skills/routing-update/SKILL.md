@@ -1,7 +1,7 @@
 ---
 name: routing-update
-description: Research a model-landscape change and regenerate every routing surface through one operator-approved changeset. Use when the user says "model update", "new model released", "update model routing", "pricing changed", "price cut", "model deprecated", "model GA'd", "recalibrate routing for <model>", "Claude Code binary bump" (effort-honoring recheck), "instruction decay", "are our rules still needed on the new model", or reports model/pricing/deprecation news from EITHER provider in our lineup — Anthropic (Claude/Opus/Sonnet/Haiku/Fable) or OpenAI (GPT/Codex/sol/terra/luna) — that should flow into ~/.claude/model-routing.yaml. Covers cost-vs-performance recalibration against the DeepSWE board, and on a model-generation change also the instruction-decay audit (probe whether failure-derived rules still earn their context). Not for judging whether current routing WORKS in practice (that's /routing-retro), and not for per-task model picks (the SSOT digest in CLAUDE.md handles those).
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Skill, AskUserQuestion, WebFetch, WebSearch, mcp__exa__web_search_exa, mcp__exa__crawling_exa, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url]
+description: "Research a model-landscape change and regenerate every routing surface through one operator-approved changeset. Use when the user says \"model update\", \"new model released\", \"update model routing\", \"pricing changed\", \"price cut\", \"model deprecated\", \"model GA'd\", \"recalibrate routing for <model>\", \"Claude Code binary bump\" (effort-honoring recheck), \"instruction decay\", \"are our rules still needed on the new model\", or reports model/pricing/deprecation news from EITHER provider in our lineup \u2014 Anthropic or OpenAI \u2014 that should flow into ~/.claude/model-routing.yaml. Not for judging whether current routing WORKS in practice (that's /routing-retro), and not for per-task model picks."
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, Skill, AskUserQuestion, WebFetch, WebSearch, mcp__exa__web_search_exa, mcp__exa__web_fetch_exa, mcp__exa__agent_run, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url]
 effort: high  # SSOT recalibration is judgment-heavy (pricing/tier tradeoffs feed every future dispatch); the mechanical apply is checklist-driven. Verified honored in binary 2.1.170.
 ---
 
@@ -68,7 +68,7 @@ Follow `references/research-protocol.md`. Summary:
 - **`/claude-api` skill FIRST** — authoritative model IDs, pricing, deprecations, effort
   availability per model. This is how the SSOT's `prices:` were verified originally
   ("never from memory"). Any `prices:` diff MUST cite this.
-- **External priors in parallel** — Exa (`mcp__exa__web_search_exa`, deep researcher for
+- **External priors in parallel** — Exa (`mcp__exa__web_search_exa`, `mcp__exa__agent_run` for
   a genuinely new tier) + Perplexity for benchmarks/practitioner signal; `mcp__ref` for
   Anthropic docs deltas (effort doc, models overview, Claude Code model-config).
   Precedent artifact shape: `evals/routing/external-priors-vulcanbench-2026-07.md`.
@@ -76,7 +76,7 @@ Follow `references/research-protocol.md`. Summary:
   https://deepswe.datacurve.ai/ scores Anthropic and OpenAI models on ONE harness with
   pass@1 *and* $/task side by side — the only way to make a provider-crossing cost-quality
   claim honestly. The changeset must carry the table for our lineup plus the resulting
-  Pareto frontier. **Fetch with `WebFetch` or `mcp__exa__crawling_exa` — never `curl`**
+  Pareto frontier. **Fetch with `WebFetch` or `mcp__exa__web_fetch_exa` — never `curl`**
   (client-hydrated: curl returns a 230 KB shell with zero model rows, and reads as "no
   data"). Mind the two toggles, the ± intervals, and the fact that the board's best-config
   rung is usually not our operating rung. Full protocol + reading rules:
@@ -130,6 +130,24 @@ runbook's SSOT-change protocol (README §"SSOT change protocol") applies from he
 Run `references/apply-checklist.md` top to bottom. Order matters (SSOT first, renders after,
 guard last). Never `--no-verify`; a guard failure is fixed forward, never bypassed. The
 commit message carries the literal token `routing-pin-change: approved-by-operator <YYYY-MM-DD>`.
+
+**Adoption registry (canary/proposal changesets only).** When this changeset ADOPTS or
+ROLLS BACK a `/routing-retro`-sourced `aggregate_outcomes.py` proposal (an upgrade,
+downgrade, or canary in `cells[]`/`canaries[]` — carrying a `proposal_id`), append one line
+to `evals/routing/adoptions.ndjson` in the source worktree as part of this same apply:
+`{"proposal_id": ..., "ssot_version": <the NEW version this changeset produces>, "date":
+"YYYY-MM-DD", "class": ..., "old_rung": "<model>@<reasoning>", "new_rung":
+"<model>@<reasoning>", "action": "adopt" | "rollback"}`. **`ssot_version` is an INTEGER**
+— the SSOT's own `version:` value, written bare (`16`, not `"16"` and not `"v16"`). This
+file is hand-authored, so the type was left unstated once and a quoted value crashed the
+whole aggregation run on an ordered comparison; `did_it_help` now coerces `"16"`/`"v16"`
+and skips a record it cannot read at all, but write the integer. This is the boundary
+`aggregate_outcomes.py`'s `did_it_help` reads back at the next retro to compare the
+class's verified cohorts before vs after — by `ssot_version_ran`, never by calendar date,
+since a source adoption is not live in the ledger until `gearbox deploy` ships it (see
+`did_it_help` in `skills/routing-retro/scripts/aggregate_outcomes.py`). A changeset with no
+`proposal_id` in play (an ordinary price/model-landscape update) skips this — the registry
+is only for retro-sourced proposal adopt/rollback decisions.
 
 ### 6. Post-apply
 

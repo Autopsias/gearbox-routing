@@ -191,6 +191,30 @@ def _option_text(opt):
     return ""
 
 
+def _brief_option_violations(brief, v):
+    """The options list and the recommendation that has to name one of them."""
+    attempts = brief.get("attempts")
+    if not isinstance(attempts, list) or not attempts or not all(
+        isinstance(a, str) and a.strip() for a in attempts
+    ):
+        v.append("'decision_brief.attempts' must be a non-empty list of non-empty strings "
+                 "saying WHAT YOU TRIED")
+
+
+def _brief_findings_violations(brief, v):
+    """The findings list: each entry needs a source and a takeaway."""
+    options = brief.get("options")
+    if not isinstance(options, list) or not options:
+        v.append("'decision_brief.options' must be a list of 1-3 options")
+    elif len(options) > MAX_BRIEF_OPTIONS:
+        v.append(f"'decision_brief.options' has {len(options)} entries; at most "
+                 f"{MAX_BRIEF_OPTIONS} are allowed — more than three is not a decision, "
+                 "it is a menu")
+    elif not all(_option_text(o) for o in options):
+        v.append("every entry in 'decision_brief.options' must be a non-empty string "
+                 "(or an object with a non-empty 'option')")
+
+
 def decision_brief_violations(data):
     """Schema check for `decision_brief` (RS-04).
 
@@ -224,12 +248,7 @@ def decision_brief_violations(data):
         return [f"'decision_brief' must be an object, got {type(brief).__name__}"]
 
     v = []
-    attempts = brief.get("attempts")
-    if not isinstance(attempts, list) or not attempts or not all(
-        isinstance(a, str) and a.strip() for a in attempts
-    ):
-        v.append("'decision_brief.attempts' must be a non-empty list of non-empty strings "
-                 "saying WHAT YOU TRIED")
+    _brief_option_violations(brief, v)
 
     findings = brief.get("findings")
     if not isinstance(findings, list) or not findings:
@@ -247,16 +266,7 @@ def decision_brief_violations(data):
                 if not isinstance(f.get(key), str) or not f[key].strip():
                     v.append(f"'decision_brief.findings[{i}].{key}' must be a non-empty string")
 
-    options = brief.get("options")
-    if not isinstance(options, list) or not options:
-        v.append("'decision_brief.options' must be a list of 1-3 options")
-    elif len(options) > MAX_BRIEF_OPTIONS:
-        v.append(f"'decision_brief.options' has {len(options)} entries; at most "
-                 f"{MAX_BRIEF_OPTIONS} are allowed — more than three is not a decision, "
-                 "it is a menu")
-    elif not all(_option_text(o) for o in options):
-        v.append("every entry in 'decision_brief.options' must be a non-empty string "
-                 "(or an object with a non-empty 'option')")
+    _brief_findings_violations(brief, v)
 
     rec = brief.get("recommendation")
     if not isinstance(rec, str) or not rec.strip():
@@ -403,6 +413,9 @@ def persist(plan_dir, session_id, parsed):
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
+    if record.get("result") == "BLOCKED":
+        import rework  # local: rework -> outcomes -> this module is a cycle at import time
+        rework.settle_blocked_closeout(plan_dir, session_id, record)
     return target
 
 
@@ -421,3 +434,17 @@ def load_closeout(plan_dir, session_id):
     if not target.exists():
         return None
     return json.loads(target.read_text())
+
+
+def never_finished(plan_dir, session_id):
+    """True unless a persisted closeout carried result DONE — the discriminator
+    run.py's `_awaits_review_kind` uses. An AWAITS_REVIEW session that never
+    finished is a PRE-DISPATCH gate ("may this start?"), so "do not start it" is a
+    retirement; one with a DONE closeout is a recorded result. An unreadable
+    closeout proves nothing finished. (2026-09-18: three superseded plans each sat
+    on one such gate that was neither ack-able nor retireable.)"""
+    try:
+        co = load_closeout(plan_dir, session_id)
+    except (OSError, ValueError):
+        co = None
+    return not (isinstance(co, dict) and co.get("result") == "DONE")

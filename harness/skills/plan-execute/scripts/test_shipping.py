@@ -15,6 +15,7 @@ Run: pytest plan-execute/scripts/test_shipping.py -q
 """
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +33,11 @@ import manifest_io as mio  # noqa: E402
 import ship_state_io as ssio  # noqa: E402
 import shipping as shp  # noqa: E402
 import shipping_adapter as adapter  # noqa: E402
+
+# The checkout's copy of every skill a git step names (commit-orchestrate, pr).
+REPO_COMMANDS = SCRIPTS.parents[2] / "commands"
+GIT_SKILLS = {adapter.git_adapter(step)["skill"]
+              for value in adapter.VALID_GIT for step in adapter.git_substeps(value)}
 
 
 # --------------------------------------------------------------------------
@@ -61,12 +67,24 @@ def _write_registries(project_root, deploy=None, gates=None):
     (cl / "eval-gates.json").write_text(json.dumps(gates or {}))
 
 
-def make_plan(tmp_path, sessions, *, phases=None, deploy=None, gates=None):
-    """Build a real plan dir (via build_plan) inside an isolated project root."""
+def make_plan(tmp_path, sessions, *, phases=None, deploy=None, gates=None, name="fixture"):
+    """Build a real plan dir (via build_plan) inside an isolated project root.
+
+    ``name`` builds a SECOND plan in the SAME project root — the shape the
+    repo-scoped shipping leases exist for."""
     project_root = tmp_path / "proj"
-    project_root.mkdir()
+    project_root.mkdir(exist_ok=True)
     _write_registries(project_root, deploy, gates)
-    plan_dir = project_root / "_plans" / "fixture"
+    # 2026-09-26: the build and ship probes search the project's .claude/commands
+    # before ~/.claude, so without these a git step resolved only where the
+    # harness is deployed — every commit-push plan went red on a CI runner.
+    # Copied, not symlinked: a test that rewrites a fixture skill to simulate
+    # drift must not write through into the repo.
+    commands = project_root / ".claude" / "commands"
+    commands.mkdir(exist_ok=True)
+    for skill in GIT_SKILLS:
+        shutil.copy(REPO_COMMANDS / f"{skill}.md", commands)
+    plan_dir = project_root / "_plans" / name
     build_plan.build(_spec(sessions, phases), plan_dir, project_root=str(project_root))
     return plan_dir
 
@@ -156,27 +174,6 @@ def test_runtime_deploy_target_missing(tmp_path):
 
 
 # --------------------------------------------------------------------------
-# 7 — resource lock blocks a foreign holder (serialization)
-# --------------------------------------------------------------------------
-def test_resource_lock_blocks_foreign_holder(tmp_path):
-    sessions = [{"id": "s01", "title": "S1", "model": "Sonnet", "items": ["w-01"], "prompt": "do",
-                 "post_session": {"git": "commit-push"}}]
-    plan_dir = make_plan(tmp_path, sessions)
-    write_closeout(plan_dir, "s01")
-    # Pre-plant a FOREIGN, live lock on the git resource (pid 1 = always alive).
-    root = shp.find_project_root(plan_dir)
-    lp = plan_dir / "_shipping_locks" / ssio._resource_slug(f"git:{root}")
-    lp = lp.with_suffix(".lock")
-    lp.parent.mkdir(parents=True, exist_ok=True)
-    import socket
-    from datetime import UTC, datetime
-    lp.write_text(json.dumps({"pid": 1, "started_at": datetime.now(UTC).isoformat(),
-                              "host": socket.gethostname(), "resource": f"git:{root}"}))
-    out = shp.ship_begin(plan_dir, "s01")
-    assert out["action"] == "locked"
-
-
-# --------------------------------------------------------------------------
 # 8 — idempotent resume: push fails -> resume at push, no duplicate commit
 # --------------------------------------------------------------------------
 def test_idempotent_resume_after_push_failure(tmp_path):
@@ -205,6 +202,27 @@ def test_idempotent_resume_after_push_failure(tmp_path):
     assert out["action"] == "done"
     state = ssio.load_ship_state(plan_dir, "s01")
     assert state["steps"] == {"commit": "done", "push": "done", "deploy": "done"}
+
+
+def test_a_replayed_commit_re_runs_a_push_already_recorded_done(tmp_path):
+    """2026-09-24: commit failed after an earlier push succeeded; clear-halt +
+    ship-begin + the commit replay left `push` done, so ship-finalize reported
+    done while origin still held the OLD sha. A commit that ran re-opens push."""
+    sessions = [{"id": "s01", "title": "S1", "model": "Sonnet", "items": ["w-01"], "prompt": "do",
+                 "post_session": {"git": "commit-push"}}]
+    plan_dir = make_plan(tmp_path, sessions)
+    write_closeout(plan_dir, "s01")
+    shp.ship_begin(plan_dir, "s01")
+    shp.ship_record(plan_dir, "s01", "commit", "done")
+    assert shp.ship_record(plan_dir, "s01", "push", "done")["action"] == "done"
+    state = ssio.load_ship_state(plan_dir, "s01")
+    state["steps"]["commit"] = "failed"          # the later commit that failed
+    shp._persist_state(plan_dir, "s01", state)
+
+    out = shp.ship_begin(plan_dir, "s01", resume=True)
+    assert out["step"] == "commit"
+    out = shp.ship_record(plan_dir, "s01", "commit", "done")
+    assert out["action"] != "done" and out["step"] == "push", out
 
 
 def test_already_shipped_is_idempotent(tmp_path):
@@ -517,7 +535,6 @@ def test_build_rejects_ship_tail_deploy_with_ci_rung_probe_failure(tmp_path):
     """Build-time gate: if the ship-tail deploy target's probe_flags are absent
     from the live skill, validate_shipping_resolves must raise ValueError — the
     plan must never build with a believed-but-dead CI rung wiring."""
-    import json
     # Register a synthetic ship-tail-alike deploy target whose probe_flags include
     # a flag that is absent from any real skill — simulating a CI rung removed from
     # ship-tail.md after the registry entry was authored.
@@ -576,3 +593,62 @@ def test_cmd_checkpoint_surfaces_decision_brief(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["checkpoint_brief"] == brief
     assert "awaiting human decision: Ship now or hold?" in (plan_dir / "PLAN.html").read_text()
+
+
+def test_the_two_gate_registries_agree_on_every_llm_review_timeout():
+    """Three separate sessions raised an llm-review timeout in the PROJECT copy and
+    left the bundled default behind, each time against a `_note` in that very file
+    saying "if you change one, change the other". The project copy WINS, so this
+    repo never felt it -- but a fresh checkout, an adopting repo and the deployed
+    ~/.claude tree all run the BUNDLED file, and each would stall INDETERMINATE on
+    a clock the way the raising session did. A note is documentation; this is the
+    control. Skips where there is no project copy (an adopting repo has none)."""
+    skill = Path(adapter.__file__).resolve().parent.parent
+    bundled = json.loads((skill / "references" / "eval-gates.default.json").read_text())
+    proj_p = skill.parent.parent / ".claude" / "eval-gates.json"
+    if not proj_p.is_file():
+        pytest.skip("no project-local eval-gates.json in this tree")
+    proj = json.loads(proj_p.read_text())
+    def inner(e):
+        return [a for a in e["argv"] if "--timeout" in a][0].split("--timeout")[1].strip()
+
+    for gid in ("llm-review-low", "llm-review-medium", "llm-review-high"):
+        if gid not in proj or gid not in bundled:
+            continue
+        assert (inner(proj[gid]), proj[gid]["timeout"]) == \
+               (inner(bundled[gid]), bundled[gid]["timeout"]), (
+            f"{gid}: project copy is inner={inner(proj[gid])}/outer={proj[gid]['timeout']} but "
+            f"the bundled default is inner={inner(bundled[gid])}/outer={bundled[gid]['timeout']}. "
+            f"A timeout raised from a measurement must land in BOTH registries.")
+
+
+def test_the_two_gate_registries_agree_on_every_llm_review_env_allowlist():
+    """The timeout control above was keyed on timeouts alone, and the allowlist
+    drifted straight past it. `PLAN_EXECUTE_REVIEW_EXCLUDE` shipped in the bundled
+    default on all three levels and was never added to the project copy, and
+    because a project entry REPLACES the bundled one wholesale
+    (shipping.py `merged.update()` per gate id) the variable simply vanished in
+    this repo -- so `land_gate`'s plan-record exclusion, guarded by
+    `if rvs.EXCLUDE_ENV in (g.get("env_allowlist") or [])`, never fired here and
+    every land re-gate handed the reviewer the generated plan record.
+
+    A variable absent from the allowlist is not a smaller review; it is a control
+    that silently does nothing, which is the failure this file already has three
+    entries for. Found 2026-08-23 by a review of the isolation branch."""
+    skill = Path(adapter.__file__).resolve().parent.parent
+    bundled = json.loads((skill / "references" / "eval-gates.default.json").read_text())
+    proj_p = skill.parent.parent / ".claude" / "eval-gates.json"
+    if not proj_p.is_file():
+        pytest.skip("no project-local eval-gates.json in this tree")
+    proj = json.loads(proj_p.read_text())
+
+    for gid in ("llm-review-low", "llm-review-medium", "llm-review-high"):
+        if gid not in proj or gid not in bundled:
+            continue
+        missing = set(bundled[gid].get("env_allowlist") or []) - \
+            set(proj[gid].get("env_allowlist") or [])
+        assert not missing, (
+            f"{gid}: the project copy's env_allowlist is missing {sorted(missing)}, which the "
+            f"bundled default declares. The project entry REPLACES the bundled one, so every "
+            f"variable the gate reads must be listed in BOTH registries or it is unset at "
+            f"runtime and whatever it gates does nothing.")

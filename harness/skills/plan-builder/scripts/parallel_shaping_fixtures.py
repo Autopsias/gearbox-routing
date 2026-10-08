@@ -192,20 +192,8 @@ def integration_session(manifest, group="g1"):
     )
 
 
-def check(name, res, expect):
-    """Return a list of failure strings ([] = the case behaved as declared)."""
-    bad = []
-    if "error" in expect and res["error"] != expect["error"]:
-        bad.append(f"expected no refusal, got: {res['error']}")
-    for needle in expect.get("error_has", []):
-        if needle not in (res["error"] or ""):
-            bad.append(f"refusal missing {needle!r}: {res['error']!r}")
-    for needle in expect.get("stderr_has", []):
-        if needle not in res["stderr"]:
-            bad.append(f"stderr missing {needle!r}")
-    for needle in expect.get("stderr_lacks", []):
-        if needle in res["stderr"]:
-            bad.append(f"stderr unexpectedly contains {needle!r}")
+def _check_group_shape(bad, expect, res):
+    """Group membership and the disjointness the contract requires."""
     exp_int = expect.get("integration")
     if exp_int is not None:
         integ = integration_session(res["manifest"] or {"sessions": []})
@@ -228,6 +216,23 @@ def check(name, res, expect):
             for it in res["manifest"]["items"]:
                 if not it.get("touches"):
                     bad.append(f"manifest item {it['id']} carries no `touches` (M2a input)")
+
+
+def check(name, res, expect):
+    """Return a list of failure strings ([] = the case behaved as declared)."""
+    bad = []
+    if "error" in expect and res["error"] != expect["error"]:
+        bad.append(f"expected no refusal, got: {res['error']}")
+    for needle in expect.get("error_has", []):
+        if needle not in (res["error"] or ""):
+            bad.append(f"refusal missing {needle!r}: {res['error']!r}")
+    for needle in expect.get("stderr_has", []):
+        if needle not in res["stderr"]:
+            bad.append(f"stderr missing {needle!r}")
+    for needle in expect.get("stderr_lacks", []):
+        if needle in res["stderr"]:
+            bad.append(f"stderr unexpectedly contains {needle!r}")
+    _check_group_shape(bad, expect, res)
     return bad
 
 

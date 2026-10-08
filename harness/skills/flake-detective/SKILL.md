@@ -1,6 +1,6 @@
 ---
 name: flake-detective
-description: Statistically confirms then root-causes flaky pytest tests under xdist parallelism and CI drift. Routes to 6 root-cause classes (fixture leakage, resource contention, test-order dependency, import-time leakage, CI drift, asyncio concurrency). Use when: flaky test, intermittent failure, passes locally fails CI, xdist race.
+description: "Statistically confirms then root-causes flaky pytest tests under xdist parallelism and CI drift. Use when: flaky test, intermittent failure, passes locally fails CI, xdist race. Routes to 6 root-cause classes (fixture leakage, resource contention, test-order dependency, import-time leakage, CI drift, asyncio concurrency)."
 ---
 
 # Flake Detective

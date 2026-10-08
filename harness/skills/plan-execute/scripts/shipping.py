@@ -10,8 +10,11 @@ the Skill tool, then records the outcome back. ``argv``-kind sub-steps
 Ordering of the safety gates (the adversarial hardenings):
 
   Step 0  checkpoint precedence — a human checkpoint ALWAYS outranks shipping.
-  Step 1  acquire resource locks FIRST (before the idempotency read — closes the
-          read-then-lock TOCTOU).
+  Step 1  acquire resource LEASES first (before the idempotency read — closes the
+          read-then-lock TOCTOU). ``git:``/``push:`` leases are repo-scoped, so a
+          second plan in the same checkout genuinely waits; ownership is a token
+          with an explicit expiry, because run.py exits before the skill it
+          authorised runs (ship_state_io.py has the measurements).
   Step 2  idempotency read + digest reconciliation — a manifest/closeout digest
           mismatch refuses as ``state-drift`` rather than skipping as shipped.
   Step 3  runtime guard (deploy target re-resolve) + execution-time adapter
@@ -22,7 +25,10 @@ Ordering of the safety gates (the adversarial hardenings):
 Orchestrator protocol (run.py subcommands):
   ship-begin   -> first directive | noop | deferred | already-shipped | skipped
                   | failed | confirm-required
-  ship-record  -> record a skill step's outcome, return next directive
+  ship-record  -> record a skill step's outcome, return next directive. Re-verifies
+                  the lease first: a step whose lease was taken over or expired
+                  mid-directive REFUSES (`reason: lease-lost`) with a decision
+                  brief instead of recording anything.
   ship-run     -> run an argv step here, return next directive
   ship-finalize / ship-release -> finalize / release locks
   ship-status  -> read-only computed plan + state (no lock; dashboard/dry-run)
@@ -34,13 +40,18 @@ from pathlib import Path
 
 import article_block as ab
 import closeout_pipeline as cp
+import gate_expect as gx
 import manifest_io as mio
+import plan_scope as pscope
+import plan_ship as pship
 import run_state_io as rsi
 import ship_state_io as ssio
 import shipping_adapter as adapter
 
-STEP_PENDING, STEP_RUNNING, STEP_DONE, STEP_FAILED, STEP_SKIPPED = (
-    "pending", "running", "done", "failed", "skipped",
+# Moved to ship_badges.py (size-ratchet extraction, s06); re-exported for callers.
+from ship_badges import (  # noqa: F401, E402
+    STEP_PENDING, STEP_RUNNING, STEP_DONE, STEP_FAILED, STEP_SKIPPED,
+    mark_done, shipping_badge, shipping_summary,
 )
 
 
@@ -52,13 +63,9 @@ def _now():
 # Project-local registry resolution (deploy targets + eval gates)
 # --------------------------------------------------------------------------
 def find_project_root(plan_dir):
-    plan_dir = Path(plan_dir).resolve()
-    for up in [plan_dir, *plan_dir.parents]:
-        if (up / ".claude").is_dir():
-            return up
-    if plan_dir.parent.name == "_plans":
-        return plan_dir.parent.parent
-    return plan_dir.parent
+    # One definition, in plan_scope: the walk must stop at the git top-level or
+    # it climbs out of a plan worktree back into the shared checkout (ISO-02).
+    return pscope.project_root(plan_dir)
 
 
 def _bundled_default(name):
@@ -115,19 +122,22 @@ def compute_steps(plan_dir, manifest, session_id):
     ``skill`` kind: ``{skill, args, probe_flags, timeout}``. For ``argv`` kind:
     ``{argv, cwd, env_allowlist, timeout, failure_mode, fixture_fake}``.
 
-    Raises ``adapter.AdapterError`` / ``StepResolveError`` on bad config so the
-    caller can halt with a precise reason."""
+    Raises ``adapter.AdapterError`` / ``StepResolveError`` on bad config — and on
+    a vanished plan worktree — so the caller can halt with a precise reason."""
     ps = _resolved_post_session(manifest, session_id)
     if not ps:
         return []
     steps = []
-    for sub in adapter.git_substeps(ps.get("git", "none")):
-        entry = adapter.git_adapter(sub)
-        steps.append({"name": sub, "kind": "skill", "resource": _git_resource(sub, plan_dir),
-                      **{k: entry[k] for k in ("skill", "args", "probe_flags", "timeout")}})
-    for gate_id in ps.get("pre_deploy_gates", []) or []:
-        steps.append(_resolve_gate(plan_dir, gate_id))
-    deploy_step = _resolve_deploy(plan_dir, ps)
+    try:                        # A plan that claims a worktree which is GONE refuses —
+        for sub in adapter.git_substeps(ps.get("git", "none")):    # in `git_step`, and
+            steps.append(pship.git_step(plan_dir, sub,             # in `_resolve_cwd`
+                                        _git_resource(sub, plan_dir), session_id))
+        for gate_id in ps.get("pre_deploy_gates", []) or []:       # for gates/deploy.
+            steps.append(_resolve_gate(plan_dir, gate_id, session_id))
+        deploy_step = _resolve_deploy(plan_dir, ps, session_id)
+    except pship.wt.WorktreeError as e:      # caller of compute_steps handles this ONE
+        raise StepResolveError("plan-worktree-missing", str(e)) from e   # family, so it
+    # halts here instead of surfacing as a traceback that also discards `apply`'s output.
     if deploy_step:
         steps.append(deploy_step)
     return steps
@@ -138,34 +148,51 @@ def _git_resource(sub, plan_dir):
     return f"push:{root}" if sub == "push" else f"git:{root}"
 
 
-def _resolve_gate(plan_dir, gate_id):
+def _resolve_gate(plan_dir, gate_id, session_id=None):
     g = eval_gates(plan_dir).get(gate_id)
     if not g:
-        raise StepResolveError("gate-missing",
-                               f"gate {gate_id!r} not in eval-gates registry")
+        raise StepResolveError("gate-missing", f"gate {gate_id!r} not in eval-gates registry")
+    return gate_descriptor(gate_id, g, lambda: _resolve_cwd(plan_dir, g.get("cwd"), session_id))
+
+
+def gate_descriptor(gate_id, g, cwd):  # cwd: a thunk, argv only. Shared with land_at_land.
     name = f"gate:{gate_id}"
     if g.get("kind") == "skill":
         return {"name": name, "kind": "skill", "resource": name, "skill": g["skill"],
                 "args": g.get("args", ""), "probe_flags": g.get("probe_flags", []),
                 "timeout": g.get("timeout", 1200), "fixture_fake": g.get("fixture_fake")}
     return {"name": name, "kind": "argv", "resource": name, "argv": g.get("argv", []),
-            "cwd": _resolve_cwd(plan_dir, g.get("cwd")), "env_allowlist": g.get("env_allowlist", []),
+            "cwd": cwd(), "env_allowlist": g.get("env_allowlist", []),
             "timeout": g.get("timeout", 1200), "failure_mode": "fail-halt",
-            "fixture_fake": g.get("fixture_fake")}
+            "fixture_fake": g.get("fixture_fake"), "indeterminate_exit": g.get("indeterminate_exit"),
+            "expect": g.get("expect"), "land_covered_by": g.get("land_covered_by")}
 
 
 # Public alias: session verify gates (verify.py) resolve through the SAME registry
-# entry as a pre_deploy gate of the same id, so the two never diverge.
-def resolve_gate(plan_dir, gate_id):
-    return _resolve_gate(plan_dir, gate_id)
+# entry as a pre_deploy gate of the same id, so the two never diverge. Translates
+# `_resolve_cwd`'s vanished-worktree refusal for callers outside compute_steps.
+#
+# `session_id` is REQUIRED for that promise to hold. Without it `plan_cwd` cannot
+# see a member worktree or a group's merge target, so the same registry entry
+# resolved by `verify.compute_gates` (which passes it) and by a `pre_deploy_gates`
+# step (which did not) landed in DIFFERENT trees for a group member and for an
+# integration session -- the integration gate testing the plan worktree the merge
+# never reached, and passing vacuously. Defaulted rather than positional so a
+# non-session caller keeps working; every in-tree caller passes it.
+def resolve_gate(plan_dir, gate_id, session_id=None):
+    try:
+        return _resolve_gate(plan_dir, gate_id, session_id)
+    except pship.wt.WorktreeError as e:
+        raise StepResolveError("plan-worktree-missing", str(e)) from e
 
 
-def _resolve_deploy(plan_dir, ps):
+def _resolve_deploy(plan_dir, ps, session_id=None):
     failure_mode = ps.get("command_failure_mode", "fail-halt")
     argv = ps.get("deploy_argv")
     if argv:
         return {"name": "deploy", "kind": "argv", "resource": "deploy:argv", "argv": argv,
-                "cwd": _resolve_cwd(plan_dir, None), "env_allowlist": ps.get("env_allowlist", []),
+                "cwd": _resolve_cwd(plan_dir, None, session_id),
+                "env_allowlist": ps.get("env_allowlist", []),
                 "timeout": _deploy_timeout(failure_mode), "failure_mode": failure_mode}
     target = ps.get("deploy", "none")
     if not target or target == "none":
@@ -179,7 +206,7 @@ def _resolve_deploy(plan_dir, ps):
                 "skill": t["skill"], "args": t.get("args", ""),
                 "probe_flags": t.get("probe_flags", []), "timeout": t.get("timeout", 1800)}
     return {"name": "deploy", "kind": "argv", "resource": f"deploy:{target}", "target": target,
-            "argv": t.get("argv", []), "cwd": _resolve_cwd(plan_dir, t.get("cwd")),
+            "argv": t.get("argv", []), "cwd": _resolve_cwd(plan_dir, t.get("cwd"), session_id),
             "env_allowlist": t.get("env_allowlist", []),
             "timeout": t.get("timeout", _deploy_timeout(failure_mode)),
             "failure_mode": t.get("command_failure_mode", failure_mode),
@@ -190,8 +217,27 @@ def _deploy_timeout(failure_mode):
     return 10 if failure_mode == "best-effort" else 1800
 
 
-def _resolve_cwd(plan_dir, cwd):
-    root = find_project_root(plan_dir)
+def _resolve_cwd(plan_dir, cwd, session_id=None):
+    # ISO-02: under plan isolation the root for a gate/deploy cwd is the tree
+    # THAT SESSION's work is actually in — the only one holding its commits.
+    # Rooted in the outer checkout, a `pre_deploy_gates` gate tests a tree the
+    # work never reached and passes without seeing it.
+    #
+    # `session_id` is what makes that true for the two nested cases, and passing
+    # it is the whole point: `plan_cwd` resolves a group MEMBER to its own
+    # worktree and a group's INTEGRATION session to the tree `merge_group`
+    # merged into — neither of which is the plan worktree. Resolved without it
+    # (as this did until 2026-08-22) an integration session's pre_deploy gate
+    # ran in the plan worktree, which never received the merge, while
+    # `verify.gate_cwd` — passing session_id — ran the SAME registry entry in
+    # the merge target. Same id, two trees, and the gate that saw neither the
+    # merge nor the members passed anyway.
+    #
+    # A plan that CLAIMS a worktree which is gone refuses (`require_live`)
+    # instead of silently degrading to the shared tree; compute_steps and
+    # compute_gates translate that refusal into `plan-worktree-missing`.
+    pscope.require_live(plan_dir)
+    root = Path(pscope.plan_cwd(plan_dir, session_id) or find_project_root(plan_dir))
     if not cwd or cwd == ".":
         return str(root)
     p = Path(cwd)
@@ -286,24 +332,6 @@ def _persist_state(plan_dir, session_id, state):
         rsi.log_event(plan_dir, "shipping_badge_failed", session_ids=[session_id], error=str(e))
 
 
-def shipping_badge(state):
-    """Human-facing badge: committed/pushed/PR-open/deployed, or
-    SHIP-FAILED@<step> / SHIP-PENDING / ship-skipped."""
-    steps = state.get("steps", {})
-    for name, st in steps.items():
-        if st == STEP_FAILED:
-            return f"SHIP-FAILED@{name}"
-    for name, label in (("deploy", "deployed"), ("pr", "PR-open"),
-                        ("push", "pushed"), ("commit", "committed")):
-        if steps.get(name) == STEP_DONE:
-            return label
-    if any(st == STEP_RUNNING for st in steps.values()):
-        return "SHIP-PENDING"
-    if steps and all(st == STEP_SKIPPED for st in steps.values()):
-        return "ship-skipped"
-    return "ship-pending"
-
-
 def _first_unfinished(state):
     for name in state["declared_steps"]:
         if state["steps"].get(name) not in (STEP_DONE, STEP_SKIPPED):
@@ -318,16 +346,31 @@ def _all_done(state):
 # --------------------------------------------------------------------------
 # ship-begin (Steps 0-3)
 # --------------------------------------------------------------------------
-def ship_begin(plan_dir, session_id, *, dry_run=False, resume=False, confirm_stale=False):
-    manifest = mio.load_manifest(plan_dir)
-    ps = _resolved_post_session(manifest, session_id)
-    if not ps or (ps.get("git", "none") == "none" and not ps.get("pre_deploy_gates")
-                  and not _resolve_deploy_present(ps)):
-        return {"action": "noop", "session": session_id}
+def _resume_ship_state(state, cur_manifest, cur_closeout, plan_dir, session_id,
+                       dry_run, acquired):
+    """Recorded shipping state, judged for resume.
 
-    co = cp.load_closeout(plan_dir, session_id)
-    result = co.get("result") if co else None
+    Returns an action dict when the run must stop here — the digests drifted, or
+    everything is already shipped — and None to carry on with the existing state.
+    """
+    if (state.get("manifest_digest") != cur_manifest
+            or state.get("closeout_digest") != cur_closeout):
+        return _fail(plan_dir, session_id, "state-drift",
+                     "manifest/closeout digest changed since shipping state was recorded; "
+                     "refusing to resume (a rebuilt plan must not skip as already-shipped)",
+                     dry_run, halt=True, locks=acquired)
+    if _all_done(state):
+        _release(plan_dir, acquired)
+        return {"action": "already-shipped", "session": session_id}
+    return None
 
+
+def _ship_deferral(plan_dir, manifest, session_id, ps, result, resume, dry_run):
+    """The two reasons shipping stands down before it starts, or None to proceed.
+
+    A pending checkpoint always outranks shipping, and skip_if_partial skips the
+    whole session when the work is not DONE.
+    """
     # Step 0 — checkpoint precedence (always outranks shipping).
     cp_reason = checkpoint_pending(manifest, session_id, plan_dir)
     if cp_reason and not resume:
@@ -342,6 +385,34 @@ def ship_begin(plan_dir, session_id, *, dry_run=False, resume=False, confirm_sta
             rsi.log_event(plan_dir, "post_session_skipped", session_ids=[session_id],
                           reason="skip-if-partial")
         return {"action": "skipped", "session": session_id, "reason": "skip-if-partial"}
+    return None
+
+
+def _lease_budget(steps):
+    """``{resource: longest step timeout it guards}`` — in declared order, so the
+    acquire order stays deterministic. The lease duration is derived from this
+    (ship_state_io.LEASE_RATIONALE): nothing renews a lease while the guarded
+    skill runs, because run.py has exited by then."""
+    budget = {}
+    for s in steps:
+        res = s["resource"]
+        budget[res] = max(budget.get(res, 0), s.get("timeout") or 0)
+    return budget
+
+
+def ship_begin(plan_dir, session_id, *, dry_run=False, resume=False, confirm_stale=False):
+    manifest = mio.load_manifest(plan_dir)
+    ps = _resolved_post_session(manifest, session_id)
+    if not ps or (ps.get("git", "none") == "none" and not ps.get("pre_deploy_gates")
+                  and not _resolve_deploy_present(ps)):
+        return {"action": "noop", "session": session_id}
+
+    co = cp.load_closeout(plan_dir, session_id)
+    result = co.get("result") if co else None
+
+    deferral = _ship_deferral(plan_dir, manifest, session_id, ps, result, resume, dry_run)
+    if deferral is not None:
+        return deferral
 
     try:
         steps = compute_steps(plan_dir, manifest, session_id)
@@ -353,11 +424,11 @@ def ship_begin(plan_dir, session_id, *, dry_run=False, resume=False, confirm_sta
         return {"action": "dry-run", "session": session_id, "result": result,
                 "steps": [_describe(s) for s in steps]}
 
-    # Step 1 — acquire locks FIRST (before the idempotency read; closes TOCTOU).
+    # Step 1 — acquire leases FIRST (before the idempotency read; closes TOCTOU).
     acquired = []
     try:
-        for res in dict.fromkeys(s["resource"] for s in steps):
-            ssio.acquire_ship_lock(plan_dir, res)
+        for res, guarded in _lease_budget(steps).items():
+            ssio.acquire_ship_lock(plan_dir, res, guarded_timeout=guarded)
             acquired.append(res)
     except rsi.LockError as e:
         _release(plan_dir, acquired)
@@ -372,15 +443,10 @@ def ship_begin(plan_dir, session_id, *, dry_run=False, resume=False, confirm_sta
     cur_manifest = mio.manifest_digest(plan_dir)
     cur_closeout = _current_closeout_digest(plan_dir, session_id)
     if state is not None:
-        if (state.get("manifest_digest") != cur_manifest
-                or state.get("closeout_digest") != cur_closeout):
-            return _fail(plan_dir, session_id, "state-drift",
-                         "manifest/closeout digest changed since shipping state was recorded; "
-                         "refusing to resume (a rebuilt plan must not skip as already-shipped)",
-                         dry_run, halt=True, locks=acquired)
-        if _all_done(state):
-            _release(plan_dir, acquired)
-            return {"action": "already-shipped", "session": session_id}
+        early = _resume_ship_state(state, cur_manifest, cur_closeout,
+                                   plan_dir, session_id, dry_run, acquired)
+        if early is not None:
+            return early
     else:
         state = _new_state(plan_dir, manifest, session_id, steps, ps, result)
         _persist_state(plan_dir, session_id, state)
@@ -452,9 +518,23 @@ def _advance(plan_dir, session_id, steps, state):
     if step["kind"] == "skill":
         state["steps"][nxt] = STEP_RUNNING
         _persist_state(plan_dir, session_id, state)
-        return {"action": "invoke-skill", "session": session_id, "step": nxt, "kind": "skill",
-                "skill": step["skill"], "args": step.get("args", ""), "timeout": step.get("timeout")}
-    return {"action": "run-argv", "session": session_id, "step": nxt, "kind": "argv"}
+        out = {"action": "invoke-skill", "session": session_id, "step": nxt, "kind": "skill",
+               "skill": step["skill"], "args": step.get("args", ""),
+               "timeout": step.get("timeout")}
+        out.update(_lease_fields(plan_dir, step))
+        return out
+    return {"action": "run-argv", "session": session_id, "step": nxt, "kind": "argv",
+            **_lease_fields(plan_dir, step)}
+
+
+def _lease_fields(plan_dir, step):
+    """The lease this directive runs under, echoed to the orchestrator so it can
+    hand the token straight back on ``ship-record --lease-token``. The skill
+    itself (e.g. /commit-orchestrate) needs no knowledge of it: both ends of the
+    round trip are run.py, and ship-record re-verifies against run_state."""
+    lease = ssio.our_lease(plan_dir, step["resource"]) or {}
+    return {"resource": step["resource"], "lease_token": lease.get("token"),
+            "lease_expires_at": lease.get("expires_at")}
 
 
 def _reload(plan_dir, session_id):
@@ -463,14 +543,104 @@ def _reload(plan_dir, session_id):
         ssio.load_ship_state(plan_dir, session_id)
 
 
-def ship_record(plan_dir, session_id, step, status, result_file=None):
+_LEASE_OK = ("held", "unrecorded")
+
+
+def _reload_failed(plan_dir, session_id, e):
+    """Mid-loop step resolution failed — most concretely, the plan worktree
+    vanished BETWEEN ship-begin and this step. A traceback here would leave the
+    lease held with no halt recorded (the finding this fixes), so: release every
+    lease this plan holds (only ours — token-checked), then halt with the same
+    precise reason ship_begin gives. Resume goes back through ship-begin, which
+    re-acquires."""
+    ssio.release_all_ship_locks(plan_dir)
+    return _fail(plan_dir, session_id, getattr(e, "reason", "step-resolve-error"),
+                 str(e), False, halt=True)
+
+
+def _refuse_if_lease_lost(plan_dir, session_id, steps, step, lease_token=None):
+    """Re-verify the lease before recording a step, or refuse and park.
+
+    Completing a directive under a lease you no longer hold is the corruption the
+    lease exists to prevent: another plan took the repo over while /commit-
+    orchestrate was still running here, and recording ``done`` would write
+    "shipped" over a tree somebody else was moving. So a lost/expired lease
+    NEVER records an outcome — it halts with a decision brief and leaves the step
+    exactly as it was, for a human to judge."""
+    sd = _step_by_name(steps, step)
+    if sd is None:
+        return None
+    lease = ssio.lease_status(plan_dir, sd["resource"])
+    status = lease["status"]
+    if status == "unrecorded":
+        # A plan that began shipping before leases existed. The lock file is
+        # still exclusive; only the token round-trip is missing, so proceed —
+        # loudly, so the gap is visible in run.ndjson rather than assumed away.
+        rsi.log_event(plan_dir, "shipping_lease_unrecorded", session_ids=[session_id],
+                      step=step, resource=sd["resource"])
+        return None
+    if status == "held" and lease_token and lease_token != lease.get("our_token"):
+        status = "token-mismatch"
+    if status in _LEASE_OK:
+        return None
+    return _park_lease_lost(plan_dir, session_id, step, lease, status)
+
+
+def _park_lease_lost(plan_dir, session_id, step, lease, status):
+    holder = lease.get("holder") or {}
+    why = {
+        "taken-over": (f"another plan took this lease over after it expired "
+                       f"(now held by {holder.get('plan_dir')} on {holder.get('host')})"),
+        "expired": (f"this lease expired at {lease.get('expires_at')} while the step was "
+                    f"running, so any other plan was free to take the repo"),
+        "vanished": f"the lock file {lease.get('lock_file')} is gone — someone removed it",
+        "token-mismatch": ("the token on this directive is not the lease this plan holds — "
+                           "the directive being recorded is not the one that is in flight"),
+    }[status]
+    message = (f"refusing to record {step!r}: {why}. The step is left untouched; nothing "
+               f"was marked shipped.")
+    brief = {
+        "situation": (f"Session {session_id} finished the {step!r} step, but this plan no "
+                      f"longer holds the {lease['resource']} lease: {why}."),
+        "options": [
+            "Check the repository state by hand (git log/status), then re-run "
+            "`run.py ship-begin --resume` to re-take the lease and redo the step.",
+            "If the other plan's work already landed what this step would have done, "
+            "clear the halt and mark this session's shipping complete deliberately.",
+            "Raise the lease duration for this resource if the operation legitimately "
+            "needs longer than its lease (ship_state_io.LEASE_* constants).",
+        ],
+        "recommendation": ("Look at git log first. Two plans may have written the same "
+                           "checkout while this lease was expired, and only the repository "
+                           "itself can say what actually landed."),
+    }
+    detail = "\n".join([brief["situation"], "", "Options:",
+                        *(f"  {i}. {o}" for i, o in enumerate(brief["options"], 1)),
+                        "", f"Recommendation: {brief['recommendation']}"])
+    rsi.log_event(plan_dir, "shipping_lease_lost", session_ids=[session_id], step=step,
+                  resource=lease["resource"], lease_status=status,
+                  holder_plan=holder.get("plan_dir"), holder_token=holder.get("token"))
+    rsi.set_halt(plan_dir, f"{session_id}: shipping lease lost at {step} ({status})",
+                 session_id, detail=detail)
+    return {"action": "failed", "session": session_id, "reason": "lease-lost",
+            "lease_status": status, "step": step, "resource": lease["resource"],
+            "message": message, "decision_brief": brief, "resumable": True}
+
+
+def ship_record(plan_dir, session_id, step, status, result_file=None, lease_token=None):
     """Record a SKILL step's outcome (orchestrator already invoked it)."""
-    _manifest, steps, state = _reload(plan_dir, session_id)
+    try:
+        _manifest, steps, state = _reload(plan_dir, session_id)
+    except (StepResolveError, adapter.AdapterError) as e:
+        return _reload_failed(plan_dir, session_id, e)
     if state is None:
         return _fail(plan_dir, session_id, "no-shipping-state",
                      "ship-record with no shipping state", False, halt=True)
+    refusal = _refuse_if_lease_lost(plan_dir, session_id, steps, step, lease_token)
+    if refusal is not None:
+        return refusal
     if status == "done":
-        state["steps"][step] = STEP_DONE
+        mark_done(state, step)
         _persist_state(plan_dir, session_id, state)
         return _post_step(plan_dir, session_id, steps, state)
     excerpt = ""
@@ -481,7 +651,10 @@ def ship_record(plan_dir, session_id, step, status, result_file=None):
 
 def ship_run_argv(plan_dir, session_id, step):
     """Run an ARGV step here (deploy_argv / argv registry target or gate)."""
-    _manifest, steps, state = _reload(plan_dir, session_id)
+    try:
+        _manifest, steps, state = _reload(plan_dir, session_id)
+    except (StepResolveError, adapter.AdapterError) as e:
+        return _reload_failed(plan_dir, session_id, e)
     if state is None:
         return _fail(plan_dir, session_id, "no-shipping-state",
                      "ship-run with no shipping state", False, halt=True)
@@ -489,6 +662,9 @@ def ship_run_argv(plan_dir, session_id, step):
     if sd is None or sd["kind"] != "argv":
         return _fail(plan_dir, session_id, "not-argv-step", f"{step!r} is not an argv step",
                      False, halt=True)
+    refusal = _refuse_if_lease_lost(plan_dir, session_id, steps, step)
+    if refusal is not None:
+        return refusal
 
     state["steps"][step] = STEP_RUNNING
     _persist_state(plan_dir, session_id, state)
@@ -503,12 +679,14 @@ def ship_run_argv(plan_dir, session_id, step):
                                    timeout=sd.get("timeout", 1800))
 
     failure_mode = sd.get("failure_mode", "fail-halt")
-    ok = (res.get("returncode") == 0) or failure_mode == "best-effort"
+    miss = gx.gate_miss(sd, res)
+    ok = (res.get("returncode") == 0 and miss is None) or failure_mode == "best-effort"
     if ok:
-        state["steps"][step] = STEP_DONE
+        mark_done(state, step)
         _persist_state(plan_dir, session_id, state)
         return _post_step(plan_dir, session_id, steps, state)
-    excerpt = adapter.redact((res.get("stderr") or "") + "\n" + (res.get("stdout") or ""))
+    excerpt = gx.expect_excerpt(step, miss, adapter.redact(
+        (res.get("stderr") or "") + "\n" + (res.get("stdout") or "")))
     return _record_failure(plan_dir, session_id, state, step, excerpt)
 
 
@@ -617,43 +795,5 @@ def ship_simulate(plan_dir, session_id):
     return out
 
 
-# --------------------------------------------------------------------------
-# Aggregate shipping summary (monitoring — Q10 monitoring_blind_spot mitigation).
-# Surfaced by `run.py status` so a silent skip/halt is visible in the default
-# output, not only in retrospective run.ndjson archaeology.
-# --------------------------------------------------------------------------
-def shipping_summary(plan_dir, manifest, *, tail=8):
-    sessions = {}
-    for s in manifest.get("sessions", []):
-        if not s.get("post_session"):
-            continue
-        sid = s["id"]
-        try:
-            state = ssio.load_ship_state(plan_dir, sid)
-        except ssio.ShipStateError:
-            sessions[sid] = "STATE-CORRUPT"
-            continue
-        sessions[sid] = shipping_badge(state) if state else "ship-pending"
-    if not sessions:
-        return None
-    return {"sessions": sessions, "recent_events": _recent_shipping_events(plan_dir, tail)}
-
-
-def _recent_shipping_events(plan_dir, tail):
-    p = Path(plan_dir) / "run.ndjson"
-    if not p.exists():
-        return []
-    out = []
-    for line in p.read_text().splitlines():
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if str(rec.get("event", "")).startswith("post_session_"):
-            ev = {"event": rec["event"], "ts": rec.get("ts"),
-                  "session": (rec.get("session_ids") or [None])[0]}
-            for k in ("reason", "failed_step", "declared_steps"):
-                if k in rec:
-                    ev[k] = rec[k]
-            out.append(ev)
-    return out[-tail:]
+# `shipping_summary` (the aggregate monitoring readout) lives in ship_badges.py
+# and is re-exported above.

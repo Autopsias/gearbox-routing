@@ -103,6 +103,23 @@ def test_m2a_missing_touches_fails_closed():
     assert "i1" in refusals[0]
 
 
+def test_m2a_explicit_empty_list_declares_no_writes():
+    """KNOWN NEGATIVE. v8 documents `touches: []` for an item that writes
+    nothing; that is a declaration, not an absence, so M2a must pass it."""
+    doc = _valid_group()
+    doc["items"][0]["touches"] = []
+    refusals, _ = pc.check(doc, schema_version=V3)
+    assert "M2a" not in _ids(refusals), refusals
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_m2a_null_or_blank_touches_still_fails_closed(value):
+    doc = _valid_group()
+    doc["items"][0]["touches"] = value
+    refusals, _ = pc.check(doc, schema_version=V3)
+    assert "M2a" in _ids(refusals), refusals
+
+
 def test_m5_overlapping_writes_refused_on_shared_tree():
     doc = _valid_group()
     doc["items"][1]["touches"] = "src/alpha.py"
@@ -498,6 +515,11 @@ def _reset(m):
     for s in m["sessions"]:
         if s["id"] in ("s02", "s03"):
             (s.get("post_session") or {}).pop("git", None)
+
+
+def test_touch_paths_accepts_a_list_and_a_string():
+    assert pc._touch_paths(["a/b.py", "c.py"]) == ["a/b.py", "c.py"]
+    assert pc._touch_paths("a/b.py, tests") == ["a/b.py", "tests"]
 
 
 if __name__ == "__main__":

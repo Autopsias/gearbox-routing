@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cross-family review findings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "reviewed", "findings"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FINDINGS"],
+      "description": "PASS only when findings is empty."
+    },
+    "reviewed": {
+      "type": "array",
+      "description": "Every path you actually read, verbatim as the prompt listed it. The gate compares this against the list it prepared; a shortfall fails the run.",
+      "items": {"type": "string"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "line", "severity", "title", "why"],
+        "properties": {
+          "file": {"type": "string"},
+          "line": {"type": "integer"},
+          "severity": {
+            "type": "string",
+            "enum": ["blocker", "critical", "high", "medium", "low", "info"]
+          },
+          "title": {"type": "string", "description": "One short phrase naming the defect."},
+          "why": {"type": "string", "description": "The defect and its evidence, one or two sentences."}
+        }
+      }
+    }
+  }
+}

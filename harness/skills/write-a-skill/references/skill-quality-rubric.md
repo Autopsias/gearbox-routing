@@ -75,6 +75,10 @@ problem is never fixed by rewording the description — those are two separate c
 - **P1. Single source of truth.** No content duplicated across skills/commands; one owns it,
   others link. If a description cited by CLAUDE.md prose-routing tables or
   SKILL-UNIFICATION-ROUTING.md changes, update those surfaces in the SAME commit.
+  The environment is a source of truth too: a skill that copies a config value, a
+  script's `--help`, a file list or a directory of agents is a cache that goes stale.
+  Point at the lookup; copy only what the agent cannot find by looking (the reason, the
+  unwritten convention, the gotcha).
 - **P2. No sediment.** No time-sensitive claims, dated workarounds, or references to
   superseded flows presented as current.
 - **P3. Deletion test.** Every paragraph must change Claude's behavior if deleted; pure

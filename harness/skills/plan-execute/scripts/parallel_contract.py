@@ -1,7 +1,7 @@
 """Parallel-group manifest contract — the single shared checker.
 
-The contract itself: ``../references/parallel-group-contract.md`` (contract v1,
-FROZEN 2026-08-12 by plan session S06 / item PL-02). Read it before changing
+The contract itself: ``../references/parallel-group-contract.md`` (contract v2,
+amended 2026-08-15). Read it before changing
 anything here; this module is its implementation, not its source of truth. Rule
 IDs in the messages below (R1, M1, M2, M2a, M3, M5, §1, §3) are that document's.
 
@@ -65,9 +65,9 @@ ISOLATION_WORKTREE = "worktree"
 # False here REFUSES a worktree declaration rather than accepting it and silently
 # providing a shared tree — accepting an inert isolation flag would let a plan
 # believe it is protected when it is not, which is the exact failure the contract
-# was written to end. The Codex harness still refuses the declaration at dispatch
-# (run.py ``_isolation_prep``): it runs sessions serially in the shared tree and
-# creates no worktrees.
+# was written to end. Both Claude and Codex harnesses now route through the same
+# orchestrator-managed lifecycle; Codex starts each member command from its
+# returned worktree and keeps its prompt/receipt inside that checkout.
 ISOLATION_IMPLEMENTED = True
 
 # Contract M2 — closed list of dependency-manifest / lockfile basenames, matched
@@ -117,10 +117,12 @@ def _norm(path):
 
 
 def _touch_paths(raw):
-    """`touches` is a free-form string like "a/b.py, tests, pyproject.toml"."""
+    """`touches` is a free-form string like "a/b.py, tests, pyproject.toml", or
+    (schema v8) a list of paths."""
     if not raw:
         return []
-    return [_norm(p) for p in re.split(r"[,\n]", str(raw)) if p.strip()]
+    parts = [str(x) for x in raw] if isinstance(raw, (list, tuple)) else re.split(r"[,\n]", str(raw))
+    return [_norm(p) for p in parts if p.strip()]
 
 
 def _overlaps(a, b):
@@ -231,6 +233,147 @@ def _write_sets(members, touches_by_item):
     }
 
 
+def _check_group_integrator(integrators, isolated, member_ids, members, pg, refusals, warnings):
+    """The group's integration session: exactly one, and it must depend on every member."""
+    if not integrators:
+        msg = (
+            f"[§3] parallel_group {pg!r} has no session declaring "
+            f"dispatch.integrates_group={pg!r}. Its members are barred from shipping (M1), "
+            "so the group's work will not be committed by this plan"
+        )
+        if isolated:
+            # An isolated group MUST have one: nothing else merges the
+            # member branches, so without it the work is stranded on them.
+            refusals.append(f"{msg}, and nothing merges the member branches. "
+                            f"See {CONTRACT_DOC} §3.")
+        else:
+            # Shared tree: a plan that never commits is legitimate, so
+            # stranding it on a shipping rule it does not use would be worse
+            # than the defect this catches.
+            warnings.append(msg)
+    elif len(integrators) > 1:
+        refusals.append(
+            f"[§3] parallel_group {pg!r} has {len(integrators)} sessions declaring "
+            f"integrates_group={pg!r} ({sorted(s['id'] for s in integrators)}). Exactly one "
+            f"is allowed — two independent shippers is an error, not an ambiguity. "
+            f"See {CONTRACT_DOC} §3."
+        )
+    for integ in integrators:
+        deps = set(_dispatch(integ).get("depends_on") or [])
+        if integ["id"] in member_ids:
+            refusals.append(
+                f"[§3] session {integ['id']} is both a member of parallel_group {pg!r} and "
+                f"its integration session. See {CONTRACT_DOC} §3 rule 2."
+            )
+        elif not member_ids <= deps:
+            refusals.append(
+                f"[§3] integration session {integ['id']} does not depend on every member of "
+                f"parallel_group {pg!r}: missing {sorted(member_ids - deps)}. It would "
+                f"dispatch before they finish. See {CONTRACT_DOC} §3 rule 2."
+            )
+        union = frozenset().union(*(_gates(s) for s in members)) if members else frozenset()
+        if not union <= _gates(integ):
+            refusals.append(
+                f"[§3] integration session {integ['id']} does not re-run the full gate set "
+                f"for parallel_group {pg!r}: missing {sorted(union - _gates(integ))}. A clean "
+                "textual merge does not imply a working tree — a member renaming a symbol "
+                "and a peer adding a caller of the old name merge without complaint and are "
+                f"caught only here. See {CONTRACT_DOC} §3 rule 3."
+            )
+        if not _ships(integ):
+            warnings.append(
+                f"[§3] integration session {integ['id']} for parallel_group {pg!r} declares "
+                "no post_session.git action, and its members are barred from shipping (M1), "
+                "so the group's work will not be committed by this plan"
+            )
+
+
+def _check_parallel_group(all_sessions, members, pg, refusals, touches_by_item, warnings):
+    """Every rule for ONE parallel group: membership, file-disjointness,
+    the integrator, and the refusals a violation earns."""
+    ids = sorted(s["id"] for s in members)
+    member_ids = set(ids)
+    refusals += _isolation_problems(pg, members)
+    isolated = _isolated(members)
+
+    for s in members:
+        if _ships(s):
+            refusals.append(
+                f"[M1] session {s['id']} is a member of parallel_group {pg!r} and declares "
+                f"post_session.git={(s.get('post_session') or {}).get('git')!r}. Concurrent "
+                "committers race on .git/index.lock, and on a shared tree a commit made "
+                "mid-flight captures a peer's half-written state. Shipping belongs to the "
+                f"group's integration session (dispatch.integrates_group={pg!r}). "
+                f"See {CONTRACT_DOC} §2 M1."
+            )
+        for item_id in s.get("items") or []:
+            raw = touches_by_item.get(item_id)
+            # M2a — FAIL CLOSED. Measured at freeze time: 307 manifest items
+            # across this repo's plans, 0 carrying `touches` (the builder did
+            # not then copy the field into manifest.json; it now does, via
+            # plan-builder's `manifest_touches`), against 177 spec items
+            # that declare it. A gate keyed on an absent field returns
+            # "clean" on every plan ever built — worse than no gate. So a
+            # member item with no `touches` is a REFUSAL, never a skip.
+            # The one exception is an explicit empty list `[]` (schema v8):
+            # a declaration that the item writes nothing, so it cannot hit
+            # M2 or M5 and is skipped. Missing, None, "" or blank still refuse.
+            if isinstance(raw, list) and len(raw) == 0:
+                continue
+            if not (raw and str(raw).strip()):
+                refusals.append(
+                    f"[M2a] session {s['id']} is a member of parallel_group {pg!r} and owns "
+                    f"item {item_id}, which declares no `touches`. M2 (dependency/lockfile "
+                    "ban) and M5 (overlapping writes) are both computed from that field, so "
+                    "without it BOTH tree-protecting rules are silently inert. Declare what "
+                    "the item writes, or take the session out of the group. "
+                    f"See {CONTRACT_DOC} §2 M2a."
+                )
+                continue
+            hits = dependency_hits(raw)
+            if hits:
+                refusals.append(
+                    f"[M2] session {s['id']} (member of parallel_group {pg!r}) owns item "
+                    f"{item_id}, whose touches names {', '.join(hits)}. Two members each "
+                    "running an install regenerate the whole lockfile and conflict on nearly "
+                    "every line, and an agent 'resolving' that silently drops dependencies. "
+                    "Move the dependency change out of the group, or narrow touches to what "
+                    f"the session actually writes. See {CONTRACT_DOC} §2 M2."
+                )
+
+    # M5 — overlapping writes. Corruption on a shared tree; on an isolated
+    # group it is a MERGE COST (S02 measured a planted conflict failing
+    # loudly), so it is reported as a quantified warning instead.
+    writes = _write_sets(members, touches_by_item)
+    for i, a in enumerate(ids):
+        for b in ids[i + 1:]:
+            shared = sorted({x for x in writes[a] for y in writes[b] if _overlaps(x, y)})
+            if not shared:
+                continue
+            if isolated:
+                warnings.append(
+                    f"[M5] parallel_group {pg!r}: {a} and {b} both declare writes under "
+                    f"{', '.join(shared)}. Isolated, so this is a MERGE COST, not "
+                    "corruption — the integration session will have to reconcile it"
+                )
+            else:
+                refusals.append(
+                    f"[M5] parallel_group {pg!r} is NOT isolated and members {a} and {b} both "
+                    f"declare writes under {', '.join(shared)}. Interleaved writes to one "
+                    "file in one working tree corrupt both members' work and nothing "
+                    "downstream can reconstruct it. Give the group "
+                    f"dispatch.isolation={ISOLATION_WORKTREE!r}, split the file, or run the "
+                    f"two sessions serially. See {CONTRACT_DOC} §2 M5."
+                )
+
+    # §3 — the integration session is DECLARED, never derived. Derivation was
+    # tried and rejected in review: it cannot be evaluated without already
+    # knowing the answer, admits two qualifying sessions with no tie-break,
+    # and silently conscripts any capstone that depends on everything.
+    integrators = [s for s in all_sessions if _dispatch(s).get("integrates_group") == pg]
+    _check_group_integrator(integrators, isolated, member_ids, members, pg, refusals, warnings)
+
+
 def check(doc, *, schema_version):
     """Return ``(refusals, warnings)`` — both lists of display strings.
 
@@ -272,131 +415,7 @@ def check(doc, *, schema_version):
     all_sessions = doc.get("sessions") or []
 
     for pg, members in sorted(grouped.items()):
-        ids = sorted(s["id"] for s in members)
-        member_ids = set(ids)
-        refusals += _isolation_problems(pg, members)
-        isolated = _isolated(members)
-
-        for s in members:
-            if _ships(s):
-                refusals.append(
-                    f"[M1] session {s['id']} is a member of parallel_group {pg!r} and declares "
-                    f"post_session.git={(s.get('post_session') or {}).get('git')!r}. Concurrent "
-                    "committers race on .git/index.lock, and on a shared tree a commit made "
-                    "mid-flight captures a peer's half-written state. Shipping belongs to the "
-                    f"group's integration session (dispatch.integrates_group={pg!r}). "
-                    f"See {CONTRACT_DOC} §2 M1."
-                )
-            for item_id in s.get("items") or []:
-                raw = touches_by_item.get(item_id)
-                # M2a — FAIL CLOSED. Measured at freeze time: 307 manifest items
-                # across this repo's plans, 0 carrying `touches` (the builder did
-                # not copy the field into manifest.json), against 177 spec items
-                # that declare it. A gate keyed on an absent field returns
-                # "clean" on every plan ever built — worse than no gate. So a
-                # member item with no `touches` is a REFUSAL, never a skip.
-                if not (raw and str(raw).strip()):
-                    refusals.append(
-                        f"[M2a] session {s['id']} is a member of parallel_group {pg!r} and owns "
-                        f"item {item_id}, which declares no `touches`. M2 (dependency/lockfile "
-                        "ban) and M5 (overlapping writes) are both computed from that field, so "
-                        "without it BOTH tree-protecting rules are silently inert. Declare what "
-                        "the item writes, or take the session out of the group. "
-                        f"See {CONTRACT_DOC} §2 M2a."
-                    )
-                    continue
-                hits = dependency_hits(raw)
-                if hits:
-                    refusals.append(
-                        f"[M2] session {s['id']} (member of parallel_group {pg!r}) owns item "
-                        f"{item_id}, whose touches names {', '.join(hits)}. Two members each "
-                        "running an install regenerate the whole lockfile and conflict on nearly "
-                        "every line, and an agent 'resolving' that silently drops dependencies. "
-                        "Move the dependency change out of the group, or narrow touches to what "
-                        f"the session actually writes. See {CONTRACT_DOC} §2 M2."
-                    )
-
-        # M5 — overlapping writes. Corruption on a shared tree; on an isolated
-        # group it is a MERGE COST (S02 measured a planted conflict failing
-        # loudly), so it is reported as a quantified warning instead.
-        writes = _write_sets(members, touches_by_item)
-        for i, a in enumerate(ids):
-            for b in ids[i + 1:]:
-                shared = sorted({x for x in writes[a] for y in writes[b] if _overlaps(x, y)})
-                if not shared:
-                    continue
-                if isolated:
-                    warnings.append(
-                        f"[M5] parallel_group {pg!r}: {a} and {b} both declare writes under "
-                        f"{', '.join(shared)}. Isolated, so this is a MERGE COST, not "
-                        "corruption — the integration session will have to reconcile it"
-                    )
-                else:
-                    refusals.append(
-                        f"[M5] parallel_group {pg!r} is NOT isolated and members {a} and {b} both "
-                        f"declare writes under {', '.join(shared)}. Interleaved writes to one "
-                        "file in one working tree corrupt both members' work and nothing "
-                        "downstream can reconstruct it. Give the group "
-                        f"dispatch.isolation={ISOLATION_WORKTREE!r}, split the file, or run the "
-                        f"two sessions serially. See {CONTRACT_DOC} §2 M5."
-                    )
-
-        # §3 — the integration session is DECLARED, never derived. Derivation was
-        # tried and rejected in review: it cannot be evaluated without already
-        # knowing the answer, admits two qualifying sessions with no tie-break,
-        # and silently conscripts any capstone that depends on everything.
-        integrators = [s for s in all_sessions if _dispatch(s).get("integrates_group") == pg]
-        if not integrators:
-            msg = (
-                f"[§3] parallel_group {pg!r} has no session declaring "
-                f"dispatch.integrates_group={pg!r}. Its members are barred from shipping (M1), "
-                "so the group's work will not be committed by this plan"
-            )
-            if isolated:
-                # An isolated group MUST have one: nothing else merges the
-                # member branches, so without it the work is stranded on them.
-                refusals.append(f"{msg}, and nothing merges the member branches. "
-                                f"See {CONTRACT_DOC} §3.")
-            else:
-                # Shared tree: a plan that never commits is legitimate, so
-                # stranding it on a shipping rule it does not use would be worse
-                # than the defect this catches.
-                warnings.append(msg)
-        elif len(integrators) > 1:
-            refusals.append(
-                f"[§3] parallel_group {pg!r} has {len(integrators)} sessions declaring "
-                f"integrates_group={pg!r} ({sorted(s['id'] for s in integrators)}). Exactly one "
-                f"is allowed — two independent shippers is an error, not an ambiguity. "
-                f"See {CONTRACT_DOC} §3."
-            )
-        for integ in integrators:
-            deps = set(_dispatch(integ).get("depends_on") or [])
-            if integ["id"] in member_ids:
-                refusals.append(
-                    f"[§3] session {integ['id']} is both a member of parallel_group {pg!r} and "
-                    f"its integration session. See {CONTRACT_DOC} §3 rule 2."
-                )
-            elif not member_ids <= deps:
-                refusals.append(
-                    f"[§3] integration session {integ['id']} does not depend on every member of "
-                    f"parallel_group {pg!r}: missing {sorted(member_ids - deps)}. It would "
-                    f"dispatch before they finish. See {CONTRACT_DOC} §3 rule 2."
-                )
-            union = frozenset().union(*(_gates(s) for s in members)) if members else frozenset()
-            if not union <= _gates(integ):
-                refusals.append(
-                    f"[§3] integration session {integ['id']} does not re-run the full gate set "
-                    f"for parallel_group {pg!r}: missing {sorted(union - _gates(integ))}. A clean "
-                    "textual merge does not imply a working tree — a member renaming a symbol "
-                    "and a peer adding a caller of the old name merge without complaint and are "
-                    f"caught only here. See {CONTRACT_DOC} §3 rule 3."
-                )
-            if not _ships(integ):
-                warnings.append(
-                    f"[§3] integration session {integ['id']} for parallel_group {pg!r} declares "
-                    "no post_session.git action, and its members are barred from shipping (M1), "
-                    "so the group's work will not be committed by this plan"
-                )
+        _check_parallel_group(all_sessions, members, pg, refusals, touches_by_item, warnings)
 
     return refusals, warnings
 

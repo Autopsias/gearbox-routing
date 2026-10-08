@@ -2,6 +2,7 @@
 name: nlm-skill
 description: "Expert guide for the NotebookLM CLI (`nlm`) and MCP server - interfaces for Google NotebookLM. Use this skill when users want to interact with NotebookLM programmatically, including: creating/managing notebooks, adding sources (URLs, YouTube, text, Google Drive), generating content (podcasts, reports, quizzes, flashcards, mind maps, slides, infographics, videos, data tables), conducting research, chatting with sources, or automating NotebookLM workflows. Triggers on mentions of \"nlm\", \"notebooklm\", \"notebook lm\", \"podcast generation\", \"audio overview\", or any NotebookLM-related automation task."
 version: "0.3.19"
+disable-model-invocation: true
 ---
 
 # NotebookLM CLI & MCP Expert
@@ -10,9 +11,9 @@ This skill provides comprehensive guidance for using NotebookLM via both the `nl
 
 If `nlm --version` reports a newer version than this doc's (0.3.19), prefer `nlm --ai` output over this file for exact flags.
 
-## Tool Detection (CRITICAL - Read First!)
+## Tool Detection
 
-**ALWAYS check which tools are available before proceeding:**
+Check which tools are available before you start:
 
 1. **Check for MCP tools**: Look for tools starting with `mcp__notebooklm-mcp__*` or `mcp_notebooklm_*`
 2. **If BOTH MCP tools AND CLI are available**: **ASK the user** which they prefer to use before proceeding

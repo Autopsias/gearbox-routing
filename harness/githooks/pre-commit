@@ -19,6 +19,51 @@ else
 fi
 
 # ============================================================================
+# Quality ratchet (file size + function length + complexity), staged mode.
+#
+# This repo AUTHORS the ratchet and vendors it to other projects
+# (scripts/quality/vendor_quality.py) but never ran it on itself: nothing local
+# or in CI blocked a file growing past its recorded baseline. That is exactly
+# how 2726 lines of size debt accumulated across 14 files unnoticed — measured
+# 2026-08-19, when the checkers were first pointed at this repo whole-project.
+#
+# --staged blocks only what THIS commit makes worse. Debt a commit merely
+# inherits warns and passes, so the gate is green from the day it lands and
+# still cannot be bypassed. Paying the debt down is separate work; this stops
+# the leak. Never `--no-verify` — see the note at the top of this file.
+#
+# check_complexity joined on 2026-08-19, for the same reason and after the same
+# omission: it is the third sibling checker, gearbox vendors it to other repos
+# and the CI template gearbox SHIPS runs it, but gearbox never ran it on itself.
+# 44 functions were over the bound when it was first pointed here.
+_ratchet_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes.py" ]]; then
+  for _check in check_file_sizes check_function_lengths check_complexity; do
+    if ! python3 "$_ratchet_root/scripts/quality/$_check.py" --staged --project "$_ratchet_root"; then
+      echo "" >&2
+      echo "COMMIT BLOCKED: $_check — this commit grows code past its bound." >&2
+      echo "Split the file or extract a helper. Re-record a baseline only when" >&2
+      echo "the growth is genuinely unavoidable (--generate-baseline)." >&2
+      exit 1
+    fi
+  done
+fi
+
+# ============================================================================
+# Codex global instructions freshness. codex/global-instructions.md is RENDERED
+# from CLAUDE.md + rules/*.md (Codex reads it via the ~/.codex/AGENTS.md symlink).
+# CI's path filter skips CLAUDE.md-only commits, so this is the one place a stale
+# render is caught before it ships. Checks the working tree, not the index; the
+# routing guard below already refuses a partially staged CLAUDE.md.
+if [[ -n "$_ratchet_root" ]] && git diff --cached --name-only \
+    | grep -qE '^(CLAUDE\.md|rules/[^/]+\.md|codex/global-instructions\.md|scripts/render-codex-instructions\.py)$'; then
+  if ! python3 "$_ratchet_root/scripts/render-codex-instructions.py" --check; then
+    echo "COMMIT BLOCKED: the Codex render is stale (see the line above)." >&2
+    exit 1
+  fi
+fi
+
+# ============================================================================
 # Routing drift guard (s02, GRD-01/model-effort-routing-2026-07-02). Fires on
 # EVERY ~/.claude commit, running verify-routing.sh's BARE/DEFAULT mode — today
 # that's --core; when s04 flips DEFAULT_MODE inside verify-routing.sh to "full",

@@ -1,7 +1,7 @@
 ---
 description: "Dual-model adversarial review. Claude (Opus) and Codex independently review from complementary perspectives, then Claude synthesizes unified findings. If a plan is in context, automatically produces a hardened revision, then loops with Codex (read-only, capped) until it verifies the fixes actually land. Use for deep dual-model code/plan review, or when routed here via /review --deep."
 argument-hint: "[optional free-text hint to narrow scope] [--background] [--synthesize]"
-allowed-tools: ["Read", "Write", "Edit", "Grep", "Glob", "Bash", "Skill", "EnterPlanMode", "ExitPlanMode", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "mcp__perplexity-ask__perplexity_ask", "mcp__exa__web_search_exa", "mcp__exa__deep_researcher_start", "mcp__exa__deep_researcher_check", "mcp__ref__ref_search_documentation", "mcp__ref__ref_read_url", "mcp__grep__searchGitHub"]
+allowed-tools: ["Read", "Write", "Edit", "Grep", "Glob", "Bash", "Skill", "EnterPlanMode", "ExitPlanMode", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "mcp__perplexity-ask__perplexity_ask", "mcp__exa__web_search_exa", "mcp__exa__agent_run", "mcp__ref__ref_search_documentation", "mcp__ref__ref_read_url", "mcp__grep__searchGitHub"]
 ---
 
 # Adversarial Review (Dual-Model: Claude + Codex)
@@ -21,7 +21,7 @@ Use `TaskCreate` to enumerate PHASE 1, 2a-2d, and 3a-3e as trackable tasks so pr
 This is the **canonical DEEP review front door**. The fast/diff counterpart is the
 native `/code-review` skill. All other review entry points were collapsed into these two
 (`~/.claude/SKILL-UNIFICATION-ROUTING.md`). Typed aliases that route here:
-`/review --deep`, `/bmad-code-review`, `/bmad-review-adversarial-general`.
+`/review --deep`, `/bmad-bmm-code-review`, `/bmad-review-adversarial-general`.
 
 ### Specialized hunter sub-agents (workers of this reviewer)
 
@@ -78,6 +78,19 @@ Search for a plan in this priority order:
 ### 1c: Select Codex entry point (MANDATORY -- decide here, execute in Phase 2c)
 
 **CRITICAL: This decision is final. Do NOT try one entry point and then fall back to another. Pick the correct one now.**
+
+**One version preflight, before the decision applies.** Run `codex --version`.
+The `adversarial-review` subcommand accepts `--model` (`-m`; codex-companion.mjs
+`handleReviewCommand` valueOptions) but its usage line does not show it; left
+unset, it asks for the `~/.codex/config.toml` model. On a CLI older than that
+model it fails HTTP 400 — worded either "requires a newer version of Codex"
+(2026-09-05, codex-cli 0.147.0) or, misleadingly, "not supported when using
+Codex with a ChatGPT account" (2026-10-01, `gpt-6.1-sol` on 0.158.0; OK on
+0.159.3). When the preflight or the first call fails that way, rerun
+`adversarial-review` with `--model gpt-6.1-sol` (the pin the other Codex calls
+below use), say so in the report, and tell the operator the fix:
+`npm install -g @openai/codex@latest`. An entry-point failure is a version
+signal, never a reason to run Claude alone.
 
 The Codex companion CLI has two relevant subcommands:
 - **`adversarial-review`** -- ONLY reviews git diffs (working tree or branch deltas). It ignores stdin, ignores piped content. It calls `resolveReviewTarget()` which reads git state. If the working tree is clean, it finds nothing useful.
@@ -166,12 +179,11 @@ In **one orchestrator message**, issue these two tool calls in parallel:
 
 Spawn a fork whose prompt:
 - Inlines the full `REVIEW_CONTENT` so the prompt is self-contained
-- Contains the literal word **ultrathink** so the fork uses extended reasoning
 - Specifies the architecture/intent/operations lenses (see "Claude review specification" below)
 - Mandates writing the artifact to `/tmp/adversarial-review-{REVIEW_TIMESTAMP}-claude.md` in the exact format specified
-- Ends with: *"Before reporting completion, verify the artifact exists with `ls -la` and is >=500 bytes. Reply in under 150 words with just: artifact path, size, and finding count."*
+- Ends with: *"Before reporting completion, verify the artifact exists with `ls -la` and is >=500 bytes. Reply with only: artifact path, size, and finding count."*
 
-The fork inherits the orchestrator's prompt cache (so marginal cost is just the review work) and keeps its ultrathink reasoning tokens out of the orchestrator's synthesis context.
+The fork inherits the orchestrator's prompt cache (so marginal cost is just the review work) and keeps its reasoning tokens out of the orchestrator's synthesis context.
 
 #### 2. Background Bash for Codex
 
@@ -189,7 +201,7 @@ Bash({
 **If `CODEX_ENTRY_POINT = "task"` (plans, documents, any non-diff content) — USE THE SUPERVISED RUNNER:**
 ```typescript
 Bash({
-  command: `python3 "$HOME/.claude/scripts/codex_supervised.py" --prompt-file /tmp/adversarial-review-input.md --out /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.md --effort xhigh --idle-timeout 600 --max-attempts 3 --total-deadline 5400 > /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.status.json 2>&1`,
+  command: `python3 "$HOME/.claude/scripts/codex_supervised.py" --prompt-file /tmp/adversarial-review-input.md --out /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.md --model gpt-6.1-sol --effort medium --idle-timeout 600 --max-attempts 3 --total-deadline 5400 > /tmp/adversarial-review-{REVIEW_TIMESTAMP}-codex.status.json 2>&1`,
   description: "Codex adversarial review (parallel, supervised)",
   run_in_background: true
 })
@@ -327,7 +339,7 @@ Before advancing to Phase 2d, verify:
 
 ## PHASE 2d: Dual-Model Synthesis
 
-Read both sealed artifacts. Use extended thinking (ultrathink MANDATORY).
+Read both sealed artifacts.
 
 ### Step 1: Extract findings
 
@@ -457,7 +469,7 @@ If the gate is not met, STOP. Do not mention Phase 3. Do not ask about plan revi
 
 **If the gate IS met, proceed AUTOMATICALLY. Do not ask the user for permission. The automatic flow is the entire point of this command.** No plan was detected in a code-diff-only review (the common path) — skip straight past this phase to the Rules section below.
 
-**When the gate IS met**, `Read ~/.claude/commands/references/adversarial-review/plan-revision-and-verify-loop.md` for the full Phase 3 procedure: 3a deep analysis, 3b producing the `[HARDENED]`-tagged revision, 3c applying it, 3d the default Codex verify loop (rounds 1-3, convergence gate, deadlock handling), and 3e the completion output block. Execute that file's steps in order; it is the complete phase body, not optional background reading.
+**When the gate IS met**, `Read ~/.claude/references/adversarial-review/plan-revision-and-verify-loop.md` for the full Phase 3 procedure: 3a deep analysis, 3b producing the `[HARDENED]`-tagged revision, 3c applying it, 3d the default Codex verify loop (rounds 1-3, convergence gate, deadlock handling), and 3e the completion output block. Execute that file's steps in order; it is the complete phase body, not optional background reading.
 
 ## Rules
 
@@ -476,10 +488,17 @@ If the gate is not met, STOP. Do not mention Phase 3. Do not ask about plan revi
 13. **Attribution mandatory.** Every finding in the synthesis shows source model(s) and confidence.
 14. **`--background` runs Claude review immediately; only Codex and synthesis are deferred.** Use `--synthesize` to complete.
 15. **Prefer unique findings over false consensus.** When matching is ambiguous, classify as unique.
-16. **Verify loop is default, not optional — and rounds 1–2 always run, round 3 is earned.** After hardening a plan, the SAME Codex thread (at `--effort xhigh`) re-reviews it via `task --resume-last` until it confirms its own fixes, converges to minor-only findings after round 2 (the convergence gate — round 3 skipped), or hits the 3-round cap (deadlock). No flag enables this -- it runs whenever a plan was hardened and Codex was available (foreground, non-`--synthesize` path).
+16. **Verify loop is default, not optional — and rounds 1–2 always run, round 3 is earned.**
+    Note the mechanism honestly: the loop PREFERS resuming the Phase-2 thread via the
+    companion's `--resume-last`, but `codex_supervised.py` (which Rule 21 mandates for these
+    calls) has no resume flag, so a round run through the supervised runner is a FRESH thread
+    carrying the restated findings ledger. Both are legitimate; the review log must say which
+    ran each round. Convergence is decided by the reviewer's own `## Convergence` answer, not
+    by the finding count — a large artifact can go quiet for a round and then yield a CRITICAL
+    inside the fix the loop ended on. After hardening a plan, the SAME Codex thread (at `gpt-6.1-sol` / `--effort medium`) re-reviews it via `task --resume-last` until it confirms its own fixes, converges to minor-only findings after round 2 (the convergence gate — round 3 skipped), or hits the 3-round cap (deadlock). No flag enables this -- it runs whenever a plan was hardened and Codex was available (foreground, non-`--synthesize` path).
 17. **Read-only every round; deadlock is honest; a blocked resume is not a round.** Verify-loop Codex calls never pass `--write` (the companion enforces a read-only sandbox without it). A `VERDICT: REVISE` at the round cap is reported as a DEADLOCK with its unresolved findings -- never silently upgraded to an approval. A missing or garbled verdict *from a genuine review* is read as REVISE. But a resume refused because a prior task is stuck (`still running` / `/codex:status`) is NOT a verdict at all -- never score it REVISE; fall back to a fresh reviewer thread per Phase 3d step 2 so the loop still gets a real second opinion.
 18. **Review log is the audit trail.** Every verify round is appended to `*-REVIEW-LOG.md` (round, verdict, resolved/unresolved, actions taken). It is the "why" record beside the plan's "what".
 19. **Never hardcode the plugin version in the companion path.** The codex cache dir is version-stamped (`…/openai-codex/codex/<ver>/scripts/codex-companion.mjs`) and keeps a single version, so a plugin update deletes the old path. Always resolve it at call time: `"$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)"` (never re-introduce a literal version anywhere in this file). `installed_plugins.json` is the source of truth for the currently-installed version — check it (`python3 -c "import json;print(json.load(open('$HOME/.claude/plugins/installed_plugins.json'))['plugins'].get('codex@openai-codex'))"`) if the glob ever returns nothing.
-21. **Long Codex calls run under the SUPERVISED runner (`scripts/codex_supervised.py`).** Rule 20's watchdog only fires if the ORCHESTRATOR is polling every turn -- and on 2026-07-26 the orchestrator's own Bash wrapper was killed, so nothing polled while two `xhigh` verify jobs hung for 28 and 20 minutes with `codex-companion status` still reporting `running`. `codex_supervised.py` closes that gap: it supervises the `--json` event stream IN-PROCESS, kills the process GROUP on `--idle-timeout` of zero growth, and RESUMES rather than restarts, bounded by `--max-attempts`/`--total-deadline`. Use it for Phase 2b (wired 2026-07-26 — that call is the longest the command makes) and every verify round. The `adversarial-review --wait` companion path for git diffs stays unsupervised because the companion builds that review itself; the watchdog still covers it. **Never respond to a stall by shrinking the prompt or lowering `--effort`** -- that degrades the review to dodge a transport bug (upstream openai/codex #31376: dead pooled connection, `stream_idle_timeout_ms` never fires), and it does not even help: the smallest prompt tried, 5 KB, hung too. Robustness comes from the supervisor; fidelity stays at `xhigh` with the full document inlined.
+21. **Long Codex calls run under the SUPERVISED runner (`scripts/codex_supervised.py`).** Rule 20's watchdog only fires if the ORCHESTRATOR is polling every turn -- and on 2026-07-26 the orchestrator's own Bash wrapper was killed, so nothing polled while two `xhigh` verify jobs hung for 28 and 20 minutes with `codex-companion status` still reporting `running`. `codex_supervised.py` closes that gap: it supervises the `--json` event stream IN-PROCESS, kills the process GROUP on `--idle-timeout` of zero growth, and RESUMES rather than restarts, bounded by `--max-attempts`/`--total-deadline`. Use it for Phase 2b (wired 2026-07-26 — that call is the longest the command makes) and every verify round. The `adversarial-review --wait` companion path for git diffs stays unsupervised because the companion builds that review itself; the watchdog still covers it. **Never respond to a stall by shrinking the prompt or lowering `--effort`** -- that degrades the review to dodge a transport bug (upstream openai/codex #31376: dead pooled connection, `stream_idle_timeout_ms` never fires), and it does not even help: the smallest prompt tried, 5 KB, hung too. Robustness comes from the supervisor, never from a weaker call. The standing pin is `--model gpt-6.1-sol --effort medium` (operator decision 2026-10-01: always the newest model; it replaced `gpt-6-astra`, the 2026-09-16 option-B pin) -- a deliberate default, not a stall response; this rule still forbids dropping BELOW it mid-run, and the full document stays inlined. Never switch these headless calls to Astra: `~/.claude/model-routing.yaml` flags it as interactive-only (its misalignment monitor can pause a tool-using run with nobody to answer). Never run these calls bare either -- the supervisor's `--idle-timeout` is what survives the transport stall.
 
 20. **Codex no-OUTPUT watchdog (OR-02).** The old failure mode was a live-but-silent Codex process (1h43m observed) that a plain "did the shell exit" check can't see. Phase 2c step 5 runs `codex_watchdog.py check` on every poll turn against the raw-output file's growth, not just its existence — 10 minutes of zero-byte growth is treated as hung: kill the shell, degrade to Claude-only findings, notify the user in-stream. Never silently wait past the window "just in case it's still working" — a live-but-silent process for >10 minutes at 0% CPU IS the definition of hung here.

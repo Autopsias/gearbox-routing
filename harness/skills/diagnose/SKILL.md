@@ -5,6 +5,8 @@ description: Disciplined diagnosis loop for hard bugs and performance regression
 
 # Diagnose
 
+<!-- Claude Code (via the ~/.claude/skills/diagnose symlink) and Codex (skill root ~/.agents/skills) load this one file. Keep the wording harness-neutral. -->
+
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
 ## Checklist (all 6 phases)
@@ -29,15 +31,17 @@ investigators were collapsed into it (`~/.claude/SKILL-UNIFICATION-ROUTING.md`):
   is mysterious, recurring, or spans subsystems and the feedback loop alone isn't
   converging. In `--deep` mode, dispatch the deep root-cause **worker** rather than
   re-implementing it here:
-  - Dispatch Codex subagent `digdeep` — Five-Whys + deep-research root-cause analysis
+  - Dispatch the `digdeep` worker — Five-Whys + deep-research root-cause analysis
     (analysis-only; never executes code). This is the same worker that `/ci-orchestrate`
     strategic mode and the parallel-orchestrator already dispatch — preserved, not moved.
   - For forensic, evidence-graded case reconstruction, invoke the `bmad-investigate`
-    skill (`$bmad-investigate`) as the deep mode's investigator.
+    skill as the deep mode's investigator. It is a project skill of the example-project repo
+    (`~/DeveloperFolder/example-project`), not installed at user level, so only a session in
+    that repo can reach it. Elsewhere, `digdeep` is the only deep worker.
 
   Fold their findings back into this skill's Phase 5 (fix) / Phase 6 (regression-test).
   `digdeep` and `bmad-investigate` are **workers** of `/diagnose --deep`, not separate
-  typed front doors. Removal of the old typed entries is decided in s09.
+  typed front doors.
 
 ## Phase 1 — Build a feedback loop
 

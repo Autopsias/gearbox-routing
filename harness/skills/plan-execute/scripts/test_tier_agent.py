@@ -182,6 +182,23 @@ def test_fable_escalation_apex_pairs_resolve(tmp_path):
     )
 
 
+def test_opus_low_experiment_tier_resolves(tmp_path):
+    """v25 (2026-09-11): opus@low is no class default, but the deep_reasoning downgrade
+    canary 4abfa765d726 dispatches it, and without a tier agent every tagged row ran at
+    the orchestrator's session effort. PLANT: no definition file -> None (the gap is
+    reported, never a silent reuse of tier-opus-medium). ALLOW: file present ->
+    tier-opus-low."""
+    empty = Path(tmp_path) / "empty"
+    empty.mkdir()
+    assert run._tier_agent("opus", "low", agent_dir=empty) is None, (
+        "PLANT FAILED: opus low resolved with no definition file on disk"
+    )
+    present = _agent_dir(tmp_path, ["tier-opus-low"])
+    assert run._tier_agent("opus", "low", agent_dir=present) == "tier-opus-low", (
+        "ALLOW CONTROL FAILED: opus low did not resolve to tier-opus-low"
+    )
+
+
 def test_every_mapped_tier_has_a_real_definition_shipped():
     """The table is only useful if the files it names are actually deployed. This is
     the check that fails when someone adds a table row and forgets the agent file
@@ -225,6 +242,7 @@ def main():
         test_resolves_only_when_the_definition_exists,
         test_unmapped_tiers_do_not_resolve,
         test_fable_escalation_apex_pairs_resolve,
+        test_opus_low_experiment_tier_resolves,
         test_frontmatter_parse_check_catches_the_unquoted_colon,
         test_every_mapped_tier_has_a_real_definition_shipped,
         test_reasoning_directive_still_covers_every_tier,

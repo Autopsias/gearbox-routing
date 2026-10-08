@@ -441,6 +441,87 @@
     display: block; margin-bottom: 5px;
   }
 
+  /* THE PLAN, EXPLAINED (eli5-derived; live half painted by renderExplainer) */
+  section.plan-explained {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-xl); padding: 34px 40px 30px;
+    margin-bottom: 26px; box-shadow: var(--shadow);
+  }
+  .explainer-title {
+    font-family: var(--font-serif); font-size: clamp(26px, 2vw, 40px);
+    font-weight: 400; color: var(--text); letter-spacing: -0.02em;
+    margin: 0 0 20px;
+  }
+  .explainer-chain {
+    display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .explainer-arrow {
+    align-self: center; color: var(--border-strong);
+    font-size: 22px; line-height: 1; user-select: none;
+  }
+  .explainer-step {
+    flex: 1 1 180px; min-width: 160px; position: relative;
+    background: var(--surface-2); border: 1.5px solid var(--border);
+    border-radius: var(--r-md); padding: 14px 16px 12px;
+    transition: border-color 0.4s ease, opacity 0.4s ease;
+  }
+  .explainer-step .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .explainer-step .step-num {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    color: var(--text-subtle); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 50%;
+    width: 22px; height: 22px; display: inline-flex;
+    align-items: center; justify-content: center;
+  }
+  .explainer-step .step-label { font-weight: 600; font-size: 14.5px; color: var(--text); margin-bottom: 4px; }
+  .explainer-step .step-caption { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; }
+  .explainer-step .step-unlocks {
+    font-size: 12px; color: var(--accent-dark); line-height: 1.4;
+    margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border);
+  }
+  .explainer-step .step-unlocks::before { content: 'makes possible: '; font-weight: 600; }
+  .explainer-step.step-done    { border-color: var(--done); opacity: 0.72; }
+  .explainer-step.step-done .step-num { color: var(--done); border-color: var(--done); }
+  .explainer-step.step-active  { border-color: var(--doing); box-shadow: 0 0 0 1px var(--doing-bg); }
+  .explainer-step.step-active .step-num { color: var(--doing); border-color: var(--doing); }
+  .explainer-step.step-blocked { border-color: var(--blocked); }
+  .explainer-step.step-blocked .step-num { color: var(--blocked); border-color: var(--blocked); }
+  .explainer-step.is-here::after {
+    content: 'You are here'; position: absolute; top: -9px; right: 10px;
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--accent-dark);
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 999px; padding: 1px 8px;
+  }
+  .explainer-now {
+    background: var(--bg-tint); border-left: 3px solid var(--accent);
+    border-radius: var(--r-md); padding: 14px 18px; margin-bottom: 18px;
+  }
+  .explainer-now strong {
+    display: block; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent-dark); margin-bottom: 4px;
+  }
+  .explainer-now p { margin: 0; font-size: 14.5px; color: var(--text); line-height: 1.55; }
+  .explainer-analogy {
+    font-size: 13.5px; color: var(--text); line-height: 1.55; margin-bottom: 14px;
+  }
+  .explainer-analogy > strong, .explainer-analogy .analogy-breaks strong {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-subtle); margin-right: 6px;
+  }
+  .explainer-analogy .analogy-breaks { display: block; margin-top: 5px; color: var(--text-muted); }
+  dl.explainer-terms { margin: 0 0 14px; font-size: 13px; line-height: 1.5; }
+  dl.explainer-terms dt { font-weight: 600; color: var(--text); float: left; clear: left; margin-right: 8px; }
+  dl.explainer-terms dt::after { content: ' —'; color: var(--text-subtle); }
+  dl.explainer-terms dd { margin: 0 0 4px; color: var(--text-muted); overflow: hidden; }
+  .explainer-recap {
+    margin: 0; font-family: var(--font-serif); font-style: italic;
+    font-size: 15.5px; color: var(--text); line-height: 1.5;
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+
   /* CUSTOM INFOGRAPHIC TRANSITIONS */
   svg [data-render="status-class"], svg [data-render="opacity"], svg [data-render="progress-fill"],
   svg [data-render="progress-height"], svg [data-render="progress-stroke"] {
@@ -778,6 +859,9 @@
   .chip.model-fable  { background: var(--fable-bg);  color: var(--fable);  border-color: var(--fable-bg); }
   .chip.model-codex  { background: var(--codex-bg);  color: var(--codex);  border-color: var(--codex-bg); }
   .chip.chip-reasoning   { letter-spacing: .02em; }
+  /* Schema v8: the session's task class, and a model left to the executor. */
+  .chip.chip-task-class  { letter-spacing: .02em; }
+  .chip.model-dispatch   { color: var(--text-muted); font-style: italic; }
   .chip.reasoning-low    { background: rgba(148,163,184,0.14); color: var(--text-subtle); border-color: rgba(148,163,184,0.20); }
   .chip.reasoning-medium { background: rgba(96,165,250,0.16);  color: #2563eb; border-color: rgba(96,165,250,0.24); }
   .chip.reasoning-high   { background: rgba(234,179,8,0.18);   color: #b45309; border-color: rgba(234,179,8,0.28); }
@@ -1264,6 +1348,7 @@
             <li>All status counters, Up Next callout, floating progress pill</li>
             <li>Sticky session strip chip statuses, last-updated stamp</li>
             <li>Plan Achievement infographic</li>
+            <li>"The plan, explained" — step states, the "you are here" marker, and the "Where we are" paragraph</li>
           </ul>
         </div>
       </div>
@@ -1289,6 +1374,8 @@
 </details>
 
 <!-- INSERT_PLAN_ACHIEVEMENT -->
+
+<!-- INSERT_EXPLAINER -->
 
 <div class="up-next" id="up-next" data-role="auto-render">
   <h3>Up next</h3>
@@ -1513,6 +1600,12 @@
     /* INSERT_INFOGRAPHIC_DATA */
     /* INSERT_INFOGRAPHIC_RENDERERS — render_phase_journey, render_maturity_ladder, render_hub_spoke, render_before_after, render_pillars, render_custom + dispatcher renderPhaseJourney */
 
+    function nextSession() {
+      return ['AWAITS_REVIEW', 'DOING', 'PARTIAL', 'TODO', 'BLOCKED']
+        .map(status => sessions.find(s => (s.dataset.status || 'TODO') === status))
+        .find(Boolean) || sessions.find(s => !['DONE', 'WONTFIX', 'DEFERRED'].includes(s.dataset.status));
+    }
+
     function renderSessionArc() {
       const svg = document.getElementById('session-arc');
       if (!svg) return;
@@ -1525,11 +1618,7 @@
       const segY = 24;
       const segH = 22;
 
-      const awaitsIdx = sessions.findIndex(s => (s.dataset.status || '') === 'AWAITS_REVIEW');
-      const doingIdx = sessions.findIndex(s => (s.dataset.status || '') === 'DOING');
-      const partialIdx = sessions.findIndex(s => (s.dataset.status || '') === 'PARTIAL');
-      const todoIdx = sessions.findIndex(s => (s.dataset.status || 'TODO') === 'TODO');
-      const nextIdx = awaitsIdx >= 0 ? awaitsIdx : (doingIdx >= 0 ? doingIdx : (partialIdx >= 0 ? partialIdx : todoIdx));
+      const nextIdx = sessions.indexOf(nextSession());
 
       let html = '';
       sessions.forEach((s, i) => {
@@ -1544,17 +1633,77 @@
         else if (modelChip && modelChip.classList.contains('model-haiku')) { modelColor = 'var(--haiku)'; modelName = 'Haiku'; }
         else if (modelChip && modelChip.classList.contains('model-fable')) { modelColor = 'var(--fable)'; modelName = 'Fable'; }
         else if (modelChip && modelChip.classList.contains('model-codex')) { modelColor = 'var(--codex)'; modelName = 'Codex'; }
+        else if (modelChip && modelChip.classList.contains('model-dispatch')) { modelColor = 'var(--text-subtle)'; modelName = 'chosen at dispatch'; }
+        const classChip = s.querySelector('.chip.chip-task-class');
+        const classLine = classChip ? '\nClass: ' + classChip.textContent.trim().replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) : '';
         const isNext = (i === nextIdx);
         html += `<text class="arc-id ${isNext ? 'is-next-text' : ''}" x="${x + segW/2}" y="14" text-anchor="middle">${id.toUpperCase()}</text>`;
         html += `<a href="#${id}">`;
         html += `<rect class="arc-seg ${isNext ? 'is-next' : ''}" data-status="${status}" data-session-id="${id}"`;
         html += `      x="${x}" y="${segY}" width="${segW}" height="${segH}" rx="3">`;
-        html += `<title>${id.toUpperCase()} — ${title.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}\nStatus: ${status}\nModel: ${modelName}</title>`;
+        html += `<title>${id.toUpperCase()} — ${title.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}\nStatus: ${status}\nModel: ${modelName}${classLine}</title>`;
         html += `</rect>`;
         html += `<circle class="arc-model" cx="${x + segW/2}" cy="${segY + segH + 12}" r="3" fill="${modelColor}"/>`;
         html += `</a>`;
       });
       svg.innerHTML = html;
+    }
+
+    // "The plan, explained" — live half. Derives each chain step's state from
+    // the SAME article data-status the donuts read, marks "you are here", and
+    // composes the plain-language "Where we are" paragraph. Static + DOM-derived
+    // on purpose: nothing at runtime writes this section, so it cannot go stale.
+    // No-ops when the plan was built without an explainer.
+    function renderExplainer() {
+      const root = document.getElementById('plan-explained');
+      if (!root) return;
+      const steps = Array.from(root.querySelectorAll('[data-chain-step]'));
+      if (!steps.length) return;
+      const stById = {};
+      sessions.forEach(s => { stById[s.id] = (s.dataset.status || 'TODO'); });
+      let here = -1;
+      steps.forEach((el, i) => {
+        const sts = (el.dataset.sessions || '').split(/\s+/)
+          .map(id => stById[id]).filter(Boolean);
+        let cls = 'todo';
+        if (sts.length && sts.every(s => s === 'DONE' || s === 'WONTFIX' || s === 'DEFERRED')) cls = 'done';
+        else if (sts.some(s => s === 'BLOCKED')) cls = 'blocked';
+        else if (sts.some(s => s === 'DOING' || s === 'PARTIAL' || s === 'AWAITS_REVIEW')) cls = 'active';
+        el.classList.remove('step-done', 'step-active', 'step-blocked', 'step-todo');
+        el.classList.add('step-' + cls);
+        if (here < 0 && cls !== 'done') here = i;
+      });
+      steps.forEach((el, i) => el.classList.toggle('is-here', i === here));
+
+      const nowText = document.getElementById('explainer-now-text');
+      if (!nowText) return;
+      const dot = s => /[.!?]$/.test(s.trim()) ? s.trim() : s.trim() + '.';
+      const n = steps.length;
+      const recap = root.dataset.recap || '';
+      if (here < 0) {
+        nowText.textContent = 'All ' + n + ' steps are complete.' + (recap ? ' ' + dot(recap) : '');
+        return;
+      }
+      const st = steps[here];
+      const doneCount = steps.filter(el => el.classList.contains('step-done')).length;
+      const parts = [];
+      if (doneCount === 0) {
+        parts.push('Nothing is done yet.');
+      } else {
+        parts.push(doneCount + ' of ' + n + ' steps are done.');
+        const lastDone = steps.slice().reverse().find(el => el.classList.contains('step-done'));
+        if (lastDone && lastDone.dataset.unlocks) parts.push('Latest result: ' + dot(lastDone.dataset.unlocks));
+      }
+      const name = 'step ' + (here + 1) + ', “' + (st.dataset.label || '') + '”';
+      if (st.classList.contains('step-blocked')) {
+        parts.push('The plan is stopped: ' + name + ' is blocked. See its session card below for the reason.');
+      } else if (st.classList.contains('step-active')) {
+        parts.push('Now in progress: ' + name + ' — ' + dot(st.dataset.caption || ''));
+      } else {
+        parts.push('Next up: ' + name + ' — ' + dot(st.dataset.caption || ''));
+      }
+      if (st.dataset.unlocks) parts.push('When it is done: ' + dot(st.dataset.unlocks));
+      nowText.textContent = parts.join(' ');
     }
 
     function recomputeCounts() {
@@ -1598,6 +1747,9 @@
       // next-line, counters). A spec with phases lacking `items` bindings used to
       // throw here and leave the whole top nav stale (2026-07-03).
       try { renderPhaseJourney(items); } catch (e) { console.error('infographic renderer failed:', e); }
+      // Same isolation rule as the infographic: an explainer failure must never
+      // stall the rest of the repaint.
+      try { renderExplainer(); } catch (e) { console.error('explainer renderer failed:', e); }
       // Hero % fallback: renderers compute from group item bindings; when the spec
       // declares none (totalAll=0), derive overall progress from all item cards.
       (function () {
@@ -1624,11 +1776,7 @@
           chip.classList.remove('is-next');
         }
       });
-      const awaits = sessions.find(s => (s.dataset.status || '') === 'AWAITS_REVIEW');
-      const doing = sessions.find(s => (s.dataset.status || '') === 'DOING');
-      const partial = sessions.find(s => (s.dataset.status || '') === 'PARTIAL');
-      const todo  = sessions.find(s => (s.dataset.status || 'TODO') === 'TODO');
-      const next = awaits || doing || partial || todo;
+      const next = nextSession();
       if (next) {
         const stripNext = document.querySelector('.strip-chip[data-session="' + next.id + '"]');
         if (stripNext) stripNext.classList.add('is-next');
@@ -1643,15 +1791,16 @@
           const model = modelChip ? modelChip.textContent.trim() : '';
           const effortChip = next.querySelector('.chip.chip-effort');
           const effort = effortChip ? effortChip.textContent.trim() : '';
-          const STATUS_NOTE = { DOING: ' (in progress)', AWAITS_REVIEW: ' (awaiting your review)', PARTIAL: ' (partially complete — continue)' };
-          const status = STATUS_NOTE[next.dataset.status] || '';
+          const STATUS_NOTE = { TODO: '', DOING: ' (in progress)', AWAITS_REVIEW: ' (awaiting your review)', PARTIAL: ' (partially complete — continue)', BLOCKED: ' (blocked — see session notes)' };
+          const rawStatus = next.dataset.status || 'TODO';
+          const status = Object.hasOwn(STATUS_NOTE, rawStatus) ? STATUS_NOTE[rawStatus] : ' (status unrecognized — see session card)';
           nextLine.innerHTML =
             '<strong>' + id.toUpperCase() + ' — ' + title.replace(/</g,'&lt;') + '</strong>' + status +
             (model ? ' · ' + model : '') +
             (effort ? ' · ' + effort : '') +
             ' · <a href="#' + id + '">Open session →</a>';
         } else {
-          nextLine.innerHTML = '<strong>All sessions complete.</strong> 🎉';
+          nextLine.innerHTML = sessions.length ? '<strong>All sessions closed.</strong>' : '<strong>No sessions defined.</strong>';
         }
       }
 
@@ -1665,7 +1814,7 @@
         if (pctEl) pctEl.textContent = pct + '%';
         if (nextEl) {
           if (next) nextEl.innerHTML = '· <a href="#' + next.id + '">' + next.id.toUpperCase() + ' →</a>';
-          else nextEl.innerHTML = '· <span style="color:var(--done);font-weight:700">done 🎉</span>';
+          else nextEl.textContent = sessions.length ? '· closed' : '· no sessions';
         }
       }
     }
@@ -1724,10 +1873,7 @@
     // Open-next buttons — jump to the current is-next session
     document.querySelectorAll('[data-action="open-next"]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const next = sessions.find(s => (s.dataset.status || '') === 'AWAITS_REVIEW') ||
-                     sessions.find(s => (s.dataset.status || '') === 'DOING') ||
-                     sessions.find(s => (s.dataset.status || '') === 'PARTIAL') ||
-                     sessions.find(s => (s.dataset.status || 'TODO') === 'TODO');
+        const next = nextSession();
         if (next) { e.preventDefault(); location.hash = next.id; }
       });
     });
@@ -1772,9 +1918,7 @@
      <script> (the nav repaint above); this block carries `data-layout-audit` so it is
      deliberately EXCLUDED from that extraction and runs fully isolated, try/catch-
      wrapped, so it can never affect the nav. It catches what a static lint cannot:
-     real horizontal overflow + clipped text once the page actually renders. When the
-     plan is opened through lavish-axi (Vista ①), lavish's own audit fires too — this
-     is the standalone fallback for opening PLAN.html directly. -->
+     real horizontal overflow + clipped text once the page actually renders. -->
 <script data-layout-audit>
 (function () {
   "use strict";
@@ -1833,11 +1977,19 @@
         + " detected (horizontal overflow / clipped). Open the DevTools console — tag [layout-audit] — for selectors.";
       banner.hidden = false;
     } else {
-      banner.hidden = true;
+      banner.hidden = true;   // re-hide + clear: a stale count must not outlive a clean re-audit
+      banner.textContent = "";
     }
   }
   var ran = false;
-  function go() { if (ran) return; ran = true; report(audit()); }
+  function go() {
+    if (ran) return;
+    // Not laid out yet (clientWidth 0 — e.g. a hidden browser pane): every element
+    // reads as overflowing. Bail WITHOUT consuming the one-shot so the next settle re-runs.
+    if (!document.documentElement.clientWidth) return;
+    ran = true;
+    report(audit());
+  }
   function settleThenRun() {
     try {
       var ro = new ResizeObserver(function () {

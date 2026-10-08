@@ -12,9 +12,17 @@ Three concerns:
     read raises ``ShipStateError`` so the caller halts rather than skipping a
     step as already-done. (The plain ``write_text`` in ``_closeouts`` is not
     strong enough to copy here.)
-  * **Resource-scoped shipping locks** (Codex MEDIUM — a single global lock
-    defeats parallel groups). Granularity: ``git:<worktree>``,
-    ``push:<remote>/<branch>``, ``deploy:<target>``, ``gate:<id>``.
+  * **Resource-scoped shipping leases** (Codex MEDIUM — a single global lock
+    defeats parallel groups). The resource names shipping.py actually keys on
+    are ``git:<project-root>``, ``push:<project-root>`` (both REPO-scoped — one
+    file per checkout, in the repo's git common dir, shared by every plan and
+    every linked worktree), and ``deploy:<target>`` / ``deploy:argv`` /
+    ``gate:<id>`` (PLAN-scoped, under the plan directory). Per-worktree and
+    per-remote/branch granularity was advertised here for two months and never
+    implemented; ``push:`` is keyed on the project root, not on a remote or a
+    branch, so a push to a different remote from the same checkout still
+    serialises. Ownership is a token+expiry LEASE, not a pid — see the section
+    comment above ``acquire_ship_lock``.
   * **``run_deploy_argv``** for ``deploy_argv`` / argv-kind registry steps —
     ``shell=False``, explicit cwd, **allow-listed env** (NOT the full-``os.environ``
     inheritance ``_run_halt_notify`` uses; that is the secret-leak anti-pattern
@@ -23,14 +31,28 @@ Three concerns:
 
 import json
 import os
-import re
 import shutil
-import socket
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-import run_state_io as rsi
+from ship_locks import (  # noqa: F401  (re-exported: callers use ssio.<name>)
+    LEASE_RATIONALE,
+    REPO_LOCK_DIRNAME,
+    REPO_SCOPED_PREFIXES,
+    _fsync_dir,
+    _lease_state,
+    _read_lock,
+    _resource_slug,
+    _ship_lock_dir,
+    _ship_lock_path,
+    acquire_ship_lock,
+    held_ship_locks,
+    lease_status,
+    our_lease,
+    release_all_ship_locks,
+    release_ship_lock,
+)
 
 
 class ShipStateError(Exception):
@@ -45,27 +67,14 @@ def _now():
 # --------------------------------------------------------------------------
 # Durable JSON writer
 # --------------------------------------------------------------------------
-def _fsync_dir(dirpath):
-    if not hasattr(os, "O_DIRECTORY"):
-        return
-    try:
-        dfd = os.open(str(dirpath), os.O_DIRECTORY)
-    except OSError:
-        return
-    try:
-        os.fsync(dfd)
-    except OSError:
-        pass
-    finally:
-        os.close(dfd)
-
-
 def durable_write_json(path, obj):
     """Atomically + durably write ``obj`` as JSON, keeping the prior file as
     ``<path>.bak``. Validates the written bytes parse before returning."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(obj, indent=2, ensure_ascii=False)
+    # Final newline: repo end-of-file hooks rewrite a file without one, which
+    # empties the plan-record commit at land time.
+    text = json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
     if path.exists():
         try:
@@ -125,106 +134,6 @@ def save_ship_state(plan_dir, session_id, state):
     return durable_write_json(ship_state_path(plan_dir, session_id), state)
 
 
-# --------------------------------------------------------------------------
-# Resource-scoped shipping locks (pidfile model mirrors run_state_io's run lock
-# so the lock holds across the multiple run.py invocations one shipping session
-# spans).
-# --------------------------------------------------------------------------
-def _ship_lock_dir(plan_dir):
-    return Path(plan_dir) / "_shipping_locks"
-
-
-def _resource_slug(resource):
-    slug = re.sub(r"[^A-Za-z0-9]+", "-", str(resource)).strip("-").lower()
-    return slug or "lock"
-
-
-def _ship_lock_path(plan_dir, resource):
-    return _ship_lock_dir(plan_dir) / f"{_resource_slug(resource)}.lock"
-
-
-def _lock_is_stale(info):
-    started = info.get("started_at")
-    age = None
-    if started:
-        try:
-            age = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
-        except ValueError:
-            age = None
-    pid = info.get("pid")
-    alive = rsi._pid_alive(pid) if isinstance(pid, int) else False
-    return (age is not None and age > rsi.STALE_LOCK_SECONDS) or not alive
-
-
-def acquire_ship_lock(plan_dir, resource):
-    """Acquire a resource-scoped shipping lock. Raises ``rsi.LockError`` if a
-    live, non-stale holder (other than this process) exists; a dead/stale holder
-    is reclaimed."""
-    lp = _ship_lock_path(plan_dir, resource)
-    lp.parent.mkdir(parents=True, exist_ok=True)
-    if lp.exists():
-        try:
-            info = json.loads(lp.read_text())
-        except (json.JSONDecodeError, OSError):
-            info = {}
-        if not _lock_is_stale(info) and info.get("pid") != os.getpid():
-            raise rsi.LockError(
-                f"shipping resource {resource!r} is locked (pid={info.get('pid')}, "
-                f"host={info.get('host')}, started={info.get('started_at')}). "
-                f"If stale, remove {lp} and retry."
-            )
-    rsi._atomic_write(
-        lp,
-        json.dumps(
-            {
-                "pid": os.getpid(),
-                "started_at": _now(),
-                "host": socket.gethostname(),
-                "resource": str(resource),
-            }
-        ),
-    )
-    rsi.log_event(plan_dir, "shipping_lock_acquired", resource=str(resource))
-    return True
-
-
-def release_ship_lock(plan_dir, resource):
-    lp = _ship_lock_path(plan_dir, resource)
-    if lp.exists():
-        lp.unlink()
-        rsi.log_event(plan_dir, "shipping_lock_released", resource=str(resource))
-
-
-def release_all_ship_locks(plan_dir):
-    """Release every shipping lock we (or a dead holder) own — cleanup on
-    abort/finalize."""
-    d = _ship_lock_dir(plan_dir)
-    if not d.is_dir():
-        return
-    for lp in d.glob("*.lock"):
-        try:
-            info = json.loads(lp.read_text())
-        except (json.JSONDecodeError, OSError):
-            info = {}
-        pid = info.get("pid")
-        if pid == os.getpid() or not (isinstance(pid, int) and rsi._pid_alive(pid)):
-            lp.unlink()
-            rsi.log_event(plan_dir, "shipping_lock_released", resource=info.get("resource", lp.stem))
-
-
-def held_ship_locks(plan_dir):
-    """List currently-present shipping lock resources (for status/tests)."""
-    d = _ship_lock_dir(plan_dir)
-    if not d.is_dir():
-        return []
-    out = []
-    for lp in sorted(d.glob("*.lock")):
-        try:
-            out.append(json.loads(lp.read_text()).get("resource", lp.stem))
-        except (json.JSONDecodeError, OSError):
-            out.append(lp.stem)
-    return out
-
 
 # --------------------------------------------------------------------------
 # argv-kind step execution
@@ -243,7 +152,7 @@ def build_allowlisted_env(extra_allow=None):
     return {k: v for k, v in os.environ.items() if k in allow}
 
 
-def run_deploy_argv(argv, *, cwd, env_allowlist=None, timeout=1800):
+def run_deploy_argv(argv, *, cwd, env_allowlist=None, timeout=1800, env_extra=None):
     """Execute an argv-kind shipping step. ``shell=False`` always; explicit cwd;
     allow-listed env (never the full inherited environment); relative-path
     executables rejected (the registry must declare an absolute path or a bare
@@ -262,6 +171,11 @@ def run_deploy_argv(argv, *, cwd, env_allowlist=None, timeout=1800):
                 "stderr": f"relative executable rejected: {exe!r}"}
 
     env = build_allowlisted_env(env_allowlist)
+    # `env_extra` is computed by the orchestrator, not inherited from the ambient
+    # environment, so it is passed EXPLICITLY rather than allow-listed through:
+    # a value the caller derived (a session's review base and scope) has no
+    # business depending on what happened to be exported into this process.
+    env.update({k: v for k, v in (env_extra or {}).items() if v})
     try:
         proc = subprocess.run(
             argv, cwd=str(cwd), env=env, capture_output=True, text=True,
@@ -275,3 +189,21 @@ def run_deploy_argv(argv, *, cwd, env_allowlist=None, timeout=1800):
                 "error": "exec-error"}
     return {"returncode": proc.returncode, "stdout": proc.stdout or "",
             "stderr": proc.stderr or "", "timed_out": False}
+
+
+def argv_outcome(res, indeterminate_exit=None):
+    """Classify a ``run_deploy_argv`` result: ``pass`` / ``fail`` / ``indeterminate``.
+
+    A TIMEOUT or an exec error is INDETERMINATE, never a fail: ``returncode`` is
+    None, the gate never ANSWERED, and charging "I could not run" as "I found
+    something" was measured twice — a timed-out llm-review charged as a rework
+    failure in `verify`, then the land re-gate inheriting the identical shape.
+    Lives beside ``run_deploy_argv`` because every caller interprets the same
+    result dict, and a fix applied to only one of them left the sibling broken.
+    """
+    rc = res.get("returncode")
+    if res.get("timed_out") or res.get("error") or rc is None:
+        return "indeterminate"
+    if indeterminate_exit is not None and rc == indeterminate_exit:
+        return "indeterminate"
+    return "pass" if rc == 0 else "fail"

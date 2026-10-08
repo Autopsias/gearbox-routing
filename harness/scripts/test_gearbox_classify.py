@@ -57,50 +57,15 @@ def test_snap_paths_terminates_last_record():
         assert n == "3", f"read loop saw {n} of 3 paths — last record not NUL-terminated"
 
 
-def main():
-    test_snap_paths_terminates_last_record()
-
-    # --- [live-state] globs: * stays in a segment, ** crosses them -------------
-    assert is_live("projects/-Users-x-example-project/memory/note.md")
-    assert is_live("projects/-Users-x-example-project/memory/sub/deep.md")
-    assert is_live("_plans/some-plan-2026-07-25/PLAN.html")
-    assert is_live("evals/routing/MISROUTES.md")
-    assert is_live("evals/routing/results/2026-07-25/run.json")
-    # …and harness source is NOT live-state (the fail-closed default)
-    assert not is_live("projects/-Users-x-example-project/transcript.jsonl")  # `*` cannot cross /
-    assert not is_live("skills/plan-execute/SKILL.md")
-    assert not is_live("scripts/gearbox")
-    assert not is_live("evals/routing/AUDIT.md")
-    assert not is_live("CLAUDE.md")
-
-    # --- settings.json: the split that must NOT abort a deploy ----------------
-    assert gc.is_churn_key("model", CHURN)                  # /model  (the S03B finding)
-    assert gc.is_churn_key("effortLevel", CHURN)            # /effort
-    assert gc.is_churn_key("permissions.allow", CHURN)      # allow-always growth
-    assert gc.is_churn_key("enabledPlugins.foo@bar", CHURN)  # via its declared ancestor
-    assert gc.is_churn_key("statusLine.command", CHURN)
-
-    # --- …and the split that MUST abort a deploy ------------------------------
-    assert not gc.is_churn_key("hooks", CHURN)
-    assert not gc.is_churn_key("hooks.SessionStart", CHURN)
-    assert not gc.is_churn_key("env.PYTHONPYCACHEPREFIX", CHURN)
-    assert not gc.is_churn_key("permissions.defaultMode", CHURN)
-    assert not gc.is_churn_key("permissions.deny", CHURN)
-    assert not gc.is_churn_key("someNewKeyTheBinaryAdded", CHURN)  # unknown => loud
-
-    # --- changed_key_paths ----------------------------------------------------
-    a = {"model": "opus", "hooks": {"SessionStart": [1]}, "permissions": {"allow": ["a"]}}
-    assert set(gc.changed_key_paths(a, dict(a, model="fable"))) == {"model"}
-    assert set(gc.changed_key_paths(a, {**a, "permissions": {"allow": ["a", "b"]}})) == {"permissions.allow"}
-    assert set(gc.changed_key_paths(a, {**a, "hooks": {"SessionStart": [2]}})) == {"hooks.SessionStart"}
-    assert set(gc.changed_key_paths(a, {**a, "newKey": 1})) == {"newKey"}
-    assert set(gc.changed_key_paths(a, a)) == set()
-
+def _end_to_end_on_a_throwaway_repo():
+    """The classifier against a real git repo: churn vs harness vs live vs triage."""
     # --- end-to-end on a throwaway repo: churn vs harness vs live vs triage ----
     with tempfile.TemporaryDirectory() as d:
-        run = lambda *c: subprocess.run(["git", "-C", d, *c], check=True, capture_output=True)
+        def run(*c):
+            return subprocess.run(["git", "-C", d, *c], check=True, capture_output=True)
         run("init", "-q", "-b", "main")
-        run("config", "user.email", "t@t"); run("config", "user.name", "t")
+        run("config", "user.email", "t@t")
+        run("config", "user.name", "t")
         settings = {"model": "opus[1m]", "hooks": {"SessionStart": []}, "permissions": {"allow": []}}
         os.makedirs(os.path.join(d, "projects/p/memory"))
         os.makedirs(os.path.join(d, "skills"))
@@ -110,7 +75,8 @@ def main():
             ("skills/s.md", "one\n"),
         ]:
             open(os.path.join(d, path), "w").write(body)
-        run("add", "-A"); run("commit", "-qm", "base")
+        run("add", "-A")
+        run("commit", "-qm", "base")
 
         def classify():
             out = subprocess.run(
@@ -156,6 +122,73 @@ def main():
         assert "settings.json" in r["harness"], r
         assert r["errors"], r
 
+
+def main():
+    test_snap_paths_terminates_last_record()
+
+    # --- [live-state] globs: * stays in a segment, ** crosses them -------------
+    assert is_live("projects/-Users-x-example-project/memory/note.md")
+    assert is_live("projects/-Users-x-example-project/memory/sub/deep.md")
+    assert is_live("_plans/some-plan-2026-07-25/PLAN.html")
+    assert is_live("evals/routing/MISROUTES.md")
+    assert is_live("evals/routing/results/2026-07-25/run.json")
+    # …and harness source is NOT live-state (the fail-closed default)
+    assert not is_live("projects/-Users-x-example-project/transcript.jsonl")  # `*` cannot cross /
+    assert not is_live("skills/plan-execute/SKILL.md")
+    assert not is_live("scripts/gearbox")
+    assert not is_live("evals/routing/AUDIT.md")
+    assert not is_live("CLAUDE.md")
+
+    # --- settings.json: the split that must NOT abort a deploy ----------------
+    assert gc.is_churn_key("model", CHURN)                  # /model  (the S03B finding)
+    assert gc.is_churn_key("effortLevel", CHURN)            # /effort
+    assert gc.is_churn_key("permissions.allow", CHURN)      # allow-always growth
+    assert gc.is_churn_key("enabledPlugins.foo@bar", CHURN)  # via its declared ancestor
+    assert gc.is_churn_key("statusLine.command", CHURN)
+    # /effort writes a per-model key beside the flat one. Naming each model id
+    # would decay silently: a NEW id would read as harness drift and abort a
+    # deploy, and that refusal is indistinguishable from a real one.
+    assert gc.is_churn_key("modelSettings.claude-opus-5.effortLevel", CHURN)
+    assert gc.is_churn_key("modelSettings.claude-sonnet-5.effortLevel", CHURN)
+
+    # --- …and the split that MUST abort a deploy ------------------------------
+    assert not gc.is_churn_key("hooks", CHURN)
+    assert not gc.is_churn_key("hooks.SessionStart", CHURN)
+    assert not gc.is_churn_key("env.PYTHONPYCACHEPREFIX", CHURN)
+    assert not gc.is_churn_key("permissions.defaultMode", CHURN)
+    assert not gc.is_churn_key("permissions.deny", CHURN)
+    assert not gc.is_churn_key("someNewKeyTheBinaryAdded", CHURN)  # unknown => loud
+    # THE WILDCARD IS ONE SEGMENT, NOT A PREFIX. Declaring `modelSettings`
+    # wholesale would make its whole subtree routine, in the one file where an
+    # over-broad rule is dangerous — so a sibling key under the same model, and
+    # the container itself, both still abort.
+    assert not gc.is_churn_key("modelSettings", CHURN)
+    assert not gc.is_churn_key("modelSettings.claude-opus-5", CHURN)
+    assert not gc.is_churn_key("modelSettings.claude-opus-5.somethingElse", CHURN)
+    assert not gc.is_churn_key("modelSettings.a.b.effortLevel", CHURN)  # `*` never spans a dot
+
+    # --- changed_key_paths ----------------------------------------------------
+    a = {"model": "opus", "hooks": {"SessionStart": [1]}, "permissions": {"allow": ["a"]}}
+    assert set(gc.changed_key_paths(a, dict(a, model="fable"))) == {"model"}
+    assert set(gc.changed_key_paths(a, {**a, "permissions": {"allow": ["a", "b"]}})) == {"permissions.allow"}
+    assert set(gc.changed_key_paths(a, {**a, "hooks": {"SessionStart": [2]}})) == {"hooks.SessionStart"}
+    assert set(gc.changed_key_paths(a, {**a, "newKey": 1})) == {"newKey"}
+    assert set(gc.changed_key_paths(a, a)) == set()
+    # A block on ONE side only is reported by its leaves. The first /effort on a NEW
+    # model id adds the whole `modelSettings.<id>` block; reported as the block, it
+    # missed `modelSettings.*.effortLevel` and aborted a deploy (Opus 5.5, 2026-09-22).
+    ms = {"modelSettings": {"claude-opus-5": {"effortLevel": "high"}}}
+    added = {"modelSettings": {**ms["modelSettings"], "claude-opus-5-5": {"effortLevel": "xhigh"}}}
+    assert set(gc.changed_key_paths(ms, added)) == {"modelSettings.claude-opus-5-5.effortLevel"}
+    assert all(gc.is_churn_key(k, CHURN) for k in gc.changed_key_paths(ms, added))
+    assert set(gc.changed_key_paths(added, ms)) == {"modelSettings.claude-opus-5-5.effortLevel"}
+    # …and a sibling key in that new block still aborts, as does a new hooks block.
+    sib = {"modelSettings": {"claude-opus-5-5": {"effortLevel": "low", "somethingElse": 1}}}
+    assert not all(gc.is_churn_key(k, CHURN) for k in gc.changed_key_paths({}, sib))
+    assert set(gc.changed_key_paths(a, {**a, "hooks": {**a["hooks"], "Stop": [1]}})) == {"hooks.Stop"}
+    assert set(gc.changed_key_paths(a, {**a, "emptyBlock": {}})) == {"emptyBlock"}
+
+    _end_to_end_on_a_throwaway_repo()
     print("test_gearbox_classify: all assertions passed")
 
 

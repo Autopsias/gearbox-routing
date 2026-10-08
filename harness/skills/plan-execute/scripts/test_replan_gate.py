@@ -508,7 +508,7 @@ def test_allow_every_mutation_appends_one_dated_change_log_line(plan, tmp_path, 
     capsys.readouterr()
     run.cmd_add_session(plan, _Args(
         id="s04", title="Follow-up", items=None, new_item=["w-04|work|New work"],
-        depends_on="s01", model="Sonnet", reasoning=None, gates=None,
+        depends_on="s01", model="Sonnet", reasoning="medium", gates=None,
         require_evidence=False, prompt="do it", human_summary=None,
         parallel_group=None, infographic_group=None, allow_builder_drift=False,
     ))

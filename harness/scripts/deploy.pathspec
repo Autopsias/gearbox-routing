@@ -42,7 +42,10 @@ evals/routing/MISROUTES.md
 evals/routing/results/**
 evals/routing/outcomes.ndjson
 evals/routing/.last-aggregated
+evals/routing/adoptions.ndjson
 evals/dyno/results/**
+improve-ledger.json
+improve-learnings.md
 
 # --- MACHINE-CHURN: settings.json keys the binary rewrites on a UI action ------
 # Dotted JSON key paths, one per line; each is a key some UI action rewrites
@@ -58,13 +61,13 @@ evals/dyno/results/**
 [settings-churn-keys]
 model
 effortLevel
+modelSettings.*.effortLevel
 theme
 editorMode
 tui
 statusLine
 outputStyle
 permissions.allow
-skillOverrides
 enabledPlugins
 extraKnownMarketplaces
 preferredNotifChannel

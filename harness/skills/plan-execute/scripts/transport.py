@@ -57,7 +57,7 @@ total elapsed — whichever is hit first. `decide()` is deterministic given a
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from random import random
 
 MAX_ATTEMPTS = 3

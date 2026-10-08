@@ -1,7 +1,7 @@
 ---
 name: aws-cost-calculator
-description: "Calculates AWS cost scenarios using REAL-TIME pricing data. Fetches latest prices with graceful MCP degradation. Tier 1: Exa Deep -> Tier 2: Exa Web -> Tier 3: Perplexity -> Tier 4: WebSearch. Use when you say 'AWS cost estimate', 'compare instance pricing', 'how much will this cost on AWS', 'calculate EC2 costs'."
-tools: Read, Grep, Glob, WebSearch, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, mcp__exa__web_search_exa, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url
+description: "Calculates AWS cost scenarios from real-time pricing data. Use when you say 'AWS cost estimate', 'compare instance pricing', 'how much will this cost on AWS', 'calculate EC2 costs'."
+tools: Read, Grep, Glob, WebSearch, mcp__exa__agent_run, mcp__exa__web_search_exa, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url
 model: sonnet
 effort: medium
 ---
@@ -27,10 +27,13 @@ Given a list of AWS services and usage patterns, you must:
 Execute this degradation pattern for EACH service requiring pricing:
 
 ```
-TIER 1: Exa Deep Researcher (PREFERRED)
-├── Use: mcp__exa__deep_researcher_start with model="exa-research-pro"
-├── Instructions: Include today's date, specific services, regions
-├── Poll: mcp__exa__deep_researcher_check until complete (max 2 min)
+TIER 1: Exa Agent (PREFERRED)
+├── Use: mcp__exa__agent_run with effort="medium"
+├── Cost: ~$0.10 and ~60s per call at effort=medium; effort=high measured
+│   5x the cost ($0.50, 131s) for no extra sources (2026-09-03)
+├── Query: Include today's date, specific services, regions
+├── The tool waits for the run itself; if it returns status "running",
+│   call it again with the returned runId — never start a second run
 ├── IF SUCCESS → Use this data
 └── IF FAILS/TIMEOUT → Continue to Tier 2
 
@@ -52,11 +55,11 @@ TIER 4: WebSearch (Built-in Fallback)
 └── Always succeeds (last resort)
 ```
 
-### Sample Exa Deep Researcher Query
+### Sample Exa Agent Query
 
 ```
-mcp__exa__deep_researcher_start({
-  instructions: "Research CURRENT AWS pricing as of January 2026 for the following services:
+mcp__exa__agent_run({
+  query: "Research CURRENT AWS pricing as of January 2026 for the following services:
     - EC2 m5.xlarge (on-demand, reserved 1yr, reserved 3yr, spot)
     - RDS PostgreSQL db.t3.medium
     - S3 Standard storage per GB
@@ -70,7 +73,7 @@ mcp__exa__deep_researcher_start({
     3. Current spot pricing trends
     4. Data transfer costs between services and to internet
     5. Any recent pricing changes or new savings options",
-  model: "exa-research-pro"
+  effort: "medium"
 })
 ```
 
@@ -149,7 +152,7 @@ Always indicate which tier provided the data:
 
 | Indicator | Meaning |
 |-----------|---------|
-| `*Source: Exa Deep Researcher (Tier 1)*` | Best quality, comprehensive |
+| `*Source: Exa Agent (Tier 1)*` | Best quality, comprehensive |
 | `*Source: Exa Web Search (Tier 2)*` | Good quality, quick lookup |
 | `*Source: Perplexity (Tier 3)*` | Expert synthesis, may be less current |
 | `*Source: WebSearch (Tier 4 - fallback)*` | Basic search, verify with AWS calculator |

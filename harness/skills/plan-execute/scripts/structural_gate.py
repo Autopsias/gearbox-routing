@@ -107,7 +107,6 @@ _ESLINT_CONFIG = (
     SCRIPT_DIR.parent.parent / "plan-builder" / "scripts" / "dashboard-eslint.config.mjs"
 )
 
-_PILL_RE = re.compile(r'<span class="pill status-\w+[^>]*>([^<]*)</span>')
 
 
 def _html_path(plan_dir):
@@ -146,30 +145,25 @@ def check_landed(plan_dir, expected):
                 "— the dashboard write did not land"
             )
             continue
-        try:
-            _, _, block = ab.extract_block(text, aid)
-        except ab.AnchorError:
-            continue
-        m = _PILL_RE.search(block)
-        if m and m.group(1) != status:
-            warnings.append(
-                f"{aid}: data-status={status!r} landed but the visible pill still "
-                f"reads {m.group(1)!r}"
-            )
+        warnings.extend(ab.visible_desyncs(text, aid, status))
     return (not mismatches, mismatches, warnings)
 
 
-def check_js_parses(plan_dir):
-    """Run ESLint ``no-undef`` over PLAN.html's inline status-repaint script.
+def _js_check_preconditions(plan_dir):
+    """(scripts, None) when eslint can run, or (None, skip_dict) when it cannot.
 
-    Returns a dict with ``status`` in {"passed", "failed", "skipped"}.
-    "skipped" is a deliberately distinct value from "passed" — callers must
-    never treat unavailable tooling as a pass.
+    Every reason this check cannot run, gathered ahead of writing anything to
+    disk. The caller returns the skip verbatim.
     """
     html_path = _html_path(plan_dir)
     if not html_path.exists():
-        return {"status": "skipped", "reason": "PLAN.html not found"}
+        return None, {"status": "skipped", "reason": "PLAN.html not found"}
     text = html_path.read_bytes().decode("utf-8")
+    # HTML COMMENTS FIRST (2026-08-25): the template explains the repaint/audit
+    # split in prose containing the literal text `<script>`, which the regex below
+    # matched as a real tag — no `data-layout-audit` before its `>`, so the
+    # exclusion never fired and eslint was handed English (3 of 4 plans failed).
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     # The repaint script is the largest attribute-less <script> block; the
     # layout-audit script (data-layout-audit) is deliberately excluded — same
     # convention build_plan.py uses to assemble its own pre-write check.
@@ -180,51 +174,46 @@ def check_js_parses(plan_dir):
     )
     scripts = [s for s in scripts if s.strip()]
     if not scripts:
-        return {"status": "skipped", "reason": "no inline repaint <script> found in PLAN.html"}
+        return None, {"status": "skipped", "reason": "no inline repaint <script> found in PLAN.html"}
     # Same unit-suite opt-out as render_verify.check (see conftest.py).
     # MEASURED: three `npx eslint` spawns cost 5.2 s per test. "skipped"
     # is already the honest value for unavailable tooling here and is
     # deliberately NOT "passed", so nothing is turned green by this.
     # DEFAULT IS ON; only the unit suite sets the variable.
     if os.environ.get(_SKIP_ENV) == "1":
-        return {"status": "skipped",
+        return None, {"status": "skipped",
                 "reason": f"eslint check skipped — {_SKIP_ENV}=1 (unit suite)"}
     if not _ESLINT_CONFIG.exists():
-        return {"status": "skipped", "reason": f"eslint config not found at {_ESLINT_CONFIG}"}
+        return None, {"status": "skipped", "reason": f"eslint config not found at {_ESLINT_CONFIG}"}
 
-    combined = "\n;\n".join(scripts)
-    tmp_dir = Path(plan_dir) / "_verify_state"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    tmp = tmp_dir / "_dashboard_script_check.mjs"
-    tmp.write_text(combined)
-    try:
-        proc = subprocess.run(
-            [
-                "npx", "--no-install", "eslint",
-                "-c", str(_ESLINT_CONFIG),
-                "--format", "json",
-                str(tmp),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except FileNotFoundError as e:
-        return {"status": "skipped", "reason": f"node/npx not available ({e})"}
-    except subprocess.TimeoutExpired:
-        return {"status": "skipped", "reason": "eslint timed out"}
-    finally:
-        tmp.unlink(missing_ok=True)
+    return scripts, None
 
-    if proc.returncode not in (0, 1):
-        return {
-            "status": "skipped",
-            "reason": f"eslint errored (rc={proc.returncode}): {proc.stderr[:400]}",
-        }
+
+def _eslint_verdict(proc):
+    """The finished eslint run, read as a verdict. A pure function of `proc`.
+
+    "skipped" is deliberately distinct from "passed" everywhere here: a run that
+    could not be interpreted must never be reported as clean.
+    """
+    # An EMPTY report is not a clean one: `npx --no-install --offline eslint` exits
+    # 1 with empty stdout on a cache miss (measured 2026-09-07) — the SAME rc as
+    # "found problems", so only the report itself tells those two apart.
     try:
         results = json.loads(proc.stdout or "[]")
     except ValueError:
-        return {"status": "skipped", "reason": "could not parse eslint JSON output"}
+        results = []
+    if proc.returncode not in (0, 1) or not results:
+        return {"status": "skipped",
+                "reason": f"eslint did not lint (rc={proc.returncode}): {proc.stderr[:400]}"}
+
+    # A file eslint declined to lint is NOT a pass. This is the guard for the
+    # base-path hole above: if the scratch file ever lands outside the config's
+    # tree again, the check says so instead of reporting green.
+    for r in results:
+        for m in r.get("messages", []):
+            if m.get("ruleId") is None and "ignored" in (m.get("message") or "").lower():
+                return {"status": "skipped",
+                        "reason": f"eslint did not lint the file: {m.get('message')}"}
 
     errors = []
     for r in results:
@@ -234,6 +223,48 @@ def check_js_parses(plan_dir):
     if errors:
         return {"status": "failed", "errors": errors}
     return {"status": "passed"}
+
+
+def check_js_parses(plan_dir):
+    """Run ESLint ``no-undef`` over PLAN.html's inline status-repaint script.
+
+    Returns a dict with ``status`` in {"passed", "failed", "skipped"}.
+    "skipped" is a deliberately distinct value from "passed" — callers must
+    never treat unavailable tooling as a pass.
+    """
+    scripts, skip = _js_check_preconditions(plan_dir)
+    if skip is not None:
+        return skip
+    combined = "\n;\n".join(scripts)
+    # ESLint 9 flat config silently IGNORES a file outside its base path, and the
+    # base path is the CWD (not the config's dir): exit 0, zero messages, and this
+    # gate read that as "passed" for every real plan until 2026-08-25 (6b45087).
+    # Scratch file beside the config + cwd there are BOTH load-bearing.
+    tmp = _ESLINT_CONFIG.parent / f"_dashboard_script_check.{os.getpid()}.mjs"
+    tmp.write_text(combined)
+    try:
+        proc = subprocess.run(
+            [
+                # --offline: eslint lives only in the npx cache here; without it npx
+                # asks the registry first (16-40 s measured, past the 60 s timeout).
+                "npx", "--no-install", "--offline", "eslint",
+                "-c", str(_ESLINT_CONFIG),
+                "--format", "json",
+                str(tmp),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(_ESLINT_CONFIG.parent),
+        )
+    except FileNotFoundError as e:
+        return {"status": "skipped", "reason": f"node/npx not available ({e})"}
+    except subprocess.TimeoutExpired:
+        return {"status": "skipped", "reason": "eslint timed out"}
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    return _eslint_verdict(proc)
 
 
 # --------------------------------------------------------------------------
@@ -365,47 +396,8 @@ def _p(check, subject, message, tag=None):
     return (check, subject, f"[{tag or check}] {message}")
 
 
-def containment_problems(html_text, manifest):
-    """Every containment problem as ``(check, subject, message)`` triples.
-
-    Pure: takes the page TEXT and the manifest DICT, so a mutation can check the
-    generation it is about to write before writing it.
-    """
-    idx = index_page(html_text)
-    sessions = [s["id"] for s in manifest.get("sessions", [])]
-    items = [it["id"] for it in manifest.get("items", [])]
-    session_set, item_set = set(sessions), set(items)
-    problems = []
-
-    # 1 — every item article inside the <section> its own data-cat names.
-    for a in idx.articles:
-        if a["kind"] != "item":
-            if a["section_cat"] != "sessions":
-                problems.append(_p(
-                    "data-cat", a["id"],
-                    f"session article {a['id']!r} sits in section "
-                    f"data-cat={a['section_cat']!r}, not the 'sessions' section"))
-            continue
-        if a["cat"] != a["section_cat"]:
-            problems.append(_p(
-                "data-cat", a["id"],
-                f"item article {a['id']!r} declares data-cat={a['cat']!r} but sits inside "
-                f"<section data-cat={a['section_cat']!r}> — it renders under the wrong "
-                "heading and its category filter chip will not find it"))
-
-    # 2 — the nav strip is the whole session set, in order.
-    chips = [c for c in idx.strip_chips if c]
-    for sid in sessions:
-        if sid not in set(chips):
-            problems.append(_p(
-                "session-strip", sid,
-                f'session {sid!r} has no chip in <nav class="session-strip"> — the nav is '
-                f"stuck at {len(chips)} of {len(sessions)} sessions"))
-    for c in chips:
-        if c not in session_set:
-            problems.append(_p(
-                "session-strip", c,
-                f"nav chip {c!r} names a session that is in no manifest"))
+def _containment_chip_problems(chips, html_text, idx, item_set, items, problems, session_set, sessions):
+    """Per-chip containment findings: a chip that names a session or item the manifest does not."""
     if set(chips) == session_set and chips != sessions:
         problems.append(_p(
             "session-strip", "order",
@@ -457,6 +449,22 @@ def containment_problems(html_text, manifest):
             f"{sessions} — the 'Up next' panel scans document order, so it would name "
             "the wrong session"))
 
+
+def _containment_orphan_problems(chips, html_text, idx, item_set, items, problems, session_set, sessions):
+    """Sessions and items the dashboard shows that the manifest does not contain."""
+    for sid in sessions:
+        if sid not in set(chips):
+            problems.append(_p(
+                "session-strip", sid,
+                f'session {sid!r} has no chip in <nav class="session-strip"> — the nav is '
+                f"stuck at {len(chips)} of {len(sessions)} sessions"))
+    for c in chips:
+        if c not in session_set:
+            problems.append(_p(
+                "session-strip", c,
+                f"nav chip {c!r} names a session that is in no manifest"))
+    _containment_chip_problems(chips, html_text, idx, item_set, items, problems, session_set, sessions)
+
     # 6 — header totals.
     if idx.header_meta:
         m = _COUNTS_RE.search(idx.header_meta)
@@ -470,6 +478,39 @@ def containment_problems(html_text, manifest):
             "header-totals", "session_total_count",
             f"SESSION_TOTAL_COUNT stamp is {idx.session_total} but the manifest has "
             f"{len(sessions)} sessions"))
+
+
+def containment_problems(html_text, manifest):
+    """Every containment problem as ``(check, subject, message)`` triples.
+
+    Pure: takes the page TEXT and the manifest DICT, so a mutation can check the
+    generation it is about to write before writing it.
+    """
+    idx = index_page(html_text)
+    sessions = [s["id"] for s in manifest.get("sessions", [])]
+    items = [it["id"] for it in manifest.get("items", [])]
+    session_set, item_set = set(sessions), set(items)
+    problems = []
+
+    # 1 — every item article inside the <section> its own data-cat names.
+    for a in idx.articles:
+        if a["kind"] != "item":
+            if a["section_cat"] != "sessions":
+                problems.append(_p(
+                    "data-cat", a["id"],
+                    f"session article {a['id']!r} sits in section "
+                    f"data-cat={a['section_cat']!r}, not the 'sessions' section"))
+            continue
+        if a["cat"] != a["section_cat"]:
+            problems.append(_p(
+                "data-cat", a["id"],
+                f"item article {a['id']!r} declares data-cat={a['cat']!r} but sits inside "
+                f"<section data-cat={a['section_cat']!r}> — it renders under the wrong "
+                "heading and its category filter chip will not find it"))
+
+    # 2 — the nav strip is the whole session set, in order.
+    chips = [c for c in idx.strip_chips if c]
+    _containment_orphan_problems(chips, html_text, idx, item_set, items, problems, session_set, sessions)
 
     # 7 — manifest ⇄ article, both directions.
     doc_ids = {a["id"] for a in idx.articles}
@@ -544,6 +585,10 @@ def run_gate(plan_dir, expected):
     js_failed = js.get("status") == "failed"
     ok = landed_ok and not js_failed
     reasons = list(mismatches)
+    warnings = list(warnings)
+    if js.get("status") == "skipped":  # non-blocking, but never silent
+        warnings.append("dashboard JS gate SKIPPED — the repaint script was NOT linted: "
+                        + str(js.get("reason", "")))
     if js_failed:
         reasons.append(
             "dashboard repaint JS has undefined-identifier error(s) (no-undef): "

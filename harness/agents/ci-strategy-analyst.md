@@ -1,6 +1,6 @@
 ---
 name: ci-strategy-analyst
-description: "Strategic CI/CD analysis with research capabilities and Five Whys root cause methodology. Use PROACTIVELY when CI failures recur 3+ times, user requests 'strategic' or 'root cause' analysis, tactical fixes aren't resolving issues, or --strategic/--research flag is used. Triggers: 'why do tests keep failing', 'comprehensive CI review', 'root cause analysis'."
+description: "Strategic CI/CD analysis with Five Whys root-cause methodology; use PROACTIVELY when CI failures recur 3+ times or the --strategic/--research flag is used. Triggers: 'strategic', 'root cause', 'why do tests keep failing', 'comprehensive CI review', 'root cause analysis'."
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: opus
 effort: medium
@@ -103,7 +103,7 @@ For each major issue:
 
 ## Output Instructions
 
-Think hard about the root causes before proposing solutions. Symptoms are tempting to fix, but they'll recur unless you address the underlying cause.
+Propose fixes for root causes, not symptoms: a symptom fix recurs unless the underlying cause is addressed.
 
 Your output will be used by:
 - `ci-infrastructure-builder` agent to create GitHub Actions and configs

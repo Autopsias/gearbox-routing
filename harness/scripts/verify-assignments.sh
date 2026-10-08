@@ -18,7 +18,7 @@ set -euo pipefail
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 MANIFEST="${MANIFEST:-$CLAUDE_DIR/epic-dev-assignments.yaml}"
 AGENTS_DIR="$CLAUDE_DIR/agents"
-PHASE_DIR="$CLAUDE_DIR/commands/references/epic-dev/full"
+PHASE_DIR="$CLAUDE_DIR/references/epic-dev/full"
 
 for p in "$MANIFEST" "$AGENTS_DIR" "$PHASE_DIR"; do
   [[ -e "$p" ]] || { echo "FATAL: missing required path: $p" >&2; exit 2; }

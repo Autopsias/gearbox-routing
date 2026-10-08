@@ -7,7 +7,7 @@ and THIS file gets the fix.
 
 | # | Surface | Edit | Verified by |
 |---|---|---|---|
-| 1 | `~/.claude/model-routing.yaml` | Apply approved diffs to `prices:` / `task_classes:` / `effort_policy:` / `agents:` / `main_session:` / `degradation:`(mirror) / `fanout_policy:`; **bump `version:`**, update `last_reviewed:`; append (never overwrite) a dated `DECISION HISTORY` entry citing the changeset file | guard (a)–(e) downstream |
+| 1 | `~/.claude/model-routing.yaml` | Apply approved diffs to `prices:` / `task_classes:` / `effort_policy:` / `agents:` / `main_session:` / `degradation:`(mirror) / `fanout_policy:`; **bump `version:`**, update `last_reviewed:`; append (never overwrite) a dated `DECISION HISTORY` entry citing the changeset file. **Maintain `value_epoch:`** (v1.17): if the changeset moved ANY routing-affecting value (task_classes, providers, agents, main_session, prices, degradation), set `value_epoch:` to the NEW version; a record-only changeset leaves it unchanged — the outcome aggregator's proposal pool spans `value_epoch..version`, so getting this wrong either discards evidence (too high) or pools across different mappings (too low) | guard (a)–(e) downstream |
 | 2 | `~/.claude/skills/plan-execute/scripts/run.py` | If the degradation ladder or the set of effort tiers changed: edit `_FALLBACK_LADDER` / `_REASONING_DIRECTIVE` **before or with** step 1 — code is authoritative, SSOT mirrors it | guard check (d) |
 | 3 | `~/.claude/epic-dev-assignments.yaml` | If any `epic-*` pin changed: edit here (authoritative), then mirror the SSOT `agents:` rows | `verify-assignments.sh` (guard sub-check f) |
 | 4 | `~/.claude/agents/*.md` frontmatter | Re-pin `model:` / `effort:` for every agent row that changed. Invariant: a `model: haiku` agent carries **no** `effort:` key at all | guard checks (a)+(b) |
@@ -16,7 +16,7 @@ and THIS file gets the fix.
 | 7 | **Prose-CONTENT propagation — the three consumer skills** | **The gap this step exists to close:** guard check (c) compares only the stamp *version*; it never diffs the prose's recommended models, efforts, prices or costs against the SSOT. So a changeset can bump every stamp, go green, and leave every skill recommending superseded values. See §"Step 7 in full" below | `scripts/check_stale_values.py` + the per-skill read |
 | 8 | `~/.claude/settings.json` | Align `model` with `main_session.advisory_default` family and `effortLevel` with `main_session.default_effort` — **re-confirm with the operator** (user-owned file; changes every future session's default) | guard settings warn-check (full mode) |
 | 9 | Hook regexes | ONLY if the `consumers:` set changed: extend `ROUTING_PREFIXES` (`githooks/pre-commit`) and `ROUTING_AFFECTING` (`githooks/commit-msg`) in lockstep | guard surface-list convergence check |
-| 10 | Guard | `bash ~/.claude/scripts/verify-routing.sh --full` must PASS. On failure: fix the surface (or the SSOT if it's wrong) and re-run — never loosen the guard, never `--no-verify` | itself |
+| 10 | Guard | `CLAUDE_DIR=$PWD bash scripts/verify-routing.sh --full`, run from `~/your-private-harness`, must PASS. **Without `CLAUDE_DIR` the guard checks the DEPLOYED `~/.claude`, not your edits, and passes on nothing** (2026-09-19: green with 5 stale stamps and a stale digest in the source tree; the header line prints `claude_dir=` — read it). The same variable points `render-routing-digest.py` (step 5) at the source `CLAUDE.md`. On failure: fix the surface (or the SSOT if it's wrong) and re-run — never loosen the guard, never `--no-verify` | itself |
 | 11 | Commit | Stage ONLY the routing surfaces + changeset file; commit message includes `routing-pin-change: approved-by-operator <YYYY-MM-DD>` (checked by commit-msg hook). Hooks stay ON | pre-commit + commit-msg hooks |
 | 12 | Deploy | All of steps 1–11 happen in the source worktree `~/your-private-harness`, not in `~/.claude` directly. After the commit: push, then `gearbox-deploy` (or `git -C ~/.claude pull --ff-only`) to fast-forward the deploy target, and confirm the guard is green there too | `bash ~/.claude/scripts/verify-routing.sh --full` re-run in `~/.claude` |
 
@@ -62,7 +62,7 @@ stale until the next `gearbox deploy` — a source-only fix isn't live for Codex
   `SKILL.md` (inline rubric prose), `codex/SKILL.md` (the rendered Codex port — unregistered,
   see step 6). Check: does every model/effort/cost cell match the SSOT's resolved pins for
   **both** providers?
-- **`/plan-harden`** — `commands/references/plan-harden/model-lint.md`. This file's rules
+- **`/plan-harden`** — `references/plan-harden/model-lint.md`. This file's rules
   are what re-model a plan, so a stale rule silently re-models every future plan. Check:
   does each rule still resolve through `resolve_route.resolve()` rather than a hardcoded
   tier, and does its prose rationale cite a premise the SSOT still holds? (Precedent: its

@@ -30,6 +30,14 @@ ONCE per run.
    inevitably drift apart). Moderate overlap → create new and name the
    consolidation candidate inside it. Then update the `MEMORY.md` index line
    per the memory conventions.
+   **Same problem found again** → the note did not prevent the repeat. Still
+   update the note, and also list the problem in the run's final report under
+   'Remove the cause candidates': the note's name, the two occurrences, and the
+   exact change that would make the mistake impossible (a check, a pinned
+   default, a code change). Append `Remove-the-cause candidate (open): <change>
+   -- <plan slug> <date>` as the last line of that note so `/improve` can find
+   it. 'Remove the cause' is defined in `commands/improve.md` section 4a. Only
+   propose; never apply a candidate outside the plan's scope without the owner's yes.
 
 ## Memory maintenance (when capture touches existing memories)
 

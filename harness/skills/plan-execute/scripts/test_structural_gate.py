@@ -22,6 +22,7 @@ Run: pytest plan-execute/scripts/test_structural_gate.py -q
 
 import json
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -151,6 +152,92 @@ def test_check_js_parses_the_real_dashboard_script(tmp_path, monkeypatch):
             "the real dashboard-JS parse was skipped by the speed-up flag — this "
             "test exists to run it for real"
         )
+        # ...nor by eslint declining to look. This assertion is why the gate was
+        # dead for six days while this very test stayed green: "outside of base
+        # path" is an honest skip, so it slipped through the clause above.
+        assert "outside of base path" not in result["reason"], (
+            "eslint ignored the scratch file — the check linted NOTHING. Its base "
+            "path is the CWD, so check_js_parses must run eslint with "
+            "cwd=_ESLINT_CONFIG.parent (measured 2026-08-25)"
+        )
+
+
+@pytest.mark.parametrize("rc,stdout", [(1, ""), (0, ""), (1, "["), (0, "[]")])
+def test_an_eslint_run_that_LINTED_NOTHING_is_not_a_pass(rc, stdout):
+    """The second way this gate went blind. `npx --no-install --offline eslint`
+    exits 1 with EMPTY stdout when eslint is not in the npx cache, and rc=1 is also
+    eslint's "found problems" code — so an empty report read as a clean one. On
+    GitHub's runner that made the PLANTED-identifier probe below report `passed`
+    (measured 2026-09-07). Only the report tells "clean" from "never ran"."""
+    proc = SimpleNamespace(returncode=rc, stdout=stdout, stderr="npm error code ENOTCACHED")
+    assert sg._eslint_verdict(proc)["status"] == "skipped"
+
+
+def test_a_PLANTED_undefined_identifier_is_CAUGHT(tmp_path, monkeypatch):
+    """KNOWN POSITIVE — the only test that proves this gate can fail at all.
+
+    Every "does it pass?" assertion above was green for six days while eslint
+    was ignoring the file entirely (base path = CWD, not the config's dir). A
+    plant is the only probe that tells "clean" apart from "never looked"."""
+    monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
+    plan_dir = make_plan(tmp_path, [SESS])
+    # RUN FROM A DIRECTORY THAT IS NOT AN ANCESTOR OF THE CONFIG. Without this
+    # the probe is broken: in the SOURCE tree the eslint config lives under the
+    # repo root, so a subprocess inheriting the repo-root cwd lints the file
+    # happily and the base-path bug cannot reproduce — measured 2026-08-25, the
+    # neuter passed 10/10 until this line was added. In the DEPLOYED tree
+    # (~/.claude) the config is outside the plan's repo, which is where the gate
+    # actually ran dead for six days.
+    monkeypatch.chdir(tmp_path)
+    html = plan_dir / "PLAN.html"
+    text = html.read_text()
+    marker = "<script>"
+    assert marker in text
+    # PLANT: reference an identifier nothing declares — the 2026-06-06
+    # `isOpus is not defined` class that froze the dashboard nav.
+    text = text.replace(marker, marker + "\nvoid mostDefinitelyNotDeclaredAnywhere;\n", 1)
+    html.write_text(text)
+
+    result = sg.check_js_parses(plan_dir)
+    if result["status"] == "skipped":
+        # A skip is acceptable ONLY for genuinely absent tooling. "outside of base
+        # path" is the DEAD-GATE symptom this probe exists to catch — skipping on
+        # it rebuilds the very loophole being fixed (measured 2026-08-25: the first
+        # version of this probe did exactly that and reported "2 skipped").
+        assert "outside of base path" not in result.get("reason", ""), result
+        pytest.skip(f"eslint unavailable on this host: {result.get('reason')}")
+    assert result["status"] == "failed", result
+    assert "mostDefinitelyNotDeclaredAnywhere" in json.dumps(result), result
+
+
+def test_a_SCRIPT_TAG_INSIDE_AN_HTML_COMMENT_is_not_extracted(tmp_path, monkeypatch):
+    """base-template.html explains the repaint/audit split in prose containing the
+    literal text `<script>`. The extraction regex matched that COMMENT as a real
+    tag — no `data-layout-audit` before its `>`, so the exclusion never fired —
+    and fed eslint English, failing 3 of the last 4 real plans with
+    `Parsing error: Unexpected token nav` (measured 2026-08-25)."""
+    monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
+    plan_dir = make_plan(tmp_path, [SESS])
+    monkeypatch.chdir(tmp_path)
+    html = plan_dir / "PLAN.html"
+    text = html.read_text()
+    planted = (
+        "<!--\n"
+        "     <script> (the nav repaint above); this block carries prose, not code,\n"
+        "     and must never reach the linter.\n"
+        "-->\n"
+    )
+    html.write_text(text.replace("<script>", planted + "<script>", 1))
+
+    result = sg.check_js_parses(plan_dir)
+    if result["status"] == "skipped":
+        # A skip is acceptable ONLY for genuinely absent tooling. "outside of base
+        # path" is the DEAD-GATE symptom this probe exists to catch — skipping on
+        # it rebuilds the very loophole being fixed (measured 2026-08-25: the first
+        # version of this probe did exactly that and reported "2 skipped").
+        assert "outside of base path" not in result.get("reason", ""), result
+        pytest.skip(f"eslint unavailable on this host: {result.get('reason')}")
+    assert result["status"] == "passed", result
 
 
 def test_run_gate_combines_both_checks(tmp_path):
@@ -281,3 +368,35 @@ def test_verify_finalize_reworks_when_session_write_silently_fails(tmp_path, mon
     out = vfy.verify_finalize(plan_dir, "s01")
     assert out["action"] in ("rework", "halted")
     assert out["gate"] == "structural"
+
+
+def test_run_gate_surfaces_a_skipped_js_check_as_a_warning(tmp_path, monkeypatch):
+    """A skipped lint must not block, but it must be visible outside `js_check`."""
+    plan_dir = make_plan(tmp_path, [SESS])
+    _begin_doing(plan_dir, "s01")
+    ab.apply_mutation(plan_dir / "PLAN.html", "s01", status="DONE", note="x")
+    monkeypatch.setattr(
+        sg, "check_js_parses", lambda _p: {"status": "skipped", "reason": "eslint timed out"}
+    )
+    result = sg.run_gate(plan_dir, {"s01": "DONE"})
+    assert result["status"] == "passed"
+    assert any("NOT linted" in w and "eslint timed out" in w for w in result["warnings"])
+    # and a passing lint adds no such line
+    monkeypatch.setattr(sg, "check_js_parses", lambda _p: {"status": "passed"})
+    assert not any("NOT linted" in w for w in sg.run_gate(plan_dir, {"s01": "DONE"})["warnings"])
+
+
+def test_eslint_is_spawned_offline(monkeypatch, tmp_path):
+    """The npx argv must carry --offline: without it each spawn asks the registry
+    (16-40 s measured) and can outrun the 60 s timeout into a silent skip."""
+    seen = {}
+
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        raise FileNotFoundError("stop here")
+
+    monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
+    monkeypatch.setattr(sg, "_js_check_preconditions", lambda _p: (["1;"], None))
+    monkeypatch.setattr(sg.subprocess, "run", fake_run)
+    assert sg.check_js_parses(tmp_path)["status"] == "skipped"
+    assert "--offline" in seen["argv"]

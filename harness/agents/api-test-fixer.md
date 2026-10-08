@@ -1,6 +1,6 @@
 ---
 name: api-test-fixer
-description: "Fixes API endpoint test failures, HTTP client issues, and API contract validation problems. Expert in REST APIs, async testing, and dependency injection. Works with Flask, Django, FastAPI, Express, and other web frameworks. Examples: 'FastAPI test 422 error', 'mock injection failing', 'API contract mismatch', 'endpoint returns wrong status'."
+description: "Fixes API endpoint test failures, HTTP client issues, and API contract validation problems (Flask, Django, FastAPI, Express). Examples: 'FastAPI test 422 error', 'mock injection failing', 'API contract mismatch', 'endpoint returns wrong status'."
 tools: Read, Edit, MultiEdit, Bash, Grep, Glob, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: medium

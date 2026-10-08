@@ -1,7 +1,7 @@
 """Orchestrator-managed git worktree isolation for a `parallel_group`.
 
 The contract this implements: ``../references/parallel-group-contract.md``
-(contract v1, FROZEN by plan session S06). Read it first — this module is its
+(contract v2, amended 2026-08-15). Read it first — this module is its
 mechanism, not its source of truth. The verdict fixes the mechanism by name:
 
     "A parallel group MAY declare worktree isolation. The mechanism is
@@ -42,6 +42,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import group_scope as gs
 import parallel_contract as pc
 import run_state_io as rsi
 import ship_state_io as ssio
@@ -91,10 +92,24 @@ def git(args, cwd, *, check=False, strip=True, timeout=GIT_TIMEOUT):
     stdout shifts that line left by one and every path parsed out of it loses its
     first character — which is exactly how the containment check silently stopped
     matching declared paths the first time this was written.
+
+    A `git` binary missing from ``PATH`` degrades to rc 127 (the shell's own
+    "command not found" convention) rather than letting ``subprocess.run``'s
+    ``FileNotFoundError`` propagate — every caller here already handles a
+    nonzero rc through its normal refuse/degrade path (``check=True`` raises
+    ``WorktreeError`` the same as any other git failure; ``repo_root`` and
+    friends just return None/False), so a test that strips ``PATH`` to
+    isolate an UNRELATED dependency check (REG-02's registry scan runs during
+    every `begin`, git-repo or not) must not crash on this instead.
     """
-    p = subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout
-    )
+    try:
+        p = subprocess.run(
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout
+        )
+    except FileNotFoundError as e:
+        if check:
+            raise WorktreeError(f"git {' '.join(args)} failed in {cwd}: {e}") from e
+        return 127, "", str(e)
     if check and p.returncode != 0:
         raise WorktreeError(
             f"git {' '.join(args)} failed in {cwd} (rc={p.returncode}): "
@@ -215,19 +230,8 @@ def _save(plan_dir, group, state):
 
 
 def _exclude_worktree_dir(root):
-    """Keep `.plan-worktrees/` out of `git status` without touching a tracked file."""
-    exclude = Path(root) / ".git" / "info" / "exclude"
-    entry = f"/{WORKTREE_DIRNAME}/"
-    try:
-        exclude.parent.mkdir(parents=True, exist_ok=True)
-        current = exclude.read_text() if exclude.exists() else ""
-        if entry not in current.splitlines():
-            exclude.write_text(current + ("" if current.endswith("\n") or not current else "\n")
-                               + entry + "\n")
-    except OSError:
-        # A worktree-of-a-worktree has `.git` as a file, not a directory. Not
-        # fatal: the dir just shows up as untracked, which the baseline records.
-        pass
+    """Keep `.plan-worktrees/` out of `git status`. See `group_scope`."""
+    gs.exclude_worktree_dir(root, WORKTREE_DIRNAME)
 
 
 def ensure_group(plan_dir, group, *, project_root):
@@ -237,6 +241,11 @@ def ensure_group(plan_dir, group, *, project_root):
     branches from that exact sha. Contract §3 rule 7's baseline (HEAD, branch,
     pre-existing dirty state) is recorded here too — before any member runs, so
     it genuinely describes what was in the tree beforehand.
+
+    UNDER PLAN ISOLATION all three are read in the PLAN WORKTREE (V3-1/V3-2): the
+    base is the plan branch's tip, and the baseline is the plan's tree, so a
+    NEIGHBOUR plan's dirty files can no longer surface as this group's strays.
+    `repo_root` stays the OUTER checkout — see `group_scope.group_roots`.
     """
     state = load_state(plan_dir, group)
     if state:
@@ -248,19 +257,22 @@ def ensure_group(plan_dir, group, *, project_root):
             f"{project_root} is not inside one. Remove the isolation declaration to run "
             "the group in a shared tree."
         )
-    _, head, _ = git(["rev-parse", "HEAD"], root, check=True)
-    _, branch, _ = git(["rev-parse", "--abbrev-ref", "HEAD"], root, check=True)
+    root, merge_root, slug = gs.group_roots(plan_dir, root)
+    _, head, _ = git(["rev-parse", "HEAD"], merge_root, check=True)
+    _, branch, _ = git(["rev-parse", "--abbrev-ref", "HEAD"], merge_root, check=True)
     _exclude_worktree_dir(root)
     state = {
         "group": group,
         "repo_root": str(root),
+        "merge_root": str(merge_root),
+        "plan_slug": slug,
         # PINNED. S02 §4: never assume a worktree's base — pass it and verify it.
         "base_ref": head,
         "base_branch": branch,
         # Contract §3 rule 7 — what was already dirty BEFORE the group ran, so
         # integration can tell a member's stray write from a pre-existing edit
         # and never sweep an unrelated change into the group's commit.
-        "baseline_dirty": _status_paths(_porcelain(root)),
+        "baseline_dirty": _status_paths(_porcelain(merge_root)),
         "members": {},
         "merged": [],
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -275,8 +287,10 @@ def ensure_group(plan_dir, group, *, project_root):
 # --------------------------------------------------------------------------
 # Member worktrees
 # --------------------------------------------------------------------------
-def member_branch(group, session_id):
-    return f"{BRANCH_PREFIX}/{group}/{session_id}"
+def member_branch(group, session_id, plan_slug=None):
+    """``plan/<group>/<sid>``; ``plan/<slug>__<group>__<sid>`` under isolation
+    (operator decision 2026-08-22 — ``group_scope`` holds the measurement)."""
+    return f"{BRANCH_PREFIX}/{gs.member_dirname(group, session_id, plan_slug)}"
 
 
 def member_path(plan_dir, session_id):
@@ -319,8 +333,8 @@ def prepare_members(plan_dir, manifest, session_ids, *, project_root):
         state = ensure_group(plan_dir, group, project_root=project_root)
         root = Path(state["repo_root"])
         base = state["base_ref"]
-        branch = member_branch(group, sid)
-        path = root / WORKTREE_DIRNAME / group / sid
+        branch = member_branch(group, sid, state.get("plan_slug"))
+        path = root / WORKTREE_DIRNAME / gs.member_dirname(group, sid, state.get("plan_slug"))
         if n:
             _stagger()
         if not path.is_dir():
@@ -381,6 +395,50 @@ def prompt_preamble(path, branch, base_ref):
     )
 
 
+def resolve_evidence_path(plan_dir, session_id, raw):
+    """Where a declared evidence path actually lives.
+
+    For an ISOLATED PARALLEL MEMBER the artifacts are written inside that
+    member's own worktree and are NOT in the shared checkout until the
+    integration merge — so the member's worktree is searched FIRST (its copy of
+    the plan directory, then its repo root), exactly as ``gate_cwd`` does for
+    argv gates. Otherwise, and as the fallback, the pre-existing order holds:
+    the plan directory, then cwd.
+    """
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    roots = []
+    member = member_path(plan_dir, session_id)
+    if member:
+        root = repo_root(plan_dir)
+        if root:
+            try:
+                rel = Path(plan_dir).resolve().relative_to(Path(root).resolve())
+                roots.append(Path(member) / rel)
+            except ValueError:
+                pass
+        roots.append(Path(member))
+    roots += [Path(plan_dir), Path.cwd()]
+    for r in roots:
+        cand = r / path
+        if cand.exists():
+            return cand
+    return Path(plan_dir) / path
+
+
+def _hooks_rewrote_the_tree(path):
+    """True when a failed commit left UNSTAGED edits behind — a formatting hook
+    rewriting what it was given (all was staged a moment ago, so a dirty worktree
+    column is the hook's doing). A real refusal — ratchet, lint, rejected message
+    — leaves the tree as staged, stays False, and surfaces. ``strip=False`` and
+    counting ``??`` are load-bearing: see test_worktree.py."""
+    rc, out, _ = git(["status", "--porcelain"], path, strip=False)
+    if rc != 0:
+        return False
+    return any(ln[1] != " " for ln in out.splitlines() if len(ln) > 1)
+
+
 def commit_member(plan_dir, manifest, session_id, message):
     """Commit an isolated member's worktree ON ITS OWN BRANCH. Orchestrator-only.
 
@@ -405,10 +463,17 @@ def commit_member(plan_dir, manifest, session_id, message):
             "work that has no checkout. Nothing here removes a worktree implicitly, so "
             "this was removed out of band."
         )
-    if not _porcelain(path):
+    import plan_ship    # lazy (cycle). Never stages the FROZEN `_plans/` copy: §8.b
+    if not _porcelain(path) or not plan_ship.stage(path):     # refuses ships over it
         return None
-    git(["add", "-A"], path, check=True)
     rc, out, err = git(["commit", "-m", message], path)
+    if rc != 0 and _hooks_rewrote_the_tree(path):
+        # A formatting pre-commit hook (trailing-whitespace, end-of-file-fixer,
+        # a formatter) fails the FIRST commit and fixes the files in place; the
+        # standard response is to re-stage and commit again. Without this the
+        # orchestrator halts the whole plan on a hook that already did its job.
+        plan_ship.stage(path)
+        rc, out, err = git(["commit", "-m", message], path)
     if rc != 0:
         # `git add -A` respects .gitignore, so an all-ignored worktree can stage
         # nothing. Say so instead of failing opaquely — the content is still on
@@ -458,9 +523,13 @@ def containment_report(plan_dir, manifest, group):
       * ``empty`` (WARNING): a member's branch has no commits and its worktree is
         clean. Legitimate for a session that had nothing to write, and the
         signature of one that worked somewhere else entirely.
+
+    "The shared tree" is the group's MERGE ROOT — the plan worktree under
+    isolation (V3-2 §3 rules 6-7), so a neighbour plan's dirty file in the
+    operator's checkout is not in this report's input at all.
     """
     state = load_state(plan_dir, group) or {}
-    root = Path(state.get("repo_root") or plan_dir)
+    root = gs.merge_root(state, plan_dir)
     baseline = set(state.get("baseline_dirty") or [])
     dirty_now = [p for p in _status_paths(_porcelain(root)) if p not in baseline]
     dirty_now = [p for p in dirty_now if not _under_plan_dir(plan_dir, root, p)
@@ -483,7 +552,8 @@ def containment_report(plan_dir, manifest, group):
 
 
 def merge_group(plan_dir, manifest, group, *, integration_session):
-    """Producer-first merge of every member branch into the shared tree.
+    """Producer-first merge of every member branch into the group's MERGE ROOT —
+    the PLAN WORKTREE under isolation (V3-2 §3 rule 5), never the primary checkout.
 
     Order is manifest document order (see ``group_members``). A conflict ABORTS
     the merge and returns ``status: "conflict"`` with every branch intact — never
@@ -497,27 +567,35 @@ def merge_group(plan_dir, manifest, group, *, integration_session):
     state = load_state(plan_dir, group)
     if not state:
         raise WorktreeError(f"no worktree state for parallel_group {group!r}")
-    root = Path(state["repo_root"])
+    root = gs.merge_root(state, plan_dir)
+    slug = state.get("plan_slug")
     order = [s["id"] for s in group_members(manifest, group)]
     contain = containment_report(plan_dir, manifest, group)
     if contain["stray"]:
-        return {"status": "containment", "group": group, "order": order,
+        return {"status": "containment", "group": group, "order": order, "merge_root": str(root),
                 "containment": contain, "merged": [], "base_ref": state["base_ref"],
-                "branches": {sid: member_branch(group, sid) for sid in order}}
+                "branches": {sid: member_branch(group, sid, slug) for sid in order}}
 
-    merged, already = [], set(state.get("merged") or [])
+    # The integration session's review base is the tree BEFORE these merges; derived
+    # at its later first dispatch it is the merged tip and the gates review nothing.
+    import review_context as rvc  # noqa: PLC0415 — lazy: it imports plan_scope → worktree
+    pre_merge = rvc.head_sha(root)  # THIS round's start: the only safe reset target
+    rvc.record_base(plan_dir, integration_session, pre_merge)
+    # Skip only the tip already merged (old state re-merges once: "Already up to date").
+    merged, tips = [], state.get("merged_tips") or {}
     for sid in order:
         entry = (state.get("members") or {}).get(sid)
         if not entry:
             return {"status": "missing-member", "group": group, "session": sid,
                     "order": order, "merged": merged, "containment": contain,
-                    "base_ref": state["base_ref"]}
+                    "base_ref": state["base_ref"], "merge_root": str(root)}
         branch = entry["branch"]
-        if sid in already:
+        tip = git(["rev-parse", branch], root)[1]
+        if tips.get(sid) == tip:
             continue
         rc, out, err = git(
             ["merge", "--no-ff", "--no-edit", "-m",
-             f"plan({group}): merge {sid} for {integration_session}", branch],
+             f"chore(plan-{group}): merge {sid} for {integration_session}", branch],
             root,
         )
         if rc != 0:
@@ -529,24 +607,100 @@ def merge_group(plan_dir, manifest, group, *, integration_session):
             return {
                 "status": "conflict", "group": group, "session": sid, "branch": branch,
                 "order": order, "merged": merged, "containment": contain,
-                "base_ref": state["base_ref"],
+                "base_ref": state["base_ref"], "merge_root": str(root), "pre_merge": pre_merge,
                 "files": [f for f in conflicted.splitlines() if f.strip()],
-                "branches": {m: member_branch(group, m) for m in order},
+                "branches": {m: member_branch(group, m, slug) for m in order},
                 "detail": (err or out).strip(),
             }
         merged.append(sid)
         state["merged"] = sorted(set(state.get("merged") or []) | {sid})
+        state.setdefault("merged_tips", {})[sid] = tip
         _save(plan_dir, group, state)
         rsi.log_event(plan_dir, "worktree_merged", session_ids=[integration_session],
                       group=group, member=sid, branch=branch)
     return {"status": "merged", "group": group, "order": order, "merged": merged,
             "containment": contain, "base_ref": state["base_ref"],
-            "branches": {sid: member_branch(group, sid) for sid in order}}
+            "branches": {sid: member_branch(group, sid, slug) for sid in order}}
 
 
 # --------------------------------------------------------------------------
 # Cleanup — explicit, last, and never the S02 §6 shape
 # --------------------------------------------------------------------------
+def _unlock_worktree(root, path):
+    """``git worktree unlock`` if ``path`` is registered locked, else a
+    no-op. Returns a note ONLY when the documented LAST RESORT fired.
+
+    Skipping this before ``remove``/``prune`` is the documented dead end:
+    ``prune`` refuses a locked worktree BY DESIGN, so the registration
+    survives forever and a later ``git worktree add`` at this path fails
+    with "missing but locked working tree". ``unlock`` on an unlocked (or
+    unregistered) path just errors "not locked" — ignored, not a problem.
+    When ``unlock`` itself fails for some OTHER reason while the entry is
+    still locked (rare git-admin corruption), the last resort is removing
+    ``.git/worktrees/<name>/locked`` by hand — reported here so it is never
+    silent."""
+    rc, _, err = git(["worktree", "unlock", str(path)], root)
+    if rc == 0 or "not locked" in err.lower():
+        return None
+    admin = gs.worktree_admin_dir(root, path)  # via the SHARED git dir
+    marker = admin / "locked" if admin else None
+    if marker and marker.exists():
+        try:
+            marker.unlink()
+            return f"`git worktree unlock` failed ({err}); hand-removed {marker}"
+        except OSError as e:
+            return f"could not unlock or hand-remove the lock for {path}: {err} / {e}"
+    return f"could not unlock {path}: {err}"
+
+
+def teardown_worktree(root, path, force):
+    """One member's worktree teardown. Fixed order: repair (a harmless no-op
+    unless the worktree's git-admin links drifted) -> the dirty-content
+    refusal -> unlock -> remove. Never raises: any git failure here is
+    reported as ``"preserved"`` rather than propagated, so one bad entry
+    never aborts the rest of a cleanup/sweep pass.
+
+    Returns ``(status, extra)``:
+      * ``"preserved"``, ``{...}``  — refused, left in place, reported.
+      * ``"removed"``,   note|None  — gone, normal path.
+      * ``"recovered"``, note|None  — the directory was already gone; the
+        dead git-admin registration was reclaimed via unlock + an immediate
+        ``prune``, since there was nothing left to ``remove``. Pruning HERE
+        (not only in the caller's final pass) matters: git still treats the
+        branch as "used by worktree at <gone path>" — and refuses `branch
+        -d` — until the dead registration is actually pruned away, and the
+        caller's branch-deletion attempt for THIS member runs immediately
+        after this call returns.
+
+    ``repair`` runs BEFORE the dirty-content check on purpose: a worktree
+    whose whole project root moved has a git-admin link broken in BOTH
+    directions (git 2.48.1, measured) — including the worktree's OWN
+    ``.git`` file — so ``git status`` inside it would raise before repair
+    ever ran.
+    """
+    try:
+        if path.is_dir():
+            git(["worktree", "repair", str(path)], root)
+            all_leftovers = _porcelain(path, ignored=True)
+            leftovers = [ln for ln, p in zip(all_leftovers, _status_paths(all_leftovers))
+                         if not _is_cache(p)]
+            if leftovers and not force:
+                return "preserved", {"path": str(path), "content": leftovers[:20],
+                                      "caches_ignored": len(all_leftovers) - len(leftovers)}
+            note = _unlock_worktree(root, path)
+            rc, _, err = git(
+                ["worktree", "remove", *(["--force"] if force else []), str(path)], root
+            )
+            if rc != 0:
+                return "preserved", {"path": str(path), "error": err}
+            return "removed", note
+        note = _unlock_worktree(root, path)
+        git(["worktree", "prune"], root)
+        return "recovered", note
+    except WorktreeError as e:
+        return "preserved", {"path": str(path), "error": str(e)}
+
+
 def cleanup_group(plan_dir, group, *, force=False):
     """Remove member worktrees and branches. Contract §4: explicit and LAST.
 
@@ -556,45 +710,58 @@ def cleanup_group(plan_dir, group, *, force=False):
     check on an explicit operator decision; nothing overrides the branch check,
     which uses ``git branch -d`` (never ``-D``), so a branch carrying unmerged
     commits always survives.
+
+    Teardown order per member is FIXED and non-negotiable: ``unlock`` ->
+    ``remove`` -> ``branch -d`` -> the final ``worktree prune`` (see
+    ``teardown_worktree``/``_unlock_worktree`` for the two recoveries
+    — a locked-and-hand-deleted directory, and a whole-project move — that
+    order exists to close.
+
+    The member's path is recomputed STRUCTURALLY (``root / WORKTREE_DIRNAME /
+    group_scope.member_dirname(...)`` — the same derivation ``prepare_members``
+    used to create it, reading the ``plan_slug`` the state file recorded)
+    rather than trusted from the recorded ``entry["path"]``: after a
+    whole-project move, ``root`` (re-resolved fresh from ``plan_dir``'s
+    CURRENT location) is correct while the recorded absolute strings are not.
     """
     state = load_state(plan_dir, group)
     if not state:
         return {"status": "noop", "group": group, "reason": "no worktree state"}
-    root = Path(state["repo_root"])
-    removed, preserved, branches_kept = [], [], []
+    root = repo_root(plan_dir) or Path(state["repo_root"])
+    # `branch -d` is judged against the CURRENT branch, so it asks the MERGE ROOT:
+    # under isolation a member merges into the plan branch, and the outer checkout
+    # (on `main`) would call every one unmerged and keep every ref forever.
+    broot = gs.merge_root(state, plan_dir, fallback=root)
+    removed, recovered, preserved, branches_kept, notes = [], [], [], [], []
     for sid, entry in sorted((state.get("members") or {}).items()):
-        path = Path(entry["path"])
-        if path.is_dir():
-            all_leftovers = _porcelain(path, ignored=True)
-            leftovers = [ln for ln, p in zip(all_leftovers, _status_paths(all_leftovers))
-                         if not _is_cache(p)]
-            if leftovers and not force:
-                preserved.append({"session": sid, "path": str(path),
-                                  "content": leftovers[:20],
-                                  "caches_ignored": len(all_leftovers) - len(leftovers)})
-                continue
-            rc, _, err = git(["worktree", "remove", *(["--force"] if force else []), str(path)],
-                             root)
-            if rc != 0:
-                preserved.append({"session": sid, "path": str(path), "error": err})
-                continue
+        path = root / WORKTREE_DIRNAME / gs.member_dirname(group, sid, state.get("plan_slug"))
+        branch = entry["branch"]
+        status, extra = teardown_worktree(root, path, force)
+        if status == "preserved":
+            preserved.append({"session": sid, **extra})
+            continue
+        if extra:
+            notes.append(extra)
+        if status == "recovered":
+            recovered.append(sid)
         # Only report a branch as KEPT when it is actually still there — a second
         # cleanup pass would otherwise list every branch the first pass deleted,
         # which reads as "unmerged work survived" when nothing survived.
-        if git(["rev-parse", "--verify", "--quiet", f"refs/heads/{entry['branch']}"], root)[0] == 0:
-            rc_b, _, err_b = git(["branch", "-d", entry["branch"]], root)
+        if git(["rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"], broot)[0] == 0:
+            rc_b, _, err_b = git(["branch", "-d", branch], broot)
             if rc_b != 0:
-                branches_kept.append({"session": sid, "branch": entry["branch"],
-                                      "reason": err_b})
+                branches_kept.append({"session": sid, "branch": branch, "reason": err_b})
         removed.append(sid)
     git(["worktree", "prune"], root)
     state["cleaned_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     _save(plan_dir, group, state)
     rsi.log_event(plan_dir, "worktree_cleanup", session_ids=[], group=group,
-                  removed=removed, preserved=[p["session"] for p in preserved],
-                  branches_kept=[b["branch"] for b in branches_kept])
+                  removed=removed, recovered=recovered,
+                  preserved=[p["session"] for p in preserved],
+                  branches_kept=[b["branch"] for b in branches_kept], notes=notes)
     return {"status": "cleaned" if not preserved else "partial", "group": group,
-            "removed": removed, "preserved": preserved, "branches_kept": branches_kept}
+            "removed": removed, "recovered": recovered, "preserved": preserved,
+            "branches_kept": branches_kept, "notes": notes}
 
 
 def group_status(plan_dir, manifest, group):
@@ -613,9 +780,9 @@ def group_status(plan_dir, manifest, group):
             "commits_ahead_of_base": int(ahead or 0),
             "dirty": _porcelain(path) if alive else [],
         }
-    return {"group": group, "base_ref": state["base_ref"],
+    return {"group": group, "base_ref": state["base_ref"], "members": members,
             "base_branch": state.get("base_branch"), "repo_root": state["repo_root"],
-            "merged": state.get("merged") or [], "members": members,
+            "merge_root": state.get("merge_root"), "merged": state.get("merged") or [],
             "containment": containment_report(plan_dir, manifest, group)}
 
 

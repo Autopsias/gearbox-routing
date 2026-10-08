@@ -132,9 +132,14 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
 - **`out_of_scope`** (array of strings, optional; 2026-08-01, wayfinder-derived) — work consciously ruled beyond this plan. Rendered as a static "Out of scope" dashboard section and carried into `manifest.json`. The rule that gives it teeth: an entry here **never graduates into a session** — it returns only as a fresh plan if the goal is redrawn. The closing acceptance review reads it to check nothing ruled out got built anyway, and accumulated closeout `deviations` are judged against it.
 - **`open_questions`** (array of strings, optional; 2026-08-01) — the fog register: decisions the interview surfaced but could not state sharply enough to resolve or assign to a decision session. Each entry should name the question plus what would sharpen it (e.g. "Which auth provider? — sharpens after the s02 spike"). Rendered as a static "Open decisions" dashboard section and carried into `manifest.json`, where plan-harden's `decision-debt` lint cross-checks it against session prompts. Prefer an explicit decision session over an entry here whenever the question can already be stated precisely — this list is for what genuinely can't be sharpened yet, not a parking lot for avoidable ambiguity.
 - **`serial_reason`** (string, optional; 2026-08-12, PL-03) — why this plan is a **chain** rather than a fan-out. Its only effect: it silences the pure-chain warning `validate_spec()` raises when every dependency layer is one session wide (see "Parallel groups" below). Non-empty or omitted — a blank string is refused, because it would silence the warning without answering it. Carried into `manifest.json`, so plan-harden's parallelization lint reads the author's stated reason instead of re-flagging a chain that was already justified. Good reasons: one hand on one interface, a migration that must land in order, a spike whose result reshapes the next session. Not a reason: "it was easier to write".
-- **`plan_schema_version`** (integer, optional but **stamp `5` on every new spec**) — the spec's own opt-in. Two build-time requirements key off it, both deliberately unenforced when it is absent so that specs written before the feature existed (and the live plans `plan_mutate` re-validates on every add/amend/retire) keep validating exactly as they did: the mandatory per-item **prior-art decision** at `>= 4` (`PRIOR_ART_MIN_SCHEMA`), and the **parallel-group contract** at `>= 3` (`PARALLEL_CONTRACT_MIN_SCHEMA`). Distinct from the `plan_schema_version` `gen_manifest` stamps on the OUTPUT manifest, which is always `build_plan.PLAN_SCHEMA_VERSION`.
+- **`plan_schema_version`** (integer, optional; **a NEW spec should declare `plan_schema_version: 8`**, which also requires `task_class` on every session and `touches` on every item — see "Schema v8" below) — the spec's own opt-in. Build-time requirements key off it, each deliberately unenforced when it is absent so that specs written before the feature existed (and the live plans `plan_mutate` re-validates on every add/amend/retire) keep validating exactly as they did: the mandatory per-item **prior-art decision** at `>= 4` (`PRIOR_ART_MIN_SCHEMA`), the **parallel-group contract** at `>= 3` (`PARALLEL_CONTRACT_MIN_SCHEMA`), and the "Schema v8" rules at `8`. It also picks the stamp `gen_manifest` writes on the OUTPUT manifest: a fresh build stamps 8 only when the spec declares 8, and any other spec stamps 7. `--preserve-state` keeps the prior manifest's stamp and refuses a rebuild across the v8 boundary. A spec above 8 is refused.
 - **`research_env`** (object, **written by the builder — never authored by hand**; RS-06, 2026-08-13) — the build-time research-environment record. `build_plan.build()` stamps it onto `spec.json` (and `gen_manifest` copies it into `manifest.json`) whenever *any* item carries a `research_status`, so the machine's own account of the environment sits beside the author's prose instead of the skip record being purely hand-written. Shape: `{available, signals[], sources[], method, probed_at}` — `signals` names each capability found (`mcp:exa`, `builtin:WebSearch`), `sources` names each config file actually read, `method` restates the probe's limits verbatim. Absent from a spec that makes no skip claim, which is every plan built before 2026-08-13 — that is what keeps `plan_mutate`'s "manifest.json == `gen_manifest(spec.json)`" check passing on existing plans. `gen_manifest` READS it off the spec and never re-probes, so regenerating a manifest on another machine reproduces the same bytes.
 - **`notify_on_complete`** (object, optional) — Symmetric companion to `notify_on_halt` for unattended (`--auto`) runs. Shape: `{"command": "<string>"}`. Fires ONCE when `/plan-execute` reports the plan complete (idempotent via a `complete_notified` run-state flag), same safety envelope (`shell=False`, ~10s, swallowed failures), with env vars `PLAN_DIR`, `PLAN_TITLE`, `PLAN_STATUS=complete`. The "you can stop watching now" ping — point it at a Slack/desktop/webhook script.
+- **`explainer`** (object, optional; 2026-08-24, eli5-derived) — renders "The plan, explained": a picture-first section that tells a newcomer what the plan does and where it stands. Content rules come from the eli5 skill (`../eli5/SKILL.md` → "Rules for the page"); validation + render live in `scripts/explainer.py`. The section's live half — step status colors, the "You are here" badge, and the "Where we are" paragraph — is repainted in the browser on every load from the sessions' `data-status`, exactly like the donuts, so `/plan-execute` never writes it and it can never go stale. Shape:
+  - **`chain`** (array, required, 2–5 steps) — the causal chain. Each step: `label` (short name), `caption` (one plain sentence: what this step changes), `sessions` (list of session ids this step covers — unknown ids are a build error; a session in no step only draws an advisory warning), optional `unlocks` (one plain sentence: what becomes possible when the step is done — this is the causal link the "Where we are" text quotes). More than 5 steps warns: merge until each step carries a cause the next one needs.
+  - **`analogy`** (object, optional) — `text` plus **required** `breaks` (where the analogy stops being true). A half-analogy without `breaks` is refused — one unqualified analogy is the main way explainers plant lasting wrong ideas.
+  - **`terms`** (array, optional) — `{name, definition}` pairs. Keep to ~3: define a term only where the reader cannot follow the chain without it.
+  - **`recap`** (string, optional) — one-line recap of the whole chain; closes the section and ends the all-steps-done "Where we are" text.
 
 ### Items — the dual-layer surface
 
@@ -160,7 +165,7 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
   - String otherwise: rendered as ASCII / plaintext mockup in a `<pre>`.
   - Object: `{svg|img|ascii, caption, alt}`.
 - **`code`** (string OR object, optional) — Code excerpt (different from schema). Same form as `schema`.
-- **`touches`** (string, optional) — Files / areas affected. Surfaced inside agent-spec when other agent fields are present, otherwise visible in the meta-row.
+- **`touches`** (string, optional; **required at `plan_schema_version` 8**) — Files / areas affected. Surfaced inside agent-spec when other agent fields are present, otherwise visible in the meta-row. At v8 every item declares it: the files it writes, comma-separated, or `[]` for an item that writes nothing.
 
 **Decision hotspots (optional, item-level):**
 - **`tweak_likelihood`** (`"high"` | `"medium"` | `"low"`, optional) — Flags an item as a judgment call likely to be revisited (a schema choice, an ambiguous tradeoff). Any item carrying this field is pulled into a static "Decision hotspots" section rendered above the Session Plan, sorted high→low, so the reader sees the plan's riskiest calls before the execution order. Omit entirely for routine items — the section itself disappears from the build when no item uses the field.
@@ -247,21 +252,62 @@ research step silently while build and harden stay green.
 **Human layer:**
 - **`id`** (string, required) — Convention: `sNN` (e.g., `s01`).
 - **`title`** (string, required)
-- **`model`** (`"Haiku"|"Sonnet"|"Opus"|"Fable"` — or a Codex token `"gpt-5.6-sol"|"gpt-5.6-terra"|"gpt-5.6-luna"`, required) — Drives the model chip color (teal / blue / amber / violet — Codex tokens all share one slate "Codex" color). Free-form tolerant at render time: any value gets a chip, but only these seven tokens have a dedicated color (unknown names fall back to Sonnet's) — and `build_plan.py` warns at build time when a value won't normalize to a dispatchable token (fable/opus/sonnet/haiku/gpt-5.6-sol/gpt-5.6-terra/gpt-5.6-luna), since `/plan-execute` would then omit `model` and the subagent inherits the orchestrator's model. A session pinned to a Codex token dispatches under `/plan-execute --harness codex` (Codex CLI) instead of the Cowork picker — see "Codex rubric" below for the model-per-kind map.
+- **`model`** (`"Haiku"|"Sonnet"|"Opus"|"Fable"` — or a Codex token `"gpt-5.6-sol"|"gpt-5.6-terra"|"gpt-5.6-luna"`, required below `plan_schema_version` 8; at v8 an optional override — see "Schema v8" below) — Drives the model chip color (teal / blue / amber / violet — Codex tokens all share one slate "Codex" color). Free-form tolerant at render time: any value gets a chip, but only these seven tokens have a dedicated color (unknown names fall back to Sonnet's) — and `build_plan.py` warns at build time when a value won't normalize to a dispatchable token (fable/opus/sonnet/haiku/gpt-5.6-sol/gpt-5.6-terra/gpt-5.6-luna), since `/plan-execute` would then omit `model` and the subagent inherits the orchestrator's model. A session pinned to a Codex token dispatches under `/plan-execute --harness codex` (Codex CLI) instead of the Cowork picker — see "Codex rubric" below for the model-per-kind map.
 - **`effort`** (string, optional) — Free-form **size / wall-clock** estimate, e.g. `"S"`, `"~2h"`, `"half day"`. This is *time weight*, NOT cognitive depth — for depth use `reasoning`.
 - **`reasoning`** (`"low"|"medium"|"high"|"xhigh"|"max"`, optional) — **Cognitive-effort tier**, orthogonal to `effort`. Renders as a `◐`-prefixed chip (grey / blue / amber / orange / pink) and is carried into `manifest.json` so the runner can size the dispatched model's thinking budget. Signals how much thinking depth the session needs: mechanical → `low`; standard build → `medium`; coding / agentic / integration → `high` (**the coding/agentic default — on Sonnet, `xhigh` is a dead rung on our own calibration run (a small accuracy gain for materially higher cost); from `high`, escalate MODEL, not effort**); ambiguous design tradeoffs / deep reasoning → `Fable` at `low`; reserve `max` for open-ended or irreversible calls (never on Opus — see the rubric). `xhigh`/`extra` are synonyms; `Haiku` rejects the reasoning dial entirely (pair it with `low`).
 - **`human_summary`** (string, optional, *strongly recommended*) — One or two sentences in plain English about what this session achieves. Rendered in serif at 18px — the most prominent text on the card. The human reader reads this first.
 - **`deliverable`** (string, optional, *recommended*) — Concrete outcome at session end. Rendered as a green callout.
-- **`why_model`** (string, optional) — One sentence rationale for the model choice. Rendered as italic line.
+- **`why_model`** (string, optional; at v8 required with an override, refused without one) — One sentence rationale for the model choice. Rendered as italic line.
 - **`peer_triggers`** (array of `"architecture_decision"|"irreversible_change"|"security_sensitive"`, optional) — **Structured second-model-review gate.** Declares that this session does work matching one or more `codex_peer` triggers (SSOT `codex_peer.triggers`). When non-empty, the session MUST carry an `adversarial-review` entry in `verify.gates` (or mention `/adversarial-review` in its `prompt`) — the §4.0 model-lint promotes a missing gate here from advisory to a 🔴 **plan-killer** (the one deterministic model-lint flag that can block). This is the structured successor to the old keyword-heuristic `codex-trigger-no-gate` scan: declare the trigger explicitly and the gate is enforced, instead of guessing from title text. Omit (or `[]`) for sessions that don't touch architecture/irreversibility/security — the keyword scan still runs as a soft 🟡 "you may have forgotten to declare this" net. Carried into `manifest.json`. (Distinct from `task_class` below — the model-routing class, which became a real optional session field at s06.)
 - **`acceptance_review`** (bool, optional; 2026-07-26) — marks THE closing plan-level acceptance-review session. At most one per plan. Full contract + the authoring template: "Closing acceptance review" below.
-- **`escalation`** (bool, optional; ESC-02, 2026-08-13, `plan_schema_version` 6+) — the per-session opt-OUT of the upward rework climb. Default (omitted) is **on**: when this session's verify gate fails twice at the SAME normalised root cause, the next re-dispatch runs one rung UP the SSOT's ladder (`sonnet@high → opus@high → fable@medium → fable@high → fable@xhigh`, then it stops). Set `false` to pin the session to its authored model however often it fails — appropriate when the session is deliberately calibrating a specific cell, or when a bigger model would change what is being measured. Only `false` is emitted into `manifest.json`, so a spec that omits it produces a byte-identical manifest. `true` is the default and writing it changes nothing; a non-bool (including the string `"false"`, which is truthy) is a **build error**, not a surprise at the third rework. A session that declares `model` but no `reasoning` never escalates either, whatever this field says — an unset effort is not a ladder rung, so there is no rung above it to name; `/plan-execute` says so on stderr the first time such a session would have climbed.
+- **`escalation`** (bool, optional; ESC-02, 2026-08-13, `plan_schema_version` 6+) — the per-session opt-OUT of the upward rework climb. Default (omitted) is **on**: when this session's verify gate fails twice at the SAME normalised root cause, the next re-dispatch runs one rung UP the SSOT's ladder (`sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh`, then it stops; opus@xhigh is the v1.20 escalation-only rung). Set `false` to pin the session to its authored model however often it fails — appropriate when the session is deliberately calibrating a specific cell, or when a bigger model would change what is being measured. Only `false` is emitted into `manifest.json`, so a spec that omits it produces a byte-identical manifest. `true` is the default and writing it changes nothing; a non-bool (including the string `"false"`, which is truthy) is a **build error**, not a surprise at the third rework. A session that declares `model` but no `reasoning` never escalates either, whatever this field says — an unset effort is not a ladder rung, so there is no rung above it to name; `/plan-execute` says so on stderr the first time such a session would have climbed.
 
 - **`routing_experiment`** (object, optional; 2026-08-13, `plan_schema_version` 6+) — tags this session as belonging to a named routing canary, so the routing outcome ledger can separate its records from the general population instead of averaging a deliberate experiment into the baseline. Shape: `{"kind": "<experiment family, e.g. effort_canary>", "proposal_id": "<the proposal this session tests>"}`. Both keys are REQUIRED when the block is present (an untagged canary record is indistinguishable from an ordinary one, which defeats the point) and any other key is refused. Carried into `manifest.json` verbatim, and ONLY when declared — the ledger reads it back from there and never re-derives it.
 
-- **`task_class`** (string, optional; s06 EXE-01) — the session's model-routing class (`mechanical|standard_build|agentic_build|deep_reasoning|linchpin`, per the SSOT `task_classes:` vocabulary). Consumed by `/plan-execute`'s `executor_policy` enforcement: under a codex-focused dial (`active_provider: openai`), ONLY a session whose `task_class` is opted into the SSOT's `executor_policy.executor_for` may auto-dispatch to Codex; unset/unknown FAILS CLOSED to Claude execution, and `linchpin` (or any irreversible session — `peer_triggers: [irreversible_change]` / `dispatch.guards_irreversible`) is permanently barred from unsupervised Codex execution. Normalized to lowercase and carried into `manifest.json` (empty string when unset).
+- **`task_class`** (string, optional; s06 EXE-01) — the session's model-routing class (`mechanical|standard_build|agentic_build|deep_reasoning|linchpin`, per the SSOT `task_classes:` vocabulary). Consumed by `/plan-execute`'s `executor_policy` enforcement: under a codex-focused dial (`active_provider: openai`), ONLY a session whose `task_class` is opted into the SSOT's `executor_policy.executor_for` may auto-dispatch to Codex; unset/unknown FAILS CLOSED to Claude execution, and `linchpin` (or any irreversible session — `peer_triggers: [irreversible_change]` / `dispatch.guards_irreversible`) is permanently barred from unsupervised Codex execution. Normalized to lowercase and carried into `manifest.json` (empty string when unset). **Required at `plan_schema_version` 8.**
+
+#### Schema v8 — route at dispatch *(2026-09-29)*
+
+From `plan_schema_version: 8` the author names the kind of work and `/plan-execute begin`
+picks the model and effort for it. Authority:
+`../plan-execute/references/route-at-dispatch-contract.md`. The rules live in
+`scripts/route_at_dispatch_build.py`; a spec below 8 builds exactly as before.
+
+- **`task_class` is required** and must be one of the five classes. `model` is not required.
+- **`model` + `reasoning` are an override pair.** Set both or neither; the error names the
+  session and the missing field.
+- **An override needs `why_model`.** A `why_model` with no override is refused too.
+- **No below-floor override on a risky session.** On a session with `peer_triggers` or
+  `task_class: linchpin`, an override that ranks lower than the class default on the
+  provider's escalation ladder (`resolve_route.below_floor`: tier first, then effort) is
+  refused (e.g. `Opus`@`medium` on a linchpin, whose default is `opus@high`, or `Sonnet`@`high`
+  on a `deep_reasoning` session, whose default is `opus@medium`). The rank uses the
+  override's own provider. A cross-provider override, or a model no provider names, skips
+  the check.
+- **No fork sessions.** `dispatch.subagent_type: "fork"` is refused: a fork always runs the
+  orchestrator's model, so no resolved or authored model can reach it. Below v8 it stays a warning.
+- **`verify.locked`** (below) is accepted only at v8.
+- **Every item carries `touches`** — a path list, or `[]`.
+- The auto-emitted integration session keeps `agentic_build` and carries no model.
+- The card shows a task-class chip, then the override's model chip or
+  "model: chosen at dispatch". The manifest carries `model: ""` when none is authored,
+  plus `why_model` when an override has one.
+- **Stamp.** A fresh build stamps 8 only when the spec declares 8; every other spec stamps 7.
+  `--preserve-state` keeps the prior stamp, but refuses a rebuild across the v8 boundary in
+  either direction. A spec above 8 is refused, naming both numbers.
+
+```json
+{"id": "s02", "title": "Cut over", "task_class": "linchpin",
+ "model": "Opus", "reasoning": "xhigh",
+ "why_model": "One-shot migration; the default opus@high has failed this shape before.",
+ "items": ["w-02"], "prompt": "..."}
+```
 
 #### Model + reasoning rubric — steer by session KIND
+
+> **Schema v8:** pick the session's `task_class`; the class default resolves at
+> dispatch. `model`/`reasoning` are an optional override — use this table only to
+> justify one (with `why_model`), never to fill every session.
 
 <!-- routing-ssot: vN (stamp with your own SSOT's revision) -->
 > **Canonical source:** `~/.claude/model-routing.yaml` (`task_classes:`) is the
@@ -269,21 +315,27 @@ research step silently while build and harden stay green.
 > those rows, not the source of truth itself. If this table and the SSOT ever
 > disagree, the SSOT wins; update this table to match (`verify-routing.sh --full`
 > check (c) enforces the version stamp above stays in lockstep with the SSOT).
+>
+> **2026-09-22 (routing v27): the `Opus` token now serves Claude Opus 5.5** — $4/$20 per MTok,
+> default effort `medium`, thinking always on, cyber + bio safety classifiers. Every `Opus` measurement
+> in this file was taken on **Opus 5** and is kept as history. No pin moved: Anthropic reports Opus 5.5
+> at `medium` ≥ Opus 5 at `high`, DeepSWE has no Opus 5.5 row yet, and our own sweep has not run on it.
+> Source: `evals/routing/results/2026-09-22/ROUTING-v27-FINAL-CHANGESET.md`.
 
 Don't default every session to Sonnet / medium. Match the tier to the work. The skill *steers* with this rubric during the interview; it never silently auto-fills.
 
 | Session kind | `model` | `reasoning` | `effort` | Why |
 |---|---|---|---|---|
 | Mechanical (rename sweep, formatting, codemod, doc edits) | `Haiku` | `low` | S | Well-specified, no judgement — fast + cheap wins. Haiku rejects the reasoning dial; keep it at `low`. |
-| Standard build (CRUD, wiring, templated features, test scaffolds) | `Sonnet` | `medium` | M | **Sonnet 5 (2026-06-30) is the broad workhorse** — near-Opus on coding/agentic at ~40% less cost. Defined scope at `medium` is its sweet spot. |
+| Standard build (CRUD, wiring, templated features, test scaffolds) | `Sonnet` | `medium` | M | **Sonnet is the broad workhorse** (Sonnet 5.5 since 2026-09-28; Sonnet 5 from 2026-06-30) — near-Opus on coding/agentic at half the Opus price. The Sonnet cells here are Sonnet 5 measurements; 5.5 recalibrated its effort levels (SSOT v29). Defined scope at `medium` is its sweet spot. |
 | Integration / multi-file refactor / non-obvious debugging | `Opus` | `high` | M–L | On our own calibration run, **`Opus 5`·`high` dominates `Sonnet`·`high`** on the hard-agentic distribution — cheaper AND materially more accurate. `Opus`·`medium` is the cost-saver rung; `Sonnet`·`high` remains reasonable for LIGHTER integration work (the easy distribution isn't covered by the same run). Sonnet's `high`→`xhigh` stays a dead rung. |
 | Architecture, ambiguous tradeoffs, security-sensitive design, hard root-cause | `Opus` | `medium` | L–XL | On our own calibration run, **`Opus 5`·`medium` dominates the old `Fable`·`low` pin on both axes** — Opus 5 (GA 2026-07-24, same $5/$25 as 4.8) inverts the earlier dominance direction. Escalate `medium`→`high` on the two named triggers. **Do not pair Opus with `xhigh`/`max`** — `high`→`xhigh` is a DEAD RUNG (no measurable gain for materially higher cost) and `max` weak (marginal at best); `max` is operator-elected only. |
-| Hard/frontier work — the plan's linchpin session (cross-cutting architecture spanning domains, one-shot irreversible adjudication, synthesis the rest of the plan rests on) | `Opus` | `high` | L–XL | On our own calibration run, `Opus 5`·`high` is the sweet-spot rung (`Fable`·`xhigh` is dominated). **Fable is escalation-apex only now** — reach it via raise-model from `Opus`·`high` when the two named triggers persist (unsolved in prior rounds; whole-codebase/large-context synthesis where 1M context matters); it still draws usage credits, is intermittently paywalled, and a failed Fable dispatch **auto-degrades to Opus @ `high`** (plan-execute, per-target degrade). |
+| Hard/frontier work — the plan's linchpin session (cross-cutting architecture spanning domains, one-shot irreversible adjudication, synthesis the rest of the plan rests on) | `Opus` | `high` | L–XL | On our own calibration run, `Opus 5`·`high` is the sweet-spot rung (`Fable`·`xhigh` is dominated). **Fable is escalation-apex only now** — reach it via raise-model from `Opus`·`high` when the two named triggers persist (unsolved in prior rounds; whole-codebase/large-context synthesis where 1M context matters); it still draws usage credits (the `fable` alias resolves to `claude-fable-5-1` since 2026-09-01; the old "intermittently paywalled" note is stale — re-check `prices.fable`, never assume it), and a failed Fable dispatch **auto-degrades to Opus @ `high`** (plan-execute, per-target degrade). |
 | Spike / research (throwaway prototype to learn) | `Sonnet` | `medium` / `high` | S–M | Value is in the thinking, not the polish. |
 
-**Plan / execute by session KIND — Anthropic's own `opusplan` pattern.** Claude Code ships an `opusplan` alias that *"uses `opus` during plan mode, then switches to `sonnet` for execution."* Apply the same split here: **design / architecture / adjudication / synthesis sessions → Opus 5 · `medium` (deep-reasoning default; `high` for linchpin/one-shot-irreversible); standard build / wiring sessions → Sonnet 5; hard multi-file/agentic build → Opus 5 · `high`.** Route by what the session *does*, not by how hard the overall plan feels. **Fable 5 is the escalation apex, not a standing pick** — Opus 5 dominates it at every rung on our own calibration run; reach Fable only when the two named triggers persist past Opus·`high`.
+**Plan / execute by session KIND — Anthropic's own `opusplan` pattern.** Claude Code ships an `opusplan` alias that *"uses `opus` during plan mode, then switches to `sonnet` for execution."* Apply the same split here: **design / architecture / adjudication / synthesis sessions → Opus · `medium` (deep-reasoning default; `high` for linchpin/one-shot-irreversible); standard build / wiring sessions → Sonnet 5; hard multi-file/agentic build → Opus 5.5 · `high`.** Route by what the session *does*, not by how hard the overall plan feels. **Fable 5 is the escalation apex, not a standing pick** — Opus 5 dominates it at every rung on our own calibration run; reach Fable only when the two named triggers persist past Opus·`high`.
 
-**Two dials, two directions — tune `effort` before switching `model`, but know when a switch wins both.** `reasoning`/effort applies to *all* the tokens a session emits — text, tool calls, and thinking — and every one is billed at the **output** rate, so effort is a real cost multiplier, not a free quality knob. **Raise `reasoning` before upgrading `model` — but only up to each model's live ceiling**: Sonnet stops at `high` (`high`→`xhigh` dead rung on our own calibration run — a small accuracy gain for materially higher cost) and **Opus 5 stops at `high` too** (`high`→`xhigh` is a dead rung — no measurable gain for materially higher cost — and `max` weak, marginal at best). **But the economics run both ways.** Because effort multiplies output-rate tokens, on a genuinely hard task a **stronger model at *lower* effort** can be both better and cheaper than a weaker model cranked hot — the canonical example from our own calibration run: `Opus 5`·`medium` beats `Sonnet`·`high` AND the old `Fable`·`low` pin on both axes. **Never pair Opus with `max` as a routine rung** (operator-elected only, for exceptional one-shots), and treat **Fable as the escalation apex, not a standing pick** — Opus 5 dominates every Fable rung on our own calibration run; Fable stays credit-metered/paywalled, and a failed Fable dispatch auto-degrades to **Opus @ `high`** (plan-execute). Keep `effort` about wall-clock and `reasoning` about depth: a session can be `effort: XL` / `reasoning: low` (lots of mechanical edits) or `effort: S` / `reasoning: high` (one hard decision). *(Pricing 2026-07-25, /claude-api-verified: Sonnet 5 $3/$15 per MTok — intro $2/$10 through 2026-08-31; Opus 5 $5/$25 — same price as 4.8, GA 2026-07-24; Fable 5 $10/$50 + usage credits, paywalled. On typical sessions the model gaps compress, which is why the Haiku/Sonnet rows optimise for cost.)*
+**Two dials, two directions — tune `effort` before switching `model`, but know when a switch wins both.** `reasoning`/effort applies to *all* the tokens a session emits — text, tool calls, and thinking — and every one is billed at the **output** rate, so effort is a real cost multiplier, not a free quality knob. **Raise `reasoning` before upgrading `model` — but only up to each model's live ceiling**: Sonnet stops at `high` (`high`→`xhigh` was a dead rung for Sonnet 5 on our own calibration run — a small accuracy gain for materially higher cost; unmeasured on Sonnet 5.5, stop kept as policy) and **Opus 5 stops at `high` too** (`high`→`xhigh` is a dead rung — no measurable gain for materially higher cost — and `max` weak, marginal at best). **But the economics run both ways.** Because effort multiplies output-rate tokens, on a genuinely hard task a **stronger model at *lower* effort** can be both better and cheaper than a weaker model cranked hot — the canonical example from our own calibration run: `Opus 5`·`medium` beats `Sonnet`·`high` AND the old `Fable`·`low` pin on both axes. **Never pair Opus with `max` as a routine rung** (operator-elected only, for exceptional one-shots), and treat **Fable as the escalation apex, not a standing pick** — Opus 5 dominates every Fable rung on our own calibration run; Fable stays credit-metered/paywalled, and a failed Fable dispatch auto-degrades to **Opus @ `high`** (plan-execute). Keep `effort` about wall-clock and `reasoning` about depth: a session can be `effort: XL` / `reasoning: low` (lots of mechanical edits) or `effort: S` / `reasoning: high` (one hard decision). *(Pricing 2026-09-05, /claude-api-verified: Sonnet $2/$10 per MTok (Sonnet 5.5, the `Sonnet` token since 2026-09-28, kept Sonnet 5's price) — that is the STANDARD price since 2026-09-01, the scheduled rise to $3/$15 was cancelled, not deferred; Opus 5.5 $4/$20 — the `Opus` token since 2026-09-22 (Opus 5, GA 2026-07-24 at $5/$25, is still available); Fable 5.1 $10/$50 + usage credits, a normal reachable model — the old "paywalled" note was stale and had been quoted back at the operator as fact, so never assume it. On typical sessions the model gaps compress, which is why the Haiku/Sonnet rows optimise for cost.)*
 
 #### Codex rubric — the `gpt-5.6-*` lane (dual-harness; 5.6-ONLY since 2026-08-13)
 
@@ -309,9 +361,47 @@ as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair `gpt-5
 with any `reasoning` other than `max`; a "cheap" luna session run at a lower tier
 isn't cheaper, it's broken.
 
+#### GLM (zai) resolution — the `~/.claude-glm` tree (v1.21, 2026-08-30)
+
+**You do not author GLM plans differently.** A plan's `model`/`reasoning` vocabulary
+stays exactly as above — `Opus`/`Sonnet` + `low`…`max` — and the SAME plan directory
+runs on either tree. When `/plan-execute` runs under the GLM tree
+(`PLAN_EXECUTE_ROUTING_PROVIDER=zai`, or `CLAUDE_CONFIG_DIR=~/.claude-glm`), the
+`providers.zai` profile in `model-routing.yaml` translates each manifest cell at
+resolution time; nothing is re-authored:
+
+| Manifest cell | zai resolution | What actually runs |
+|---|---|---|
+| `Sonnet` + `low` | `sonnet@low` | glm-5.3-flash @ low — the one sub-max rung, mechanical only |
+| `Sonnet` + anything else (incl. unset) | `sonnet@max` | **glm-5.3-flash @ max** — the normal-work default |
+| `Opus` + anything except `low` | `opus@max` | **glm-5.3 @ max** — hard work, and the zai ladder's TOP rung |
+| `Haiku` + any | `sonnet@`<its tier> | glm-5.3-flash (4.5-air is the rough zone; never a dispatch target) |
+| `Fable` + any | `opus@max` | glm-5.3 @ max (no zai apex above it; a bare fable alias would otherwise land on FLASH — probed) |
+
+**Escalation caps at `Opus`/`max`.** The zai ladder is `sonnet@max → opus@max →
+STOP` — no fable rungs exist on that lane, and degrade keeps `max`
+(`opus→sonnet@max`; effort-steep, unlike the Anthropic lane's high-landing).
+Evidence: DeepSWE v1.1 `glm-5.3[max]` 69%±3/$3.99 · `glm-5.3-flash[max]` 63%±4/$0.24 ·
+`glm-5.2[max]` 44%±2; z.ai's model docs recommend `reasoning_effort: max` for coding
+(and for flash explicitly); live probes 2026-08-30 confirmed the Claude effort dial
+reaches z.ai end-to-end (thinking chars on one prompt: `low` 49 / `max` 642 /
+`xhigh` 1450) and that `-max` model-id suffixes are rejected client-side — effort
+rides the dial, never the model id.
+
 **Agent layer:**
 - **`items`** (array of item IDs, required) — Items completed in this session.
 - **`prompt`** (string, required) — The task body. `build_plan.py` writes it to `sessions/<id>.prompt.md`, wrapped with the item scope, a pointer to `sessions/<id>.context.md`, and the closeout contract. **Write only the task body — don't include closeout instructions yourself.** The subagent reads the generated prompt file; it is never JSON-escaped into the HTML.
+
+  **Two traps that both look like success** *(added 2026-08-21, each cost a lost edit)*:
+
+  1. **`notes` on a session is the dashboard's RUNTIME notes area, not an authoring field.**
+     `--preserve-state` rewrites it, so an authoring statement written into `notes` is silently
+     discarded on the next rebuild and the edit reports success. Anything an author needs to
+     survive belongs in `prompt`, `deliverable` or `why_model`.
+  2. **`PLAN.html` never inlines prompt bodies** — it links `sessions/<id>.prompt.md`. So
+     grepping the dashboard for prompt text ALWAYS returns 0, which reads as "my edit did not
+     land" when the edit is fine. Verify prompt content against `sessions/*.prompt.md`; verify
+     item and session *card* fields against `PLAN.html`.
 
   **Wargame contract (blind executability).** A dispatched session runs on a cheaper model with no one to ask — the prompt must leave it no judgment calls. For every non-trivial session prompt:
   - each move states its **expected observation** — exactly what the executor should see if the move worked;
@@ -325,13 +415,31 @@ isn't cheaper, it's broken.
 - **`updated`** (string, optional) — ISO date.
 
 **Dispatch block (`dispatch`, optional — drives `/plan-execute`):**
-- **`subagent_type`** (string \| null) — The agent type `/plan-execute` dispatches. `null` (or omitted) = a **fresh `general-purpose` agent**: clean isolated context, and the per-session `model` IS honored. This is the right default for almost every session. A named type (`"Plan"`, `"Explore"`, `"code-reviewer"`, `"epic-implementer"`, …) is also a fresh agent with that type's tools/prompt. The literal `"fork"` is a true fork that inherits the orchestrator's context **and runs the orchestrator's model (the per-session `model` is ignored — build warns)**; reserve it for the rare session that needs the live conversation context. *(Earlier docs called `null` "a fork" — incorrect; omitting `subagent_type` yields a fresh agent, not a fork.)*
+- **`subagent_type`** (string \| null) — The agent type `/plan-execute` dispatches. `null` (or omitted) = a **fresh `general-purpose` agent**: clean isolated context, and the per-session `model` IS honored. `/plan-execute` resolves it at dispatch to the `tier-<model>-<effort>` agent that binds the session's effort, or — for a cell with no tier agent — to `session-effort-worker`, which inherits the orchestrator's effort. This is the right default for almost every session. A named type (`"Plan"`, `"Explore"`, `"code-reviewer"`, `"epic-implementer"`, …) is also a fresh agent with that type's tools/prompt. The literal `"fork"` is a true fork that inherits the orchestrator's context **and runs the orchestrator's model (the per-session `model` is ignored — build warns)**; reserve it for the rare session that needs the live conversation context. *(Earlier docs called `null` "a fork" — incorrect; omitting `subagent_type` yields a fresh agent, not a fork.)*
 - **`parallel_group`** (string \| null) — Sessions sharing a group whose deps are all satisfied dispatch concurrently in one batch. Members of a group MUST share the same `depends_on` set (validated). A member is bound by the frozen parallel-group contract — see "Parallel groups" below before using it.
 - **`isolation`** (`"worktree"` \| null; 2026-08-12, contract M3) — declares that this group's members run in **separate orchestrator-managed git worktrees** (`git worktree add`). Group-level: every member must carry the same value, and a half-isolated group is refused. `"worktree"` is the ONLY legal value — a typo is refused, never quietly read as "no isolation" — and it never means the Agent tool's own `isolation: "worktree"` parameter, which is barred by name (measured to destroy untracked agent output). Absent/`null` = a shared-tree group, which stays legal.
+- **`review_scope`** (array of repo-relative path prefixes, optional; 2026-08-20) — the directories this session's work lives in, e.g. `["skills/repo-health"]`. `/plan-execute` hands it to the `llm-review-*` gates as `PLAN_EXECUTE_REVIEW_SCOPE`, and the reviewed surface — the untracked list **and** the diff file the reviewer reads — is restricted to it. Declare it whenever another plan may be live in the same checkout: measured 2026-08-20, three rework attempts were charged to sessions for findings in files they never touched, because the surface was the whole tree. Whole-component prefix (`skills/x` does not match `skills/xy`). An empty scoped surface is refused (`INDETERMINATE`), never passed, and every dropped path is printed — so a scope that is *wrong* (the session edited outside it) is visible, not silent. Absent → the whole tree, the pre-2026-08-20 behaviour. **Keep it honest:** a scope narrower than the session's real footprint hides work from review; when in doubt, widen it or leave it out.
+
+#### Build-time advisories on a plan's own text *(2026-08-21)*
+
+Three warnings, printed by `build_plan.py` at build time and folded into every
+`plan_mutate` mutation's `validation_warnings` — one definition, both call sites, in
+`skills/plan-builder/scripts/plan_limits.py`. All three are ADVISORY: none refuses a build.
+
+| Advisory | Fires when | Why it exists |
+|---|---|---|
+| wide session | a session declares writes across more than `SESSION_TOUCHES_P90` (6) files | one LLM review pass samples a surface that size at 15–31% recall, so rework keeps finding new things in untouched code and the session may not converge |
+| stale prose reference | a session's or item's PROSE names a session id (`sNN`) or an item id (`<prefix>-NN`, where the prefix is one the plan's own items use) that the plan does not have | measured 2026-08-21 over all 29 plans here, counted by HIT: **9 real** — one plan naming a session that was split into `sNNa`/`sNNb`, another naming it three times, and a third referencing a dropped `cal-01` five times while carrying only `cal-02`/`cal-03`. No schema check can see any of them, because prose is not a reference the schema resolves, and the next builder follows it. Four shapes are deliberately skipped — a path segment, a hyphenated compound, a quoted notice, and a sentence that negates the id (*"no s04b exists"*) — without which the sweep runs at 33% precision |
+| embedded program | a session prompt carries a heredoc of `EMBEDDED_PROGRAM_LINES` (10) or more lines | review reads prose and cannot run code; see SKILL.md's "Never leave a PROGRAM embedded in a build session's prompt" |
+
+**Splitting a session is the moment the second one fires.** Split `sNN` into `sNN`/`sNNb`
+and every sibling prompt that named the old scope is now describing work that moved. Re-read
+the warning rather than dismissing it — that is exactly the defect it was measured on.
+
 - **`integrates_group`** (string, optional; contract §3) — this session is the named group's **integration session**: it depends on every member, re-runs the union of their gates on the merged tree, and owns the group's single git action. Declared, never derived. For a **worktree-isolated** group you do not write it — `build_plan.py` emits it (see "Parallel groups" below) — but an author-written one is left untouched.
 - **`depends_on`** (array of session ids) — These sessions must be DONE/terminal before this one is dispatched. No cycles, no dangling refs (validated).
 - **`requires_human_checkpoint`** (bool) — If true, the loop sets this session to `AWAITS_REVIEW` and halts before dispatching it; the human continues with `/plan-execute … --resume`. **Requires the `checkpoint` decision brief below — build error without it.**
-- **`checkpoint`** (object — **required when `requires_human_checkpoint` is true**, forbidden keys otherwise validated) — the decision brief `/plan-execute` presents when the gate parks the plan. Fields: **`reason`** (string, required) — why a human must look: what is irreversible or judgment-laden here, written in plain language for a reader with no context; **`decision`** (string, required) — the specific question the human answers; **`options`** (array of strings, optional) — the 2-4 concrete answers. If no real decision exists (the answer would always be "proceed"), don't declare the gate: use a `verify` gate or `checkpoint_policy: "notify-and-continue"`. Carried verbatim into `manifest.json`; `/plan-execute`'s `checkpoint` action and `PYBP checkpoint` output surface it as `checkpoint_brief`.
+- **`checkpoint`** (object — **required when `requires_human_checkpoint` is true**, forbidden keys otherwise validated) — the decision brief `/plan-execute` presents when the gate parks the plan. Fields: **`reason`** (string, required) — why a human must look: what is irreversible or judgment-laden here, written in plain language for a reader with no context; **`decision`** (string, required) — the specific question the human answers; **`options`** (array of strings, optional) — the 2-4 concrete answers. If no real decision exists (the answer would always be "proceed"), don't declare the gate: use a `verify` gate or `checkpoint_policy: "notify-and-continue"`. Carried verbatim into `manifest.json`; `/plan-execute`'s `checkpoint` action and `PYBP checkpoint` output surface it as `checkpoint_brief`. `/plan-execute` records the owner's answer with `plan --resume --answer-file`, so a session prompt needs no step that writes the answer to a file.
 - **`max_retries`** (int 0–5) — Reserved for transient-error retry (v1.5). Semantic failures never retry.
 - **`depends_on_policy`** (`"all"｜"completed_or_terminal"`, optional, default `"all"`) — how the session treats an upstream dep that **terminally failed**. `"all"` (today's behaviour) is a hard AND: every dep must complete or the session never dispatches. `"completed_or_terminal"` lets the session dispatch over the **completed subset** even when a dep terminally failed — for a capstone/synthesis session that should degrade rather than be stranded by one upstream stumble. Carried into `manifest.json` for `/plan-execute` to honour; a session using it should say in its prompt how it degrades (which items become `no-data`). *(Encodes the hardening that a prompt clause alone cannot: without this key the DAG silently strands the capstone.)*
 - **`codex_shell`** (object, optional; 2026-07-29) — **the shell capabilities this session needs when a `codex exec` process runs it** (under `/plan-execute --harness codex`, or a Codex-pinned session on the Claude harness). Omit for work confined to the repo. The default dispatch is `--sandbox workspace-write`, MEASURED on codex-cli 0.145.0 to deny **writes outside the repo workspace**, **all network** (`CODEX_SANDBOX_NETWORK_DISABLED=1`), and **nested `codex exec` / vendor CLIs** (`failed to initialize in-process app-server client`). A session needing any of those must declare it, or a Codex run dispatches it and fails it after paying for it. Fields:
@@ -341,8 +449,8 @@ isn't cheaper, it's broken.
   - **`sandbox`** (`"workspace-write"` default | `"danger-full-access"`) — `danger-full-access` is the ONLY thing that grants **nested agent dispatch** (a session shelling out to `codex exec` / `claude -p` / another vendor CLI), and it hands that session an **unsandboxed** shell. Two build-time rules: it **forbids** `writable_roots`/`network` beside it (already granted; the command must have one reading), and it is legal ONLY on a session a human already gates — `dispatch.guards_irreversible`, `requires_human_checkpoint`, `task_class: linchpin`, or `peer_triggers: [irreversible_change]`. `build_plan.py` refuses an ungated one and `run.py` refuses again at dispatch (`UngatedFullAccessSession` → `BLOCKED` + halt): the gate protecting an unsandboxed agent must not be enforced only by the tool that wrote the manifest.
 
   Absent/empty ⇒ the emitted command is byte-identical to the pre-2026-07-29 form, so existing plans are unaffected. The grant is disclosed in the `begin` translation receipt (`shell` line), each member's `codex_shell_grant`, and the `codex_dispatch` ndjson event. Full contract, probe by probe: `../plan-execute/references/dual-harness-contract.md` § 4.5.
-- **`model_fallbacks`** (array of model-name strings, optional) — machine-readable degrade ladder the runner applies **before dispatch** if the primary `model` is unavailable (e.g. `["Opus"]` for a `Fable` session that must degrade to Opus 4.8 when Fable is paywalled). Beats prompt-text "degrade to X" prose, which is never read if allocation fails before the prompt runs.
-- **`reasoning_fallbacks`** (array of reasoning-tier strings, optional) — the reasoning tier to pair with each `model_fallbacks` entry (e.g. `["xhigh"]`), so the degrade preserves an appropriate thinking budget.
+- **`model_fallbacks`** (array of model-name strings, optional) — machine-readable degrade ladder the runner applies **before dispatch** if the primary `model` is unavailable (e.g. `["Opus"]` for a `Fable` session that must degrade to **Opus** (Opus 5.5 since 2026-09-22) if the Fable dispatch is refused — access/entitlement/quota, *not* a paywall: the 2026-07 suspension note is retired, see `model-effort-guidance.md` and the SSOT `prices.fable`). Beats prompt-text "degrade to X" prose, which is never read if allocation fails before the prompt runs.
+- **`reasoning_fallbacks`** (array of reasoning-tier strings, optional) — the reasoning tier to pair with each `model_fallbacks` entry — pair it with the SSOT `degrade.effort_on_degrade` landing, which is `high` for BOTH Opus and Sonnet (e.g. `["high"]`). Never `xhigh`: it is a dead rung on Sonnet and escalation-only on Opus since v1.20, so no degrade may land there.
 
 If `dispatch` is omitted, defaults apply: `subagent_type=null`, `parallel_group=null`, `depends_on=[]`, `depends_on_policy="all"`, `requires_human_checkpoint=false`, `max_retries=0`, `model_fallbacks=[]`, `reasoning_fallbacks=[]`.
 
@@ -368,8 +476,59 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   gate id is a **build-time error**. Gates run sequentially; all must pass.
 - **`on_fail`** — `rework` (default) or `halt`. `rework` re-dispatches the session
   with the gate's (redacted) output appended as feedback; `halt` stops for a human.
-- **`max_rework`** (int 0–5, default 1) — the bound on the rework loop. After it's
+- **`max_rework`** (int 0–6, default 2) — the bound on the rework loop. After it's
   exhausted, the session goes `BLOCKED` + halt.
+
+  **Default to 2–3. Size to the apex only when the session genuinely needs it (revised
+  2026-08-27).** Every rework round is a full re-dispatch plus a full re-run of every gate,
+  and the rounds are not free: measured on the cross-family-review-gate plan
+  (2026-08-25/26), apex-sized budgets of 5–6 bought 11 rework rounds across 11 sessions,
+  each round paying the ~9-min deterministic suite before the paid review even started.
+  Reserve apex sizing for the sessions where an unattended climb to the apex model matters
+  more than wall time — `linchpin` work, or a hard root-cause session expected to defeat
+  its authored tier. Everything else takes 2–3 and parks `BLOCKED` for the operator when
+  that runs out, which is the cheaper failure.
+
+  **Sizing `max_rework` against the escalation ladder — DERIVED, not asserted (ESC-04,
+  s07).** On a plan stamped `plan_schema_version` ≥ 6 with `escalation` not opted out (the
+  default), `max_rework` doesn't just bound retries — it bounds how far the session's
+  UPWARD escalation (ESC-02/ESC-03, see the `escalation` field above) can climb before the
+  loop exhausts. One number everywhere: **rework 1 = the same-tier retry** (the stuck
+  protocol needs two same-signature failures before it arms), **rework 2 = the first
+  escalated attempt** (one rung up), and each further rework climbs one more rung. So
+  `max_rework = 1 + (escalate() calls from the session's authored cell to the ladder's
+  apex)` is the number that lets a persistently-failing session actually REACH the apex
+  rather than exhausting mid-climb and parking `BLOCKED` for the operator one or two rungs
+  short. `references/plan-harden/model-lint.md`'s `max-rework-cannot-reach-apex`
+  rule computes this live via `resolve_route`, never a hardcoded ladder — but size it right
+  at authoring time using these worked examples (Claude lane, verified against the live
+  SSOT 2026-08-15, re-measured 2026-08-23 against SSOT v21 — the v1.20 opus@xhigh
+  escalation rung added one step to every walk through opus;
+  `sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh`):
+
+  | Session's authored cell | Ladder to apex | `max_rework` to reach `fable@xhigh` |
+  |---|---|---|
+  | `opus@high` (the `agentic_build`/`linchpin` default) | `opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **5** |
+  | `opus@medium` (the `deep_reasoning` default) — needs `opus@high` first, one extra rung | `opus@medium → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **6** |
+  | `sonnet@high` (the `standard_build` ceiling) | `sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **6** |
+  | `sonnet@medium` (the `standard_build` **default**) — needs `sonnet@high` first | `sonnet@medium → sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **7** |
+
+  **The ceiling is 6 because the longest ladder is 6** *(raised from 5 on 2026-08-21)*.
+  `sonnet@medium` — the cell most plans author most of their build sessions at — needs six
+  rework rounds to reach the apex, and the old cap of 5 made that session UNAUTHORABLE: the
+  right number was refused by the builder, and the model-lint could only recommend clamping to
+  a number that still cannot get there, which reads as compliance and is not. The ceiling now
+  comes from the ladder itself: `plan_limits.MAX_REWORK_CEILING`, pinned by a test that walks
+  every starting rung through `resolve_route.escalate` and fails if the SSOT's longest ladder
+  ever grows past it. Authoring a session below its own row above is still legitimate — it
+  accepts early exhaustion — but it is now a CHOICE rather than the only buildable option.
+
+  A session sized below its own row above exhausts before reaching the apex and parks
+  `BLOCKED` for the operator. Since the 2026-08-27 revision that is the DEFAULT posture, not
+  an accident: a persistent failure below the apex usually needs a human more than it needs
+  a bigger model, and the operator can always redispatch at a higher tier by hand. Set
+  `escalation: false` instead when the session should stay pinned to its authored cell no
+  matter how many times it fails (a calibration run, a canary).
 - **`require_evidence`** (bool, default `false` — **Vista ③**) — when `true`, the
   session's closeout MUST carry an `evidence` array (paths to proof-of-engagement
   artifacts: eval JSON, a `grep -c <log-event>` count > 0, a screenshot, a
@@ -396,6 +555,15 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   ]
   ```
 
+- **`locked`** (array of strings, optional; `plan_schema_version` 8+) — repo-relative
+  paths of check files the session must not edit (tests, fixtures, gate scripts). No
+  leading `/`, no `..`, no glob characters. The build refuses a path that exists but is
+  not a regular file (a directory, FIFO, device), or is or sits under a symlink; a path
+  that does not exist yet is left for `begin` to refuse. Per session only — a phase-level
+  `locked` is refused. A session `verify` holding only `locked` is valid and keeps its
+  phase's gates; with no gates, `require_evidence` or `checks` on either, it is refused. Carried into `manifest.json` with the rest of
+  `verify`. Contract §5.
+
 Phase-level default: put `verify` on a `phases[]` entry; a session with `"phase":
 "pN"` inherits it, and its own `verify` overrides. **Author a verify gate on every
 session whose `deliverable` is checkable** — tests for code, `/eval --smoke` for
@@ -411,11 +579,38 @@ code (`0` no findings · `1` findings · `2` INDETERMINATE — see
 `../plan-execute/references/verify-gates.md` → "LLM review gates"). Propose one per
 **ship-ready** session from its `task_class`:
 
-| `task_class` | Gate id | Why this depth |
-|---|---|---|
-| `mechanical`, `standard_build` | `llm-review-low` | Few, high-confidence findings. A rename sweep or a templated CRUD wire-up doesn't need a reviewer speculating; it needs the one real mistake caught cheaply (~30 s). |
-| `agentic_build` | `llm-review-medium` | Multi-file integration is where non-obvious breakage lives. Medium verifies candidate findings by running the code before reporting (measured), so the extra minute buys confirmed bugs, not guesses. |
-| `deep_reasoning`, `linchpin` | `llm-review-high` | Broader coverage, and explicitly allowed to raise **uncertain** findings. On architecture / security / one-shot-irreversible work an uncertain finding is worth a human minute; on a rename it is noise. |
+| `task_class` | Gate id | Reviewer when the session's model is a Claude token | Why this depth |
+|---|---|---|---|
+| `mechanical`, `standard_build` | `llm-review-low` | `cross-family-review-low` | Few, high-confidence findings. A rename sweep or a templated CRUD wire-up doesn't need a reviewer speculating; it needs the one real mistake caught cheaply (~30 s). |
+| `agentic_build` | `llm-review-medium` | `cross-family-review-medium` | Multi-file integration is where non-obvious breakage lives. Medium verifies candidate findings by running the code before reporting (measured), so the extra minute buys confirmed bugs, not guesses. |
+| `deep_reasoning`, `linchpin` | `llm-review-high` | `cross-family-review-high` | Broader coverage, and explicitly allowed to raise **uncertain** findings. On architecture / security / one-shot-irreversible work an uncertain finding is worth a human minute; on a rename it is noise. |
+
+**Decided 2026-08-25: REPLACE, at the same level, never stack.** For a
+ship-ready session whose `model` is a Claude token (Sonnet/Opus/Haiku/Fable),
+propose the `cross-family-review-<level>` gate from the table above **instead
+of** `llm-review-<level>` at that same level — one reviewer per rework
+attempt, and Codex (the other family) is the one reading Claude's own diff.
+This applies at every level, not just `agentic_build`. For a session whose
+`model` is a Codex token (`gpt-5.6-*`), keep `llm-review-<level>` unchanged —
+there, Claude reading the diff already IS the other family, so no substitution
+applies.
+
+[HARDENED:codex-r0 V-1] **Never declare both gates on the same session.** A
+single session must not carry both `llm-review-<level>` and
+`cross-family-review-<level>` — `land` re-runs the union of every session's
+gates, and the findings ledger is keyed on level (extended with the reviewer
+for exactly this reason). REPLACE means replace, never stack.
+
+Three plain exceptions to the REPLACE rule:
+
+- **A plan whose own sessions build the cross-family gate cannot use it** —
+  circular: the gate can't review the code that makes it exist (this plan is
+  the example).
+- **A restricted repo degrades to an on-box HUMAN checkpoint automatically.**
+  The author does not choose this — it is not an automated same-family
+  review either.
+- **A box with no working Codex degrades the same way** — on-box HUMAN
+  checkpoint, not a silent fallback to `llm-review-<level>`.
 
 **The level is a spend decision too.** Measured on a ten-line diff: low ~$0.53,
 medium $0.58–0.72, high $0.75–3.40 per run — and a gate re-runs on every rework
@@ -436,6 +631,7 @@ Rules that keep this honest:
   reviewer, different question — declare both.
 - **Not `code-review-gate`.** Despite the name, that id is the project's
   DETERMINISTIC test/lint gate (see `.claude/eval-gates.json`). Never overload it.
+  `cross-family-review-*` is likewise not `code-review-gate`.
 - **Order matters.** Put the deterministic gates first (`gates: ["code-review-gate",
   "llm-review-medium"]`) — gates run sequentially and stop at the first failure, so a
   broken build should fail on the cheap test gate, not after paying for a review.
@@ -507,13 +703,11 @@ body should tell it to:
 4. Ship it in the eval-deliverable shape `/plan-execute` § PS-02 requires — one
    rendered one-pager with the data inline, plus a decision card of **at most three**
    options. Never a narration wall, never a multi-page HTML maze.
-5. **For a plan that shipped substantial code**, put one line on the decision card
-   RECOMMENDING the operator run `claude ultrareview` over the plan's accumulated diff
-   before it merges — the cloud multi-agent review, which reads the whole change at
-   once rather than session by session. **The session never launches it**: it bills
-   **$5–25** per run, so it is operator-elected, always. Recommend it, name the target
-   (branch or PR), and stop. Skip the line entirely for a docs/config plan — the
-   recommendation only earns its price against real code.
+5. **Do not recommend `claude ultrareview`** (operator decision 2026-10-04: it bills
+   $5–25 per run and nobody ran it). The whole-plan review now runs at land: the
+   `llm-review-high` gate is flagged `at_land`, so `/plan-execute`'s land runs the
+   code review over the plan's accumulated diff next to the adversarial review, and
+   one repair round takes the findings of both (`verify-gates.md` § "At plan close").
 
 ```json
 {

@@ -33,9 +33,9 @@ Validation:
 ## Flag Routing
 
 Parse the arguments for mode flags:
-- If `--full` is present: Read `~/.claude/commands/references/epic-dev/full-workflow.md` and follow those instructions instead of the standard cycle below. Pass remaining args (epic number, --phase, --yolo, --auto, --resume, --force-model) to that workflow.
-- If `--uat` is present: Read `~/.claude/commands/references/epic-dev/uat-phase.md` and follow those instructions. Pass the epic number and any remaining flags (--waiver, --resume, --retest-only).
-- If `--end` is present: Read `~/.claude/commands/references/epic-dev/end-tests.md` and follow those instructions. Pass the epic number and any remaining flags (--yolo, --resume).
+- If `--full` is present: Read `~/.claude/references/epic-dev/full-workflow.md` and follow those instructions instead of the standard cycle below. Pass remaining args (epic number, --phase, --yolo, --auto, --resume, --force-model) to that workflow.
+- If `--uat` is present: Read `~/.claude/references/epic-dev/uat-phase.md` and follow those instructions. Pass the epic number and any remaining flags (--waiver, --resume, --retest-only).
+- If `--end` is present: Read `~/.claude/references/epic-dev/end-tests.md` and follow those instructions. Pass the epic number and any remaining flags (--yolo, --resume).
 - If no mode flag: Continue with the standard cycle below.
 
 ---
@@ -44,7 +44,7 @@ Parse the arguments for mode flags:
 
 **If `--auto` is present:** run the epic UNATTENDED, in-session — no external runner, no `claude -p` loop.
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/auto-mode.md` and follow the in-session self-drive loop. In brief:
+**Instructions:** Read `~/.claude/references/epic-dev/auto-mode.md` and follow the in-session self-drive loop. In brief:
 - `--auto` IMPLIES `--force-model` (no `AskUserQuestion` prompts; gates are fail-closed → quarantine on exhaustion) AND `--yolo` (no "Confirm Next" pause). Treat both as present everywhere downstream.
 - Self-drive STEP 4's story/phase loop to completion. Each phase is already a fresh subagent (that is what keeps the run lean — no per-iteration process restart needed).
 - Halt ONLY on: epic complete; a quarantined / `STORY_BLOCKED` story (keep going with siblings, surface blocked ones at the end); an infra/UAT story that needs manual work; or an unrecoverable error (save state + surface).
@@ -60,7 +60,7 @@ If `--auto` is NOT present, continue to STEP 2 (attended / interactive).
 isolated git worktrees (opt-in; default is serial). This is the biggest wall-clock lever but is ONLY
 safe for genuinely file-disjoint stories.
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/parallel-stories.md` and follow it. In brief:
+**Instructions:** Read `~/.claude/references/epic-dev/parallel-stories.md` and follow it. In brief:
 - Parallelize ONLY stories the operator DECLARED independent (`parallel_group:` in story metadata, or
   an explicit `--stories S1,S2,…` list). Undeclared stories run serially. Never infer independence.
 - Each parallel story runs its FULL BMAD pipeline (fail-closed gates) in its own `git worktree` on its
@@ -129,7 +129,7 @@ IF "--phase-single" in "$ARGUMENTS":
   Output: "📋 PHASE-LEVEL MODE active - executing next incomplete phase..."
 ```
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/story-lifecycle.md` and follow all steps for the current story's phase:
+**Instructions:** Read `~/.claude/references/epic-dev/story-lifecycle.md` and follow all steps for the current story's phase:
 
 1. **Story Type Detection** — Detect type (coding, uat, infrastructure, documentation)
 2. **Phase routing based on story status:**
@@ -160,7 +160,7 @@ FOR each pending story, execute the full lifecycle:
 [ ] 6. Confirm Next (unless --yolo)
 ```
 
-**Instructions for each sub-step:** Read `~/.claude/commands/references/epic-dev/story-lifecycle.md` and follow the matching section.
+**Instructions for each sub-step:** Read `~/.claude/references/epic-dev/story-lifecycle.md` and follow the matching section.
 
 ---
 
@@ -168,7 +168,7 @@ FOR each pending story, execute the full lifecycle:
 
 When all stories in the epic are done (no more pending stories):
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/story-lifecycle.md` and follow the "Epic Completion (STEP 5)" section, which includes:
+**Instructions:** Read `~/.claude/references/epic-dev/story-lifecycle.md` and follow the "Epic Completion (STEP 5)" section, which includes:
 - Step 0: UAT Gate Check (MANDATORY)
 - Step A: Update epic status in sprint-status.yaml
 - Step B: Update retrospective status (if exists)
@@ -180,7 +180,7 @@ When all stories in the epic are done (no more pending stories):
 
 After STEP 5 completes (epic status marked done):
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/full/phase-ship.md` and follow all steps.
+**Instructions:** Read `~/.claude/references/epic-dev/full/phase-ship.md` and follow all steps.
 
 Skip with `--no-ship` flag. The ship phase dispatches ship-tail via a Task agent — the
 conductor itself does NOT call SlashCommand directly (pure-orchestrator invariant preserved;
@@ -190,19 +190,19 @@ the Task agent has its own tool list that includes SlashCommand).
 
 ## TASKLIST INTEGRATION (MANDATORY)
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/troubleshooting.md` and follow all TaskList integration patterns:
+**Instructions:** Read `~/.claude/references/epic-dev/troubleshooting.md` and follow all TaskList integration patterns:
 - Phase Task Creation Pattern (with dependencies)
 - Phase Execution Pattern (status transitions)
 - Verification Gate Sub-Tasks
 - Progress Summary Pattern (after each phase)
 
-For autonomous (`--auto`) runs, also read `~/.claude/commands/references/epic-dev/auto-mode.md` for the in-session self-drive loop + endurance (ScheduleWakeup / cloud Routine).
+For autonomous (`--auto`) runs, also read `~/.claude/references/epic-dev/auto-mode.md` for the in-session self-drive loop + endurance (ScheduleWakeup / cloud Routine).
 
 ---
 
 ## ERROR HANDLING
 
-**Instructions:** Read `~/.claude/commands/references/epic-dev/troubleshooting.md` and follow:
+**Instructions:** Read `~/.claude/references/epic-dev/troubleshooting.md` and follow:
 - Error handling (retry/skip/stop)
 - Gate escalation patterns (Gate 2.5 and 3.5 failures)
 - Confirm next story pattern (unless --yolo)

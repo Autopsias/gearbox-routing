@@ -954,6 +954,132 @@ PY
   echo
 fi
 
+# ---- (i) ~/.codex/config.toml ↔ codex_orchestrator (WARN-ONLY) ------------
+# ~/.codex/config.toml is USER-OWNED — this repo reads it and never writes it — so
+# drift surfaces loudly but never blocks, exactly like check (h)'s settings.json.
+# Full mode only. Skips SILENTLY (no header, no output) when the file is absent.
+#
+# WHY THIS CHECK REFUSES TO COMPARE SOMETIMES. Since Codex CLI 0.134.0 the effective
+# model comes from a LAYER STACK — base ~/.codex/config.toml, then a
+# ~/.codex/<name>.config.toml profile layer, then a project-local .codex/config.toml,
+# then `-c`/`-m` flags; closest wins. There is no non-interactive
+# `codex config inspect` to ask for the resolved value (openai/codex#26255 is open),
+# so no script can know it. Comparing the base `model` while a higher-precedence
+# layer sits unread is a check that passes on nothing. When any other layer exists
+# this check says so instead of pretending.
+if [[ "$MODE" == "full" ]]; then
+  # $CODEX_HOME is the Codex config root when set — the installed CLI's own --help says
+  # "Layer $CODEX_HOME/<name>.config.toml on top of the base user config". Reading only
+  # $HOME/.codex would silently SKIP (branch 0) on a machine that sets it, which is the
+  # "check that passes on nothing" failure this check exists to avoid.
+  CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
+  CODEX_CONFIG="$CODEX_HOME_DIR/config.toml"
+  if [[ -f "$CODEX_CONFIG" ]]; then
+    echo "== (i) Codex orchestrator alignment (warn-only; $CODEX_CONFIG is user-owned) =="
+    set +e
+    SSOT="$SSOT" CODEX_CONFIG="$CODEX_CONFIG" CODEX_HOME_DIR="$CODEX_HOME_DIR" python3 - <<'PY'
+import glob, os, re, sys
+
+ssot = open(os.environ["SSOT"], encoding="utf-8").read()
+start = ssot.find("\ncodex_orchestrator:\n")
+if start == -1:
+    print("  WARN: SSOT has no `codex_orchestrator:` block — nothing for check (i) to compare against")
+    sys.exit(0)
+tail = ssot[start + len("\ncodex_orchestrator:\n"):]
+nxt = re.search(r"^[^\s#]", tail, re.M)
+block = tail[: nxt.start() if nxt else len(tail)]
+want_m = re.search(r"^\s*model:\s*([\w.\-]+)", block, re.M)
+if not want_m:
+    print("  WARN: SSOT `codex_orchestrator:` block has no `model:` key — nothing for check (i) to compare against")
+    sys.exit(0)
+want = want_m.group(1)
+# D8 contracts BOTH keys: codex_orchestrator.model AND .effort. `effort:` is optional
+# here only so a future SSOT that drops it degrades to a model-only compare with a WARN,
+# never to a silent green.
+want_e_m = re.search(r"^\s*effort:\s*([\w.\-]+)", block, re.M)
+want_e = want_e_m.group(1) if want_e_m else None
+
+base = os.environ["CODEX_CONFIG"]
+base_real = os.path.realpath(base)
+
+# Layer 1: profile files sitting beside the base config.
+layers = sorted(glob.glob(os.path.join(os.environ["CODEX_HOME_DIR"], "*.config.toml")))
+# Layer 2: project-local .codex/config.toml, walked from the PROJECT ROOT down to
+# cwd — the walk Codex itself documents. The walk is BOUNDED at the enclosing git
+# root on purpose: an unbounded climb to / passes through $HOME and would pick up
+# the base ~/.codex/config.toml as a "project-local layer", warning "layers present"
+# on every run of a checkout that lives under $HOME (i.e. all of them). The realpath
+# guard below is the second belt for the same trap.
+d = os.path.abspath(os.getcwd())
+walked = []
+while True:
+    walked.append(d)
+    if os.path.exists(os.path.join(d, ".git")):   # a worktree's .git is a FILE, not a dir
+        break
+    parent = os.path.dirname(d)
+    if parent == d:
+        break
+    d = parent
+for d in walked:
+    cand = os.path.join(d, ".codex", "config.toml")
+    if os.path.isfile(cand) and os.path.realpath(cand) != base_real:
+        layers.append(cand)
+
+if layers:
+    print("  WARN: effective model undetermined (config layers present)")
+    for layer in layers:
+        print(f"         layer: {layer}")
+    print("         Codex CLI >=0.134.0 resolves the model through base -> profile -> project-local -> -c/-m (closest")
+    print("         wins) and exposes no non-interactive `codex config inspect` (openai/codex#26255), so the base")
+    print(f"         layer alone cannot be compared. SSOT codex_orchestrator.model = {want!r}, .effort = {want_e!r};")
+    print("         NO comparison made (neither model nor effort).")
+    sys.exit(0)
+
+# No other layer: the base file IS the effective config, so a comparison is honest.
+try:
+    text = open(base, encoding="utf-8").read()
+except OSError as exc:
+    # Never let an unreadable user-owned file traceback its way into a green guard.
+    print(f"  WARN: could not read {base} ({exc.__class__.__name__}) — check (i) made no comparison")
+    sys.exit(0)
+root_table = re.split(r"^\[", text, maxsplit=1, flags=re.M)[0]   # `model` under [profiles.x] is NOT the root key
+have_m = re.search(r'^\s*model\s*=\s*"([^"]+)"', root_table, re.M)
+have = have_m.group(1) if have_m else None
+have_e_m = re.search(r'^\s*model_reasoning_effort\s*=\s*"([^"]+)"', root_table, re.M)
+have_e = have_e_m.group(1) if have_e_m else None
+
+drift = False
+if have is None:
+    print(f"  WARN: {base} names no root `model` key — SSOT codex_orchestrator.model is {want!r}")
+    drift = True
+elif have != want:
+    print(f"  WARN: {base} model={have!r} != SSOT codex_orchestrator.model {want!r}")
+    drift = True
+
+if want_e is None:
+    print("  WARN: SSOT `codex_orchestrator:` block has no `effort:` key — effort NOT compared")
+    drift = True
+elif have_e is None:
+    # Absent is NOT "agrees": the CLI then falls back to the model's own catalog
+    # default (sol's is `low`), which is not the effort the SSOT deliberately records.
+    print(f"  WARN: {base} names no root `model_reasoning_effort` key — SSOT codex_orchestrator.effort is"
+          f" {want_e!r}, so the CLI runs the model's catalog default instead")
+    drift = True
+elif have_e != want_e:
+    print(f"  WARN: {base} model_reasoning_effort={have_e!r} != SSOT codex_orchestrator.effort {want_e!r}")
+    drift = True
+
+if drift:
+    print("         (warn-only: ~/.codex/config.toml is user-owned. Align it, or move codex_orchestrator")
+    print("          through a /routing-update changeset — never edit the SSOT to match a drifted config silently.)")
+else:
+    print(f"  [OK ] {base} model ({have}) + model_reasoning_effort ({have_e}) match SSOT codex_orchestrator, and no config FILE layer exists to override them (a per-call -c/-m flag still can)")
+PY
+    set -e
+    echo
+  fi
+fi
+
 # ---- (f) verify-assignments.sh sub-check ----------------------------------
 echo "== (f) verify-assignments.sh sub-check =="
 set +e

@@ -97,12 +97,12 @@ if [[ -f "$planFile" && "$overwrite" != true ]]; then
 fi
 ```
 
-**Instructions:** Read ~/.claude/commands/references/create-test-plan/output-templates.md for Requirements Analysis, Test Scenarios, and Validation Criteria templates (Steps 2-4).
+**Instructions:** Read ~/.claude/references/create-test-plan/output-templates.md for Requirements Analysis, Test Scenarios, and Validation Criteria templates (Steps 2-4).
 
-**Instructions:** Read ~/.claude/commands/references/create-test-plan/agent-prompts.md for Agent Execution Prompts and Test Plan File Generation (Steps 5-6).
+**Instructions:** Read ~/.claude/references/create-test-plan/agent-prompts.md for Agent Execution Prompts and Test Plan File Generation (Steps 5-6).
 
-**Instructions:** Read ~/.claude/commands/references/create-test-plan/execution-notes.md for Execution Notes and Completion output.
+**Instructions:** Read ~/.claude/references/create-test-plan/execution-notes.md for Execution Notes and Completion output.
 
 ---
 
-**Instructions:** Read ~/.claude/commands/references/create-test-plan/tasklist-integration.md for TaskList integration patterns.
+**Instructions:** Read ~/.claude/references/create-test-plan/tasklist-integration.md for TaskList integration patterns.

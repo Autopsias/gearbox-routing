@@ -1,0 +1,51 @@
+prior_art: pre-bump spec (no plan_schema_version) with a missing prior_art still validates clean
+prior_art: explicit plan_schema_version=3 (below threshold) also unenforced
+prior_art: explicit plan_schema_version=4 with a missing prior_art still refused
+build(): an unrelated pre-bump 1-item spec with no prior_art notion builds clean (the regression)
+prior_art: item with neither prior_art nor research_status refused
+prior_art: build decision with no source refused
+prior_art: build decision with blank source refused
+prior_art: research_status='skipped' + research_reason accepted (explicit degrade)
+prior_art: research_status='skipped' with no research_reason refused
+prior_art: research_status other than 'skipped' refused
+prior_art: decision outside adopt|adapt|build refused
+prior_art: unknown key refused
+prior_art: non-object refused
+prior_art: allow control — fully-decided spec validates clean
+build: prior_art and research-skipped both render in the agent-spec
+build: decision hotspots pull in build-despite-alternatives items (no tweak_likelihood needed)
+build: a build decision with no note (no alternative found) stays OUT of decision hotspots
+shaping[chained-disjoint]: PLANT — pure chain of file-disjoint sessions
+shaping[chained-justified]: ALLOW — same chain, `serial_reason` declared
+shaping[worktree-group]: ALLOW — isolated group auto-emits its integration session
+shaping[member-ships]: PLANT — group member declares commit-push
+shaping[worktree-group-as-shipped]: CONTROL — the same isolated spec against the executor's REAL readiness flag
+parallel contract: pre-bump spec with an M1 violation still validates (mutation-safe)
+parallel contract: the same M1 violation at v4 is refused
+serial_reason: blank string refused
+serial_reason: non-string refused
+integration session: emitted once, and a re-run adds no duplicate
+touches: unparseable prose is treated as conflicting with everything
+probe: known positive — a configured research MCP server is detected
+probe: known positive — built-in WebSearch counts when nothing denies it
+probe: known negative — a bare environment reports no research capability
+probe: known negative — built-ins denied + no research-capable MCP server
+probe: never carries a config VALUE (credential canary absent from the record)
+probe: research-server matching is token-based (claude_ai_Exa hits, 'preferences' does not)
+RS-06 PLANT: research_status='unavailable' refused when the probe sees research capability
+RS-06 PLANT: the refusal came from the probe (it was actually consulted)
+RS-06 ALLOW: research_status='unavailable' accepted when the probe finds nothing
+RS-06 ALLOW: research_status='skipped' unaffected by the probe verdict
+RS-06: validate_spec does not probe at all for a 'skipped' item (zero added I/O)
+RS-06 VERSION CONTROL: pre-bump spec with research_status='skipped' validates unchanged
+RS-06 VERSION CONTROL: pre-bump spec never reaches the probe
+RS-06: blank research_reason alongside 'unavailable' refused
+RS-06: research_env stamped into spec.json + manifest.json, and gen_manifest stays pure
+RS-06: a spec with no research_status gains no research_env (pre-RS-06 plans unchanged)
+RS-06: an 'unavailable' item renders the build-time-verified prior-art block
+coverage: PLANT — an item in no group is refused at the gating version
+coverage: the refusal states the denominator it would have counted
+coverage: ALLOW — a fully-placed spec validates at the gating version
+coverage: CONTROL — the same defect below the gate still validates
+coverage: CONTROL — an unstamped spec (every plan on disk) still validates
+coverage: plan_mutate aliases the builder's group-key map (one definition)

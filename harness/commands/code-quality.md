@@ -8,6 +8,10 @@ allowed-tools: ["Task", "Bash", "Grep", "Read", "Glob", "SlashCommand", "AskUser
 
 Analyze and fix code quality violations for: "$ARGUMENTS"
 
+If the user asked for a review of the whole repo (its health, security, refactoring needs,
+over-engineering or performance together), stop and tell them to type `/repo-health`, the
+front door for that. This command covers only file size, function length and complexity.
+
 ## CRITICAL: ORCHESTRATION ONLY
 
 **MANDATORY**: This command NEVER fixes code directly.
@@ -45,13 +49,13 @@ If no arguments provided, default to `--check` (analysis only).
 ### Special: --refresh-exceptions
 
 Single-branch flag, only relevant when `$ARGUMENTS` contains `--refresh-exceptions`:
-`Read ~/.claude/commands/references/code-quality/refresh-exceptions.md` and run it,
+`Read ~/.claude/references/code-quality/refresh-exceptions.md` and run it,
 then exit (no other steps execute).
 
 ### Special: --adopt (brownfield onboarding)
 
 Single-branch flag, only relevant when `$ARGUMENTS` contains `--adopt`:
-`Read ~/.claude/commands/references/code-quality/brownfield-adoption.md` and run it,
+`Read ~/.claude/references/code-quality/brownfield-adoption.md` and run it,
 then exit (no other steps execute). Grandfathers existing violations into baselines
 and sets up the ratchet so enforcement applies to changed code going forward.
 
@@ -59,13 +63,13 @@ and sets up the ratchet so enforcement applies to changed code going forward.
 
 ## STEP 1.25: Ralph Loop Mode Detection (Fresh Context)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode Detection" section. If `--loop` is present, launch the runner script and EXIT. Otherwise proceed to STEP 1.26.
+**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode Detection" section. If `--loop` is present, launch the runner script and EXIT. Otherwise proceed to STEP 1.26.
 
 ---
 
 ## STEP 1.26: Rule-Level Mode Detection (Phase Granularity)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/chaining-logic.md` and follow the "Rule-Level Mode Detection" section. If `--fix-single-rule` is present, execute only ONE category and EXIT. Otherwise proceed to STEP 1.5.
+**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Rule-Level Mode Detection" section. If `--fix-single-rule` is present, execute only ONE category and EXIT. Otherwise proceed to STEP 1.5.
 
 ---
 
@@ -168,25 +172,25 @@ AskUserQuestion(
 
 ## STEP 2: Run Quality Analysis
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/analysis-rules.md` and follow the "Quality Check Scripts" and "Violation Categories" sections.
+**Instructions:** Read `~/.claude/references/code-quality/analysis-rules.md` and follow the "Quality Check Scripts" and "Violation Categories" sections.
 
 ---
 
 ## STEP 3: Generate Quality Report
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/analysis-rules.md` and follow the "Quality Report Format" section.
+**Instructions:** Read `~/.claude/references/code-quality/analysis-rules.md` and follow the "Quality Report Format" section.
 
 ---
 
 ## STEP 4: Smart Parallel Refactoring (if --fix or --dry-run flag provided)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/agent-dispatch.md` and follow all phases:
+**Instructions:** Read `~/.claude/references/code-quality/agent-dispatch.md` and follow all phases:
 - For `--dry-run`: Follow the "Dry Run Plan Format" section and exit.
 - For `--fix`: Follow PHASE 0 through PHASE 4 for dependency-aware batched execution.
 
 After each batch of agents completes, execute the BATCH GATE:
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/troubleshooting.md` and follow:
+**Instructions:** Read `~/.claude/references/code-quality/troubleshooting.md` and follow:
 - "Batch Gate" section (save state, wait for agents)
 - "Anti-Hallucination Verification" section (verify git changes)
 - "Auto-Ralph on Hallucination" section (if hallucination detected)
@@ -199,13 +203,13 @@ After each batch of agents completes, execute the BATCH GATE:
 
 ## STEP 5: Parallel-Safe Operations (Linting, Type Errors)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/analysis-rules.md` and follow the "Parallel-Safe Operations" section.
+**Instructions:** Read `~/.claude/references/code-quality/analysis-rules.md` and follow the "Parallel-Safe Operations" section.
 
 ---
 
 ## STEP 6: Verify Results and Update Exceptions (after --fix)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/analysis-rules.md` and follow the "Verify Results and Update Exceptions" section (re-run checks + refresh stale exceptions).
+**Instructions:** Read `~/.claude/references/code-quality/analysis-rules.md` and follow the "Verify Results and Update Exceptions" section (re-run checks + refresh stale exceptions).
 
 ---
 
@@ -261,13 +265,13 @@ Output final status:
 
 ## STEP 8: Chain Invocation (unless --no-chain)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/chaining-logic.md` and follow the "Chain Invocation" section.
+**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Chain Invocation" section.
 
 ---
 
 ## STEP 4-RALPH: Ralph Loop Mode (DEFAULT FALLBACK or --ralph flag)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode" section (STEP 4-RALPH).
+**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode" section (STEP 4-RALPH).
 
 ---
 
@@ -323,4 +327,4 @@ Output final status:
 
 ## TASKLIST INTEGRATION (MANDATORY)
 
-**Instructions:** Read `~/.claude/commands/references/code-quality/troubleshooting.md` and follow the "TASKLIST INTEGRATION" section for task creation, dispatch tracking, Ralph loop bridge, and progress summary patterns.
+**Instructions:** Read `~/.claude/references/code-quality/troubleshooting.md` and follow the "TASKLIST INTEGRATION" section for task creation, dispatch tracking, Ralph loop bridge, and progress summary patterns.

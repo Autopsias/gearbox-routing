@@ -12,7 +12,7 @@ allowed-tools: ["Task", "Bash", "Read", "Grep", "Glob", "AskUserQuestion", "Task
 
 Systematically improve test coverage from any starting point (20-75%) to production-ready levels (75%+) through intelligent gap analysis and strategic orchestration.
 
-**MANDATORY:** Read `~/.claude/commands/references/coverage/tasklist-integration.md` and follow its TaskList integration patterns for this run.
+**MANDATORY:** Read `~/.claude/references/coverage/tasklist-integration.md` and follow its TaskList integration patterns for this run.
 
 ## Usage
 
@@ -114,9 +114,9 @@ Validate coverage improvements with integration safety and simplicity enforcemen
 - **Generate comprehensive quality score report** with test improvement recommendations
 - **Simplicity Score Report**: Rate test simplicity and flag over-engineered patterns
 
-> For quality scoring algorithm, anti-mocking-theater, and anti-over-engineering principles, `Read ~/.claude/commands/references/coverage/quality-scoring.md`
+> For quality scoring algorithm, anti-mocking-theater, and anti-over-engineering principles, `Read ~/.claude/references/coverage/quality-scoring.md`
 
-> For test compatibility matrix and integration requirements, `Read ~/.claude/commands/references/coverage/test-compatibility.md`
+> For test compatibility matrix and integration requirements, `Read ~/.claude/references/coverage/test-compatibility.md`
 
 ## Implementation Guidelines
 
@@ -127,7 +127,7 @@ Follow Epic 4.4 simplification patterns:
 - All operations must be async/await for non-blocking execution
 - Integrate with existing coverage.py and pytest infrastructure without disruption
 
-> For safety, rollback, and conflict detection details, `Read ~/.claude/commands/references/coverage/safety-rollback.md`
+> For safety, rollback, and conflict detection details, `Read ~/.claude/references/coverage/safety-rollback.md`
 
 ## Key Integration Points
 
@@ -143,13 +143,13 @@ Follow Epic 4.4 simplification patterns:
 - Critical path coverage: 100% for business logic
 - Quality over quantity: Focus on meaningful test coverage
 
-> For argument processing and directory detection logic, `Read ~/.claude/commands/references/coverage/argument-processing.md`
+> For argument processing and directory detection logic, `Read ~/.claude/references/coverage/argument-processing.md`
 
-> For enhanced workflow with pattern learning and safety validation, `Read ~/.claude/commands/references/coverage/workflow-pattern-learning.md`
+> For enhanced workflow with pattern learning and safety validation, `Read ~/.claude/references/coverage/workflow-pattern-learning.md`
 
 ---
 
-> For tasklist integration patterns, `Read ~/.claude/commands/references/coverage/tasklist-integration.md`
+> For tasklist integration patterns, `Read ~/.claude/references/coverage/tasklist-integration.md`
 
 ## Troubleshooting
 

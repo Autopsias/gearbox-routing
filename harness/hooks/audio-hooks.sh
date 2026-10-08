@@ -1,20 +1,72 @@
 #!/bin/bash
-# Global Audio Feedback Hooks for Claude Code
+# Global Audio Feedback Hooks for Claude Code AND Codex
 # This script provides intelligent audio feedback across all your projects
-# 
-# Installation: Add this to your Claude Code hooks configuration
-# Usage: Called automatically by Claude Code events
+#
+# Installation: reference it from the harness hooks configuration.
+#   Claude Code  ~/.claude/settings.json   → audio-hooks.sh on_task_complete
+#   Codex        ~/.codex/hooks.json       → audio-hooks.sh --codex stop
+# Usage: Called automatically by harness events.
 
 set -euo pipefail
 
-# Configuration paths
-readonly AUDIO_BASE="$HOME/.claude/audio-feedback/generated"
-readonly PREFS_FILE="$HOME/.claude/audio-feedback/config/user_preferences.json"
-readonly STATE_FILE="$HOME/.claude/audio-feedback/config/runtime_state.json"
-readonly LOG_FILE="$HOME/.claude/audio-feedback/logs/audio-feedback.log"
+# --codex — running under Codex rather than Claude Code. It changes two things,
+# both harness facts rather than preferences:
+#
+#   1. STDOUT MUST BE JSON. Codex validates a hook's stdout and rejects an empty
+#      body ("hook returned invalid session start JSON output"); Claude Code
+#      accepts raw stdout and treats it as context. This script has nothing to
+#      say, so under Codex it prints one empty JSON object and nothing else.
+#      Verified 2026-08-15 against the ponytail runtime, whose Codex branch also
+#      always writes a JSON object while its native-Claude branch writes raw text.
+#   2. State and logs belong to Codex. Generated audio and preferences fall back
+#      to the Claude tree so the existing assets keep working unchanged.
+#
+# It is a FLAG, not env sniffing, on purpose: the hooks file that invokes this
+# script already knows which harness it is, so nothing has to be inferred.
+EMIT_JSON=0
+if [[ "${1:-}" == "--codex" ]]; then
+    EMIT_JSON=1
+    shift
+fi
 
-# Ensure log directory exists
-mkdir -p "$(dirname "$LOG_FILE")"
+# Codex validates stdout even when the run FAILED, so the JSON is emitted from an
+# EXIT trap and the hook always exits 0. A missing sound must never surface as a
+# broken hook, let alone stop the turn.
+emit_hook_json() {
+    if [[ "$EMIT_JSON" == 1 ]]; then
+        EMIT_JSON=0
+        printf '{}'
+    fi
+}
+if [[ "$EMIT_JSON" == 1 ]]; then
+    trap 'emit_hook_json; exit 0' EXIT
+fi
+
+# Configuration paths. Under Codex, state and logs are Codex's; generated audio
+# and preferences fall back to the Claude tree so current assets keep working.
+if [[ "$EMIT_JSON" == 1 ]]; then
+    CODEX_AUDIO_ROOT="${CODEX_AUDIO_ROOT:-$HOME/.codex/audio-feedback}"
+    LEGACY_AUDIO_ROOT="${LEGACY_AUDIO_ROOT:-$HOME/.claude/audio-feedback}"
+
+    AUDIO_BASE="$CODEX_AUDIO_ROOT/generated"
+    [[ ! -d "$AUDIO_BASE" && -d "$LEGACY_AUDIO_ROOT/generated" ]] \
+        && AUDIO_BASE="$LEGACY_AUDIO_ROOT/generated"
+
+    PREFS_FILE="$CODEX_AUDIO_ROOT/config/user_preferences.json"
+    [[ ! -f "$PREFS_FILE" && -f "$LEGACY_AUDIO_ROOT/config/user_preferences.json" ]] \
+        && PREFS_FILE="$LEGACY_AUDIO_ROOT/config/user_preferences.json"
+
+    STATE_FILE="$CODEX_AUDIO_ROOT/config/runtime_state.json"
+    LOG_FILE="$CODEX_AUDIO_ROOT/logs/audio-feedback.log"
+    mkdir -p "$(dirname "$STATE_FILE")" "$(dirname "$LOG_FILE")"
+else
+    AUDIO_BASE="$HOME/.claude/audio-feedback/generated"
+    PREFS_FILE="$HOME/.claude/audio-feedback/config/user_preferences.json"
+    STATE_FILE="$HOME/.claude/audio-feedback/config/runtime_state.json"
+    LOG_FILE="$HOME/.claude/audio-feedback/logs/audio-feedback.log"
+    mkdir -p "$(dirname "$LOG_FILE")"
+fi
+readonly AUDIO_BASE PREFS_FILE STATE_FILE LOG_FILE
 
 # Logging function
 log_event() {
@@ -50,7 +102,17 @@ get_time_context() {
     local work_start=$(jq -r '.scheduling.time_based_switching.work_hours.start // "09:00"' "$PREFS_FILE" | cut -d: -f1)
     local work_end=$(jq -r '.scheduling.time_based_switching.work_hours.end // "18:00"' "$PREFS_FILE" | cut -d: -f1)
     
-    if [[ $hour -ge $work_start && $hour -lt $work_end ]]; then
+    # 10# forces base 10. Both `date +%H` and the default work_hours.start
+    # ("09:00") are zero-padded, and bash arithmetic reads a leading zero as
+    # octal — so "08"/"09" raise "value too great for base", the [[ -ge ]] test
+    # silently evaluates FALSE, and this function answered "after_hours" at every
+    # hour of the day. Measured 2026-08-15: with work_start="09", the unfixed
+    # comparison returns false for 08, 09 AND 10.
+    local hour_num=$((10#$hour))
+    local work_start_num=$((10#$work_start))
+    local work_end_num=$((10#$work_end))
+
+    if (( hour_num >= work_start_num && hour_num < work_end_num )); then
         echo "work_hours"
     else
         echo "after_hours"
@@ -84,6 +146,9 @@ is_focus_mode() {
     local project_name=$(basename "$(pwd)")
     
     while IFS= read -r trigger; do
+        # No triggers configured reads as one EMPTY line here, and every string
+        # contains "", so focus mode switched itself on for every project.
+        [[ -z "$trigger" ]] && continue
         if [[ "$current_branch" == *"$trigger"* || "$project_name" == *"$trigger"* ]]; then
             return 0
         fi
@@ -298,13 +363,13 @@ play_audio() {
     # Platform-specific audio playback
     if command -v afplay >/dev/null 2>&1; then
         # macOS
-        afplay "$audio_file" --volume "$volume" 2>/dev/null &
+        afplay "$audio_file" --volume "$volume" >/dev/null 2>&1 &
     elif command -v paplay >/dev/null 2>&1; then
         # Linux with PulseAudio
-        paplay "$audio_file" --volume=$(($(echo "$volume * 65536" | bc -l | cut -d. -f1))) 2>/dev/null &
+        paplay "$audio_file" --volume=$(($(echo "$volume * 65536" | bc -l | cut -d. -f1))) >/dev/null 2>&1 &
     elif command -v aplay >/dev/null 2>&1; then
         # Linux with ALSA
-        aplay "$audio_file" -q 2>/dev/null &
+        aplay "$audio_file" -q >/dev/null 2>&1 &
     else
         log_event "ERROR" "No audio playback command found (afplay, paplay, aplay)"
         return 1
@@ -348,6 +413,24 @@ on_task_complete() {
     fi
 }
 
+on_session_start() {
+    if ! is_enabled; then
+        return 0
+    fi
+
+    local enabled=$(jq -r '.audio_feedback.session_start.enabled // true' "$PREFS_FILE" 2>/dev/null)
+    if [[ "$enabled" != "true" ]]; then
+        return 0
+    fi
+
+    log_event "INFO" "Session start event triggered"
+
+    local audio_file=$(select_audio_file "input_needed")
+    if [[ $? -eq 0 && -n "$audio_file" ]]; then
+        play_audio "$audio_file" "input_needed"
+    fi
+}
+
 # Utility functions for manual testing
 test_input_sound() {
     echo "🔊 Testing input needed sound..."
@@ -381,11 +464,16 @@ case "${1:-}" in
     "test-complete")
         test_complete_sound
         ;;
-    "on_input_needed")
+    # Claude Code names the handler; Codex names the EVENT. Both reach the same
+    # three handlers, so neither hooks file has to know the other's vocabulary.
+    "on_input_needed"|"permission"|"PermissionRequest")
         on_input_needed
         ;;
-    "on_task_complete")
+    "on_task_complete"|"stop"|"Stop"|"SessionEnd")
         on_task_complete
+        ;;
+    "on_session_start"|"session"|"SessionStart")
+        on_session_start
         ;;
     "toggle-focus")
         toggle_focus_mode
@@ -402,6 +490,6 @@ case "${1:-}" in
         # No arguments - this is normal for hook usage
         ;;
     *)
-        echo "Usage: $0 [test-input|test-complete|toggle-focus|status|on_input_needed|on_task_complete]"
+        echo "Usage: $0 [--codex] [test-input|test-complete|toggle-focus|status|on_input_needed|on_task_complete|on_session_start]"
         ;;
 esac

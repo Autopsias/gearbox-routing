@@ -55,6 +55,7 @@ Autonomy is only useful if the loop survives the wait. Three patterns (none chan
 the state machine — only how you hold the turn open):
 
 - **Long gate / deploy:** don't block idle. argv gates time out themselves; for a long skill gate or deploy, use `run_in_background` + `Monitor` (Bash) and react when it finishes — don't surface a task id and wait for "continue."
+- **Long land re-gate:** `land` runs argv gates synchronously, including every `at_land` gate. When any gate it will run has a `timeout` above 540 s (this repo's `ci-check` is 3000 s), run `PYBP land <dir>` with `run_in_background: true` and wait on it with `Monitor`. Never run it in the foreground under the 600 s Bash cap (finish-contract.md "Long gates").
 - **Soak / condition wait:** to wait for a measurable condition (coverage ≥ X%, error rate stable N min, deploy healthy), use `ScheduleWakeup` to re-enter and re-check — tied to the **condition**, not a calendar default — re-entering with `/plan-execute <dir> --auto`.
 - **Very long plan:** each session is a SUBAGENT, so your context accrues only closeouts, not the work. State lives on disk (`PLAN.html` + `run_state.json` + `_closeouts/` + `_verify_state/`), so a fresh `/plan-execute <dir> --auto` resumes across a compaction boundary. Nothing is held only in context.
 

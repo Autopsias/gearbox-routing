@@ -15,7 +15,7 @@ git commit -m "$(cat <<'EOF'
 
 Generated with [Claude Code](https://claude.ai/claude-code)
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: <active model name/version> <noreply@anthropic.com>
 EOF
 )"
 git push

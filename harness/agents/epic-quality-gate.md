@@ -1,6 +1,6 @@
 ---
 name: epic-quality-gate
-description: Makes the Phase-8 requirements-traceability quality-gate decision (PASS/CONCERNS/FAIL). Isolated from Phase-2 story validation so the gate can run at maximum effort. Use ONLY for Phase 8 testarch-trace / quality-gate.
+description: "Makes the Phase-8 requirements-traceability quality-gate decision (PASS/CONCERNS/FAIL). Use ONLY for Phase 8 testarch-trace / quality-gate."
 tools: Read, Glob, Grep, Skill
 model: opus
 effort: high

@@ -87,12 +87,8 @@ verify state that has nothing to do with it. Two rules keep that honest:
 import hashlib
 import json
 import os
-import re
-import shutil
 import sys
 import tempfile
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -102,12 +98,18 @@ if str(_BUILDER) not in sys.path:
 
 import article_block as ab  # noqa: E402
 import build_plan as bp  # noqa: E402
+import closeout_pipeline as cp  # noqa: E402
 import dispatch as dsp  # noqa: E402
+import session_fields as sess_help  # noqa: E402
 import structural_gate as sg  # noqa: E402
+# Re-exported: callers and tests reach these as `pm.<name>`, and nothing
+# monkeypatches them. plan_journal never imports this file back.
+from plan_journal import (  # noqa: E402,F401
+    JOURNAL_DIR, JOURNAL_NAME, MutationError, _apply_journal, _crash_point,
+    _fsync_dir, _now, _write_fsync, commit, recover,
+)
 
 CHANGELOG_FILE = "_changelog.ndjson"
-JOURNAL_DIR = "_mutation"
-JOURNAL_NAME = "journal.json"
 VERIFY_STATE_DIR = "_verify_state"
 CLOSEOUT_DIR = "_closeouts"
 # A verify cycle that has stopped moving. Anything else (no outcome yet, or
@@ -115,23 +117,13 @@ CLOSEOUT_DIR = "_closeouts"
 SETTLED_VERIFY = {"passed", "halted"}
 # `<sid>.rN.json` — state a redispatch round already moved aside (run.py's
 # `_archive_session_state`). History, not live state.
-_ARCHIVED_RE = re.compile(r"^r\d+$")
 
 # A session whose work is finished or deliberately abandoned cannot be amended:
 # its prompt/model/deps describe a dispatch that already happened.
 AMENDABLE = {"TODO"}
-# Retirement is a decision NOT to do work. Refuse where there is work in flight
-# (DOING), a recorded result (DONE / AWAITS_REVIEW), or nothing left to retire
-# (WONTFIX). PARTIAL/BLOCKED/DEFERRED are the honest "we are dropping this" cases.
+# Retirement is a decision NOT to do work: refuse work in flight (DOING), a recorded
+# result (DONE, or AWAITS_REVIEW on a DONE closeout — `cp.never_finished`), and WONTFIX.
 RETIREABLE = {"TODO", "BLOCKED", "DEFERRED", "PARTIAL"}
-
-
-class MutationError(Exception):
-    """Refusal: the requested mutation is invalid or unsafe. Nothing was written."""
-
-
-def _now():
-    return datetime.now(timezone.utc).isoformat()
 
 
 # --------------------------------------------------------------------------
@@ -172,14 +164,18 @@ def read_changelog(plan_dir):
     if not p.is_file():
         return []
     out = []
-    for line in p.read_text().splitlines():
+    # errors="replace": this feeds only the PLAN.html renderer; a bad byte must not
+    # stop a record_change. Non-object values (`[]`, `null`) are skipped likewise.
+    for line in p.read_bytes().decode("utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
             continue
         try:
-            out.append(json.loads(line))
+            rec = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if isinstance(rec, dict):
+            out.append(rec)
     return out
 
 
@@ -230,146 +226,6 @@ def _statuses(plan_dir):
 
 
 # --------------------------------------------------------------------------
-# Journalled multi-file transaction
-# --------------------------------------------------------------------------
-def _fsync_dir(path):
-    fd = os.open(str(path), os.O_RDONLY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-
-
-def _write_fsync(path, data):
-    path = Path(path)
-    with open(path, "wb") as f:
-        f.write(data)
-        f.flush()
-        os.fsync(f.fileno())
-
-
-def _crash_point(label, n):
-    """Test-only crash injection. `PLAN_MUTATE_CRASH=<label>` kills the process
-    at that point; for `rename` the value may be `rename:<n>` to die after the
-    n-th rename. Real process death (os._exit), so the test exercises the same
-    recovery path a power cut would."""
-    want = os.environ.get("PLAN_MUTATE_CRASH")
-    if not want:
-        return
-    tag, _, arg = want.partition(":")
-    if tag != label:
-        return
-    if arg and int(arg) != n:
-        return
-    sys.stderr.write(f"[crash-injection] dying at {label}:{n}\n")
-    sys.stderr.flush()
-    os._exit(70)
-
-
-def commit(plan_dir, targets, meta):
-    """Journal + apply a multi-file generation.
-
-    `targets` maps plan-relative path -> complete new bytes. Returns the txn id.
-    """
-    plan_dir = Path(plan_dir)
-    txn = uuid.uuid4().hex[:12]
-    stage = plan_dir / JOURNAL_DIR / txn
-    stage.mkdir(parents=True, exist_ok=False)
-
-    entries = []
-    for i, (rel, data) in enumerate(sorted(targets.items())):
-        staged = f"{i:02d}.{Path(rel).name}"
-        _write_fsync(stage / staged, data)
-        entries.append(
-            {"path": rel, "staged": staged, "sha256": hashlib.sha256(data).hexdigest()}
-        )
-    _fsync_dir(stage)
-    _crash_point("stage", 0)
-
-    journal = {"txn": txn, "at": _now(), "targets": entries, **meta}
-    # The commit point: one atomic rename. Nothing above this line touched a
-    # live file; nothing below it can leave a mixed generation.
-    fd, tmp = tempfile.mkstemp(dir=str(stage), prefix=".journal-")
-    with os.fdopen(fd, "wb") as f:
-        f.write(json.dumps(journal, indent=2).encode("utf-8"))
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, stage / JOURNAL_NAME)
-    _fsync_dir(stage)
-    _crash_point("journal", 0)
-
-    _apply_journal(plan_dir, stage, journal)
-    return txn
-
-
-def _apply_journal(plan_dir, stage, journal):
-    plan_dir = Path(plan_dir)
-    applied = []
-    for n, t in enumerate(journal["targets"], start=1):
-        src = stage / t["staged"]
-        dst = plan_dir / t["path"]
-        if not src.exists():
-            continue  # already landed in an earlier (interrupted) pass
-        # The journal's digest is checked, not decorative: a staged file torn by
-        # the same power loss that interrupted the mutation must never be renamed
-        # over a good live file.
-        if hashlib.sha256(src.read_bytes()).hexdigest() != t["sha256"]:
-            raise MutationError(
-                f"staged {t['path']} in {stage} is corrupt (sha256 mismatch); refusing to "
-                f"apply it. Delete {stage} to abandon the interrupted mutation and re-run it."
-            )
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(src, dst)
-        _fsync_dir(dst.parent)
-        applied.append(t["path"])
-        _crash_point("rename", n)
-    # Journal last: while it exists the generation is replayable.
-    (stage / JOURNAL_NAME).unlink(missing_ok=True)
-    shutil.rmtree(stage, ignore_errors=True)
-    parent = plan_dir / JOURNAL_DIR
-    try:
-        parent.rmdir()
-    except OSError:
-        pass
-    return applied
-
-
-def recover(plan_dir):
-    """Finish or discard any interrupted mutation. Safe to call on every command.
-
-    Returns a list of recovery records (empty when there was nothing to do).
-    """
-    base = Path(plan_dir) / JOURNAL_DIR
-    if not base.is_dir():
-        return []
-    out = []
-    for stage in sorted(base.iterdir()):
-        if not stage.is_dir():
-            continue
-        jpath = stage / JOURNAL_NAME
-        if not jpath.is_file():
-            # Crashed BEFORE the commit point — no live file was touched.
-            shutil.rmtree(stage, ignore_errors=True)
-            out.append({"txn": stage.name, "action": "discarded_uncommitted"})
-            continue
-        journal = json.loads(jpath.read_text())
-        applied = _apply_journal(plan_dir, stage, journal)
-        out.append(
-            {
-                "txn": journal["txn"],
-                "action": "replayed",
-                "op": journal.get("op"),
-                "paths_completed": applied,
-            }
-        )
-    try:
-        base.rmdir()
-    except OSError:
-        pass
-    return out
-
-
-# --------------------------------------------------------------------------
 # Rendering one complete generation
 # --------------------------------------------------------------------------
 def _validate(spec, plan_dir, *, baseline_ok):
@@ -384,7 +240,7 @@ def _validate(spec, plan_dir, *, baseline_ok):
         # Every refusal leaves this module as a MutationError, so the CLI prints
         # one clear line instead of a traceback from inside the builder.
         raise MutationError(f"the resulting plan would be invalid: {e}") from e
-    warnings = []
+    warnings = bp.pl.plan_risk_warnings(spec, bp._declared_writes(spec))
     root = project_root_for(plan_dir)
     for name in ("validate_shipping_resolves", "validate_verify_resolves"):
         try:
@@ -532,14 +388,16 @@ def build_generation(plan_dir, spec, *, touched_sessions, status_ops, log_entry)
 # The containment gate + recorded-state safety (RP-04)
 # --------------------------------------------------------------------------
 def _live_state_files(plan_dir, subdir):
-    """`<sid>.json` records in `subdir`, skipping redispatch archives."""
+    """`<sid>.json` records in `subdir`, skipping every sidecar beside them."""
     out = []
     d = Path(plan_dir) / subdir
     if not d.is_dir():
         return out
     for p in sorted(d.glob("*.json")):
-        parts = p.name.split(".")
-        if len(parts) > 2 and _ARCHIVED_RE.match(parts[1]):
+        # Only `<sid>.json` is a record. The rest are sidecars: `<sid>.rN.json`
+        # redispatch archives, and llm_review_ledger's `<sid>.accepted.json`.
+        # A sidecar has no `outcome`, so counting one blocked every mutation.
+        if p.name.count(".") != 1:
             continue
         out.append(p)
     return out
@@ -663,10 +521,10 @@ def _run(plan_dir, spec_before, spec_after, *, op, session, summary, touched_ses
         preview = "\n".join(drift[:20])
         raise MutationError(
             f"refusing to {op}: re-rendering this plan with the CURRENT plan-builder "
-            f"would change {len(drift)} line(s) of PLAN.html even with no mutation "
-            "applied — the plan was built by an older builder (or from another path). "
-            "Those changes would ride in on top of your mutation, unannounced. Review "
-            "them and re-run with --allow-builder-drift to accept both:\n" + preview
+            f"would change {len(drift)} line(s) of PLAN.html with no mutation applied, "
+            f"{sum(1 for ln in drift if ln[1:].strip())} of them real content — an older "
+            f"builder built it, or another path did. Review ALL — {max(0, len(drift) - 20)} of "
+            "them are not in the sample — then re-run with --allow-builder-drift:\n" + preview
         )
 
     entry = {
@@ -769,7 +627,37 @@ def _exclusive_items(spec, session_ids):
 # add-session
 # --------------------------------------------------------------------------
 def parse_new_item(raw):
-    """`id|category|title[|summary]` -> item dict."""
+    """`id|category|title[|summary]` -> item dict. A JSON OBJECT is also accepted,
+    and on a modern plan it is the only form that can produce a valid item.
+
+    WHY THE SECOND FORM EXISTS (measured 2026-08-15): since plan_schema_version 4
+    the builder REQUIRES every item to carry `prior_art` (decision+source) or a
+    `research_status` with a reason. Three positional fields have nowhere to put
+    either, so `--new-item` failed validation on every plan the builder now
+    stamps — the documented "change the plan mid-run" path could not add a new
+    item at all. JSON carries those fields, and every field the builder adds
+    later, without inventing a second escaping grammar for pipes.
+    """
+    s = str(raw).strip()
+    if s[:1] in ("{", "["):
+        try:
+            item = json.loads(s)
+        except ValueError as exc:
+            raise MutationError(
+                f"--new-item {raw!r} opens like JSON but is not valid JSON: {exc}"
+            ) from exc
+        if not isinstance(item, dict):
+            raise MutationError(
+                f"--new-item {raw!r} must be a JSON object (one item per --new-item), "
+                f"not a {type(item).__name__}"
+            )
+        missing = [k for k in ("id", "category", "title")
+                   if not str(item.get(k) or "").strip()]
+        if missing:
+            raise MutationError(
+                f"--new-item JSON is missing required key(s): {', '.join(missing)}"
+            )
+        return item
     parts = [p.strip() for p in str(raw).split("|")]
     if len(parts) < 3 or not all(parts[:3]):
         raise MutationError(
@@ -792,55 +680,39 @@ def parse_new_item(raw):
 # one validate_spec refuses against and the renderer emits from. Aliased, never
 # re-declared: two copies drift, and the copy that drifts is the one the bar
 # counts through.
-_INFOGRAPHIC_GROUPS = bp.INFOGRAPHIC_GROUP_KEYS
+from infographic_place import attach_to_infographic  # noqa: E402,F401
 
 
-def attach_to_infographic(spec, item_ids, group_name=None):
-    """Add `item_ids` to a Plan-Achievement group. Returns (group_name, warning)."""
-    info = spec.get("infographic") or {}
-    groups = info.get(_INFOGRAPHIC_GROUPS.get(info.get("type"), ""), None)
-    if not item_ids or not isinstance(groups, list) or not groups:
-        return None, None
-    wanted = group_name
-    if wanted is None:
-        # Default: the item's own category LABEL, when a group is named for it.
-        labels = {c["key"]: c.get("label", "") for c in spec["categories"]}
-        by_id = {it["id"]: it for it in spec["items"]}
-        cats = {labels.get(by_id[i]["category"], "").strip().lower()
-                for i in item_ids if i in by_id}
-        names = {str(g.get("name", "")).strip().lower() for g in groups}
-        hit = cats & names
-        wanted = next(iter(hit)) if len(hit) == 1 else None
-    if wanted is None:
-        return None, (
-            f"item(s) {', '.join(item_ids)} were not added to any Plan Achievement "
-            f"group ({', '.join(str(g.get('name')) for g in groups)}), so that "
-            "section's counters exclude them. Re-run with --infographic-group NAME "
-            "to place them."
+def _refuse_naked_new_items(parsed_new, schema):
+    """At PRIOR_ART_MIN_SCHEMA and above every item must carry prior_art or
+    research_status, and the pipe syntax has nowhere to put them — so say
+    WHICH form to use rather than letting validate_spec answer with a
+    requirement that form cannot express."""
+    naked = [it["id"] for it in parsed_new
+             if not it.get("prior_art") and not it.get("research_status")]
+    if naked:
+        raise MutationError(
+            f"new item(s) {', '.join(naked)}: this plan is schema v{schema}, where every "
+            "item must carry prior_art (decision + source) or research_status. The "
+            "'id|category|title|summary' form has nowhere to put them — pass the item as "
+            "JSON instead:\n"
+            "  --new-item '{\"id\": \"w-99\", \"category\": \"work\", \"title\": \"…\", "
+            "\"prior_art\": {\"decision\": \"build\", \"source\": \"what you checked\"}}'\n"
+            "decision is adopt|adapt|build; the alternative is "
+            "\"research_status\": \"skipped\" with a \"research_reason\"."
         )
-    for g in groups:
-        if str(g.get("name", "")).strip().lower() == str(wanted).strip().lower():
-            g.setdefault("items", [])
-            g["items"] += [i for i in item_ids if i not in g["items"]]
-            return g.get("name"), None
-    raise MutationError(
-        f"--infographic-group {group_name!r} matches no group in the Plan "
-        f"Achievement section. Groups: "
-        f"{[str(g.get('name')) for g in groups]}"
-    )
 
 
-def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
-                model="Sonnet", reasoning=None, gates=(), require_evidence=False,
-                prompt=None, human_summary=None, parallel_group=None,
-                infographic_group=None, allow_builder_drift=False):
-    spec = load_spec(plan_dir)
-    after = json.loads(json.dumps(spec))
-    if any(s["id"] == sid for s in after["sessions"]):
-        raise MutationError(f"session {sid!r} already exists in this plan")
-
+def _validated_item_ids(after, *, sid, items, parsed_new, depends_on):
+    """Everything that must hold before a session can be added, and the item ids
+    it will own. Raises MutationError with the fix in the message; returns the
+    de-duplicated id list."""
     cat_keys = {c["key"] for c in after["categories"]}
-    parsed_new = [parse_new_item(n) for n in new_items]
+    # Say WHICH form to use, here, instead of letting validate_spec answer with a
+    # requirement the pipe syntax cannot express (see `parse_new_item`).
+    schema = after.get("plan_schema_version") or 0
+    if schema >= bp.PRIOR_ART_MIN_SCHEMA:
+        _refuse_naked_new_items(parsed_new, schema)
     for it in parsed_new:
         if it["category"] not in cat_keys:
             raise MutationError(
@@ -877,17 +749,24 @@ def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
         if d not in known and d != sid:
             raise MutationError(f"--depends-on {d!r} is not a session in this plan")
 
+    item_ids = list(dict.fromkeys([*items, *[it["id"] for it in parsed_new]]))
+    return item_ids
+
+
+def _new_session(*, sid, title, model, item_ids, prompt, reasoning, human_summary,
+                 depends_on, parallel_group, gates, require_evidence, task_class=None):
+    """The session dict itself — every optional key omitted rather than set null,
+    because validate_spec distinguishes absent from empty."""
     session = {
         "id": sid,
         "title": title,
-        "model": model,
         "items": item_ids,
         "prompt": prompt or "",
     }
-    if reasoning:
-        session["reasoning"] = reasoning
-    if human_summary:
-        session["human_summary"] = human_summary
+    if model:  # v8 class-default sessions carry no model key at all
+        session["model"] = model
+    sess_help.apply_optional_fields(session, reasoning=reasoning, task_class=task_class,
+                                     human_summary=human_summary)
     dispatch = {}
     if depends_on:
         dispatch["depends_on"] = list(depends_on)
@@ -902,13 +781,37 @@ def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
         if require_evidence:
             verify["require_evidence"] = True
         session["verify"] = verify
+    return session
+
+
+def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
+                model=None, reasoning=None, gates=(), require_evidence=False,
+                prompt=None, human_summary=None, parallel_group=None,
+                infographic_group=None, allow_builder_drift=False, task_class=None):
+    spec = load_spec(plan_dir)
+    after = json.loads(json.dumps(spec))
+    if any(s["id"] == sid for s in after["sessions"]):
+        raise MutationError(f"session {sid!r} already exists in this plan")
+    sess_help.warn_missing_task_class(task_class)  # RT-01
+    try:
+        model, reasoning = sess_help.resolve_model_pair(after, model, reasoning, task_class)
+    except ValueError as e:
+        raise MutationError(f"add-session {sid}: {e}") from e
+
+    parsed_new = [parse_new_item(n) for n in new_items]
+    item_ids = _validated_item_ids(after, sid=sid, items=items,
+                                   parsed_new=parsed_new, depends_on=depends_on)
+    session = _new_session(
+        sid=sid, title=title, model=model, item_ids=item_ids, prompt=prompt,
+        reasoning=reasoning, human_summary=human_summary, depends_on=depends_on, gates=gates,
+        parallel_group=parallel_group, require_evidence=require_evidence, task_class=task_class)
 
     after["items"].extend(parsed_new)
     # Appended, not inserted: document order drives the dashboard's UP-NEXT panel,
     # and a session added mid-run is by definition the newest work.
     after["sessions"].append(session)
     placed, info_warning = attach_to_infographic(
-        after, [n["id"] for n in parsed_new], infographic_group
+        after, [n["id"] for n in parsed_new], infographic_group, session_id=sid
     )
 
     result = _run(
@@ -990,8 +893,22 @@ _DEP_DROPPED_NOTE = (
 )
 
 
-def retire_session(plan_dir, sid, *, reason, cascade=False, drop_dependency=False,
-                   allow_builder_drift=False):
+def _retire_dependency_ops(cascade, direct, drop_dependency, live_all, sid, transitive_only):
+    """Status ops for the sessions that depended on the one being retired."""
+    if live_all and not (cascade or drop_dependency):
+        raise MutationError(
+            f"refusing to retire {sid}: {len(live_all)} live session(s) still depend on "
+            f"it — direct: {direct or '(none)'}; transitive: {transitive_only or '(none)'}. "
+            "WONTFIX counts as done to the dispatcher, so they would run WITHOUT the "
+            "input they were written to consume. Choose one and re-run:\n"
+            f"  --cascade           retire them too (same reason)\n"
+            f"  --drop-dependency   keep them, drop {sid} from their depends_on and warn "
+            "them in their prompt (same transaction)"
+        )
+
+
+def _retire_preconditions(cascade, drop_dependency, reason):
+    """What must hold before a session can be retired WONTFIX."""
     if not (reason or "").strip():
         raise MutationError(
             "refusing to retire without --reason: WONTFIX is a terminal state that "
@@ -1001,6 +918,11 @@ def retire_session(plan_dir, sid, *, reason, cascade=False, drop_dependency=Fals
     if cascade and drop_dependency:
         raise MutationError("--cascade and --drop-dependency are alternatives; pick one")
 
+
+def retire_session(plan_dir, sid, *, reason, cascade=False, drop_dependency=False,
+                   allow_builder_drift=False):
+    _retire_preconditions(cascade, drop_dependency, reason)
+
     spec = load_spec(plan_dir)
     after = json.loads(json.dumps(spec))
     by_id = {s["id"]: s for s in after["sessions"]}
@@ -1009,11 +931,11 @@ def retire_session(plan_dir, sid, *, reason, cascade=False, drop_dependency=Fals
 
     statuses = _statuses(plan_dir)
     status = statuses.get(sid, "TODO")
-    if status not in RETIREABLE:
+    if status not in RETIREABLE and not (status == "AWAITS_REVIEW" and cp.never_finished(plan_dir, sid)):
         raise MutationError(
-            f"refusing to retire {sid}: it is {status}. Retirement records a decision "
-            f"not to do the work ({'/'.join(sorted(RETIREABLE))} only) — it is not a way "
-            "to cancel an in-flight dispatch or erase a recorded result."
+            f"refusing to retire {sid}: it is {status}. Retirement records a decision not to "
+            f"do the work ({'/'.join(sorted(RETIREABLE))}, or a never-run AWAITS_REVIEW gate) "
+            "— it is not a way to cancel an in-flight dispatch or erase a recorded result."
         )
 
     # WONTFIX is a member of the executor's DONE_STATES: retiring a producer
@@ -1026,16 +948,7 @@ def retire_session(plan_dir, sid, *, reason, cascade=False, drop_dependency=Fals
 
     retire_ids = [sid]
     touched, status_ops, notes = [], [], []
-    if live_all and not (cascade or drop_dependency):
-        raise MutationError(
-            f"refusing to retire {sid}: {len(live_all)} live session(s) still depend on "
-            f"it — direct: {direct or '(none)'}; transitive: {transitive_only or '(none)'}. "
-            "WONTFIX counts as done to the dispatcher, so they would run WITHOUT the "
-            "input they were written to consume. Choose one and re-run:\n"
-            f"  --cascade           retire them too (same reason)\n"
-            f"  --drop-dependency   keep them, drop {sid} from their depends_on and warn "
-            "them in their prompt (same transaction)"
-        )
+    _retire_dependency_ops(cascade, direct, drop_dependency, live_all, sid, transitive_only)
 
     if cascade and live_all:
         not_retireable = {d: statuses.get(d, "TODO") for d in live_all

@@ -251,7 +251,7 @@ def test_amend_breaking_group_symmetry_is_refused_before_write(plan):
 def test_allow_control_mutation_lands_and_stays_clean(plan):
     """The same command, valid: add a session and the page is still coherent."""
     res = pm.add_session(plan, sid="s04", title="Extra", new_items=["w-03|work|W3"],
-                         depends_on=["s01"], infographic_group="Track A")
+                         depends_on=["s01"], infographic_group="Track A", task_class="standard_build")
     assert res["op"] == "add-session"
     assert sg.check_containment(plan)["status"] == "passed"
 
@@ -261,7 +261,7 @@ def test_add_session_that_would_orphan_an_item_is_refused(plan):
     defect. The mutation is refused rather than quietly shipping a wrong bar."""
     with pytest.raises(pm.MutationError) as e:
         pm.add_session(plan, sid="s04", title="Extra", new_items=["w-03|work|W3"],
-                       infographic_group=None)
+                       infographic_group=None, task_class="standard_build")
     assert "[workstreams]" in str(e.value)
     assert (plan / "spec.json").is_file() and not (plan / "_changelog.ndjson").exists()
 
@@ -278,7 +278,7 @@ def test_prior_breach_downgrades_the_same_check_to_a_warning(plan):
     (plan / "PLAN.html").write_bytes(
         ab.carry_over_state(html, build_plan.render_html(spec, plan)).encode("utf-8")
     )
-    res = pm.add_session(plan, sid="s04", title="Extra", new_items=["w-03|work|W3"])
+    res = pm.add_session(plan, sid="s04", title="Extra", new_items=["w-03|work|W3"], task_class="standard_build")
     assert any("[workstreams]" in w and "w-03" in w for w in res["validation_warnings"]), \
         res["validation_warnings"]
     # …and the pre-existing d-01 breach is NOT re-reported as this mutation's doing.
@@ -330,7 +330,7 @@ def test_settled_verify_state_migrates_and_keeps_rework_count(plan):
     old_digest = json.loads(p.read_text())["manifest_digest"]
 
     res = pm.add_session(plan, sid="s04", title="Extra", new_items=["w-03|work|W3"],
-                         depends_on=["s01"], infographic_group="Track A")
+                         depends_on=["s01"], infographic_group="Track A", task_class="standard_build")
 
     new_digest = pm.hashlib.sha256((plan / "manifest.json").read_bytes()).hexdigest()
     assert new_digest != old_digest, "fixture bug: the manifest did not change"
@@ -412,7 +412,7 @@ def main(out_path, cli_transcript=None, suite_result=""):  # pragma: no cover - 
              lambda p: pm.amend_session(p, "s03", depends_on=["s02"])),
             ("add-session s04 --new-item w-03  (item in no WORKSTREAMS group)",
              lambda p: pm.add_session(p, sid="s04", title="Extra",
-                                      new_items=["w-03|work|W3"])),
+                                      new_items=["w-03|work|W3"], task_class="standard_build")),
         ):
             lines.append(f"$ {what}")
             try:
@@ -428,7 +428,7 @@ def main(out_path, cli_transcript=None, suite_result=""):  # pragma: no cover - 
             ("add-session under an UNSETTLED verify cycle (outcome=rework)",
              lambda p: pm.add_session(p, sid="s05", title="X",
                                       new_items=["w-05|work|W5"],
-                                      infographic_group="Track A")),
+                                      infographic_group="Track A", task_class="standard_build")),
         ):
             _verify_state(plan_dir, "s02", outcome="rework", rework_count=1)
             lines.append(f"$ {what}")
@@ -444,7 +444,7 @@ def main(out_path, cli_transcript=None, suite_result=""):  # pragma: no cover - 
         old = json.loads(p.read_text())
         res = pm.add_session(plan_dir, sid="s04", title="Extra",
                              new_items=["w-03|work|W3"], depends_on=["s01"],
-                             infographic_group="Track A")
+                             infographic_group="Track A", task_class="standard_build")
         new = json.loads(p.read_text())
         lines += [
             f"before: digest={old['manifest_digest'][:12]}… rework_count={old['rework_count']}"

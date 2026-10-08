@@ -145,7 +145,7 @@ for the current gate ID, define the set of implementation files that must exist 
 that gate's story to count as implemented, then check for their presence.
 
 This is genuinely project-specific — the gate IDs and file paths differ per project.
-`Read ~/.claude/commands/references/usertestgates/step-3.5-example-file-checks.md` for
+`Read ~/.claude/references/usertestgates/step-3.5-example-file-checks.md` for
 a worked example (from a historical PPTX-pipeline project) showing the case-statement
 pattern; adapt it to this project's actual gates before running.
 
@@ -326,8 +326,8 @@ Show the exit code and interpret:
 - Exit 1 → ⚠️ REFINE
 - Exit 2 → 🚨 ESCALATE
 
-**Instructions:** Read ~/.claude/commands/references/usertestgates/special-cases.md for special case handling and execution notes.
+**Instructions:** Read ~/.claude/references/usertestgates/special-cases.md for special case handling and execution notes.
 
 ---
 
-**Instructions:** Read ~/.claude/commands/references/usertestgates/tasklist-integration.md for TaskList integration patterns.
+**Instructions:** Read ~/.claude/references/usertestgates/tasklist-integration.md for TaskList integration patterns.

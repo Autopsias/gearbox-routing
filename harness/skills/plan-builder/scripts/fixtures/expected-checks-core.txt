@@ -1,0 +1,58 @@
+backward-compat: briefed base spec validates
+checkpoint brief: un-briefed human gate rejected (policy 2026-07-11)
+checkpoint brief: optional options list accepted
+checkpoint brief: missing decision rejected
+checkpoint brief: blank reason rejected
+checkpoint brief: unknown key rejected
+checkpoint brief: empty options rejected
+verify.checks: valid list accepted (assert optional)
+verify.checks: missing evidence_path rejected
+verify.checks: missing name rejected
+verify.checks: non-list rejected
+verify.checks: unknown key rejected
+verify.checks: non-string assert rejected
+verify.checks: empty list rejected
+verify: checks-only block (no gates/require_evidence) valid
+dispatch.depends_on_policy: valid enum accepted
+dispatch.depends_on_policy: invalid enum rejected
+dispatch.model_fallbacks/reasoning_fallbacks: list-of-str accepted
+dispatch.model_fallbacks: non-list rejected
+dispatch.reasoning_fallbacks: non-string items rejected
+build: manifest carries depends_on_policy + fallbacks
+build: manifest defaults depends_on_policy='all', fallbacks=[]
+build: manifest carries the checkpoint decision brief verbatim
+build: prompt.md renders the Evidence contracts list
+acceptance_review: bool accepted
+acceptance_review: non-bool rejected
+acceptance_review: two markers rejected
+acceptance_review: missing-on-big-plan warning fires
+acceptance_review: warning silent when a session declares it
+acceptance_review: warning silent on a plan under 4 sessions
+build: manifest carries acceptance_review (default False)
+codex model: gpt-5.6-sol emits no dispatchable-token WARNING
+codex model: gpt-5.6-terra validates
+codex model: gpt-5.6-luna validates
+retired model: gpt-5.5 emits the dispatchable-token WARNING
+build: Codex session renders a model-codex chip; ESLint no-undef gate stays green
+retired model: gpt-5.5 still maps to the dot-free 'codex' chip class
+codex model: fork+gpt-5.6-sol still warns (fork ignores model)
+rebuild --preserve-state: mixed statuses + notes + ship badge survive; added s11 is TODO
+control: rebuild WITHOUT carry-over demonstrably wipes every status (test can fail)
+rebuild --preserve-state: a REMOVED session does not resurrect; survivors keep status
+rebuild without --preserve-state is REFUSED and leaves PLAN.html untouched
+rebuild of a never-executed plan needs no flag and is byte-stable
+codex_shell danger-full-access is REFUSED on an ungated session
+codex_shell danger-full-access BUILDS when guards_irreversible gates it
+codex_shell rejects writable_roots/network beside danger-full-access
+codex_shell rejects a sandbox mode the runner does not emit
+codex_shell rejects writable_roots that is not a list
+codex_shell rejects a misspelled key instead of ignoring it
+codex_shell rejects wildcard environment grants
+codex_shell env_include reaches manifest.json without credential values
+codex_shell writable_roots+network needs no gate and reaches manifest.json
+no codex_shell => no codex_shell key in manifest.json
+out_of_scope/open_questions reach manifest.json verbatim
+out_of_scope/open_questions render on the dashboard
+out_of_scope: non-list rejected
+open_questions: blank entry rejected
+no scope fields => no scope keys in manifest.json

@@ -6,6 +6,9 @@
 **Binding on:** CP-02 (`run.py --harness codex`), CP-03/04/05 (the three Codex skill
 ports), PI-* (deploy/SSOT), and the lint sessions. Every later session implements
 against this file; contradict it only by amending it in the same commit.
+**Amended:** 2026-08-15 — worktree-isolated parallel groups are now supported by
+both harnesses; see § 9.3 and the parallel-group contract v2. 2026-08-26 — D4d
+now gates the actual isolated dispatch tree rather than the primary checkout.
 
 **Rule of this document:** every capability claim below cites a probe that was
 actually run, with its verbatim output. Nothing here is asserted from memory. The
@@ -369,10 +372,12 @@ remembers where — a completed session's work is unreachable, and the session s
 
 Recovery then reads `run.ndjson` for the most recent `codex_dispatch` of a `DOING`
 session, checks the file, and either applies it or re-dispatches. No new state file,
-no new format — two existing mechanisms, one deterministic path. The `rm -f <file> &&`
-prefix already in `_codex_cmd()` keeps a stale file from a previous attempt out of the
-way, unchanged: it removes only the one path the current attempt is about to write, so
-every earlier attempt's file survives for audit.
+no new format — two existing mechanisms, one deterministic path. Before launch,
+`_codex_cmd()` moves an existing receipt (including a dangling symlink) into a unique
+`<receipt>.stale.XXXXXX/last-message.txt` recovery directory. The current path is clear
+without deleting evidence. If archival fails, Codex does not launch; do not apply
+the old receipt as a new result. This replaces the deletion prefix rejected by the
+desktop shell on 2026-09-05; model, sandbox and receipt-path contracts are unchanged.
 
 ### 3.7 The dispatch receipt — `apply` refuses a closeout with no dispatch
 
@@ -400,7 +405,7 @@ Design notes, each of which is a way this could have gone wrong:
 - **The fallback path counts.** A session degraded onto `fallback_cmd` writes to the
   `-fb` file and the primary path never appears; that is a real dispatch.
 - **No replay bypass, and none needed.** `_codex/` is inside the plan directory and
-  `rm -f` only clears the path being rewritten, so re-running `apply` — including the
+  archival only clears the path being rewritten at launch, so re-running `apply` — including the
   operator's real recovery of passing the `_codex` last-message file to
   `--output-file` after a loop interruption — finds the same receipt. A
   `_closeouts/<sid>.json`-exists bypass was considered and rejected: it would wave
@@ -696,6 +701,29 @@ honours 0 and reports all 16. Until this was matched in `run.py`, every repo car
 no message anywhere saying why, while this document and the SSOT both claimed the file
 was honoured.
 
+**A pin is keyed on `<path>:<rule>`, and the pin COUNT is its bound (2026-08-15).**
+`run.py` drops the line number from the key it matches on. A gitleaks fingerprint is
+line-anchored, so any edit *above* a reviewed false positive silently unpins it and
+turns the whole tree DO-NOT-SEND — and the refusal reads exactly like a fresh secret,
+so nothing on the surface says the pin is merely stale. `profile-a-brain` stranded that
+way: commit `4cfb55a` (2026-08-05) dropped one line above a flagged docstring, moving it
+from 143 to 142; the text and its entropy (3.81) never changed. Same defect the quality
+gate fixed in `77278cd` by forgiving a function by NAME instead of by line number.
+
+Dropping the line would otherwise widen one pin into *"this rule is forgiven anywhere in
+this file"*, so the count replaces it as the bound: **N pins for a `(path, rule)` pair
+forgive N findings; finding N+1 refuses on its own.** A false positive that merely moves
+stays pinned; a real key added beside it does not ride out on the same pin. The ceiling
+is a new secret that *replaces* the pinned one one-for-one — the count is unchanged, so
+it is forgiven. Closing that needs a content anchor, and every content field gitleaks
+emits under `--redact` is redacted except `Entropy`; recording entropy would break the
+gitleaks-native file format the commit hooks share. The pin file keeps the three-field
+form (`<path>:<rule>:<line>`) for exactly that reason — gitleaks' own `-i` is still
+line-exact, so keep the number current even though `run.py` no longer reads it.
+Regression-proved both ways in `test_codex_dispatch.py`: a pin still clears its finding
+after the finding moves, a second finding on the same pair still refuses, and two pins
+clear both.
+
 Everything runs over realpath-resolved absolute paths. gitleaks does not descend into
 symlinked directories, so `run.py` walks them itself and gives each out-of-tree target
 its own pass (as it does each git submodule). No `gitleaks` on PATH — or a crash,
@@ -786,10 +814,24 @@ includes the egress verdict in its **first** payload:
 "egress": {"root": "/Users/…/your-private-harness", "restricted_hit": null, "opted_in": false}
 ```
 
-This reuses `begin`'s existing lazy `egress_state()` — one scan per invocation,
-shared by the disclosure and the refusal.
+~~This reuses `begin`'s existing lazy `egress_state()` — one scan per invocation,
+shared by the disclosure and the refusal.~~
 
-### D4e — verification family: deferred, with a recommendation
+**Amendment 2026-08-26 — scan root equals dispatch root.** Plan-level isolation
+made the sentence above false: `begin` created `.plan-worktrees/<slug>` and built
+`codex exec` with that cwd, while the singleton egress closure still scanned the
+primary checkout. A primary-only `.env` therefore blocked a tree that would never
+be shipped. The regression was reproduced by
+`test_codex_egress_scans_the_isolated_plan_worktree` against a real git worktree.
+
+For a shared-tree plan, `egress` remains the hard turn-one verdict. For an isolated
+plan, `egress` describes the orchestrator checkout and `dispatch_egress` names the
+plan worktree with `status: gated_at_begin`. `begin` creates the worktrees first,
+scans each exact resolved dispatch root, and only then constructs a command or
+mutates session state. Its lazy cache is keyed by resolved root so member worktrees
+and verifier dispositions cannot reuse a verdict from a different tree.
+
+### D4e — verification family: settled 2026-08-25, both directions
 
 Under `--harness codex` every session stamps `executor_family: "openai"`, so the
 existing provider-symmetric rule ("the non-executing family verifies") makes
@@ -797,12 +839,31 @@ existing provider-symmetric rule ("the non-executing family verifies") makes
 spawning Claude from the Codex shell, which is the same cross-vendor egress in
 reverse, and which an operator who chose Codex may specifically not want.
 
-**Not settled here** — it is a verify-gate design question, not a dispatch-contract
-one. Recommended default for CP-02/CP-03, to be confirmed by whichever session
-implements verify under Codex: keep the stamp honest (`executor_family: openai`), and
-set `verifier_mode: "on_box_human"` for review-class gates unless the operator has
-explicitly enabled a Claude verifier (e.g. `claude -p` available and elected).
-Deterministic gates (tests, argv gates) are family-neutral and need no change.
+**Settled 2026-08-25, both directions** (plan `cross-family-review-gate-2026-08-25`).
+
+**Claude-built, verified by Codex.** The gate ids
+`cross-family-review-low|medium|high` route `llm_review_gate.py` to a read-only
+headless `codex exec` via `scripts/codex_review_backend.py`, plan-builder proposes
+them in place of `llm-review-*` for Claude-token ship-ready sessions, and a
+restricted tree degrades to `VERIFIER: on_box_human` / `DEGRADED_FROM:
+cross_family` at exit 2 instead of sending anything (see `verify-gates.md`'s
+"Cross-family review" subsection and `scripts/test_verifier_wiring.py`, which
+proves both directions through the registry entry).
+
+**Codex-built, verified by Claude — the mirror direction, landed session s05.**
+The recommended default above (`verifier_mode: "on_box_human"` unless a Claude
+verifier is explicitly elected) is now the wired behaviour, not just a
+recommendation: any `llm-review-*` or `cross-family-review-*` gate running
+under `--harness codex` defaults to `on_box_human` — it prints the
+`VERIFIER: on_box_human` marker and parks the session at `AWAITS_REVIEW`
+(no rework charge) rather than spawning `claude -p` — unless the operator sets
+`verification.claude_verifier_under_codex_harness: true` in `model-routing.yaml`
+(fail-closed: absent, `false`, or an unreadable SSOT all mean the on-box park).
+See `verify-gates.md`'s "Under the Codex harness" subsection for the marker,
+the prefix-scan rule that reads it, the two resolution dispositions
+(`VERIFIED-ON-BOX` / `BLOCKED` via `run.py ack-checkpoint --decision …`), and
+the measured launch requirement for reaching the network from inside the
+Codex sandbox.
 
 ---
 
@@ -886,8 +947,8 @@ rather than treat it as a working model.
 1. **Approval-escalation launch mode (§ 3.1)** — does `codex -s workspace-write
    -a on-request` escalate an approved dispatch out of the Seatbelt sandbox? If yes,
    it is a much better default than `danger-full-access`. **CP-03 must probe it live.**
-2. **Verify-gate family under Codex (§ D4e)** — confirm the `on_box_human` default,
-   or wire an explicit Claude-verifier opt-in.
+2. ~~**Verify-gate family under Codex (§ D4e)**~~ — **settled 2026-08-25**, both
+   directions now wired; see § D4e above.
 3. **`--output-schema` (P0)** — `codex exec` supports a JSON-schema-constrained final
    response, which would eliminate the malformed-closeout failure class outright (the
    Claude side gets this via Workflow's `agent(..., {schema})`). The Claude path
@@ -1106,37 +1167,32 @@ Precedence (unchanged, harness-neutral): a closeout carrying BOTH
 `ack-checkpoint` raises the REPLAN afterwards. Plans below `plan_schema_version 3`
 ignore `plan_impact` entirely, in both harnesses.
 
-### 9.3 Worktree parallelism is explicitly Claude-harness-only — restated, with its enforcement point named
+### 9.3 Worktree parallelism is harness-neutral — amended 2026-08-15
 
-**This was already the position of record before this session** —
-`parallel-group-contract.md` (frozen by session S06, PL-02, *before* S06B/S07
-implemented against it) states in its member-rules section: *"Codex harness
-boundary — explicitly unchanged. `begin --harness codex` dispatches serially, one
-`codex exec` per session, in the shared tree, and creates no worktrees. It
-therefore REFUSES an isolated group by name rather than running it unprotected."*
-This decision restates that boundary **here**, in the contract § 3.4 already
-gestures at ("parallelism is a shell detail... revisit only with a plan whose
-batches are actually wide") but never made explicit for the worktree-isolation
-case specifically — § 3.4 is about a Codex orchestrator choosing to background
-independent `codex exec` calls itself; it is not, and was never, permission to
-honour a plan's own `dispatch.isolation: "worktree"` declaration.
+The orchestrator-managed worktree lifecycle is now shared by both harnesses.
+`run.py::_isolation_prep()`, called from `cmd_begin` before the lock and before
+any status mutation, creates or reuses the member worktrees and performs the
+producer-first integration merge regardless of `--harness`.
 
-**Enforcement point, verified against the shipped code (not re-derived from
-memory):** `run.py::_isolation_prep()`, called from `cmd_begin` before the lock and
-before any status mutation. When `codex_harness` is true and the batch contains
-any isolated member or integration session, it raises `SystemExit` naming the
-affected session ids and citing `parallel-group-contract.md` §2 M3, rather than
-silently dispatching them into the shared tree. There is no config flag, no
-override, and no partial mode — a group that declares isolation is refused
-**wholesale** under `--harness codex`; it either runs entirely under Claude Code,
-or the plan author removes the declaration.
+For an isolated member, `begin` returns `worktree`, `worktree_branch`, and
+`isolation` in the dispatch payload. The Claude path puts the worktree preamble
+in the member prompt. The Codex path emits a command beginning
+`cd <member-worktree> &&`, and copies the effective prompt plus its stamped
+`--output-last-message` receipt into `<member worktree>/.plan-worktrees/codex/`.
+That placement is required by the dispatched command's `workspace-write` root;
+the directory is ignored by the worktree mechanism and is not candidate output
+for the member commit.
 
-`worktree-status` and `worktree-cleanup` are the one part of this surface that
-**does** work from either harness — they are read-only/cleanup operations over
-`.plan-worktrees/<group>/<sid>` and carry no harness branch of their own. An
-operator who started a group under Claude Code and is now driving the rest of the
-plan from a Codex orchestrator can still inspect or clean up that group's
-worktrees with them; what a Codex-harness `begin` cannot do is *create* new ones.
+The integration session has no member worktree. Its Codex command runs from the
+shared project checkout after the producer branches have merged; its Claude
+path likewise receives the merged-tree gate context. A failed preparation,
+dispatch-path construction, merge, or containment check refuses before the
+session is marked `DOING`; there is no shared-tree fallback for a worktree
+declaration.
+
+`worktree-status` and `worktree-cleanup` remain harness-neutral read/cleanup
+operations over `.plan-worktrees/<group>/<sid>`. Cleanup is still explicit and
+last, after integration gates and shipping.
 
 ### 9.4 What this session found NOT yet landed, named rather than invented
 
@@ -1188,3 +1244,15 @@ declared — proved both directions in this session's evidence
 (`_plans/plan-framework-upgrade-2026-08-12/_evidence/s12/port-coverage.md`): the
 real run exits 0 over all thirteen required names and five declared gaps; a
 `--plant` run adding one deliberately-unported name exits 1.
+
+## 10. Route at dispatch (plan schema v8) — the openai side
+
+Added by plan session S10 of `_plans/route-at-dispatch-2026-09-29/`. The rules are in `route-at-dispatch-contract.md`, which wins on any disagreement. This section records only what changes under `--harness codex`.
+
+- **Provider.** `--harness codex` makes the active provider `openai` (contract 3.1). An unpinned v8 session resolves from the routing file's `openai` cells. Nothing new detects the lane.
+- **Effort.** The begin receipt's `effort_mechanism` is `codex_cli`; effort rides `-c model_reasoning_effort=`. Tier agents do not apply; the receipt's `dropped` list names the drop.
+- **Eligibility.** `executor_policy.executor_for` still gates implicit Codex dispatch. A required `task_class` adds none. An explicit Codex pin and `--harness codex` keep their existing waivers.
+- **Overrides.** A cross-provider override (a Codex model named on the Claude tree, or the reverse) skips the floor check and is recorded `pinned_override`. The existing bar on Codex pins for linchpin or irreversible work still applies.
+- **Locked checks.** `verify.locked` and the protected test-configuration set are fingerprinted at `begin` and re-checked at `verify-begin`; a change fails the attempt as `LOCKED_CHECK_EDITED` before any gate. The rule is harness-neutral.
+- **Usage.** The `codex_cmd` that `begin` builds runs `codex exec --json` with stdout redirected to `<last_message_file>.events.jsonl` (probed on codex-cli 0.158.0, 2026-09-30: the `-o` file is byte-identical with and without `--json`, and the stream holds a `turn.completed` usage event). `record-receipt --backend codex --transcript <last_message_file>.events.jsonl` gives the sum of `turn.completed` events, with `input_tokens` net of cached and cache-write tokens; without it usage lands `unavailable`. There is no attested served id, so `cost_usd` stays `null`. Cost per dispatch path: `claude -p` records the reported cost; an Agent-tool or Workflow dispatch now records a real cost (`cost_source` `model_prices`), because `model-routing.yaml` v31 carries `cache_write_5m` / `cache_write_1h` rates and cache-creation tokens bill at the 5m rate, or at the 1h rate for the share the transcript splits out as `ephemeral_1h_input_tokens`; a codex attempt records token usage from its `--json` log but `cost_usd` stays null (the stream names no served model and `model_prices` has no GPT rows).
+- **Rollback.** `--no-route-at-dispatch` or `PLAN_EXECUTE_ROUTE_AT_DISPATCH=0`; an unpinned v8 session is then refused. A v8 plan must not run under `~/.claude-glm` until its copy has `SUPPORTED_MAX_SCHEMA` of 8 or more.

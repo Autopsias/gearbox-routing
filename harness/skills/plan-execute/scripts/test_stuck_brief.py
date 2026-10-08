@@ -63,7 +63,7 @@ def _sessions():
 
 @pytest.fixture
 def plan(tmp_path):
-    """A freshly built plan — stamped at the CURRENT PLAN_SCHEMA_VERSION."""
+    """A freshly built plan — stamped at the fresh pre-v8 stamp (rad.PRE_V8_STAMP)."""
     return str(make_plan(tmp_path, _sessions()))
 
 
@@ -243,6 +243,267 @@ def test_plant_rework_feedback_stays_quiet_on_two_different_errors(plan):
     assert _events(plan, "stuck_protocol_armed") == []
 
 
+# --------------------------------------------------------------------------
+# RS-03 / D2 — a REVIEW gate's root cause is its FINDINGS, not its banner
+# --------------------------------------------------------------------------
+# Found 2026-08-15 by running the loop, not by reading it. `llm-review-*` ends
+# every failing run with the same sentence, and the findings themselves contain no
+# error word — so that sentence was the only line `_ERRORISH` matched and EVERY
+# review-gate failure signed `6c61d90dec14`. Two unrelated findings read as one
+# recurring root cause. That counter is what `escalation.climb_steps` buys a model
+# rung with, so the ladder would have climbed on evidence that did not exist.
+#
+# These drive the REAL gate (llm_review_gate.py as a subprocess, against a `claude`
+# stand-in on PATH) and the REAL rework path, because a hand-written excerpt is
+# exactly the synthetic shortcut that let this ship.
+_FIND_A = [{"file": "skills/routing-retro/scripts/aggregate_outcomes.py", "line": 118,
+            "severity": "medium",
+            "summary": "ssot_version is compared with < against an int with no type check"}]
+_FIND_B = [{"file": "skills/routing-retro/scripts/render_report.py", "line": 61,
+            "severity": "minor",
+            "summary": "a smoke-in-progress proposal ranks equal to an actionable one"}]
+
+
+def _stuck_rec(plan_dir, sid="s01"):
+    """The PERSISTED stuck record — what `escalation` reads, not the return value."""
+    return (rsi.load_state(plan_dir).get("stuck") or {}).get(sid) or {}
+
+
+def _review_gate_excerpt(tmp_path, findings, tag):
+    """The excerpt `verify._run_gate` builds from a REAL failing llm-review run."""
+    import os
+    import subprocess
+
+    bindir = Path(tmp_path) / f"bin-{tag}"
+    bindir.mkdir(parents=True, exist_ok=True)
+    # `REVIEWED_FILES: 1` because this fixture hands the gate exactly ONE
+    # changed file (reviewed.py below). Since 5a1da8f the gate compares the
+    # reviewer's attested count to the surface it handed over and scores a
+    # mismatch -- or a missing line -- INDETERMINATE, so a stub that only emits
+    # the fence now reads as "did not review the surface" and never reaches the
+    # FINDINGS path this fixture exists to drive.
+    answer = ("Reviewed the diff.\n\nREVIEWED_FILES: 1\n\n```json\n"
+              + json.dumps(findings) + "\n```")
+    stub = bindir / "claude"
+    stub.write_text("#!/bin/sh\ncat <<'EOF'\n"
+                    + json.dumps({"type": "result", "is_error": False, "result": answer})
+                    + "\nEOF\n")
+    stub.chmod(0o755)
+    # A real git work tree: since 2026-08-15 the gate refuses to review a tree it
+    # cannot enumerate the NEW files of (D1).
+    tree = Path(tmp_path) / "tree"
+    if not (tree / ".git").exists():
+        tree.mkdir(exist_ok=True)
+        subprocess.run(["git", "init", "-q"], cwd=tree, check=True)
+        # A NON-EMPTY reviewed surface. Since 805938e the gate returns
+        # INDETERMINATE when `git diff HEAD` has 0 changed files and there are 0
+        # untracked ones, because a green verdict over nothing is a check that
+        # cannot fail. This fixture drives the FINDINGS path, so it needs one
+        # real committed-then-modified file; an empty repo now (correctly)
+        # refuses before the reviewer is ever called.
+        (tree / "reviewed.py").write_text("x = 1\n")
+        subprocess.run(["git", "add", "reviewed.py"], cwd=tree, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-qm", "base"], cwd=tree, check=True)
+        (tree / "reviewed.py").write_text("x = 2\n")
+    res = subprocess.run(
+        [sys.executable, str(SCRIPTS / "llm_review_gate.py"), "--level", "low",
+         "--cwd", str(tree)],
+        capture_output=True, text=True,
+        env=dict(os.environ, PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}"),
+    )
+    assert res.returncode == 1, (res.returncode, res.stdout, res.stderr)
+    return vfy.adapter.redact((res.stderr or "") + (res.stdout or ""),
+                              max_len=vfy.GATE_EXCERPT_MAX)
+
+
+def test_plant_two_different_review_findings_are_not_one_root_cause(plan, tmp_path):
+    a = _review_gate_excerpt(tmp_path, _FIND_A, "a")
+    b = _review_gate_excerpt(tmp_path, _FIND_B, "b")
+    # The gate's own banner IS in both excerpts, byte-identical — that is the trap.
+    banner = "llm-review-low: FAILED with 1 finding(s)."
+    assert banner in a and banner in b
+
+    assert sp.signature(a)["sig"] != sp.signature(b)["sig"], "different findings collided"
+    _fail_gate(plan, a)
+    second = _fail_gate(plan, b)
+    assert _stuck_rec(plan)["consecutive"] == 1, _stuck_rec(plan)
+    assert "stuck_protocol" not in second
+    assert "STUCK PROTOCOL" not in Path(second["feedback_file"]).read_text()
+    assert _events(plan, "stuck_protocol_armed") == []
+
+
+def test_allow_two_identical_review_findings_still_arm(plan, tmp_path):
+    """The other control. Fixing the collision by never arming on a review gate
+    would be a worse bug than the one it replaced, so the same finding twice must
+    STILL arm — and must still buy the ladder its rung."""
+    a1 = _review_gate_excerpt(tmp_path, _FIND_A, "a1")
+    a2 = _review_gate_excerpt(tmp_path, _FIND_A, "a2")
+    _fail_gate(plan, a1)
+    second = _fail_gate(plan, a2)
+    assert second["stuck_protocol"]["consecutive"] == 2
+    assert second["stuck_protocol"]["triggered"]
+    fb = Path(second["feedback_file"]).read_text()
+    assert "STUCK PROTOCOL — ARMED" in fb
+    # The RESEARCH PASS names what recurred, not the gate's boilerplate. Sliced off
+    # the gate excerpt above it, which legitimately quotes the banner verbatim.
+    brief = fb.split("## STUCK PROTOCOL", 1)[1]
+    assert "aggregate_outcomes.py" in brief and "no type check" in brief
+    assert "for a deliberate choice" not in brief
+    assert len(_events(plan, "stuck_protocol_armed")) == 1
+    # ...and the expensive consumer agrees: this is a rung the ladder may buy.
+    assert sp.armed(_stuck_rec(plan))
+
+
+# --------------------------------------------------------------------------
+# RS-03 / D3 — the same root cause SURVIVING a rework is a repeat
+# --------------------------------------------------------------------------
+# Measured 2026-08-20 over 182 outcome records: 40 cohorts needed >=2 attempts,
+# exactly ONE ever changed model or effort, and `escalated_from` was null on all
+# 182. The ladder was fine; the signature was not. Signing the SET of findings
+# makes `consecutive` reset to 1 on every attempt of a working rework loop —
+# the loop changes the finding set by construction, so byte-identical finding
+# sets twice running never happen and the counter can never reach TRIGGER_AT.
+#
+# The line drawn here: two attempts share a root cause when a finding CARRIED
+# OVER — the same (file, severity) appears in both sets. Line numbers and
+# summary prose are dropped from that key because both drift on a rework.
+
+# Attempt N+1 of _FIND_A's defect: same file, same severity, RE-WORDED summary,
+# moved line, plus one newly-raised unrelated finding. This is what a rework
+# round genuinely looks like.
+_FIND_A_REWORDED = [
+    {"file": "skills/routing-retro/scripts/aggregate_outcomes.py", "line": 124,
+     "severity": "medium",
+     "summary": "the ssot_version comparison still assumes an int; a str raises TypeError"},
+    {"file": "skills/routing-retro/scripts/render_report.py", "line": 88,
+     "severity": "minor",
+     "summary": "the proposal table has no stable sort key"},
+]
+
+
+def test_allow_a_finding_that_survives_a_rework_arms_the_protocol(plan, tmp_path):
+    """THE KNOWN POSITIVE. The same defect, reported in different words on the
+    next attempt, is the same root cause — and must arm, or the whole escalation
+    ladder below it is unreachable."""
+    a1 = _review_gate_excerpt(tmp_path, _FIND_A, "carry1")
+    a2 = _review_gate_excerpt(tmp_path, _FIND_A_REWORDED, "carry2")
+    # The prose really did change: identity signing would see two different runs.
+    assert sp.signature(a1)["sig"] != sp.signature(a2)["sig"]
+
+    _fail_gate(plan, a1)
+    second = _fail_gate(plan, a2)
+    assert _stuck_rec(plan)["consecutive"] == 2, _stuck_rec(plan)
+    assert second["stuck_protocol"]["triggered"]
+    assert sp.armed(_stuck_rec(plan))
+    fb = Path(second["feedback_file"]).read_text()
+    assert "STUCK PROTOCOL — ARMED" in fb
+    # The brief names WHAT carried over, not just that something did.
+    assert "aggregate_outcomes.py" in fb.split("## STUCK PROTOCOL", 1)[1]
+    # ...and the expensive consumer buys exactly one rung off it.
+    import escalation as esca
+    _restamp(plan, esca.ESCALATION_MIN_SCHEMA)
+    rsi.save_state(plan, {**rsi.load_state(plan),
+                          "escalation": {"s01": {"refused": [], "generation": 0,
+                                                 "climb": 0, "last_rung": 0,
+                                                 "last_attempts": 0}}})
+    assert esca.climb_steps(plan, "s01") == 1
+
+
+# --------------------------------------------------------------------------
+# RS-03 / D4 — an INDETERMINATE review verdict is a signable, armable failure
+# --------------------------------------------------------------------------
+# repo-health s13 repeated `verdict=INDETERMINATE` three times and never armed:
+# the banner names no error class and carries no findings block, so it fell to
+# the unattributable branch and `armable` was False. A reviewer that cannot
+# answer, twice at the same gate and level, is the clearest "this is stuck"
+# signal the system has. Signed explicitly — the general `armable` guard below
+# is NOT loosened to reach it.
+
+
+def _indeterminate_excerpt(tmp_path, tag, level="medium"):
+    """A REAL indeterminate run: the reviewer answers, but never in the pinned
+    shape, so the gate exhausts its attempts and returns INDETERMINATE (2)."""
+    import os
+    import subprocess
+
+    bindir = Path(tmp_path) / f"ibin-{tag}"
+    bindir.mkdir(parents=True, exist_ok=True)
+    stub = bindir / "claude"
+    stub.write_text("#!/bin/sh\ncat <<'EOF'\n"
+                    + json.dumps({"type": "result", "is_error": False,
+                                  "result": f"I had trouble reading the diff ({tag})."})
+                    + "\nEOF\n")
+    stub.chmod(0o755)
+    tree = Path(tmp_path) / "tree"
+    if not (tree / ".git").exists():
+        tree.mkdir(exist_ok=True)
+        subprocess.run(["git", "init", "-q"], cwd=tree, check=True)
+        (tree / "reviewed.py").write_text("x = 1\n")
+        subprocess.run(["git", "add", "reviewed.py"], cwd=tree, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-qm", "base"], cwd=tree, check=True)
+        (tree / "reviewed.py").write_text("x = 2\n")
+    res = subprocess.run(
+        [sys.executable, str(SCRIPTS / "llm_review_gate.py"), "--level", level,
+         "--cwd", str(tree)],
+        capture_output=True, text=True,
+        env=dict(os.environ, PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}"),
+    )
+    assert res.returncode == 2, (res.returncode, res.stdout, res.stderr)
+    return vfy.adapter.redact((res.stderr or "") + (res.stdout or ""),
+                              max_len=vfy.GATE_EXCERPT_MAX)
+
+
+def test_allow_a_repeated_indeterminate_verdict_arms(plan, tmp_path):
+    """The reviewer failing to answer twice at the same gate and level IS a
+    repeat, even though the two runs quote different attempt notes."""
+    a = _indeterminate_excerpt(tmp_path, "i1")
+    b = _indeterminate_excerpt(tmp_path, "i2")
+    sig = sp.signature(a)
+    assert sig["class"] == "review-indeterminate", sig
+    assert sig["armable"] is True, sig
+    _fail_gate(plan, a)
+    second = _fail_gate(plan, b)
+    assert _stuck_rec(plan)["consecutive"] == 2, _stuck_rec(plan)
+    assert second["stuck_protocol"]["triggered"] and sp.armed(_stuck_rec(plan))
+
+
+def test_plant_indeterminate_at_a_different_level_is_a_different_root_cause(tmp_path):
+    """The paired PLANT: the signature keys on the GATE and its LEVEL, so a
+    low-level and a medium-level indeterminate are not one recurring cause."""
+    lo = sp.signature(_indeterminate_excerpt(tmp_path, "i3", level="low"))
+    med = sp.signature(_indeterminate_excerpt(tmp_path, "i4", level="medium"))
+    assert lo["sig"] != med["sig"], (lo, med)
+
+
+UNATTRIBUTABLE = "```\nRe-run the gate after fixing the issues above.\n```"
+
+
+def test_plant_an_unattributable_locus_never_arms(plan):
+    """s05 latched the signature onto a markdown code fence. A locus that names
+    neither an error class nor a finding is not evidence of a repeat — twice in a
+    row it is still not evidence, so the protocol refuses rather than arming."""
+    sig = sp.signature(UNATTRIBUTABLE)
+    assert sig["armable"] is False, sig
+    first = _fail_gate(plan, UNATTRIBUTABLE)
+    second = _fail_gate(plan, UNATTRIBUTABLE)
+    # The COUNTER stays honest — it really was the same text twice...
+    assert _stuck_rec(plan)["consecutive"] == 2
+    # ...but nothing arms off it, in either consumer.
+    assert "stuck_protocol" not in first and "stuck_protocol" not in second
+    assert _events(plan, "stuck_protocol_armed") == []
+    assert not sp.armed(_stuck_rec(plan))
+
+
+def test_allow_a_classifiable_locus_repeated_twice_does_arm(plan):
+    """The paired ALLOW for the refusal above: identical text, but this one names
+    its error class, so the protocol still arms exactly as it always did."""
+    _fail_gate(plan, SAME_A)
+    second = _fail_gate(plan, SAME_B)
+    assert second["stuck_protocol"]["triggered"] and sp.armed(_stuck_rec(plan))
+
+
 def test_allow_generated_prompt_carries_the_stuck_clause():
     """RS-03's ONE source of truth: the wrapper, not per-session prompt text."""
     md = build_plan.gen_session_prompt_md(
@@ -344,3 +605,28 @@ def test_allow_the_builder_stamp_and_the_gate_move_together():
     enforced on plans that can never satisfy it. It must also not be ABOVE 0, i.e.
     the gate has to exist; both halves are asserted."""
     assert 0 < cp.DECISION_BRIEF_MIN_SCHEMA <= build_plan.PLAN_SCHEMA_VERSION
+
+
+def test_the_PRODUCTION_indeterminate_route_arms_and_still_charges_nothing(plan, tmp_path):
+    """THE WIRING. `_fail_gate` above calls `vfy._gate_failed` directly, but a
+    gate that DECLARES `indeterminate_exit` never reaches it -- verify routes it
+    to `rework._indeterminate`, which is the only path production takes, since
+    every llm-review-* entry in both registries declares that exit. So the arming
+    proved above was unreachable: a reviewer could time out forever and nothing
+    would suggest splitting the session. Measured 2026-08-20 on s04 -- two 900s
+    timeouts on a 5,543-line surface, nothing armed (review, 2026-08-20).
+
+    Both halves matter: it must ARM (a repeat is a repeat) and it must NOT charge
+    the agent's rework budget for the harness's own timeout."""
+    a = _indeterminate_excerpt(tmp_path, "p1")
+    b = _indeterminate_excerpt(tmp_path, "p2")
+    state = {"session_id": "s01", "gates": ["g"], "gate_status": {"g": "pending"},
+             "on_fail": "rework", "max_rework": 5, "rework_count": 0, "failures": {}}
+    import rework
+    rework._indeterminate(plan, "s01", state, "g", a)
+    rework._indeterminate(plan, "s01", state, "g", b)
+    rec = _stuck_rec(plan)
+    assert rec.get("consecutive") == 2, rec          # it arms through the real route
+    assert sp.armed(rec), rec
+    assert state["rework_count"] == 0                # and charges nobody
+    assert state["gate_status"]["g"] == "pending"    # gate stays re-runnable

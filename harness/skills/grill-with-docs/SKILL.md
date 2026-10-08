@@ -1,6 +1,6 @@
 ---
 name: grill-with-docs
-description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions. For a pure interview without doc updates, use grill-me instead.
+description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions. For a pure interview without doc updates, suggest the user run /grill-me instead.
 ---
 
 <what-to-do>
@@ -12,6 +12,8 @@ description: Grilling session that challenges your plan against the existing dom
 - [ ] **ADR-offer** — offer an ADR only when hard-to-reverse + surprising + a real trade-off
 - [ ] **Adversarial review** — hand off to `/adversarial-review` per the shared post-interview protocol
 
+Between sections, from the MAIN CONVERSATION (never a dispatched worker — its session id is not yours), say whether this is a good moment to compact: `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --state ok --phase <section> || true` with the section you just finished (`interview`, `domain`, `adr`, `review`). **Write no safe point at all when another command invoked you** — its args carry the caller's own context (`/plan-harden` passes `PRE-GRILL ENRICHMENT FINDINGS`) — because the caller owns this session's safe point for the whole of its run, and an `ok` under a section name rewrites `current_phase` and `safe_point_phase` together, which reads as `ok` and clears the caller's `hold`.
+
 Same interview opening as `/grill-me` — `Read ~/.claude/skills/_shared/grill-adversarial-review.md` for the exact shared wording. This skill's delta: wait for feedback on each question before continuing (rather than just asking one at a time), and layer in the domain-awareness work below.
 
 </what-to-do>
@@ -19,6 +21,8 @@ Same interview opening as `/grill-me` — `Read ~/.claude/skills/_shared/grill-a
 <supporting-info>
 
 ## Domain awareness
+
+Hold first — `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --state hold --phase domain || true` — because this section reads many sources at once and a compaction mid-read loses the glossary you are building against (skip this too when a caller owns the safe point, per the rule above: its hold already covers you).
 
 During codebase exploration, also look for existing documentation:
 

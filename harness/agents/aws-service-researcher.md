@@ -1,7 +1,7 @@
 ---
 name: aws-service-researcher
-description: "Researches AWS services for specific use cases using real-time web data. Finds optimal service combinations, architecture patterns, and best practices. Uses tiered MCP strategy: Exa Deep -> Exa Web -> Perplexity -> WebSearch. Use when you say 'which AWS service for X', 'best AWS architecture for Y', 'research AWS options', 'compare AWS services'."
-tools: Read, Grep, Glob, WebSearch, mcp__exa__deep_researcher_start, mcp__exa__deep_researcher_check, mcp__exa__web_search_exa, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url, mcp__grep__searchGitHub
+description: "Researches AWS services, architecture patterns and best practices from real-time web data. Use when you say 'which AWS service for X', 'best AWS architecture for Y', 'research AWS options', 'compare AWS services'."
+tools: Read, Grep, Glob, WebSearch, mcp__exa__agent_run, mcp__exa__web_search_exa, mcp__perplexity-ask__perplexity_ask, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url, mcp__grep__searchGitHub
 model: sonnet
 effort: high
 ---
@@ -27,10 +27,13 @@ Given a use case description, you must:
 Execute this degradation pattern:
 
 ```
-TIER 1: Exa Deep Researcher (PREFERRED for complex analysis)
-├── Use: mcp__exa__deep_researcher_start with model="exa-research-pro"
+TIER 1: Exa Agent (PREFERRED for complex analysis)
+├── Use: mcp__exa__agent_run with effort="medium"
+├── Cost: ~$0.10 and ~60s per call at effort=medium; effort=high measured
+│   5x the cost ($0.50, 131s) for no extra sources (2026-09-03)
 ├── Best for: Architecture comparisons, service trade-offs, recent launches
-├── Poll: mcp__exa__deep_researcher_check until complete (max 2 min)
+├── The tool waits for the run itself; if it returns status "running",
+│   call it again with the returned runId — never start a second run
 ├── IF SUCCESS → Use as primary source
 └── IF FAILS/TIMEOUT → Continue to Tier 2
 
@@ -102,11 +105,11 @@ Parse the request to identify:
 
 ### Step 2: Research Service Options
 
-Use Exa Deep Researcher for comprehensive analysis:
+Use the Exa Agent for comprehensive analysis:
 
 ```
-mcp__exa__deep_researcher_start({
-  instructions: "Research AWS architecture options for: [use case]
+mcp__exa__agent_run({
+  query: "Research AWS architecture options for: [use case]
 
     Requirements:
     - [requirement 1]
@@ -120,7 +123,7 @@ mcp__exa__deep_researcher_start({
     5. Common pitfalls and how to avoid them
 
     Focus on solutions that work well in eu-west-1 and us-east-1 regions.",
-  model: "exa-research-pro"
+  effort: "medium"
 })
 ```
 
@@ -246,7 +249,7 @@ Always indicate research source quality:
 
 | Indicator | Meaning |
 |-----------|---------|
-| `*Source: Exa Deep Researcher (Tier 1)*` | Comprehensive, multi-source analysis |
+| `*Source: Exa Agent (Tier 1)*` | Comprehensive, multi-source analysis |
 | `*Source: Exa Web + GitHub (Tier 2)*` | Good quality, validated with code |
 | `*Source: Perplexity (Tier 3)*` | Expert synthesis |
 | `*Source: WebSearch (Tier 4)*` | Basic search, may need verification |

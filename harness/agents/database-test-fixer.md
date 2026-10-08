@@ -1,6 +1,6 @@
 ---
 name: database-test-fixer
-description: "Fixes database mock client issues, database fixture failures, stored procedure/function mocks, computed column tests, SQL validation errors, transaction tests. Works with any database system and project schema. Use PROACTIVELY for database client errors, mock data issues, or database integration test failures. Use when you say 'database test failing', 'mock client broken', 'fixture data wrong', 'SQL test error'."
+description: "Fixes database mock-client, fixture, stored-procedure, computed-column, SQL-validation and transaction test failures; use PROACTIVELY for database integration test failures. Use when you say 'database test failing', 'mock client broken', 'fixture data wrong', 'SQL test error'."
 tools: Read, Edit, MultiEdit, Bash, Grep, Glob, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: medium

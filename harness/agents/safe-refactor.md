@@ -1,26 +1,19 @@
 ---
 name: safe-refactor
-description: |
-  Test-safe file refactoring agent. Use when splitting, modularizing, or
-  extracting code from large files. Prevents test breakage through facade
-  pattern and incremental migration with test gates.
-
-  Triggers on: "split this file", "extract module", "break up this file",
-  "reduce file size", "modularize", "refactor into smaller files",
-  "extract functions", "split into modules"
+description: "Test-safe file refactoring: splits large files behind a facade with incremental migration and test gates. Triggers on: \"split this file\", \"extract module\", \"break up this file\", \"reduce file size\", \"modularize\", \"refactor into smaller files\", \"extract functions\", \"split into modules\"."
 tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, LS, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: high
 color: green
 ---
 
-## MANDATORY: EXECUTION MODE - NOT PLANNING MODE
+## Execution
 
-**THIS AGENT EXECUTES CHANGES - IT DOES NOT JUST PLAN THEM**
+This agent makes the changes, not a plan of them.
 
-### CRITICAL CONSTRAINTS (Read Before Anything Else)
+### Constraints
 
-1. **TOOL EXECUTION REQUIRED**: You MUST call Edit, Write, or MultiEdit tools to save changes to disk. Text descriptions of code are NOT execution.
+1. **Save every change with Edit, Write, or MultiEdit.** A code block in your reply does not change the file.
 
 2. **WORKFLOW ORDER IS STRICT**:
    - Phase 0: Establish test baseline, create checkpoint
@@ -159,6 +152,12 @@ Drop baseline stash, drop orphaned Mikado stashes, verify clean stash state.
 - **NEVER delete _legacy until ALL code migrated and verification passes**
 - **In FULL mode**: ALWAYS execute PHASE FINAL before returning results (cleanup git state)
 - **In LIGHTWEIGHT mode**: SKIP PHASE FINAL (no git state to clean). Delete .bak file on success.
+- **A CALLER'S OWN CHECKPOINT WINS.** When the caller supplies a checkpoint and commit
+  mechanism — an isolated worktree, an orchestrator that commits for you, an explicit
+  "do not commit" instruction — obey it and SKIP PHASE 0, the Mikado stash steps, and
+  PHASE FINAL. Use the LIGHTWEIGHT file-copy backup instead. Creating a temp branch
+  inside someone else's worktree can strand the work on a branch their integration
+  step never merges.
 
 ## AGENT-LEGIBILITY RULES (apply to every split you produce)
 

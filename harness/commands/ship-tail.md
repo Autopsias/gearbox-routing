@@ -64,7 +64,7 @@ review/fix stages (test-fix, CI-loop fixers, commit quality checks) receive it a
 block so the reviewer/fixers **stop flagging things you chose on purpose** (code removed on
 purpose, a default flipped on purpose). This is the same pattern Lane A's BMAD review uses
 natively (it validates the diff against the story's ACs); the shared contract is
-`~/.claude/commands/references/shared/intent-into-review.md`.
+`~/.claude/references/shared/intent-into-review.md`.
 
 Build the intent block ONCE here and thread it to every stage that reviews/fixes:
 
@@ -218,7 +218,7 @@ Skip this step if `--no-pr` is set (nothing was pushed) or `--no-ci` is passed
 **This STAGE closes the loop: watch CI to green; on red, trigger `/ci-orchestrate`
 and re-push; loop until green or a bounded ceiling. It NEVER auto-merges.**
 
-**Full algorithm:** read `~/.claude/commands/references/ship-tail/ci-loop.md` and
+**Full algorithm:** read `~/.claude/references/ship-tail/ci-loop.md` and
 follow it exactly. Summary of the contract:
 
 1. **Atomic env-detect (once per run).** Decide the path ONCE, with

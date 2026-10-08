@@ -32,11 +32,27 @@ Set these flags (all default false unless flag present):
 | `--quick` | Skip Phase 0 + Phase 3. |
 | `--interactive-grill` | Phase 1: run `/grill-with-docs` interactively (pause for the user's answers). **Auto-accept is the DEFAULT** (operator standing order, 2026-07-03): without this flag, grilling auto-accepts its own recommended answers. `--auto-grill` is still accepted as a no-op for back-compat. Composes with `--quick`. |
 | `--plan-file PATH` | Override plan auto-detection. |
-| `--from-phase N` | Resume from phase N (0/1/2/3/4). |
+| `--from-phase N` | Resume from phase N (0/1/2/3/4). **Loads the prior findings ledger** — see S.1b. |
 | `--no-memory` | Force-skip Fork A. |
 | `--no-research` | Force-skip Fork B. |
 | `--no-edge-cases` | Force-skip Fork C. |
 | `--no-blindspot` | Force-skip Fork D. |
+
+### S.1b: Load the prior findings ledger (`--from-phase`, or any re-run)  *(2026-08-21)*
+
+If a `*-REVIEW-LOG.md` sits beside `PLAN_FILE`, READ IT and build `RESOLVED_LEDGER` — the
+list of findings prior runs already settled. Pass it verbatim into every reviewer prompt
+this run creates (Phase 2's args, and each verify round), under the heading:
+
+```
+ALREADY RESOLVED BY A PRIOR PASS — DO NOT RE-RAISE unless you can show the applied fix is
+itself WRONG (quote it and say why):
+  - <one line per settled finding>
+```
+
+*Why:* without it a second pass re-derives findings the first pass closed and burns the
+round. Measured 2026-08-21: the ledger had to be hand-written into the review args twice
+across two passes of one plan. The review log IS the ledger — do not maintain a second one.
 
 ### S.2: Plan file resolution (in order, stop at first match)
 
@@ -68,7 +84,7 @@ fi
 
 **Research MCP detection**: scan your own available-tools system message for these tool names; if present, the corresponding tier is available:
 - Tier 1: `mcp__perplexity-ask__perplexity_ask`
-- Tier 2: `mcp__exa__web_search_exa` or `mcp__exa__deep_researcher_start`
+- Tier 2: `mcp__exa__web_search_exa` or `mcp__exa__agent_run`
 - Tier 3: `mcp__ref__ref_search_documentation`
 
 Build `RESEARCH_TIERS_AVAILABLE = ["perplexity"|"exa"|"ref"|...]`. If empty, Fork B will skip.
@@ -79,7 +95,7 @@ Build `RESEARCH_TIERS_AVAILABLE = ["perplexity"|"exa"|"ref"|...]`. If empty, For
 
 **Blindspot detection + scan-target derivation**: scan available-skills system message for `blindspot`. Set `BLINDSPOT_AVAILABLE=true|false`. If available, derive `BLINDSPOT_TARGETS` — the concrete code areas (dirs/files/modules) the plan under hardening touches — from the plan's session cards / manifest (`sessions[].touches` or equivalent) or, for a freeform plan file, from explicit file paths named in its "Recommended Approach" / "Touches" sections. If the plan touches no code at all (pure docs/process/research plan — no file paths, no dirs, no modules named), set `BLINDSPOT_TARGETS=[]` and record the skip reason `"plan touches no code — skipping blindspot enrichment"`.
 
-**Early model-lint pass (plan-builder plans only, advisory)** *(2026-08-03)*: on a plan-builder plan, run §4.0's model-lint NOW as well — deterministic and near-free, and a 🔴-class hit (`peer-gate-missing`) discovered only at Phase 4 arrives AFTER the ~50-200k-token Phase 2 spend and forces a re-run; discovered here, it is one grilling branch. Hold as `EARLY_MODEL_LINT`, passed into the Phase 1 args as a fifth enrichment source. The §4.0 pass remains AUTHORITATIVE (Phases 1-2 mutate sessions); never skip it because this pass ran.
+**Early model-lint pass (plan-builder plans only, advisory)** *(2026-08-03)*: on a plan-builder plan, run §4.0's model-lint NOW as well — deterministic and near-free, and a 🔴-class hit (`peer-gate-missing`) discovered only at Phase 4 arrives AFTER the ~50-200k-token Phase 2 spend and forces a re-run; discovered here, it is one grilling branch. Hold as `EARLY_MODEL_LINT`, passed into the Phase 1 args as a fifth enrichment source. The §4.0 pass remains AUTHORITATIVE (Phases 1-2 mutate sessions); never skip it because this pass ran. **On a schema-v8 plan (`manifest.json` `plan_schema_version` ≥ 8) the lint checks the class and risk declarations — `task_class` valid, every override has a `why_model`, no override below the risk floor — not the model pick (§4.0).**
 
 Apply user overrides:
 - `--no-memory` → `MEMORY_AVAILABLE=false`
@@ -109,9 +125,13 @@ If `--from-phase N` was supplied AND N > 0, jump to that phase. Otherwise start 
 
 ## PHASE 0 — Pre-grill enrichment (Workflow-primary; Agent forks as fallback)
 
+**Safe point.** From the main conversation (never inside a fork or a Workflow agent), run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state ok --phase phase-0 || true` — SETUP is done, and the only state it carries is the handful of scalars §S.4 just printed to the user, so a compaction here loses nothing. It marks a boundary, so it runs whether or not the phase below is skipped; the same holds for every safe point in this file. **This and §4.3 are the ONLY two `--state ok` points in this command**, because from Phase 0's forks onward every phase consumes `ENRICHMENT_FINDINGS` (and Phase 4 consumes `PREMORTEM`), which live in context and on no disk — so every boundary between them is a `hold`, and an `ok` there would permit exactly the compaction that destroys the next phase's input. This `ok`'s window therefore ends at the fork-dispatch hold below: it covers only the SETUP boundary behind it, never the fan-out. The `[ -f … ] && … || true` guard on this and every safe-point line below is the same fail-open pattern the settings.json hook entries use: the hook ships at deploy time, so on a tree where it is absent the line is a silent no-op (exit 0, no output), never an error the operator has to interpret. **`--session "$CLAUDE_CODE_SESSION_ID"` is mandatory on every safe-point line in this file and must not be dropped.** `safe-point` never guesses a session id for a write: it refuses whenever a worker marker is set, and `CLAUDE_CODE_CHILD_SESSION`/`CLAUDE_CODE_FORK_SUBAGENT` both read `1` in the MAIN conversation's own Bash subprocess too (measured 2026-08-23, re-confirmed 2026-09-04) — so the bare form refuses HERE, prints `Nothing written.` to stderr, and exits 0. Measured 2026-09-04 with a known-positive control: the bare call left the policy file byte-identical while the `--session` call wrote `safe_point`. Every safe point in this command was therefore inert until this flag was added. The variable resolves in a main conversation, and an empty one falls back to the same refusal, so the explicit form is never worse than the bare one.
+
 **Skip this entire phase if `--quick` was passed. Note in the final summary: `enrichment ⊘ (--quick)`.**
 
 **Workflow seam rule (shared with /plan-execute):** a Workflow is bounded analysis that returns a structured report; all human interaction (S.2 plan resolution, Phase 1 grilling, Phase 4 decisions) stays in the main conversation — workflows cannot pause for input. Phase 0 contains no human-input point, so it is a clean fit.
+
+**Fork-dispatch hold.** Immediately before dispatching the forks — on EITHER path below — run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-0 || true`. The forks return `ENRICHMENT_FINDINGS` into context and onto no disk, and `compact-policy.py`'s verdict answers `allow (safe_point_ok)` on a stored `ok` BEFORE it ever reaches the planning-session branch — so leaving Phase 0's `ok` standing through the fan-out permits an auto-compaction in exactly the window where the findings land. This is the hold the run carries until §4.3 releases it (under `--quick` the forks never run, so the hold starts at Phase 1 instead).
 
 ### Primary path — ONE Workflow call (schema-forced forks)
 
@@ -128,11 +148,13 @@ If the Workflow tool is in this session's tool list (it can be disabled via sett
 
 If the Workflow tool is NOT available: spawn the enabled forks as parallel `Explore` Agent forks in a SINGLE orchestrator message, each receiving the plan content + S.3 detection results as explicit args. Forks auto-notify on completion — do not poll. If one fork is still running long after the others have finished (rule of thumb ~2-3 min), proceed without it and record `{"status": "error", "errors": ["timeout"]}` for that source.
 
-Full fork prompt templates (each with its embedded JSON output schema) + fork-output-handling for both dispatch paths: `Read ~/.claude/commands/references/plan-harden/fork-prompts.md`.
+Full fork prompt templates (each with its embedded JSON output schema) + fork-output-handling for both dispatch paths: `Read ~/.claude/references/plan-harden/fork-prompts.md`.
 
 ---
 
 ## PHASE 1 — Grill with enrichment
+
+**Safe point — `hold`, not `ok`.** Run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-1 || true` before starting (skipped phase or not): §1.2 passes `ENRICHMENT_FINDINGS` VERBATIM out of context into the grill's `args` and nothing wrote them to disk, so a compaction in this window destroys Phase 1's input.
 
 **Skip this phase only if `--from-phase` was supplied with N>1.**
 
@@ -147,6 +169,8 @@ Phase 1: invoking /grill-with-docs (mode=<interactive|auto-accept>) with <N> enr
 ```
 
 ### 1.2: Invoke the grilling skill with enrichment in args
+
+**Hold (refresh).** Re-run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-1 || true` here — every safe point expires after 30 minutes and the grill reads many sources for longer than that. The grill should not write its own safe points while nested under this command (`skills/grill-with-docs/SKILL.md` carries that rule, and its between-section `--state ok --phase <section>` rewrites both `current_phase` and `safe_point_phase`, which would read as `ok` at its first section boundary) — but that rule lives in ANOTHER repository this command does not ship, so it is belt-and-braces, never the control. The control is the caller's own re-assert after the grill returns, below.
 
 Pass the enrichment findings VERBATIM via the Skill `args` field. The Skill tool surfaces args in the executing skill's conversation context as an `ARGUMENTS:` line, which the executing Claude reads and uses to ground questions. (Behavior empirically verified 2026-05; the probe command used has since been removed.)
 
@@ -206,12 +230,16 @@ Allow the grilling to run until either:
 - The skill itself decides shared understanding has been reached (per its existing logic).
 - In auto-accept mode (the default), the skill stops on its own shared-understanding signal only (the user-signal bullet does not apply — there is no user in the loop).
 
+**Hold (re-assert, on return).** The moment the grill returns — before reading its output, before anything else — run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-1 || true` again. This re-assert exists precisely because the callee's cooperation cannot be relied on: the DIRECTORY `skills/grill-with-docs` is a tracked symlink (git mode 120000, target `../../.agents/skills/grill-with-docs`) into `~/.agents` — nothing under it is tracked in this repository, and `ls -l` on a file inside it follows the link and reports a regular file, which is the target file in `~/.agents`, not one this repo ships — so on any other checkout the grill may still write `--state ok --phase <section>` at its section boundaries and clear the hold above. The safe-point store is last-writer-wins with no writer identity, so the caller who owns the window overwrites whatever the callee wrote, on every return, rather than trusting a rule in the callee's file. (`ENRICHMENT_FINDINGS` is still only in context — §3.1 and §4.1 read it later.) Apply this same on-return re-assert after EVERY nested Skill invocation in this command that could write a safe point; the other such call site is §2.2.
+
 The grilling skill may itself mutate the plan file (or `CONTEXT.md` / `docs/adr/`). That's fine — Phase 2 reads the post-grill plan, not the pre-grill plan.
 
 
 ---
 
 ## PHASE 2 — Adversarial review (dual-model)
+
+**Safe point — `hold`, not `ok`.** Run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-2 || true` before starting (skipped phase or not): the grill's edits are on disk, but `ENRICHMENT_FINDINGS` — which §3.1 still reads and §4.1 still reports — is not.
 
 **Skip if `--from-phase` > 2.**
 
@@ -227,13 +255,50 @@ Re-read `PLAN_FILE` here (it may have been mutated during grilling).
 
 If you find yourself reasoning "this is plan mode" OR "the budget is tight" as a reason to inline Phase 2: **stop**. Invoke the Skill. The only legal Phase-2-skip paths are: `--from-phase N` with N>2, OR `/adversarial-review` itself returning a hard error. Runner discretion is not on the list.
 
+### 2.0b: MEASURE THE REVIEW SURFACE FIRST, AND SCOPE ACCORDINGLY  *(2026-08-21)*
+
+Before invoking, measure the artifact the reviewers will read (`spec.json` for a plan-builder
+plan, else `PLAN_FILE`). **A whole-document review loop does not converge above roughly
+60 KB** — each round re-reads everything and samples a different part of it, so findings per
+round stop falling and the 3-round cap is reached with the document no closer to closed.
+
+| Measured size | Mode |
+|---|---|
+| < 60 KB | `whole-document` — the classic path below, unchanged. |
+| ≥ 60 KB | `targeted` — §2.1b. Say so in the Phase 2 status line: `scope=targeted (spec.json is N KB)`. |
+
+Hold the choice as `REVIEW_MODE`. This is a scope decision, never a depth or effort decision:
+`--quick` is the only thing that reduces rigour, and targeted mode reviews MORE, not less.
+
+**Evidence (2026-08-21, a 107 KB spec).** Whole-document new findings per round ran
+19 → 10 → 1 → 1 across pass 1 and 12 → 6 → 13 → 9 across pass 2 — no convergence, and pass 2's
+first round found a CRITICAL inside the fix pass 1 had ended on. Codex, asked the convergence
+question directly: *"Another whole-document round would more likely surface another fresh
+sample than close this document. It is too large for a whole-document review loop to converge
+reliably without a targeted patch pass."* A targeted pass on the same plan then returned 25
+findings in one parallel round against the whole-document loop's 9, and the session it was
+aimed at went from 7 findings to 1 on re-review.
+
 ### 2.1: Invoke
+
+**Hold (refresh).** Re-run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-2 || true` here — the review plus its Codex verify rounds run well past the safe point's 30-minute expiry, and this reads the whole plan plus both reviewers' findings.
 
 ```
 Skill(skill="adversarial-review", args="Review the plan at <PLAN_FILE>. Apply hardenings inline.")
 ```
 
+Append `RESOLVED_LEDGER` (S.1b) to those args whenever it is non-empty.
+
 This nested invocation relies on `/plan-harden`'s frontmatter declaring `Agent` in `allowed-tools` (which it does). The Skill tool executes within the main conversation, so `/adversarial-review`'s Phase 2b fork-spawning will run with this command's tool permissions, not the nested skill's frontmatter.
+
+### 2.1b: `targeted` mode — one unit at a time against a fixed contracts block
+
+Selected by §2.0b on a large review surface, and ALSO whenever a whole-document verify round
+answers its `## Convergence` question with "different latent defects / another round would not
+close this document" (`scope-too-wide`). One unit = ONE SESSION plus the items it declares,
+reviewed against a ≤15 KB verbatim block of the cross-unit contracts and `RESOLVED_LEDGER`,
+several units in parallel. **Full procedure, prompt contract and the measured evidence:
+`Read ~/.claude/references/plan-harden/targeted-review.md`.**
 
 ### 2.2: Wait for completion
 
@@ -244,6 +309,8 @@ This nested invocation relies on `/plan-harden`'s frontmatter declaring `Agent` 
 - Then run a **default Codex verify loop** (`task --resume-last`, read-only, `--effort xhigh`) that re-checks the hardened plan and writes a `*-REVIEW-LOG.md` audit trail beside `PLAN_FILE`. Rounds 1–2 always run; a 3rd runs ONLY if round 2 keeps surfacing strong (new `[HIGH]`/`[CRITICAL]`) findings — the **convergence gate** stops at round 2 when only minor items remain (`converged@r2`, NOT a deadlock). If Codex still has strong unresolved findings at the 3-round cap it ends in a flagged **DEADLOCK** (it does NOT fake an approval).
 
 Do NOT kill it if it runs long — killing mid-write would corrupt the `/tmp/` artifacts. The verify loop adds up to 3 foreground Codex rounds, so let it run up to 15min, then warn user but still proceed.
+
+**Hold (re-assert, on return).** When `/adversarial-review` returns — success OR hard error — run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-2 || true` before anything else, exactly as §1.2 does after the grill: the nested skill runs in this session and may have written its own safe point into the last-writer-wins store, and the caller who owns the window re-asserts it on every return instead of relying on the callee's behaviour. (The measured fact behind that rule: the directory `skills/grill-with-docs` is a tracked symlink, git mode 120000, into `~/.agents`, with nothing under it tracked in this repository — so `ls -l` on a file inside it reports a regular file only because it follows the link, and neither callee's safe-point behaviour is code this command ships.)
 
 If `/adversarial-review` returns a hard error or both reviewers fail (no `[HARDENED:...]` tags applied):
 - Mark Phase 2 as ⊘ in the summary
@@ -256,6 +323,8 @@ If `/adversarial-review` returns a hard error or both reviewers fail (no `[HARDE
 ---
 
 ## PHASE 3 — Klein premortem
+
+**Safe point — `hold`, not `ok`.** Run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-3 || true` before starting (skipped phase or not): Phase 2's hardenings are applied to the plan file, but §3.1 reads `ENRICHMENT_FINDINGS.blindspot.findings` out of context.
 
 **Skip if `--quick` was passed OR `--from-phase` > 3. Note in summary: `premortem ⊘ (--quick)`.**
 
@@ -295,6 +364,8 @@ Hold the result as `PREMORTEM = {paragraph: "...", class: "<tag>"}`.
 
 ## PHASE 4 — Synthesis (idempotent)
 
+**Safe point — `hold`, not `ok`.** Run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state hold --phase phase-4 || true` before starting: §3.2 holds `PREMORTEM` in context and this is the phase that aggregates it, so an `ok` here would permit exactly the compaction that destroys Phase 4's input. The release comes at §4.3, once §4.2 has written the summary to disk.
+
 This phase ALWAYS runs (regardless of skipped phases). Aggregates all phase outputs into a single summary section appended/replaced in `PLAN_FILE`.
 
 ### 4.0: Model-selection sanity lint (lightweight, always-on)
@@ -321,16 +392,24 @@ external dispatch. **Skip only if this is not a plan-builder plan** (no sibling
 Read the sessions from `manifest.json` (`sessions[].model` / `.reasoning` /
 `.dispatch.subagent_type`) when present, else parse the plan's session cards.
 
+**Schema v8 (`plan_schema_version` ≥ 8, route-at-dispatch):** the executor picks the
+model from `task_class`, so the lint stops grading the author's model pick. It checks the
+class and risk declarations instead: `task-class-missing` 🔴, `override-without-reason` 🔴,
+`override-incomplete` 🔴, `override-below-floor` 🔴 (session has `peer_triggers` or is `linchpin`), and
+`locked-check-suggested` 🟡. Every rule that compares a declared `model` with the rubric
+runs on a v8 session only when it declares an override. Below v8 nothing changes. Detail:
+`model-lint.md` → "Schema v8 — route-at-dispatch gate".
+
 **Full rule set (all flags — Opus+max, Fable escalation, opusplan mismatch, hard session
 at medium, blank reasoning; the s04/SKL-02 structural rules pin-conflict /
 codex-trigger-no-gate / specialist-exists-but-null-subagent; the s07
 `task-class-model-mismatch` routing rule; the s08/LN-01 Codex-lane rules; and the three
 non-model rules acceptance-review-missing / decision-debt / blind-executability — each
 with severity tag and rationale): `Read
-~/.claude/commands/references/plan-harden/model-lint.md`.** Apply every flag in that
+~/.claude/references/plan-harden/model-lint.md`.** Apply every flag in that
 file; hold the result as `MODEL_LINT = [{session, issue, recommendation, severity}, …]`
-(empty list if clean). **Non-blocking by design, with ONE exception** — every flag is
-🟡 Polish / 🟣 Known-debt EXCEPT `peer-gate-missing` (a session carrying a non-empty
+(empty list if clean). **Non-blocking by design, with exceptions** — every flag is
+🟡 Polish / 🟣 Known-debt EXCEPT the v8 structural flags (`task-class-missing`, `override-without-reason`, `override-incomplete`, `override-below-floor`, all 🔴 and deterministic) and `peer-gate-missing` (a session carrying a non-empty
 structured `peer_triggers` array with no `adversarial-review` gate), which is a 🔴
 plan-killer: deterministic (a declared field, not a heuristic) and self-evidenced (the
 `peer_triggers` value), satisfying the §4.1 🔴 gate.
@@ -353,7 +432,7 @@ member-shipping-declared / integration-session-gap; the judgment half —
 gate-mutates-global-state / tree-scoped-gate / checkpoint-member /
 data-dependency-in-prose; semantic-ordering suppressor; session-split decomposition
 patterns; verdict + decision-card contract): `Read
-~/.claude/commands/references/plan-harden/parallelization-lint.md`.** Hold the result as
+~/.claude/references/plan-harden/parallelization-lint.md`.** Hold the result as
 `PARALLEL_LINT = {verdict: linear-optimal|opportunities, blockers, warnings, options}`.
 Three invariants: **never auto-apply** `parallel_group` OR `dispatch.isolation` (the lint
 recommends with evidence; the operator elects — a wrong grouping corrupts a shared-tree
@@ -369,6 +448,66 @@ is a quantified merge cost rather than a blocker, and tree-scoped gates no longe
 (they run inside the member's worktree). Both revert to their old blocking form for a
 pair that is not isolation-eligible — a pre-v3 manifest, a lockfile touch, or a missing
 integration session. The reference file's rule ledger is the authority on which is which.
+
+### 4.0c: Contradiction sweep (deterministic, MANDATORY after every mutation)  *(2026-08-21)*
+
+**The single highest-yield check in this command, and it needs no model.** After EVERY batch of
+hardenings — including those applied between verify rounds — assert that what each fix claims
+to have replaced is actually gone: a deleted-phrase sweep, an item-vs-prompt sweep, a
+field-vs-prose sweep on every branch the prompt permits, and a schema-vs-writer sweep. Record
+`sweep ✓ N classes clean` (or the survivors) in the Phase 4 summary, and probe any all-clear
+with a known positive before trusting it — a sweep pointed at the wrong string reports "clean"
+and "I did not look" identically. **The five sweeps and the measured rationale:
+`Read ~/.claude/references/plan-harden/contradiction-sweep.md`.**
+
+### 4.0d: Reviewability lint — is any session too wide to converge?  *(2026-08-21)*
+
+`build_plan.py` already WARNS when a session writes past its measured p90 of 6 files, and
+explains why: *"One LLM review pass samples a surface that size at 15-31% recall and falls
+further as it grows, so rework rounds will keep finding NEW things in untouched code."* Nothing
+in this command acted on that warning. Now it does — as a RECOMMENDATION with evidence and a
+decision card, never an auto-apply, exactly as §4.0b treats `parallel_group`.
+
+**NO STATIC SIZE PROXY PREDICTED CONVERGENCE — both were falsified on the plan that produced
+this rule** (2026-08-21, corrected the same day after the first version of this section asserted
+one of them from an unverified number):
+
+| session | brief | distinct files | items | rounds | outcome |
+|---|---|---|---|---|---|
+| s08 | 8,850 | 1 | 1 | 2 → 4 → **0** | APPROVE |
+| s09 | 7,231 | 2 | 1 | 8 → 8 → 6 → 3 | code, not size |
+| s07 | **19,171** | **7** | 1 | 7 → 1 → — → 2 | **converged** |
+| s02 | 21,501 | 5 | **4** | 8 → 5 → 2 → **4** | **never converged** |
+
+s07 is the longest-but-one AND the widest-but-one, and it converged. s02 is NARROWER than s07
+and never did. So neither brief length nor file count is the discriminator, and a lint keyed on
+either would have flagged the healthy session. (The "12 files" originally read off s02 was a
+counting bug in `build_plan._declared_writes`, which did not dedupe paths across a session's
+items; fixed the same day. Do not rebuild this rule on that number.)
+
+What actually singles out s02 here is that it is the only MULTI-ITEM session (4 items) and the
+only one with BRANCH CONDITIONALITY (two mutually exclusive bundles, doubling every rule a
+reviewer must hold at once). That is a plausible mechanism, but it is **n = 1** — offer it as a
+hypothesis in the decision card, never as a threshold.
+
+Three signals, and only the last one is evidence:
+1. **Observed non-convergence** (the trigger). Findings did not FALL across two consecutive
+   targeted rounds on that unit. Available only after §2.1b ran. This is the ONLY signal here
+   with no measured counter-example, so it decides.
+2. **Embedded code** — findings concentrating on a snippet in the prompt. Rule 13's territory:
+   the remedy is to MOVE the code to whoever owns its tests, NOT to split the session. Measured:
+   that move closed six findings at once where three review rounds had closed none.
+3. **Static hints** (weak, each falsified above) — a brief past `build_plan.py`'s 6,400-char p90,
+   a `touches` span past its 6-file p90, more than one item, or branch conditionality. Worth a
+   look, never worth a flag on their own. Say "hint" in the output, not "finding".
+
+**Never split automatically.** Splitting changes the DAG, `depends_on`, gate placement and
+possibly a checkpoint's position — that is the operator's call. Emit a ≤3-option decision card:
+split at a named item boundary (name it from the session's own item list); extract the
+untestable part to its proper owner (what actually resolved the measured case — the code moved
+to the session that owns its test suite, and six findings closed at once); or accept, with the
+session's human checkpoint as the standing control. Record the election in the summary so a
+later run does not silently re-open it.
 
 ### 4.1: Build the summary block
 
@@ -387,7 +526,7 @@ Pull findings from:
 - The `*-REVIEW-LOG.md` written by Phase 2's verify loop — read its final round; any "UNRESOLVED AT DEADLOCK" entries are 🔴 plan-killers
 - The grilling exchange (Phase 1) — extract any explicit "let's add X to the plan" decisions
 - `PREMORTEM` (Phase 3) — including any Fork D landmine it weighed in on
-- `MODEL_LINT` (Phase 4.0) — fold each flag into 🟡 Polish or 🟣 Known-debt per its severity, EXCEPT `peer-gate-missing` which is 🔴 (the one structured, self-evidenced model-lint flag allowed to block — see §4.0)
+- `MODEL_LINT` (Phase 4.0) — fold each flag into 🟡 Polish or 🟣 Known-debt per its severity, EXCEPT `peer-gate-missing` and the four v8 structural flags (`task-class-missing`, `override-without-reason`, `override-incomplete`, `override-below-floor`) which are 🔴 (the one structured, self-evidenced model-lint flag allowed to block — see §4.0)
 - `PARALLEL_LINT` (Phase 4.0b) — the verdict goes in the Phases-run line; any `data-dependency-in-prose` hit lands under 🟡 Polish; the operator's grouping election (or "keep linear") is recorded verbatim
 
 Compose the block:
@@ -396,7 +535,7 @@ Compose the block:
 ## /plan-harden Summary
 
 **Run metadata**: timestamp <ISO8601>, version v1.0.0, args `<original $ARGUMENTS>`
-**Phases run**: enrichment <✓ N hits | ⊘ skipped> (memory: <n>, research: <tier>, edge-cases: <n>, blindspot: <n | ⊘ reason>), grill <✓ ~N exchanges (mode=interactive|auto-accept) | ⊘>, adversarial <✓ N hardenings, verify=<approved@rN | converged@rN (M minor) | deadlock@rN (M unresolved) | codex-error | n/a>, log=<path> | ⊘ failed: <reason>>, premortem <✓ | ⊘>, model-lint <✓ N flags | clean | ⊘ (not a plan-builder plan)>, parallel-lint <linear-optimal | opportunities (elected: <choice>) | ⊘ (not a plan-builder plan)>
+**Phases run**: enrichment <✓ N hits | ⊘ skipped> (memory: <n>, research: <tier>, edge-cases: <n>, blindspot: <n | ⊘ reason>), grill <✓ ~N exchanges (mode=interactive|auto-accept) | ⊘>, reviewability <✓ N sessions flagged (elected: <choice>) | clean>, adversarial <✓ N hardenings, verify=<approved@rN | converged@rN (M minor) | deadlock@rN (M unresolved) | codex-error | n/a>, log=<path> | ⊘ failed: <reason>>, premortem <✓ | ⊘>, model-lint <✓ N flags | clean | ⊘ (not a plan-builder plan)>, parallel-lint <linear-optimal | opportunities (elected: <choice>) | ⊘ (not a plan-builder plan)>
 **Token cost**: ~<N>k total (coarse self-estimate)
 
 When auto-accept mode ran (the default), the `N exchanges` count for the grill slot comes from counting `- Q:` lines in the freshly-written `## Grill auto-accept log` section of `PLAN_FILE`.
@@ -427,6 +566,23 @@ plan-harden:
 
 ### 4.2: Apply to plan file (idempotent)
 
+**ORDERING — READ THIS FIRST, IT IS A REAL BUG IF YOU GET IT WRONG**  *(2026-08-21)*. On a
+plan-builder plan, `PLAN_FILE` is `PLAN.html`, which is GENERATED from `spec.json`. So the
+rebuild that §4.2b REQUIRES destroys anything §4.2 writes into it. The order is fixed:
+
+1. Write the summary to a DURABLE sibling file — `PLAN-HARDEN-SUMMARY.md` — which no rebuild
+   touches. This is the copy of record.
+2. Do §4.2b's backport and the LAST rebuild.
+3. ONLY THEN insert the summary into `PLAN.html`, between the idempotent anchors
+   `<!-- PLAN-HARDEN-SUMMARY:BEGIN -->` / `<!-- PLAN-HARDEN-SUMMARY:END -->` placed
+   immediately before `</main>`, stripping any prior block first.
+4. RENDER the result and confirm the section is in the live DOM. A byte count is not proof —
+   see Rule 12.
+
+Any later `--rebuild` wipes step 3 again; that is expected, and step 1 is why it does not
+matter. On a non-plan-builder plan (a plain `.md`) steps 2–4 do not apply and the summary
+goes straight into `PLAN_FILE`.
+
 Read `PLAN_FILE` once.
 
 **Idempotency rule**: search for an existing `## /plan-harden Summary` heading.
@@ -443,11 +599,19 @@ If `PLAN_FILE` lives in a **plan-builder plan directory** (a sibling `spec.json`
 
 1. For each edited session, set `spec.json` session `prompt` = the current prompt-file body between `## Work` and the first of `## Verification gates` / `## Post-session actions` / `## Closeout` (stripped).
 2. Write `spec.json` back (preserve JSON shape: `json.dump(..., indent=2, ensure_ascii=False)` + trailing newline).
-3. **Verify the round-trip:** rebuild to a TEMP dir (`build_plan.py spec.json /tmp/<x>`) and diff the regenerated prompt bodies against the live ones — they must match byte-for-byte. Never overwrite the live plan dir during verification.
+3. **Verify the round-trip:** rebuild to a TEMP dir (`build_plan.py spec.json /tmp/<x>`) and diff
+   the regenerated prompt bodies against the live ones. They must match **after normalising the
+   plan-directory path** — `build_plan.py` stamps the output directory into a header line
+   (*"The plan dashboard is at the sibling `PLAN.html` in this directory: `<dir>/`"*), so a
+   temp-dir build ALWAYS differs there and a literal byte-for-byte demand can never be met
+   [2026-08-21]. Normalise that one line, then require byte equality on everything else. Never
+   overwrite the live plan dir during verification.
 
 Report the backport + round-trip result in the completion output. (Originating: 2026-06-21 — hardenings landed only in PLAN.html + prompt files; the user caught that a rebuild would wipe them. See `reference_in_place_revision_no_contradictory_layers.md`.)
 
 ### 4.3: Final user-facing output
+
+**Safe point — release.** Run `[ -f ~/.claude/hooks/compact-policy.py ] && python3 ~/.claude/hooks/compact-policy.py safe-point --session "$CLAUDE_CODE_SESSION_ID" --state ok --phase phase-4 || true` now: §4.2 wrote the summary to `PLAN-HARDEN-SUMMARY.md` and the plan file, nothing this run built lives only in context any more, and this clears the hold the run has carried since Phase 0's fork dispatch (since Phase 1, under `--quick`).
 
 Print to user:
 
@@ -482,7 +646,7 @@ This is a thin wrapper around the user's existing manual chain (`/grill-with-doc
 Full failure-mode table (Workflow/Agent-fork errors, `/adversarial-review` errors or
 long-runs, Ctrl-C mid-run, deleted plan file, structure drift), the `--from-phase N`
 resumption preconditions, and the rough token-budget numbers per phase: `Read
-~/.claude/commands/references/plan-harden/failure-modes.md`.
+~/.claude/references/plan-harden/failure-modes.md`.
 
 ---
 
@@ -499,10 +663,55 @@ resumption preconditions, and the rough token-budget numbers per phase: `Read
 9. **Auto-accept is auditable.** In auto-accept mode (the default), all auto-accepted Q+A pairs MUST land in a `## Grill auto-accept log` section of the plan file so the user can review post-hoc what the grilling skill decided on their behalf. The Phase 4 summary's `mode=auto-accept` tag is the entry point to that log.
 10. **Plan-file required.** This command refuses to run without a resolvable plan file (Phase 4 must mutate something).
 11. **Severity rule for the summary block** is in Phase 4.1. Apply consistently.
+12. **Never report an artifact correct from a structural proxy** *(2026-08-21)*. A byte count, a
+    tag count, an exit code or an anchor count is not evidence the reader sees what you think.
+    Render `PLAN.html` and confirm the summary is in the live DOM before saying it landed. And
+    when a count comes back ZERO, establish whether the zero is CORRECT before reporting it —
+    a check pointed at the wrong string returns "clean" and "I declined to look" identically.
+13. **Embedded code is EXECUTED, never merely reviewed** *(2026-08-21)*. When a session prompt
+    carries a code snippet, a hardening pass that only reads it is not finished. **Better: move
+    it out.** `build_plan.py` now warns on any heredoc of 10+ lines in a session prompt, and the
+    standing plan-builder rule is that one session BUILDS a script with tests and later sessions
+    RUN it — a prompt that names a tested script has nothing for this rule to execute. Run it against
+    one KNOWN POSITIVE (it must produce the affirmative result) and at least one negative per
+    branch (each must fail for ITS OWN reason), then re-extract the snippet FROM the authoring
+    source and run it again, so the code a builder receives is the code that was tested.
+    *Measured:* a snippet that passed `ast.parse` shipped with a `NameError` on its first real
+    line; executing it against seven fixtures then found two further defects that four rounds
+    of two-model review had not — both introduced by fixes applied minutes earlier.
+14. **Never state a number you have not re-measured at report time** *(2026-08-21)*. Counts
+    drift across rounds; a wrong number inside a correct report is the hardest error to catch
+    because everything around it is right. Re-run the command that produces each figure, or
+    label it unverified.
 
 ---
 
 ## Changelog
+
+- **2026-08-21** — Scope, sweep and execution, all from one measured session (three hardening
+  passes over a 107 KB plan; evidence in that plan's `PLAN-REVIEW-LOG.md`). (1) NEW §2.0b: the
+  review surface is MEASURED and, above ~60 KB, Phase 2 runs in `targeted` mode — a
+  whole-document verify loop does not converge on a large artifact, it resamples it
+  (19→10→1→1 then 12→6→13→9 across two passes, with pass 2's first round finding a CRITICAL
+  inside the fix pass 1 ended on). (2) NEW §2.1b: targeted mode reviews ONE session at a time
+  against a ≤15 KB verbatim contracts block — 25 findings in one parallel round against the
+  whole-document loop's 9, and the target session converged 7→1. (3) NEW §4.0c: a deterministic
+  contradiction sweep after EVERY mutation — *a fix applied in one place while the replaced
+  text survives elsewhere* was the majority defect in every round of all three passes, and an
+  ad-hoc sweep caught 9 findings neither model did. (4) NEW S.1b: `--from-phase` loads the
+  prior `*-REVIEW-LOG.md` as a findings ledger so a second pass stops re-litigating a settled
+  first. (5) §4.2 ordering fixed: the summary is written to a durable `PLAN-HARDEN-SUMMARY.md`
+  and inserted into `PLAN.html` only AFTER the last rebuild — §4.2b's required rebuild was
+  destroying it. (6) §4.2b's round-trip check now normalises the plan-directory path, which the
+  builder stamps into a header line, so the check can actually pass. (7) Rules 12–14:
+  render-verify instead of trusting structural proxies, EXECUTE embedded code against a known
+  positive and per-branch negatives, and re-measure every number at report time. Companion
+  edits: the verify prompt now demands a `## Convergence` answer and the loop branches on it
+  (new `scope-too-wide` outcome handing off to §2.1b); the review log records `verifier=` mode
+  every round; the model-lint checks `max_rework` against the schema's ceiling, which was
+  RAISED from 5 to 6 later the same day (`plan_limits.MAX_REWORK_CEILING`) because the longest
+  ladder — `sonnet@medium`, the `standard_build` default — needs 6, so the computed number is
+  now buildable for every cell instead of being clamped to one that cannot reach the apex.
 
 - **2026-08-03** — Ordering pass + parallelization lint, from the agent-janitor run's evidence. (1) NEW §4.0b `PARALLEL_LINT` (reference: `references/plan-harden/parallelization-lint.md`): deterministic write-conflict/gate/commit blockers + decision-card contract, advisory-only, placed AFTER the last plan mutation because hardening changes the DAG (observed: grilling added a cross-session data dependency). (2) §4.0 model-lint now ALSO runs early at S.3 as advisory grill enrichment — a 🔴 discovered only at Phase 4 arrives after the dominant Phase-2 spend; the Phase-4 pass stays authoritative. (3) Phase 3 premortem may overlap Phase 2's verify-loop waits (hypothesis committed before Phase 2 findings are read; reconciliation may then weigh them). Macro phase order confirmed correct against the same run: grilling before the dual-model pass let Phase 2 attack the improved plan — and catch a CRITICAL that Phase 1 itself introduced, which is the layering working, not an ordering defect.
 - **2026-07-09** — Phase 4.1: 🔴 plan-killer now requires quoted verbatim evidence (else downgraded to 🟡 with note). Companion edits in `/adversarial-review`: decision primer + relitigation suppression (R29) and fix-landed check (R30) in the Codex verify loop, quote-the-line gate at synthesis, fresh-context per-finding validator rule. Source: everyinc/compound-engineering-plugin gap review — ce-doc-review R29/R30 + ce-code-review quote gate.

@@ -25,6 +25,9 @@ This command was collapsed in the **skill-unification** program (session s08, CP
 
 ### Selection
 
+0. If the ask is about the whole repo, not a diff (its health, security, refactoring needs,
+   over-engineering or performance), tell the user to type `/repo-health`, the front door for
+   whole-repo reviews, and stop. Only the user can start it.
 1. If `$ARGUMENTS` contains `--deep` (or a plan/architecture is in context, or the ask
    is "thoroughly / adversarially review"), route to **`/adversarial-review`**.
 2. If `$ARGUMENTS` contains `--fast` (or the ask is a quick diff/PR correctness pass),

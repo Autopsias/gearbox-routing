@@ -149,6 +149,98 @@ def test_the_orchestrator_commits_a_member_and_the_member_never_has_to(group):
     assert wt.commit_member(group["plan_dir"], group["manifest"], "s01", "m") is None
 
 
+def test_a_member_commit_never_stages_the_plans_directory(group):
+    """2026-09-24: the review gate wrote its findings ledger into the member's
+    FROZEN `_plans/` copy, `git add -A` committed it, and §8.b then refused every
+    later ship of the plan. A tree dirty ONLY under `_plans/` commits nothing."""
+    path = Path(group["paths"]["s01"])
+    ledger = path / "_plans" / "fixture" / "_verify_state" / "s01.medium.claude.findings.ndjson"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text("{}\n")
+    assert wt.commit_member(group["plan_dir"], group["manifest"], "s01", "m") is None
+    (path / "src" / "alpha.py").write_text("A = 2\n")
+    sha = wt.commit_member(group["plan_dir"], group["manifest"], "s01", "m")
+    files = wt.git(["show", "--name-only", "--format=", sha], path)[1].split()
+    assert files == ["src/alpha.py"], files
+
+
+def _install_hook(root, body):
+    """Write a pre-commit hook into the SHARED .git (worktrees share hooks)."""
+    rc, hooks, _ = wt.git(["rev-parse", "--git-common-dir"], root)
+    assert rc == 0
+    d = Path(root) / hooks if not Path(hooks).is_absolute() else Path(hooks)
+    h = d / "hooks" / "pre-commit"
+    h.parent.mkdir(parents=True, exist_ok=True)
+    h.write_text(body)
+    h.chmod(0o755)
+
+
+def test_a_formatting_hook_that_rewrites_files_does_not_fail_the_commit(group):
+    """end-of-file-fixer / trailing-whitespace fail the FIRST commit and fix the
+    files. One re-stage-and-retry is the standard response; without it the
+    orchestrator halts the plan on a hook that already did its job."""
+    path = Path(group["paths"]["s01"])
+    (path / "src" / "alpha.py").write_text("A = 2")  # no trailing newline
+    _install_hook(group["root"], "#!/bin/sh\n"
+                  "f=src/alpha.py\n"
+                  '[ -s "$f" ] && [ "$(tail -c1 "$f")" != "" ] || exit 0\n'
+                  'printf "\\n" >> "$f"; exit 1\n')
+    sha = wt.commit_member(group["plan_dir"], group["manifest"], "s01", "m")
+    assert sha, "a formatting hook must not strand the commit"
+    assert (path / "src" / "alpha.py").read_text().endswith("\n")
+
+
+def test_a_hook_that_rewrites_an_UNSTAGED_file_is_still_detected(group):
+    """The `` M path`` case, which the MM case above cannot reach.
+
+    `git status --porcelain` puts the staged code in column 1 and the worktree
+    code in column 2, so a tracked file the hook rewrote but the member never
+    touched prints with a LEADING SPACE. Read that output through `git(...)`'s
+    default `strip=True` and the first line loses that space, every column
+    shifts left, and the hook rewrite reads as a clean tree — the retry never
+    fires and `commit_member` raises on a hook that already did its job.
+
+    The file the hook rewrites must sort FIRST (`src/alpha.py` before
+    `src/beta.py`), because stripping only damages the first line."""
+    path = Path(group["paths"]["s02"])
+    (path / "src" / "beta.py").write_text("B = 2\n")          # the member's own edit, staged
+    _install_hook(group["root"], "#!/bin/sh\n"
+                  "f=src/alpha.py\n"
+                  'grep -q FIXED "$f" && exit 0\n'
+                  'echo "# FIXED" >> "$f"; exit 1\n')
+    sha = wt.commit_member(group["plan_dir"], group["manifest"], "s02", "m")
+    assert sha, "a hook rewriting an unstaged tracked file must not strand the commit"
+    assert "FIXED" in (path / "src" / "alpha.py").read_text()
+
+
+def test_a_hook_that_GENERATES_a_file_is_still_detected(group):
+    """A generating hook (pip-compile, `go mod tidy`, terraform-docs) writes a
+    NEW file rather than rewriting a tracked one, so its only trace is a ``??``
+    line. `git add -A` ran moments earlier, so an untracked file after the
+    failed commit can only be the hook's doing — excluding ``??`` makes the
+    retry miss it and strands a commit the hook already prepared."""
+    path = Path(group["paths"]["s02"])
+    (path / "src" / "beta.py").write_text("B = 2\n")
+    _install_hook(group["root"], "#!/bin/sh\n"
+                  "f=src/generated.txt\n"
+                  '[ -f "$f" ] && exit 0\n'
+                  'echo GENERATED > "$f"; exit 1\n')
+    sha = wt.commit_member(group["plan_dir"], group["manifest"], "s02", "m")
+    assert sha, "a generating hook must not strand the commit"
+    rc, out, _ = wt.git(["show", "--name-only", "--format=", sha], path)
+    assert "src/generated.txt" in out, "the generated file must land in the commit"
+
+
+def test_a_real_hook_refusal_still_fails_the_commit(group):
+    """The known-negative: a hook that refuses WITHOUT touching the tree (a
+    ratchet, a lint error) must still surface, not be retried into success."""
+    path = Path(group["paths"]["s01"])
+    (path / "src" / "alpha.py").write_text("A = 3\n")
+    _install_hook(group["root"], "#!/bin/sh\necho 'RATCHET: blocked' >&2\nexit 1\n")
+    with pytest.raises(wt.WorktreeError):
+        wt.commit_member(group["plan_dir"], group["manifest"], "s01", "m")
+
+
 def test_commit_member_is_a_noop_for_a_non_isolated_session(group):
     m = group["manifest"]
     m["sessions"][0]["dispatch"].pop("isolation")
@@ -238,3 +330,77 @@ def test_producer_first_order_is_manifest_document_order(group):
     assert res["merged"] == ["s01", "s02"]
     assert (group["root"] / "src" / "alpha.py").read_text() == "ALPHA = 2\n"
     assert (group["root"] / "src" / "beta.py").read_text() == "BETA = 2\n"
+
+
+def test_the_integration_review_base_is_the_tree_before_the_member_merges(group):
+    """`begin` merges the members BEFORE the integration session's first
+    `dispatch_started`, so a base derived from that timestamp is the merged tip
+    and the review surface is EMPTY (model-rating-and-gateways g1-integration,
+    2026-09-27: INDETERMINATE twice). The base must be the pre-merge HEAD, so the
+    gate reviews the members' combined diff plus any hand conflict resolution."""
+    import llm_review_surface as lrs
+    import review_context as rvc
+    import run_state_io as rsi
+    root, plan_dir = group["root"], group["plan_dir"]
+    pre_merge = wt.git(["rev-parse", "HEAD"], root)[1]
+    for sid, name in (("s01", "alpha"), ("s02", "beta")):
+        (Path(group["paths"][sid]) / "src" / f"{name}.py").write_text(f"{name.upper()} = 2\n")
+        wt.commit_member(plan_dir, group["manifest"], sid, "m")
+    assert wt.merge_group(plan_dir, group["manifest"], "g",
+                          integration_session="s03")["status"] == "merged"
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s03"])
+    # Control: the timestamp derivation alone lands on the merged tip -- the defect.
+    assert rvc.derive_base(plan_dir, "s03", root) == wt.git(["rev-parse", "HEAD"], root)[1]
+    base = rvc.gate_env(plan_dir, "s03", str(root)).get(rvc.BASE_ENV)
+    assert base == pre_merge
+    assert lrs.diff_stat(str(root), base) == ["src/alpha.py", "src/beta.py"]
+
+
+def test_a_reworked_member_is_merged_again_and_an_unchanged_one_is_not(group):
+    """A member reworked after its merge has new commits on its branch. Skipping
+    it by id alone left the integration tree on the pre-rework state and begin
+    reported "nothing new"."""
+    root, plan_dir, m = group["root"], group["plan_dir"], group["manifest"]
+    for sid, name in (("s01", "alpha"), ("s02", "beta")):
+        (Path(group["paths"][sid]) / "src" / f"{name}.py").write_text(f"{name.upper()} = 2\n")
+        wt.commit_member(plan_dir, m, sid, "m")
+    assert wt.merge_group(plan_dir, m, "g", integration_session="s03")["merged"] == ["s01", "s02"]
+    (Path(group["paths"]["s01"]) / "src" / "alpha.py").write_text("ALPHA = 3\n")
+    wt.commit_member(plan_dir, m, "s01", "rework")
+    res = wt.merge_group(plan_dir, m, "g", integration_session="s03")
+    assert res["merged"] == ["s01"]
+    assert (root / "src" / "alpha.py").read_text() == "ALPHA = 3\n"
+    assert wt.merge_group(plan_dir, m, "g", integration_session="s03")["merged"] == []
+
+
+def test_a_containment_refusal_carries_its_merge_root(group):
+    """begin's recovery note aims `reset --hard` at `merge_root`; a refusal that
+    carried none fell back to the operator's own checkout."""
+    (group["root"] / "src" / "alpha.py").write_text("A = 'shared tree'\n")
+    res = wt.merge_group(group["plan_dir"], group["manifest"], "g", integration_session="s03")
+    assert res["status"] == "containment"
+    assert res["merge_root"] == str(group["root"])   # no plan worktree here: the outer repo
+
+
+def test_a_second_round_conflict_resets_to_that_rounds_start_not_base_ref(group):
+    """After a rework, a later integration round can conflict. Resetting to the
+    group's `base_ref` would also undo the merges round one landed; the note must
+    name the head THIS round started from."""
+    import group_scope as gs
+    root, plan_dir, m = group["root"], group["plan_dir"], group["manifest"]
+    for sid, name in (("s01", "alpha"), ("s02", "beta")):
+        (Path(group["paths"][sid]) / "src" / f"{name}.py").write_text(f"{name.upper()} = 2\n")
+        wt.commit_member(plan_dir, m, sid, "m")
+    assert wt.merge_group(plan_dir, m, "g", integration_session="s03")["status"] == "merged"
+    (root / "src" / "alpha.py").write_text("ALPHA = 'hand fix on the merged tree'\n")
+    wt.git(["commit", "-qam", "hand fix"], root, check=True)
+    round_two = wt.git(["rev-parse", "HEAD"], root)[1]
+    (Path(group["paths"]["s01"]) / "src" / "alpha.py").write_text("ALPHA = 'rework'\n")
+    wt.commit_member(plan_dir, m, "s01", "rework")
+    res = wt.merge_group(plan_dir, m, "g", integration_session="s03")
+    assert res["status"] == "conflict"
+    assert res["pre_merge"] == round_two != res["base_ref"]
+    assert wt.git(["rev-parse", "HEAD"], root)[1] == round_two     # the abort left it here
+    note = gs.merge_recovery(res, "s03")
+    assert f"reset --hard {round_two[:12]}" in note
+    assert res["base_ref"][:12] not in note

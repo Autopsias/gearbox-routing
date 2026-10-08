@@ -27,3 +27,16 @@ if [ "$rc" != "0" ]; then
 else
   printf '[%s] ok — no harness drift\n' "$ts" >> "$LOG"
 fi
+
+# `|| true` on every step here is load-bearing: under `set -euo pipefail` a
+# nonzero doc_check --strict exit, or a grep that matches nothing, would kill
+# the whole weekly job before it logs. This check must raise a notification
+# on a real failure but never stop the run — same posture as the harness-drift
+# block above, just a second, independent gate.
+doc_out="$(python3 "$CD/scripts/doc_check.py" --repo-root "$CD" --strict 2>&1)" && doc_rc=0 || doc_rc=$?
+doc_failed="$(printf '%s\n' "$doc_out" | head -1 | grep -oE 'failed=[0-9]+' | cut -d= -f2 || true)"
+printf '[%s] doc_check: failed=%s rc=%s\n' "$ts" "${doc_failed:-?}" "$doc_rc" >> "$LOG"
+if [ "$doc_rc" != "0" ]; then
+  printf '%s\n' "$doc_out" | sed 's/^/    /' >> "$LOG"
+  osascript -e "display notification \"${doc_failed:-some} doc_check claim(s) failed\" with title \"gearbox: doc_check drift\" subtitle \"run: python3 ~/.claude/scripts/doc_check.py --strict\"" 2>/dev/null || true
+fi

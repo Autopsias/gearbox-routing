@@ -8,14 +8,22 @@ Lock model (v1, single-user): a pidfile `.lock` carrying {pid, started_at,
 host}. Best-effort across separate process invocations (the orchestrator calls
 this CLI multiple times within one turn). True fcntl.flock and shared-FS
 detection are v1.5/v2 refinements — see references/failure-modes.md.
+
+Staleness is HOST-AWARE (`lock_stale` / `lock_on_this_host`, LCK-02): a pid only
+means something on the machine that recorded it, so a lock carrying another
+host's name is reported with that name and never reclaimed here. The shipping
+LEASES in ship_state_io.py are a different, stronger model (token + explicit
+expiry, atomic O_EXCL create) because they must survive run.py exiting mid-
+operation; this pidfile lock is only held inside one run.py process tree.
 """
 
 import json
 import os
-import socket
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+
+from host_id import host_fields, same_host  # noqa: F401  (host_fields re-exported for ship_locks)
 
 STALE_LOCK_SECONDS = 3600  # 1 hour
 
@@ -55,9 +63,12 @@ def load_state(plan_dir):
     if not p.exists():
         return _default_state()
     try:
-        return json.loads(p.read_text())
+        state = json.loads(p.read_text())
     except json.JSONDecodeError:
         return _default_state()
+    # Guard the parsed VALUE, not just the parse: valid JSON that is a list or a
+    # scalar would make every `state.get(...)` below raise AttributeError.
+    return state if isinstance(state, dict) else _default_state()
 
 
 def save_state(plan_dir, state):
@@ -106,15 +117,7 @@ def rewrite_halt_notice(plan_dir, detail):
     return True
 
 
-def clear_halt(plan_dir):
-    state = load_state(plan_dir)
-    state["halt"] = {"set": False, "reason": None, "by_session": None, "at": None, "kind": None}
-    save_state(plan_dir, state)
-    notice = Path(plan_dir) / "HALT_NOTICE.txt"
-    if notice.exists():
-        notice.unlink()
-    log_event(plan_dir, "halt_cleared")
-    return state
+from halt_clears import HaltClearRefused, clear_halt, clear_halt_cli  # noqa: E402,F401
 
 
 def is_halted(plan_dir):
@@ -123,7 +126,10 @@ def is_halted(plan_dir):
 
 def record_batch(plan_dir, session_ids, result):
     state = load_state(plan_dir)
-    state["last_batch"] = {"at": _now(), "session_ids": list(session_ids), "result": result}
+    # orchestrator_session_id lets hooks/turnend-guard.py scope "no turn ends
+    # blind" to the Claude session that actually dispatched this batch.
+    state["last_batch"] = {"at": _now(), "session_ids": list(session_ids), "result": result,
+                           "orchestrator_session_id": os.environ.get("CLAUDE_CODE_SESSION_ID")}
     save_state(plan_dir, state)
 
 
@@ -335,122 +341,6 @@ def notify_gate_continue(plan_dir, session_id, gate_type, reason):
 
 
 # --------------------------------------------------------------------------
-# Filesystem lock-semantics guard (P5)
-# --------------------------------------------------------------------------
-# Pidfile / flock advisory locks are reliable only on a local POSIX filesystem.
-# On networked or cloud-sync filesystems two runs can each believe they hold the
-# lock and race PLAN.html into corruption. We detect the common cases and refuse
-# by default (override: --unsafe-lock).
-
-# Path-prefix heuristics: sync-folder roots under $HOME (cheap, no external deps).
-_SYNC_FS_PREFIXES = {
-    "iCloud Drive": ["Library/Mobile Documents"],
-    "CloudStorage (Google Drive / OneDrive / Dropbox via Finder)": ["Library/CloudStorage"],
-    "Dropbox": ["Dropbox"],
-    "Google Drive": ["Google Drive"],
-    "OneDrive": ["OneDrive"],
-}
-
-# fstype values that indicate a networked filesystem where POSIX locks misbehave.
-_NETWORK_FSTYPES = {"nfs", "smbfs", "cifs", "afpfs", "fuse", "fuseblk", "webdav", "ftp"}
-
-
-def check_lock_fs(plan_dir):
-    """Return a human-readable FS-class name if ``plan_dir`` resolves onto a
-    networked/sync filesystem where the lock is unreliable, else ``None``.
-
-    Detection is best-effort: any error returns ``None`` (never block on a
-    detection failure — the caller decides whether to refuse).
-    """
-    try:
-        resolved = Path(plan_dir).expanduser().resolve()
-    except (OSError, RuntimeError):
-        return None
-
-    # 1. Path-prefix match against known sync-folder roots under $HOME.
-    try:
-        home = Path.home()
-    except (OSError, RuntimeError):
-        home = None
-    if home is not None and resolved.is_relative_to(home):
-        rel = str(resolved.relative_to(home))
-        for fs_class, prefixes in _SYNC_FS_PREFIXES.items():
-            for pre in prefixes:
-                if rel == pre or rel.startswith(pre + "/"):
-                    return fs_class
-
-    # 2. Mount-type probe (best-effort, guarded).
-    fstype = _probe_fstype(resolved)
-    if fstype and fstype.lower() in _NETWORK_FSTYPES:
-        return f"network filesystem ({fstype})"
-    return None
-
-
-def _probe_fstype(path):
-    """Best-effort fstype for ``path``'s mount point. ``None`` on any failure.
-
-    NB: BSD/macOS ``stat -f %T`` reports the *file* type (ls -F style), not the
-    fstype, so we parse ``mount`` output (macOS) / ``/proc/mounts`` (Linux) and
-    match the longest mount point that is a prefix of ``path``.
-    """
-    import subprocess
-    import sys
-
-    try:
-        if sys.platform == "darwin":
-            out = subprocess.run(
-                ["/sbin/mount"], capture_output=True, text=True, timeout=5, check=False
-            )
-            if out.returncode != 0:
-                return None
-            mounts = _parse_macos_mount(out.stdout)
-        elif sys.platform.startswith("linux"):
-            mounts = _parse_proc_mounts(Path("/proc/mounts").read_text())
-        else:
-            return None
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
-    return _fstype_for_path(str(path), mounts)
-
-
-def _parse_macos_mount(text):
-    """macOS ``mount`` lines: ``<dev> on <mountpoint> (<fstype>, <opts>)``."""
-    import re
-
-    mounts = []
-    for line in text.splitlines():
-        m = re.match(r"^.*? on (.+?) \(([^,)]+)", line)
-        if m:
-            mounts.append((m.group(1), m.group(2).strip()))
-    return mounts
-
-
-def _parse_proc_mounts(text):
-    """Linux ``/proc/mounts`` lines: ``<dev> <mountpoint> <fstype> <opts> 0 0``.
-    Mount points escape spaces as ``\\040``."""
-    mounts = []
-    for line in text.splitlines():
-        parts = line.split()
-        if len(parts) >= 3:
-            mountpoint = parts[1].replace("\\040", " ")
-            mounts.append((mountpoint, parts[2]))
-    return mounts
-
-
-def _fstype_for_path(path, mounts):
-    """Return the fstype of the longest mount point that is a prefix of ``path``."""
-    best_fstype, best_len = None, -1
-    for mountpoint, fstype in mounts:
-        if not mountpoint:
-            continue
-        norm = mountpoint.rstrip("/")
-        matches = path == mountpoint or norm == "" or path.startswith(norm + "/")
-        if matches and len(mountpoint) > best_len:
-            best_fstype, best_len = fstype, len(mountpoint)
-    return best_fstype
-
-
-# --------------------------------------------------------------------------
 # Lock (best-effort pidfile)
 # --------------------------------------------------------------------------
 class LockError(Exception):
@@ -468,7 +358,47 @@ def _pid_alive(pid):
         return False
     except PermissionError:
         return True
+    except (OSError, OverflowError):
+        # A pid outside the platform's valid range (hand-edited/truncated
+        # pidfile) raises from os.kill itself — degrade to "not alive".
+        return False
     return True
+
+
+def lock_age_seconds(info):
+    """Age of a lock record in seconds, or None when ``started_at`` is missing
+    or unparseable (a naive timestamp cannot be subtracted from an aware now)."""
+    started = (info or {}).get("started_at")
+    if not started:
+        return None
+    try:
+        return (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
+    except (ValueError, TypeError):
+        return None
+
+
+def lock_on_this_host(info):
+    """True when the lock record was written on THIS machine (or names no host).
+
+    LCK-02: the single definition of "may this machine judge that lock at all".
+    A pid is only meaningful on the host that recorded it — on a shared checkout
+    (network share, synced folder) this machine's pid table says nothing about a
+    process on another one, so a foreign-host lock must be REPORTED with its host
+    name, never reclaimed because the number happens to be free here."""
+    return same_host(info)
+
+
+def lock_stale(info):
+    """True when a `.lock` record may be reclaimed. Host-aware: a lock recorded
+    on another machine is NEVER stale here, whatever its pid or age."""
+    if not isinstance(info, dict):
+        return True
+    if not lock_on_this_host(info):
+        return False
+    age = lock_age_seconds(info)
+    pid = info.get("pid")
+    alive = _pid_alive(pid) if isinstance(pid, int) else False
+    return (age is not None and age > STALE_LOCK_SECONDS) or not alive
 
 
 def acquire_lock(plan_dir):
@@ -478,25 +408,21 @@ def acquire_lock(plan_dir):
             info = json.loads(lp.read_text())
         except (json.JSONDecodeError, OSError):
             info = {}
-        started = info.get("started_at")
-        age = None
-        if started:
-            try:
-                age = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
-            except ValueError:
-                age = None
-        pid = info.get("pid")
-        alive = _pid_alive(pid) if isinstance(pid, int) else False
-        stale = (age is not None and age > STALE_LOCK_SECONDS) or not alive
-        if not stale:
+        if not isinstance(info, dict):
+            info = {}
+        if not lock_stale(info):
+            foreign = ("" if lock_on_this_host(info) else
+                       f" This lock was taken on ANOTHER machine ({info.get('host')}); this host "
+                       "cannot tell whether that process is alive, so it is never reclaimed here.")
             raise LockError(
-                f"another /plan-execute appears to be running (pid={pid}, host={info.get('host')}, "
-                f"started={started}). If it is stale, remove {lp} and retry."
+                f"another /plan-execute appears to be running (pid={info.get('pid')}, "
+                f"host={info.get('host')}, started={info.get('started_at')}). "
+                f"If it is stale, remove {lp} and retry.{foreign}"
             )
         # stale -> overwrite
     token = _now()
     _atomic_write(
-        lp, json.dumps({"pid": os.getpid(), "started_at": token, "host": socket.gethostname()})
+        lp, json.dumps({"pid": os.getpid(), "started_at": token, **host_fields()})
     )
     log_event(plan_dir, "lock_acquired")
     return token
@@ -513,16 +439,7 @@ def lock_holder(plan_dir):
         info = json.loads(lp.read_text())
     except (json.JSONDecodeError, OSError):
         return None
-    started = info.get("started_at")
-    age = None
-    if started:
-        try:
-            age = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
-        except ValueError:
-            age = None
-    pid = info.get("pid")
-    alive = _pid_alive(pid) if isinstance(pid, int) else False
-    if (age is not None and age > STALE_LOCK_SECONDS) or not alive:
+    if not isinstance(info, dict) or lock_stale(info):
         return None
     return info
 
@@ -545,8 +462,9 @@ def release_lock(plan_dir):
 # token already do.
 # --------------------------------------------------------------------------
 def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="claude",
-                   attested=None, generation=None, attempt=None):
-    """Persist one dispatch's correlation receipt. `attested` is
+                   attested=None, generation=None, attempt=None, usage=None):
+    """Persist one dispatch's correlation receipt. `usage` is the rule-6 token
+    and cost block read off `transcript` (None without one). `attested` is
     `{"model": ..., "reasoning": ...}` when served-model evidence was found in
     `transcript`, else None (the receipt still proves an Agent ID was
     correlated — `outcomes.py` reads that as `model_ran_source="requested"`).
@@ -554,7 +472,7 @@ def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="
     `generation`/`attempt` key the receipt to the DISPATCH it was recorded
     for (TEL-01 finding 1) — the caller passes the same escalation generation
     and dispatch-attempt ordinal a resolution recorded right now would carry.
-    `outcomes._model_ran` compares them against the resolution it is actually
+    `outcomes._fresh_receipt` compares them against the resolution it is actually
     composing and refuses to trust a receipt that does not match: this
     receipt does not get cleared on re-dispatch (see `get_receipt`), so
     without this check a skipped `record-receipt` on a later attempt would
@@ -566,6 +484,7 @@ def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="
         "transcript": transcript,
         "backend": backend,
         "attested": attested,
+        "usage": usage,
         "generation": generation,
         "attempt": attempt,
         "recorded_at": _now(),
@@ -585,7 +504,7 @@ def get_receipt(plan_dir, session_id):
     the previous attempt, same as any other pre-dispatch state. Callers that
     attribute a served model to a SPECIFIC resolution must check the receipt's
     `generation`/`attempt` against that resolution's own — see
-    `outcomes._model_ran`, which is the only place that does."""
+    `outcomes._fresh_receipt`, which is the only place that does."""
     return (load_state(plan_dir).get("dispatch_receipts") or {}).get(session_id)
 
 

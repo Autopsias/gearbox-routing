@@ -12,7 +12,7 @@ Execute this test orchestration procedure for: "$ARGUMENTS"
 
 ## TASKLIST INTEGRATION (MANDATORY)
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/tasklist-patterns.md` and follow all steps.
+**Instructions:** Read `~/.claude/references/test-orchestrate/tasklist-patterns.md` and follow all steps.
 
 ---
 
@@ -104,13 +104,13 @@ Report the mode: "Operating in [TACTICAL/STRATEGIC] mode."
 
 ## STEP 0.5: Ralph Loop Mode Detection
 
-**If `--loop` is present:** Read `~/.claude/commands/references/test-orchestrate/troubleshooting.md` for Ralph Loop launch instructions, then EXIT.
+**If `--loop` is present:** Read `~/.claude/references/test-orchestrate/troubleshooting.md` for Ralph Loop launch instructions, then EXIT.
 
 ---
 
 ## STEP 0.6: Type-Level Mode Detection (--fix-single-type)
 
-**If `--fix-single-type` is present:** Read `~/.claude/commands/references/test-orchestrate/troubleshooting.md` for type-level mode execution, then EXIT after fixing one type.
+**If `--fix-single-type` is present:** Read `~/.claude/references/test-orchestrate/troubleshooting.md` for type-level mode execution, then EXIT after fixing one type.
 
 **Otherwise:** Proceed to STEP 1 (all-types mode).
 
@@ -131,7 +131,7 @@ Check "$ARGUMENTS" for these flags:
   choices), passed by the ship-tail / Cluster C. Forward it VERBATIM into every fixer-agent
   prompt's `## Change intent` heading so fixers classify deliberate-choice (`intent_touched:
   true` → ask-user) vs mistake (auto-fix). See `references/test-orchestrate/agent-dispatch-rules.md`
-  and `~/.claude/commands/references/shared/intent-into-review.md`.
+  and `~/.claude/references/shared/intent-into-review.md`.
 
 **Intent-into-review engagement (deterministic log).** Emit exactly one of:
 ```bash
@@ -315,19 +315,19 @@ Use the Read tool:
 
 ## STEP 5.5: ANALYSIS PHASE
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/failure-categorization.md` and follow the Analysis Phase section (test isolation, flakiness detection, coverage analysis).
+**Instructions:** Read `~/.claude/references/test-orchestrate/failure-categorization.md` and follow the Analysis Phase section (test isolation, flakiness detection, coverage analysis).
 
 ---
 
 ## STEP 6: Enhanced Failure Categorization
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/failure-categorization.md` and follow all regex-based categorization rules and prioritization steps.
+**Instructions:** Read `~/.claude/references/test-orchestrate/failure-categorization.md` and follow all regex-based categorization rules and prioritization steps.
 
 ---
 
 ## STEP 7: STRATEGIC MODE (if triggered)
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/strategic-mode.md` and follow all steps.
+**Instructions:** Read `~/.claude/references/test-orchestrate/strategic-mode.md` and follow all steps.
 
 If TACTICAL mode, skip to STEP 7.5.
 
@@ -335,7 +335,7 @@ If TACTICAL mode, skip to STEP 7.5.
 
 ## STEP 7.5-7.6: Conflict Detection & Test File Safety
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/agent-dispatch-rules.md` and follow the conflict detection and test file modification safety sections.
+**Instructions:** Read `~/.claude/references/test-orchestrate/agent-dispatch-rules.md` and follow the conflict detection and test file modification safety sections.
 
 ---
 
@@ -343,7 +343,7 @@ If TACTICAL mode, skip to STEP 7.5.
 
 ### CRITICAL: Launch ALL agents in ONE response with multiple Task calls.
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/agent-dispatch-rules.md` and follow the enhanced agent context template, dispatch examples, and model strategy.
+**Instructions:** Read `~/.claude/references/test-orchestrate/agent-dispatch-rules.md` and follow the enhanced agent context template, dispatch examples, and model strategy.
 
 ---
 
@@ -363,14 +363,14 @@ Check results:
 
 ## STEP 10: INTELLIGENT CHAIN INVOCATION
 
-**Instructions:** Read `~/.claude/commands/references/test-orchestrate/troubleshooting.md` for chain invocation rules (depth check, --no-chain, chain action).
+**Instructions:** Read `~/.claude/references/test-orchestrate/troubleshooting.md` for chain invocation rules (depth check, --no-chain, chain action).
 
 ---
 
 ## STEP 11: Report Summary
 
 Emit a `findings-contract/v1` report (see the Findings output section below and
-`~/.claude/commands/references/shared/findings-contract.md`). Compute `decision`:
+`~/.claude/references/shared/findings-contract.md`). Compute `decision`:
 any unresolved blocking/error -> FAIL; else any `ask-user` -> CONCERNS; else PASS
 (only once every auto-fix is `status: fixed` and `post_fix_verified: true`).
 
@@ -421,7 +421,7 @@ Then: Run tests in VS Code -> `/test_orchestrate` reads cached results -> Fixes 
 ## Findings output: the Uniform Findings Contract
 
 **This orchestrator emits the shared Uniform Findings Contract.**
-Read `~/.claude/commands/references/shared/findings-contract.md` — it is the single,
+Read `~/.claude/references/shared/findings-contract.md` — it is the single,
 canonical findings envelope (action `no-op | auto-fix | ask-user` + severity
 `error | warning | info` + the finding-vs-suggestion split + lifecycle fields), and it
 maps to epic-dev's PASS/CONCERNS/FAIL gate. This supersedes the old flat

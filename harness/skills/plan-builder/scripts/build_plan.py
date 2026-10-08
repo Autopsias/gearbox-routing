@@ -20,6 +20,9 @@ except for the visual refresh.
 See ../references/schemas.md for the spec schema.
 """
 
+import explainer as expl
+import plan_limits as pl
+import route_at_dispatch_build as rad
 import hashlib
 import html
 import json
@@ -30,6 +33,13 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+
+from session_bundle import (  # noqa: F401 — re-exported: callers use bp.<name>
+    gen_post_session_section, gen_session_prompt_md, gen_verify_section,
+)
+from project_registries import (
+    _bundled_gate_ids, _merged_registries, load_project_registries, registry_root,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
@@ -209,7 +219,7 @@ def _validate_checkpoint_brief(brief, where):
 # `require_evidence` (Vista ③) asserts the closeout carries an `evidence` list of
 # paths that exist + are non-empty before DOING→DONE — a structural form of the
 # "verify mechanism engagement" discipline.
-VERIFY_KEYS = {"gates", "on_fail", "max_rework", "require_evidence", "checks"}
+VERIFY_KEYS = {"gates", "on_fail", "max_rework", "require_evidence", "checks", "locked"}
 VALID_ON_FAIL = {"rework", "halt"}
 # dispatch.depends_on_policy — how a session treats an upstream that terminally
 # failed. "all" (default) = today's hard-AND: every dep must complete or the
@@ -226,7 +236,8 @@ def _deploy_present(block):
     return bool(block.get("deploy_argv")) or (block.get("deploy", "none") not in (None, "none"))
 
 
-def _validate_post_session_block(block, where, *, allow_checkpoint):
+def _validate_post_session_shape(allow_checkpoint, block, where):
+    """Shape of a post_session block: the allowed keys and their types."""
     """Structural validation of a post_session / phase_closer block. Registry
     resolution + the adapter probe happen later (they need the project root)."""
     if not isinstance(block, dict):
@@ -250,6 +261,10 @@ def _validate_post_session_block(block, where, *, allow_checkpoint):
     cfm = block.get("command_failure_mode", "fail-halt")
     if cfm not in VALID_FAILURE_MODES:
         raise ValueError(f"{where}.command_failure_mode must be one of {sorted(VALID_FAILURE_MODES)}")
+
+
+def _validate_post_session_block(block, where, *, allow_checkpoint):
+    _validate_post_session_shape(allow_checkpoint, block, where)
     if "skip_if_partial" in block and not isinstance(block["skip_if_partial"], bool):
         raise ValueError(f"{where}.skip_if_partial must be bool")
     if "rollback_hint" in block and not isinstance(block["rollback_hint"], str):
@@ -291,6 +306,25 @@ def resolve_post_session(session, phases_by_id):
     return merged if actionable else None
 
 
+def _validate_named_checks(checks, where):
+    """verify.checks[] — the named evidence-artifact contracts."""
+    if not isinstance(checks, list) or not checks:
+        raise ValueError(f"{where}.checks must be a non-empty list of check objects")
+    for i, c in enumerate(checks):
+        if not isinstance(c, dict):
+            raise ValueError(f"{where}.checks[{i}] must be an object")
+        unknown_ck = set(c) - VERIFY_CHECK_KEYS
+        if unknown_ck:
+            raise ValueError(f"{where}.checks[{i}] has unknown keys: {sorted(unknown_ck)} "
+                             f"(allowed: {sorted(VERIFY_CHECK_KEYS)})")
+        for req in ("name", "evidence_path"):
+            if not isinstance(c.get(req), str) or not c[req].strip():
+                raise ValueError(f"{where}.checks[{i}].{req} is required and must be a "
+                                 f"non-empty string")
+        if "assert" in c and not isinstance(c["assert"], str):
+            raise ValueError(f"{where}.checks[{i}].assert must be a string")
+
+
 def _validate_verify_block(block, where):
     """Structural validation of a verify block (gate-registry resolution is a
     later guard — it needs the project root)."""
@@ -305,7 +339,7 @@ def _validate_verify_block(block, where):
     gates = block.get("gates")
     # gates may be omitted when require_evidence carries the block on its own; but
     # an empty block (neither gates nor require_evidence) is meaningless.
-    if gates is None and not require_evidence and not block.get("checks"):
+    if gates is None and not require_evidence and not block.get("checks") and "locked" not in block:
         raise ValueError(f"{where} must declare `gates` (non-empty), `require_evidence: true`, "
                          f"and/or `checks` (non-empty)")
     if gates is not None and (not isinstance(gates, list) or not gates
@@ -314,29 +348,15 @@ def _validate_verify_block(block, where):
     on_fail = block.get("on_fail", "rework")
     if on_fail not in VALID_ON_FAIL:
         raise ValueError(f"{where}.on_fail must be one of {sorted(VALID_ON_FAIL)}, got {on_fail!r}")
-    mr = block.get("max_rework", 1)
-    if not isinstance(mr, int) or mr < 0 or mr > 5:
-        raise ValueError(f"{where}.max_rework must be an int 0..5, got {mr!r}")
+    mr = block.get("max_rework", pl.DEFAULT_MAX_REWORK)
+    if not isinstance(mr, int) or mr < 0 or mr > pl.MAX_REWORK_CEILING:
+        raise ValueError(f"{where}.max_rework must be an int 0..{pl.MAX_REWORK_CEILING}, got {mr!r}")
     # verify.checks[] — named evidence-artifact contracts (optional). Each item
     # names an artifact the runner asserts exists + is non-empty; `assert` is a
     # human-readable description of what the artifact must show.
     checks = block.get("checks")
     if checks is not None:
-        if not isinstance(checks, list) or not checks:
-            raise ValueError(f"{where}.checks must be a non-empty list of check objects")
-        for i, c in enumerate(checks):
-            if not isinstance(c, dict):
-                raise ValueError(f"{where}.checks[{i}] must be an object")
-            unknown_ck = set(c) - VERIFY_CHECK_KEYS
-            if unknown_ck:
-                raise ValueError(f"{where}.checks[{i}] has unknown keys: {sorted(unknown_ck)} "
-                                 f"(allowed: {sorted(VERIFY_CHECK_KEYS)})")
-            for req in ("name", "evidence_path"):
-                if not isinstance(c.get(req), str) or not c[req].strip():
-                    raise ValueError(f"{where}.checks[{i}].{req} is required and must be a "
-                                     f"non-empty string")
-            if "assert" in c and not isinstance(c["assert"], str):
-                raise ValueError(f"{where}.checks[{i}].assert must be a string")
+        _validate_named_checks(checks, where)
 
 
 def resolve_verify(session, phases_by_id):
@@ -357,7 +377,7 @@ def resolve_verify(session, phases_by_id):
     if not merged.get("gates") and not merged.get("require_evidence") and not merged.get("checks"):
         return None
     merged.setdefault("on_fail", "rework")
-    merged.setdefault("max_rework", 1)
+    merged.setdefault("max_rework", pl.DEFAULT_MAX_REWORK)
     return merged
 
 
@@ -480,20 +500,73 @@ def deploy_auth_digest(session_id, sessions_by_id):
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def load_project_registries(project_root):
-    """Load .claude/{deploy-targets,eval-gates}.json from the project (if any)."""
-    reg = {"deploy": {}, "gates": {}}
-    if not project_root:
-        return reg
-    base = Path(project_root) / ".claude"
-    for key, fname in (("deploy", "deploy-targets.json"), ("gates", "eval-gates.json")):
-        p = base / fname
-        if p.is_file():
-            try:
-                reg[key] = json.loads(p.read_text())
-            except (json.JSONDecodeError, OSError) as e:
-                raise ValueError(f"{p} is not valid JSON: {e}") from e
-    return reg
+def _resolve_shipping_steps(_ship_adapter, bundled_gates, full_reg, probe_roots, project_root, ps, reg, where):
+    """Each shipping step resolved against the registry, the bundled gates and the probe roots."""
+    if ps.get("deploy", "none") not in (None, "none") and not ps.get("deploy_argv"):
+        merged_deploy = full_reg["deploy"] if full_reg else reg["deploy"]
+        if ps["deploy"] not in merged_deploy:
+            raise ValueError(
+                f"{where}: deploy target {ps['deploy']!r} is not defined in "
+                f"{Path(project_root or '.') / '.claude' / 'deploy-targets.json'} "
+                f"nor the skill-bundled deploy-targets.default.json. "
+                f"Declared targets: {sorted(merged_deploy)}"
+            )
+        # Probe probe_flags of skill-kind deploy targets — fails loud on drift.
+        if _ship_adapter is not None:
+            entry = merged_deploy[ps["deploy"]]
+            res = _ship_adapter.probe_registry_entry(ps["deploy"], entry, probe_roots)
+            if not res["ok"]:
+                raise ValueError(
+                    f"{where}: deploy target {ps['deploy']!r} probe_flags "
+                    f"{res.get('missing', [])} are not present in skill "
+                    f"{res.get('skill')!r} (adapter-contract-drift). "
+                    f"The registered probe_flags must exist in the live skill interface."
+                )
+    # deploy-bearing sessions MUST declare a rollback_hint (mandatory, not optional).
+    if _deploy_present(ps) and not ps.get("rollback_hint"):
+        raise ValueError(
+            f"{where}: a deploy-bearing session MUST declare a 'rollback_hint' "
+            f"(command or note surfaced on later-invalidation)."
+        )
+    # pre_deploy_gates must resolve (project registry or skill-bundled defaults).
+    for gate in ps.get("pre_deploy_gates", []) or []:
+        merged_gates = full_reg["gates"] if full_reg else reg["gates"]
+        if gate not in merged_gates and gate not in bundled_gates:
+            raise ValueError(
+                f"{where}: pre_deploy_gate {gate!r} is not in the project's "
+                f".claude/eval-gates.json nor the skill-bundled defaults "
+                f"{sorted(bundled_gates)}."
+            )
+        # Probe probe_flags of skill-kind gates — fails loud on drift.
+        if _ship_adapter is not None and gate in merged_gates:
+            entry = merged_gates[gate]
+            res = _ship_adapter.probe_registry_entry(gate, entry, probe_roots)
+            if not res["ok"]:
+                raise ValueError(
+                    f"{where}: pre_deploy_gate {gate!r} probe_flags "
+                    f"{res.get('missing', [])} are not present in skill "
+                    f"{res.get('skill')!r} (adapter-contract-drift)."
+                )
+
+
+def _validate_session_shipping_resolves(_ship_adapter, bundled_gates, full_reg, phases_by_id, probe_roots, project_root, reg, s):
+    """One session's shipping block, resolved against the registry and the probe roots."""
+    ps = resolve_post_session(s, phases_by_id)
+    if not ps:
+        return
+    where = f"Session {s['id']} post_session"
+    # git adapter probe (single-sourced from plan-execute).
+    if _ship_adapter is not None and ps.get("git", "none") != "none":
+        for step, res in _ship_adapter.probe_git_value(ps["git"], probe_roots):
+            if not res["ok"]:
+                raise ValueError(
+                    f"{where}: git={ps['git']!r} sub-step {step!r} references "
+                    f"skill {res['skill']!r} flags {res['missing']} that are not present "
+                    f"in its current interface (adapter-contract-drift). Update "
+                    f"plan-execute/scripts/shipping_adapter.py or the skill."
+                )
+    # deploy target must resolve in the merged registry (bundled defaults + project-local).
+    _resolve_shipping_steps(_ship_adapter, bundled_gates, full_reg, probe_roots, project_root, ps, reg, where)
 
 
 def validate_shipping_resolves(spec, project_root):
@@ -515,105 +588,7 @@ def validate_shipping_resolves(spec, project_root):
                        str(Path(project_root) / ".claude" / "skills")]
 
     for s in spec["sessions"]:
-        ps = resolve_post_session(s, phases_by_id)
-        if not ps:
-            continue
-        where = f"Session {s['id']} post_session"
-        # git adapter probe (single-sourced from plan-execute).
-        if _ship_adapter is not None and ps.get("git", "none") != "none":
-            for step, res in _ship_adapter.probe_git_value(ps["git"], probe_roots):
-                if not res["ok"]:
-                    raise ValueError(
-                        f"{where}: git={ps['git']!r} sub-step {step!r} references "
-                        f"skill {res['skill']!r} flags {res['missing']} that are not present "
-                        f"in its current interface (adapter-contract-drift). Update "
-                        f"plan-execute/scripts/shipping_adapter.py or the skill."
-                    )
-        # deploy target must resolve in the merged registry (bundled defaults + project-local).
-        if ps.get("deploy", "none") not in (None, "none") and not ps.get("deploy_argv"):
-            merged_deploy = full_reg["deploy"] if full_reg else reg["deploy"]
-            if ps["deploy"] not in merged_deploy:
-                raise ValueError(
-                    f"{where}: deploy target {ps['deploy']!r} is not defined in "
-                    f"{Path(project_root or '.') / '.claude' / 'deploy-targets.json'} "
-                    f"nor the skill-bundled deploy-targets.default.json. "
-                    f"Declared targets: {sorted(merged_deploy)}"
-                )
-            # Probe probe_flags of skill-kind deploy targets — fails loud on drift.
-            if _ship_adapter is not None:
-                entry = merged_deploy[ps["deploy"]]
-                res = _ship_adapter.probe_registry_entry(ps["deploy"], entry, probe_roots)
-                if not res["ok"]:
-                    raise ValueError(
-                        f"{where}: deploy target {ps['deploy']!r} probe_flags "
-                        f"{res.get('missing', [])} are not present in skill "
-                        f"{res.get('skill')!r} (adapter-contract-drift). "
-                        f"The registered probe_flags must exist in the live skill interface."
-                    )
-        # deploy-bearing sessions MUST declare a rollback_hint (mandatory, not optional).
-        if _deploy_present(ps) and not ps.get("rollback_hint"):
-            raise ValueError(
-                f"{where}: a deploy-bearing session MUST declare a 'rollback_hint' "
-                f"(command or note surfaced on later-invalidation)."
-            )
-        # pre_deploy_gates must resolve (project registry or skill-bundled defaults).
-        for gate in ps.get("pre_deploy_gates", []) or []:
-            merged_gates = full_reg["gates"] if full_reg else reg["gates"]
-            if gate not in merged_gates and gate not in bundled_gates:
-                raise ValueError(
-                    f"{where}: pre_deploy_gate {gate!r} is not in the project's "
-                    f".claude/eval-gates.json nor the skill-bundled defaults "
-                    f"{sorted(bundled_gates)}."
-                )
-            # Probe probe_flags of skill-kind gates — fails loud on drift.
-            if _ship_adapter is not None and gate in merged_gates:
-                entry = merged_gates[gate]
-                res = _ship_adapter.probe_registry_entry(gate, entry, probe_roots)
-                if not res["ok"]:
-                    raise ValueError(
-                        f"{where}: pre_deploy_gate {gate!r} probe_flags "
-                        f"{res.get('missing', [])} are not present in skill "
-                        f"{res.get('skill')!r} (adapter-contract-drift)."
-                    )
-
-
-def _bundled_gate_ids():
-    p = _PE_SCRIPTS.parent / "references" / "eval-gates.default.json"
-    if p.is_file():
-        try:
-            return set(json.loads(p.read_text()))
-        except (json.JSONDecodeError, OSError):
-            return set()
-    return set()
-
-
-def _bundled_registries():
-    """Load the skill-bundled default registries (deploy-targets + eval-gates).
-
-    Mirrors the merge order in plan-execute/scripts/shipping.py: bundled defaults
-    are the floor; project-local files win when present (but here we only load the
-    bundled floor for probe-flag access during build-time validation).
-    """
-    result = {"deploy": {}, "gates": {}}
-    base = _PE_SCRIPTS.parent / "references"
-    for key, fname in (("deploy", "deploy-targets.default.json"),
-                       ("gates", "eval-gates.default.json")):
-        p = base / fname
-        if p.is_file():
-            try:
-                result[key] = json.loads(p.read_text())
-            except (json.JSONDecodeError, OSError):
-                pass
-    return result
-
-
-def _merged_registries(project_root):
-    """Project-local registries merged OVER the bundled defaults (project wins)."""
-    merged = _bundled_registries()
-    local = load_project_registries(project_root)
-    merged["deploy"].update(local["deploy"])
-    merged["gates"].update(local["gates"])
-    return merged
+        _validate_session_shipping_resolves(_ship_adapter, bundled_gates, full_reg, phases_by_id, probe_roots, project_root, reg, s)
 
 
 def _check_id(kind, value):
@@ -733,7 +708,7 @@ def _declared_writes(spec):
                 if not _PATHISH.match(p):
                     usable = False
                 paths.append(p)
-        out[s["id"]] = paths if (usable and paths) else None
+        out[s["id"]] = list(dict.fromkeys(paths)) if (usable and paths) else None  # dedupe
     return out
 
 
@@ -1033,9 +1008,9 @@ def synthesize_integration_sessions(spec):
         if gates:
             # §3 rule 3 — a SUPERSET of the union of the members' gates, so
             # "re-run the full gate set on the merged tree" is checkable.
-            integ["verify"] = {"gates": gates, "on_fail": "rework", "max_rework": 1}
+            integ["verify"] = {"gates": gates, "on_fail": "rework", "max_rework": pl.DEFAULT_MAX_REWORK}
         last = max(i for i, s in enumerate(sessions) if s["id"] in set(member_ids))
-        sessions.insert(last + 1, integ)
+        sessions.insert(last + 1, rad.integration_session(integ, spec))
     return sessions
 
 
@@ -1070,7 +1045,7 @@ def _check_parallel_contract(spec):
     # integration sessions this builder emits — or a worktree group would be
     # refused under §3 for lacking the very session the builder is about to write.
     checked = with_integration_sessions(spec)
-    refusals, warnings = _pcon.check(checked, schema_version=PLAN_SCHEMA_VERSION)
+    refusals, warnings = _pcon.check(checked, schema_version=rad.fresh_stamp(spec))
     enforced = (spec.get("plan_schema_version") or 0) >= PARALLEL_CONTRACT_MIN_SCHEMA
     if refusals and enforced:
         raise ValueError(_pcon.refusal_text(refusals))
@@ -1079,7 +1054,7 @@ def _check_parallel_contract(spec):
             f"WARNING: [would be REFUSED at dispatch] {r} (this spec declares no "
             f'"plan_schema_version": {PARALLEL_CONTRACT_MIN_SCHEMA}+, so the contract is not '
             "enforced at build time — but the manifest this build writes is stamped "
-            f"{PLAN_SCHEMA_VERSION}, and /plan-execute WILL refuse it)",
+            f"{rad.fresh_stamp(spec)}, and /plan-execute WILL refuse it)",
             file=sys.stderr,
         )
     for w in warnings:
@@ -1226,6 +1201,90 @@ def probe_research_tools(project_root=None, home=None):
     }
 
 
+def stamp_spec(spec, out_path=None):
+    """Pin the build-time observations onto the spec BEFORE anything renders or
+    serializes it, so PLAN.html, spec.json and manifest.json describe ONE
+    observation and a rebuild cannot invent a different one.
+
+    BOTH keys here are clock-derived and BOTH must survive a rebuild: `created`
+    and `research_env.probed_at`. Either one moving rewrites manifest_digest,
+    which is what _verify_state reads to declare state-drift, so the plan halts
+    for a change nobody made. Fixing `created` alone left the identical defect on
+    its sibling -- a rebuild re-probed and moved the digest 1e021aeb -> a5283e62
+    (measured 2026-08-21). Hence one rule applied to every clock-derived key,
+    rather than a guard per key: take what the spec carries, else what the plan
+    already PUBLISHED in its manifest, else observe afresh.
+
+    `research_env` stays absent for a spec that makes no research-skip claim --
+    every plan built before RS-06.
+    """
+    prior = prior_manifest(out_path)
+    if claims_research(spec) and not spec.get("research_env"):
+        was = prior.get("research_env")
+        spec = {**spec, "research_env": was if isinstance(was, dict) and was
+                else research_env_record(spec)}
+    if not spec.get("created"):
+        was = prior.get("created")
+        spec = {**spec, "created": was if isinstance(was, str) and was.strip()
+                else today_iso()}
+    # Same rule per session: a PUBLISHED key survives a rebuild even when empty.
+    # CONSEQUENCE, accepted deliberately: deleting `review_scope` from spec.json
+    # by hand no longer removes it -- absent and never-present are the same thing
+    # to a spec, and the alternative re-drops the key from every plan published
+    # while the emit was unconditional. Narrow a live plan's scope through
+    # plan_mutate (which rebinds manifest_digest), not by editing spec.json.
+    was_sess = {x.get("id"): x for x in prior.get("sessions") or [] if isinstance(x, dict)}
+    if was_sess:
+        spec = {**spec, "sessions": [
+            {**x, "review_scope": was_sess[x.get("id")]["review_scope"]}
+            if "review_scope" not in x and "review_scope" in (was_sess.get(x.get("id")) or {})
+            else x for x in spec.get("sessions") or []]}
+    return spec
+
+
+def prior_manifest(out_path):
+    """The manifest a plan already published, as a dict -- {} when there is none,
+    it is unreadable, or it does not parse to an object. Guards the PARSE and not
+    only the exception: a manifest that parses to a list has no `.get`."""
+    if out_path is None:
+        return {}
+    d = Path(out_path)
+    d = d.parent if str(d).endswith(".html") else d
+    try:
+        prior = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return prior if isinstance(prior, dict) else {}
+
+
+def write_manifest(plan_dir, manifest):
+    """Write manifest.json, but ONLY when the dispatch graph actually differs.
+
+    Pinning the clock keys in `stamp_spec` is not enough on its own, because
+    `manifest_digest` (manifest_io.py) hashes the RAW BYTES and the bytes on disk
+    are not canonical: 4 of the 28 plans in this repo carry a trailing newline
+    nothing here writes. Re-serialising value-identical content moves the digest,
+    and every `_verify_state` bound to it then halts on state-drift for a change
+    nobody made -- the same defect as the two clock keys, one level down.
+    Measured 2026-08-21 on _plans/plan-level-git-isolation-2026-08-20: a rebuild
+    moved 75bd9a7c60aa -> 35271aafb96d over ONE byte and zero content.
+
+    Comparing VALUES rather than bytes is the point -- a real graph change still
+    writes, and an absent or unparseable manifest compares unequal, so a rebuild
+    over a corrupt one heals it.
+    """
+    if prior_manifest(plan_dir) != manifest:
+        (plan_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False))
+
+
+def claims_research(spec):
+    """True when any item makes a research-skip claim, i.e. this plan needs a
+    research_env record at all."""
+    return any((it.get("research_status") or "").strip()
+               for it in spec.get("items") or [])
+
+
 def research_env_record(spec):
     """The build-time environment record stamped onto a spec that makes ANY
     research-skip claim, or None when it makes none.
@@ -1238,11 +1297,570 @@ def research_env_record(spec):
     re-probed there, so re-generating a manifest on another machine reproduces
     the same bytes.
     """
-    if not any((it.get("research_status") or "").strip() for it in spec.get("items") or []):
+    if not claims_research(spec):
         return None
     rec = dict(probe_research_tools())
     rec["probed_at"] = today_iso()
     return rec
+
+
+def _validate_infographic_coverage(info, spec):
+    """Every item the progress bar counts must actually sit in a group."""
+    if (spec.get("plan_schema_version") or 0) >= INFOGRAPHIC_COVERAGE_MIN_SCHEMA:
+        groups = info.get(INFOGRAPHIC_GROUP_KEYS.get(info.get("type"), ""), None)
+        if isinstance(groups, list) and groups:
+            placed = {i for g in groups if isinstance(g, dict) for i in (g.get("items") or [])}
+            if placed:
+                unplaced = [it["id"] for it in spec["items"] if it["id"] not in placed]
+                if unplaced:
+                    names = [str(g.get("name") or g.get("id")) for g in groups
+                             if isinstance(g, dict)]
+                    raise ValueError(
+                        f"infographic: item(s) {', '.join(unplaced)} are in no Plan "
+                        f"Achievement group, so the progress bar would count "
+                        f"{len(placed & {it['id'] for it in spec['items']})} of "
+                        f"{len(spec['items'])} items and report progress over a "
+                        f"subset while looking like it covers the whole plan. "
+                        f"Add each item to a group, or add a group for its "
+                        f"category. Groups: {names}"
+                    )
+
+
+def _validate_infographic_and_hooks(spec):
+    """The frozen parallel-group contract, infographic shape and coverage, and the
+    optional halt/complete notification hooks.
+
+    Split off the tail of validate_spec, which was 512 lines. Self-contained: it
+    reads only `spec` and module-level constants, and raises the same ValueError
+    the rest of the validator does.
+    """
+    # The frozen parallel-group contract (§5, build-time call site) + the
+    # pure-chain warning. AFTER the graph check on purpose: R1 (dependency
+    # symmetry) stays enforced there for every schema version, so the contract's
+    # own R1 refusal never has to fire ungated from here.
+    _check_parallel_contract(spec)
+
+    info = spec["infographic"]
+    if info.get("type") not in VALID_INFOGRAPHIC_TYPES:
+        raise ValueError(
+            f"infographic.type must be one of {VALID_INFOGRAPHIC_TYPES}, got {info.get('type')!r}"
+        )
+    if info.get("type") == "custom":
+        if "svg_inline" not in info and "svg_inline_file" not in info:
+            raise ValueError(
+                "custom infographic requires 'svg_inline' (raw SVG markup) or 'svg_inline_file' (path)"
+            )
+        if "groups" not in info:
+            raise ValueError(
+                "custom infographic requires 'groups' (list of {id, items[]} for data binding)"
+            )
+        for g in info["groups"]:
+            for f in ["id", "items"]:
+                if f not in g:
+                    raise ValueError(f"custom group missing '{f}': {g}")
+
+    # Every item the progress bar should count must actually be in a group.
+    # Only fires when this infographic binds items at all: a shape with no
+    # bindings drives the bar from the item cards instead, and has no
+    # denominator to leave anything out of. Same rule the executor's
+    # containment gate applies as a WARNING at run time — enforced HERE, where
+    # it is still cheap to fix, because by run time the plan is already built.
+    _validate_infographic_coverage(info, spec)
+
+    # Optional halt/complete notification hooks (opt-in command run when
+    # /plan-execute halts or finishes).
+    for hook in ("notify_on_halt", "notify_on_complete"):
+        notify = spec.get(hook)
+        if notify is not None:
+            if not isinstance(notify, dict):
+                raise ValueError(f"{hook} must be an object with a 'command' string")
+            cmd = notify.get("command")
+            if not isinstance(cmd, str) or not cmd.strip():
+                raise ValueError(f"{hook}.command must be a non-empty string")
+
+
+def _validate_research_status(rs, it):
+    """An item's research_status block: the claim, its reason, and the probe
+    record that has to agree with an `unavailable` claim."""
+    if rs not in ("skipped", "unavailable"):
+        raise ValueError(
+            f"Item {it['id']}.research_status must be 'skipped' or 'unavailable' "
+            f"(or omitted), got {rs!r}"
+        )
+    reason = it.get("research_reason")
+    if rs == "skipped":
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(
+                f"Item {it['id']}.research_reason is required (non-empty string) "
+                "when research_status is 'skipped'"
+            )
+    else:
+        # research_status: "unavailable" (RS-06, 2026-08-13) — the ONE
+        # value that asserts the tooling was absent, and the one claim
+        # the builder can adjudicate for itself instead of taking on
+        # trust. NOT version-gated, and it needs no gate: the value was
+        # ILLEGAL until this change (the branch above refused anything
+        # but "skipped"), so no spec on disk can carry it and still have
+        # built. Every new refusal below therefore fires only on specs
+        # that could not previously build at all — measured across every
+        # spec.json under every `_plans/` tree on this machine, zero
+        # newly refused. See `probe_research_tools` for what the probe
+        # can and cannot see; `research_reason` is OPTIONAL here because
+        # the system supplies the reason.
+        if reason is not None and (not isinstance(reason, str) or not reason.strip()):
+            raise ValueError(
+                f"Item {it['id']}.research_reason, when present alongside "
+                "research_status: 'unavailable', must be a non-empty string"
+            )
+        probe = probe_research_tools()
+        if probe["available"]:
+            raise ValueError(
+                f"Item {it['id']}.research_status is 'unavailable', but the build-time "
+                "probe found research capability configured in this environment: "
+                + ", ".join(probe["signals"])
+                + " (read from " + ", ".join(probe["sources"]) + "). "
+                "'The research tools were absent' is a claim the builder checks, not "
+                "one it takes from the author (RS-06). Either run the prior-art pass, "
+                "or — if you chose not to research this item for some other reason — "
+                "say so with research_status: 'skipped' plus a research_reason. "
+                "NOTE the probe reads configuration only (MCP server names + "
+                "permission deny-lists); it cannot tell whether a configured tool "
+                "actually answered."
+            )
+
+
+def _validate_prior_art(pa, it):
+    """An item's prior_art block: the decision, and the source it requires."""
+    if not isinstance(pa, dict):
+        raise ValueError(f"Item {it['id']}.prior_art must be an object")
+    unknown = set(pa) - {"decision", "source", "note"}
+    if unknown:
+        raise ValueError(
+            f"Item {it['id']}.prior_art has unknown key(s) {sorted(unknown)}; "
+            "allowed: decision, source, note"
+        )
+    dec = pa.get("decision")
+    if dec not in ("adopt", "adapt", "build"):
+        raise ValueError(
+            f"Item {it['id']}.prior_art.decision must be adopt|adapt|build, got {dec!r}"
+        )
+    src = pa.get("source")
+    if not isinstance(src, str) or not src.strip():
+        raise ValueError(
+            f"Item {it['id']}.prior_art.source is required (non-empty string) -- "
+            f"a {dec!r} decision with no source is unenforceable (2026-08-12 hardening)"
+        )
+    note = pa.get("note")
+    if note is not None and not isinstance(note, str):
+        raise ValueError(f"Item {it['id']}.prior_art.note must be a string")
+
+
+def _validate_item(it, cat_keys, item_ids, _prior_art_enforced):
+    """Every per-item rule. Split out of validate_spec, which scored 84 on the
+    complexity ratchet (limit 12) — a single function carrying every rule for
+    items, sessions and the plan as a whole."""
+    for f in ["id", "title", "category"]:
+        if f not in it:
+            raise ValueError(f"Item missing '{f}': {it}")
+    _check_id("Item", it["id"])
+    if it["category"] not in cat_keys:
+        raise ValueError(f"Item {it['id']} references unknown category {it['category']!r}")
+    if it["id"] in item_ids:
+        raise ValueError(f"Duplicate item id: {it['id']}")
+    item_ids.add(it["id"])
+
+    # Prior-art decision (RS-01/RS-02, 2026-08-12 hardening). The P8 research
+    # step asks one question per item -- does a proven solution already cover
+    # this scope? Optional AT THE SHAPE LEVEL (either shape below satisfies
+    # it), but the PRESENCE of a decision is mandatory ON A SPEC THAT OPTS IN
+    # (see `_prior_art_enforced` above, gated on the spec's own top-level
+    # `plan_schema_version` -- mirrors closeout_pipeline.PLAN_IMPACT_MIN_SCHEMA
+    # exactly: a spec that never declares its version is untouched, never
+    # retroactively refused). Shape checks below run whenever the fields are
+    # PRESENT regardless of the gate -- harmless for a pre-bump spec, which
+    # never carries them.
+    pa = it.get("prior_art")
+    rs = it.get("research_status")
+    if pa is not None:
+        _validate_prior_art(pa, it)
+    if rs is not None:
+        _validate_research_status(rs, it)
+    if pa is None and rs is None and _prior_art_enforced:
+        raise ValueError(
+            f"Item {it['id']} must carry either prior_art (decision+source) or "
+            "research_status: 'skipped' with research_reason (or 'unavailable', which "
+            "the build-time probe must corroborate) -- the prior-art pass "
+            "(RS-01) must be explicit, never silently absent (2026-08-12 hardening). "
+            "See references/schemas.md -> 'Prior-art decision'."
+        )
+
+
+def _validate_codex_shell(sh, s, d):
+    """dispatch.codex_shell: the declared shell capabilities, and the human gate
+    that `danger-full-access` requires."""
+    if not isinstance(sh, dict):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell must be an object with keys "
+            "writable_roots / network / sandbox / env_include"
+        )
+    unknown = set(sh) - {"writable_roots", "network", "sandbox", "env_include"}
+    if unknown:
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell has unknown key(s) "
+            f"{sorted(unknown)}; allowed: writable_roots, network, sandbox, env_include"
+        )
+    wr = sh.get("writable_roots")
+    if wr is not None and (
+        not isinstance(wr, list)
+        or not all(isinstance(x, str) and x.strip() for x in wr)
+    ):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell.writable_roots must be a "
+            "list of non-empty path strings (e.g. [\"~/.dyno\"])"
+        )
+    if sh.get("network") is not None and not isinstance(sh.get("network"), bool):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell.network must be bool"
+        )
+    env_include = sh.get("env_include")
+    if env_include is not None and (
+        not isinstance(env_include, list)
+        or not all(
+            isinstance(name, str)
+            and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+            for name in env_include
+        )
+    ):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell.env_include must be a "
+            "list of environment variable names"
+        )
+    sbx = sh.get("sandbox")
+    if sbx is not None and sbx not in ("workspace-write", "danger-full-access"):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.codex_shell.sandbox must be "
+            "'workspace-write' (the default) or 'danger-full-access', got {!r}".format(sbx)
+        )
+    if sbx == "danger-full-access":
+        # Only nested `codex exec` / vendor-CLI dispatch needs this, and
+        # it hands the dispatched agent an UNSANDBOXED shell. Two rules,
+        # both build-time: no redundant narrower keys beside it, and a
+        # human must gate the session. run.py re-checks the gate at
+        # dispatch (a manifest is editable; the invariant must not be).
+        if wr or sh.get("network"):
+            raise ValueError(
+                f"Session {s['id']}.dispatch.codex_shell: sandbox "
+                "'danger-full-access' already grants writes anywhere and network — "
+                "drop writable_roots/network so the command has one reading"
+            )
+        gated = bool(
+            d.get("guards_irreversible")
+            or d.get("requires_human_checkpoint")
+            or (s.get("task_class") or "").strip().lower() == "linchpin"
+            or "irreversible_change" in (s.get("peer_triggers") or [])
+        )
+        if not gated:
+            raise ValueError(
+                f"Session {s['id']} asks for codex_shell.sandbox "
+                "'danger-full-access' (an UNSANDBOXED dispatched agent) but no "
+                "human gates it. Add dispatch.guards_irreversible: true (or "
+                "requires_human_checkpoint with its checkpoint brief), or drop to "
+                "'workspace-write' with writable_roots/network instead."
+            )
+
+
+def _validate_dispatch_agent(d, s):
+    """The dispatch agent and its declared subagent_type."""
+    """Every rule on a session's `dispatch` block: the agent, the graph edges,
+    the parallel group, the checkpoint brief and the shell grant.
+
+    Split out of _validate_session, which scored 46 on the complexity ratchet
+    after validate_spec was itself split — 139 of its lines were this one branch.
+    """
+    if not isinstance(d, dict):
+        raise ValueError(f"Session {s['id']}.dispatch must be an object")
+    for f in (
+        "subagent_type",
+        "parallel_group",
+        "isolation",
+        "integrates_group",
+        "depends_on",
+        "requires_human_checkpoint",
+        "max_retries",
+    ):
+        if f in d and d[f] is not None:
+            if f in ("subagent_type", "parallel_group", "isolation",
+                     "integrates_group") and not isinstance(d[f], str):
+                raise ValueError(f"Session {s['id']}.dispatch.{f} must be a string or null")
+            if f == "depends_on" and not isinstance(d[f], list):
+                raise ValueError(f"Session {s['id']}.dispatch.depends_on must be a list")
+            if f == "requires_human_checkpoint" and not isinstance(d[f], bool):
+                raise ValueError(
+                    f"Session {s['id']}.dispatch.requires_human_checkpoint must be bool"
+                )
+            if f == "max_retries" and not isinstance(d[f], int):
+                raise ValueError(f"Session {s['id']}.dispatch.max_retries must be int")
+    if d.get("max_retries", 0) < 0 or d.get("max_retries", 0) > 5:
+        raise ValueError(f"Session {s['id']}.dispatch.max_retries must be 0..5")
+
+
+def _validate_dispatch_block(d, s):
+    _validate_dispatch_agent(d, s)
+    # A human gate without its decision brief is a build error (owner
+    # policy 2026-07-11): the operator who hits the gate weeks later must
+    # see why it exists and what they are deciding, not just "review s07".
+    if d.get("requires_human_checkpoint"):
+        _validate_checkpoint_brief(
+            d.get("checkpoint"), f"Session {s['id']}.dispatch"
+        )
+    # checkpoint_policy (optional) — OR-03 per-gate autonomy for the
+    # AWAITS_REVIEW-ack gate. Only "block" | "notify-and-continue".
+    cpol = d.get("checkpoint_policy")
+    if cpol is not None and cpol not in ("block", "notify-and-continue"):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.checkpoint_policy must be "
+            f"'block' or 'notify-and-continue', got {cpol!r}"
+        )
+    if d.get("guards_irreversible") is not None and not isinstance(
+        d.get("guards_irreversible"), bool
+    ):
+        raise ValueError(
+            f"Session {s['id']}.dispatch.guards_irreversible must be bool"
+        )
+    # codex_shell (optional, 2026-07-29) — the shell capabilities this
+    # session needs from a `codex exec` dispatch. Absent = today's
+    # `--sandbox workspace-write` with nothing added, which MEASURABLY
+    # denies writes outside the repo, all network, and nested
+    # `codex exec`/vendor CLIs. A session that needs any of those must
+    # SAY SO, or a `--harness codex` run fails it one session at a time.
+    sh = d.get("codex_shell")
+    if sh is not None:
+        _validate_codex_shell(sh, s, d)
+    # depends_on_policy (optional) — how to treat a terminally-failed dep.
+    pol = d.get("depends_on_policy")
+    if pol is not None and pol not in VALID_DEPENDS_ON_POLICY:
+        raise ValueError(
+            f"Session {s['id']}.dispatch.depends_on_policy must be one of "
+            f"{sorted(VALID_DEPENDS_ON_POLICY)}, got {pol!r}"
+        )
+    # model_fallbacks / reasoning_fallbacks (optional) — machine-readable
+    # degrade ladder the runner applies BEFORE dispatch (not prompt prose).
+    for fb in ("model_fallbacks", "reasoning_fallbacks"):
+        v = d.get(fb)
+        if v is not None and (not isinstance(v, list)
+                              or not all(isinstance(x, str) for x in v)):
+            raise ValueError(
+                f"Session {s['id']}.dispatch.{fb} must be a list of strings"
+            )
+
+
+def _validate_session_shipping(rx, s):
+    """A session's shipping block."""
+    if not isinstance(rx, dict):
+        raise ValueError(f"Session {s['id']}.routing_experiment must be an object")
+    unknown = sorted(set(rx) - {"kind", "proposal_id"})
+    if unknown:
+        raise ValueError(
+            f"Session {s['id']}.routing_experiment has unknown key(s) {unknown}; "
+            "allowed: kind, proposal_id"
+        )
+    for f in ("kind", "proposal_id"):
+        if f not in rx:
+            raise ValueError(
+                f"Session {s['id']}.routing_experiment.{f} is required — an "
+                "untagged canary record is indistinguishable from an ordinary "
+                "one in the ledger, which defeats the point of tagging it"
+            )
+        if not isinstance(rx[f], str) or not rx[f].strip():
+            raise ValueError(
+                f"Session {s['id']}.routing_experiment.{f} must be a non-empty string"
+            )
+
+
+def _validate_session_model(s, model_low):
+    """The session's model token must name a Claude model or a declared Codex one."""
+    print(
+        f"WARNING: Session {s['id']}.model {s['model']!r} will not normalize to a "
+        "dispatchable model token (fable/opus/sonnet/haiku/gpt-5.6-sol/"
+        "gpt-5.6-terra/gpt-5.6-luna) — /plan-execute will "
+        "omit `model` and the subagent inherits the orchestrator's model.",
+        file=sys.stderr,
+    )
+
+
+def _validate_session_escalation(s):
+    """The per-session escalation opt-out is a bool when present."""
+    raise ValueError(
+        f"Session {s['id']}.escalation must be true or false (bool), got "
+        f"{s['escalation']!r}. Omit it for the default (escalation ON, from "
+        f"plan_schema_version {PLAN_SCHEMA_VERSION}); set it to false to pin "
+        "this session to its authored model however often it fails."
+    )
+
+
+def _validate_session_verify_and_ship(s):
+    """A session's verify block, shipping block and gate declarations."""
+    model_low = str(s.get("model", "")).strip().lower()
+    if "model" in s and not any(t in model_low for t in CLAUDE_MODEL_TOKENS) and not _is_codex_model(model_low):
+        _validate_session_model(s, model_low)
+
+    # escalation (optional, ESC-02, 2026-08-13) — the per-session opt-OUT of
+    # the upward rework climb. Only `false` is meaningful; `true` is the
+    # default and writing it changes nothing. Validated as a strict bool so a
+    # string "false" (which is truthy, and would silently leave escalation ON)
+    # is a build error rather than a surprise at the third rework.
+    if "escalation" in s and not isinstance(s["escalation"], bool):
+        _validate_session_escalation(s)
+
+    # routing_experiment (optional, 2026-08-13) — tags a session as belonging
+    # to a named routing canary so the outcome ledger can separate its records
+    # from the general population. The BUILDER owns validation + propagation;
+    # the ledger only READS it back off the manifest, which is why it is
+    # defined here rather than in the consumer.
+    rx = s.get("routing_experiment")
+    if rx is not None:
+        _validate_session_shipping(rx, s)
+
+    # Dispatch block (optional but if present, validate)
+    d = s.get("dispatch")
+    if d is not None:
+        _validate_dispatch_block(d, s)
+
+    # Post-session shipping block (optional). Registry/probe resolution is a
+    # later guard (needs the project root) — here we only check structure.
+    if s.get("post_session") is not None:
+        _validate_post_session_block(
+            s["post_session"], f"Session {s['id']}.post_session", allow_checkpoint=False
+        )
+    # Verify block (optional). Gate-registry resolution is a later guard.
+    if s.get("verify") is not None:
+        _validate_verify_block(s["verify"], f"Session {s['id']}.verify")
+    # P4 — fork ignores the per-session model: a true fork (subagent_type
+    # "fork") inherits the orchestrator's context AND always runs the
+    # orchestrator's model. Pairing it with a dispatchable model is a
+    # contradiction the runner can't honor.
+    _fork_model_low = str(s.get("model", "")).strip().lower()
+    if d is not None and d.get("subagent_type") == "fork" and (
+        any(t in _fork_model_low for t in CLAUDE_MODEL_TOKENS) or _is_codex_model(_fork_model_low)
+    ):
+        print(
+            f"WARNING: Session {s['id']}.dispatch.subagent_type is 'fork' but model is "
+            f"{s.get('model')!r}. A fork inherits the orchestrator's context and ALWAYS runs "
+            "the orchestrator's model — the per-session model is ignored. Use a fresh agent "
+            "(omit subagent_type, or set a typed agent) to honor the model.",
+            file=sys.stderr,
+        )
+
+
+def _validate_session(s, spec, item_ids, session_ids):
+    """Every per-session rule: dispatch, verify, shipping, models and gates."""
+    for f in rad.required_session_fields(spec):
+        if f not in s:
+            raise ValueError(f"Session missing '{f}': {s}")
+    _check_id("Session", s["id"])
+    if s["id"] in session_ids:
+        raise ValueError(f"Duplicate session id: {s['id']}")
+    session_ids.add(s["id"])
+    for iid in s["items"]:
+        if iid not in item_ids:
+            raise ValueError(f"Session {s['id']} references unknown item {iid!r}")
+
+    # Model/reasoning tiers: a typo here silently drops the deliberately-chosen
+    # tier at dispatch (run.py omits `model` for unrecognized values, and an
+    # unknown reasoning tier maps to no thinking directive). Validate at build.
+    r = s.get("reasoning")
+    if r is not None and str(r).strip():  # None/'' = unset (run.py: no directive)
+        if str(r).strip().lower() not in {"low", "medium", "high", "xhigh", "max"}:
+            raise ValueError(
+                f"Session {s['id']}.reasoning must be low|medium|high|xhigh|max (or omitted), got {r!r}"
+            )
+    rad.validate_session(s, spec)  # schema v8: task_class, the override pair, the floor
+    _validate_session_verify_and_ship(s)
+    if "phase" in s and not isinstance(s["phase"], str):
+        raise ValueError(f"Session {s['id']}.phase must be a string (phase id)")
+    if "acceptance_review" in s and not isinstance(s["acceptance_review"], bool):
+        raise ValueError(
+            f"Session {s['id']}.acceptance_review must be a boolean (true marks THE "
+            "closing plan-level acceptance review; omit otherwise)"
+        )
+
+
+def _validate_phase(p, phase_ids):
+    """One top-level phase entry: its id, its shape, and its phase_closer default."""
+    if "id" not in p:
+        raise ValueError(f"phase missing 'id': {p}")
+    _check_id("Phase", p["id"])
+    if p["id"] in phase_ids:
+        raise ValueError(f"Duplicate phase id: {p['id']}")
+    phase_ids.add(p["id"])
+    if p.get("phase_closer") is not None:
+        _validate_post_session_block(
+            p["phase_closer"], f"Phase {p['id']}.phase_closer", allow_checkpoint=True
+        )
+    if p.get("verify") is not None:
+        _validate_verify_block(p["verify"], f"Phase {p['id']}.verify")
+
+
+def _warn_no_acceptance_review(spec):
+    """Four sessions or more with no closing acceptance review is a WARNING, not a refusal."""
+    print(
+        f"WARNING: {len(spec['sessions'])}-session plan has no closing acceptance-review "
+        "session (no session sets acceptance_review: true). Session verify gates check "
+        "each part; nothing will check whether the PLAN's objectives were achieved. See "
+        "references/schemas.md -> 'Closing acceptance review'.",
+        file=sys.stderr,
+    )
+
+
+def _validate_wayfinder_keys(spec, f):
+    """out_of_scope / open_questions: both optional, both list-of-string when present."""
+    v = spec.get(f)
+    if v is not None:
+        if not isinstance(v, list) or any(
+            not isinstance(e, str) or not e.strip() for e in v
+        ):
+            raise ValueError(f"{f!r} must be a list of non-empty strings")
+
+
+def _validate_plan_items(cat_keys, spec):
+    """Plan-level item rules: ids unique, categories known, every item owned."""
+    _prior_art_enforced = (spec.get("plan_schema_version") or 0) >= PRIOR_ART_MIN_SCHEMA
+
+    item_ids = set()
+    for it in spec["items"]:
+        _validate_item(it, cat_keys, item_ids, _prior_art_enforced)
+
+    session_ids = set()
+    for s in spec["sessions"]:
+        _validate_session(s, spec, item_ids, session_ids)
+
+    # Closing acceptance review (2026-07-26): the plan-level validation session.
+    # Session verify gates check the PARTS; nothing checked the WHOLE — a plan
+    # where every session closed DONE can still miss its objectives through
+    # accumulated deviations and descoped items. Exactly one session may carry
+    # the marker, and a plan big enough to drift should have one.
+    acceptance = [s["id"] for s in spec["sessions"] if s.get("acceptance_review")]
+    if len(acceptance) > 1:
+        raise ValueError(
+            f"Sessions {acceptance} all set acceptance_review — a plan has exactly ONE "
+            "closing acceptance review (it validates every other session's outcome)"
+        )
+    # ponytail: 4 is the "big enough to drift" line; raise it if small plans nag.
+    if not acceptance and len(spec["sessions"]) >= 4:
+        _warn_no_acceptance_review(spec)
+
+    _oversized_session_warning(spec)
+    pl.warn_plan_risks(spec, _declared_writes(spec))
+
+    # Optional top-level phases carrying phase_closer defaults that sessions
+    # inherit (phase-default + per-session override).
+    phase_ids = set()
+    for p in spec.get("phases", []) or []:
+        _validate_phase(p, phase_ids)
+    for s in spec["sessions"]:
+        if s.get("phase") and s["phase"] not in phase_ids:
+            raise ValueError(f"Session {s['id']}.phase references unknown phase {s['phase']!r}")
+    rad.validate_plan(spec)
 
 
 def validate_spec(spec):
@@ -1251,6 +1869,7 @@ def validate_spec(spec):
     for k in required_top:
         if k not in spec:
             raise ValueError(f"Missing required top-level field: {k!r}")
+    rad.check_version(spec)
 
     if not isinstance(spec["categories"], list) or not spec["categories"]:
         raise ValueError("'categories' must be a non-empty list")
@@ -1260,12 +1879,7 @@ def validate_spec(spec):
     # static dashboard section. out_of_scope entries never graduate into work;
     # open_questions entries are decisions not yet sharp enough to assign.
     for f in ("out_of_scope", "open_questions"):
-        v = spec.get(f)
-        if v is not None:
-            if not isinstance(v, list) or any(
-                not isinstance(e, str) or not e.strip() for e in v
-            ):
-                raise ValueError(f"{f!r} must be a list of non-empty strings")
+        _validate_wayfinder_keys(spec, f)
 
     # serial_reason (optional; S07 / PL-03) — the author's stated reason this plan
     # is a chain rather than a fan-out. Its ONLY effect is to silence the
@@ -1300,462 +1914,11 @@ def validate_spec(spec):
     # field -- EVERY pre-existing spec.json, EVERY unrelated test fixture --
     # validates exactly as it did before this feature existed. Conservative
     # reading, deliberately: unset/unknown version = pre-bump = unenforced.
-    _prior_art_enforced = (spec.get("plan_schema_version") or 0) >= PRIOR_ART_MIN_SCHEMA
-
-    item_ids = set()
-    for it in spec["items"]:
-        for f in ["id", "title", "category"]:
-            if f not in it:
-                raise ValueError(f"Item missing '{f}': {it}")
-        _check_id("Item", it["id"])
-        if it["category"] not in cat_keys:
-            raise ValueError(f"Item {it['id']} references unknown category {it['category']!r}")
-        if it["id"] in item_ids:
-            raise ValueError(f"Duplicate item id: {it['id']}")
-        item_ids.add(it["id"])
-
-        # Prior-art decision (RS-01/RS-02, 2026-08-12 hardening). The P8 research
-        # step asks one question per item -- does a proven solution already cover
-        # this scope? Optional AT THE SHAPE LEVEL (either shape below satisfies
-        # it), but the PRESENCE of a decision is mandatory ON A SPEC THAT OPTS IN
-        # (see `_prior_art_enforced` above, gated on the spec's own top-level
-        # `plan_schema_version` -- mirrors closeout_pipeline.PLAN_IMPACT_MIN_SCHEMA
-        # exactly: a spec that never declares its version is untouched, never
-        # retroactively refused). Shape checks below run whenever the fields are
-        # PRESENT regardless of the gate -- harmless for a pre-bump spec, which
-        # never carries them.
-        pa = it.get("prior_art")
-        rs = it.get("research_status")
-        if pa is not None:
-            if not isinstance(pa, dict):
-                raise ValueError(f"Item {it['id']}.prior_art must be an object")
-            unknown = set(pa) - {"decision", "source", "note"}
-            if unknown:
-                raise ValueError(
-                    f"Item {it['id']}.prior_art has unknown key(s) {sorted(unknown)}; "
-                    "allowed: decision, source, note"
-                )
-            dec = pa.get("decision")
-            if dec not in ("adopt", "adapt", "build"):
-                raise ValueError(
-                    f"Item {it['id']}.prior_art.decision must be adopt|adapt|build, got {dec!r}"
-                )
-            src = pa.get("source")
-            if not isinstance(src, str) or not src.strip():
-                raise ValueError(
-                    f"Item {it['id']}.prior_art.source is required (non-empty string) -- "
-                    f"a {dec!r} decision with no source is unenforceable (2026-08-12 hardening)"
-                )
-            note = pa.get("note")
-            if note is not None and not isinstance(note, str):
-                raise ValueError(f"Item {it['id']}.prior_art.note must be a string")
-        if rs is not None:
-            if rs not in ("skipped", "unavailable"):
-                raise ValueError(
-                    f"Item {it['id']}.research_status must be 'skipped' or 'unavailable' "
-                    f"(or omitted), got {rs!r}"
-                )
-            reason = it.get("research_reason")
-            if rs == "skipped":
-                if not isinstance(reason, str) or not reason.strip():
-                    raise ValueError(
-                        f"Item {it['id']}.research_reason is required (non-empty string) "
-                        "when research_status is 'skipped'"
-                    )
-            else:
-                # research_status: "unavailable" (RS-06, 2026-08-13) — the ONE
-                # value that asserts the tooling was absent, and the one claim
-                # the builder can adjudicate for itself instead of taking on
-                # trust. NOT version-gated, and it needs no gate: the value was
-                # ILLEGAL until this change (the branch above refused anything
-                # but "skipped"), so no spec on disk can carry it and still have
-                # built. Every new refusal below therefore fires only on specs
-                # that could not previously build at all — measured across every
-                # spec.json under every `_plans/` tree on this machine, zero
-                # newly refused. See `probe_research_tools` for what the probe
-                # can and cannot see; `research_reason` is OPTIONAL here because
-                # the system supplies the reason.
-                if reason is not None and (not isinstance(reason, str) or not reason.strip()):
-                    raise ValueError(
-                        f"Item {it['id']}.research_reason, when present alongside "
-                        "research_status: 'unavailable', must be a non-empty string"
-                    )
-                probe = probe_research_tools()
-                if probe["available"]:
-                    raise ValueError(
-                        f"Item {it['id']}.research_status is 'unavailable', but the build-time "
-                        "probe found research capability configured in this environment: "
-                        + ", ".join(probe["signals"])
-                        + " (read from " + ", ".join(probe["sources"]) + "). "
-                        "'The research tools were absent' is a claim the builder checks, not "
-                        "one it takes from the author (RS-06). Either run the prior-art pass, "
-                        "or — if you chose not to research this item for some other reason — "
-                        "say so with research_status: 'skipped' plus a research_reason. "
-                        "NOTE the probe reads configuration only (MCP server names + "
-                        "permission deny-lists); it cannot tell whether a configured tool "
-                        "actually answered."
-                    )
-        if pa is None and rs is None and _prior_art_enforced:
-            raise ValueError(
-                f"Item {it['id']} must carry either prior_art (decision+source) or "
-                "research_status: 'skipped' with research_reason (or 'unavailable', which "
-                "the build-time probe must corroborate) -- the prior-art pass "
-                "(RS-01) must be explicit, never silently absent (2026-08-12 hardening). "
-                "See references/schemas.md -> 'Prior-art decision'."
-            )
-
-    session_ids = set()
-    for s in spec["sessions"]:
-        for f in ["id", "title", "model", "items"]:
-            if f not in s:
-                raise ValueError(f"Session missing '{f}': {s}")
-        _check_id("Session", s["id"])
-        if s["id"] in session_ids:
-            raise ValueError(f"Duplicate session id: {s['id']}")
-        session_ids.add(s["id"])
-        for iid in s["items"]:
-            if iid not in item_ids:
-                raise ValueError(f"Session {s['id']} references unknown item {iid!r}")
-
-        # Model/reasoning tiers: a typo here silently drops the deliberately-chosen
-        # tier at dispatch (run.py omits `model` for unrecognized values, and an
-        # unknown reasoning tier maps to no thinking directive). Validate at build.
-        r = s.get("reasoning")
-        if r is not None and str(r).strip():  # None/'' = unset (run.py: no directive)
-            if str(r).strip().lower() not in {"low", "medium", "high", "xhigh", "max"}:
-                raise ValueError(
-                    f"Session {s['id']}.reasoning must be low|medium|high|xhigh|max (or omitted), got {r!r}"
-                )
-        model_low = str(s["model"]).strip().lower()
-        if not any(t in model_low for t in CLAUDE_MODEL_TOKENS) and not _is_codex_model(model_low):
-            print(
-                f"WARNING: Session {s['id']}.model {s['model']!r} will not normalize to a "
-                "dispatchable model token (fable/opus/sonnet/haiku/gpt-5.6-sol/"
-                "gpt-5.6-terra/gpt-5.6-luna) — /plan-execute will "
-                "omit `model` and the subagent inherits the orchestrator's model.",
-                file=sys.stderr,
-            )
-
-        # escalation (optional, ESC-02, 2026-08-13) — the per-session opt-OUT of
-        # the upward rework climb. Only `false` is meaningful; `true` is the
-        # default and writing it changes nothing. Validated as a strict bool so a
-        # string "false" (which is truthy, and would silently leave escalation ON)
-        # is a build error rather than a surprise at the third rework.
-        if "escalation" in s and not isinstance(s["escalation"], bool):
-            raise ValueError(
-                f"Session {s['id']}.escalation must be true or false (bool), got "
-                f"{s['escalation']!r}. Omit it for the default (escalation ON, from "
-                f"plan_schema_version {PLAN_SCHEMA_VERSION}); set it to false to pin "
-                "this session to its authored model however often it fails."
-            )
-
-        # routing_experiment (optional, 2026-08-13) — tags a session as belonging
-        # to a named routing canary so the outcome ledger can separate its records
-        # from the general population. The BUILDER owns validation + propagation;
-        # the ledger only READS it back off the manifest, which is why it is
-        # defined here rather than in the consumer.
-        rx = s.get("routing_experiment")
-        if rx is not None:
-            if not isinstance(rx, dict):
-                raise ValueError(f"Session {s['id']}.routing_experiment must be an object")
-            unknown = sorted(set(rx) - {"kind", "proposal_id"})
-            if unknown:
-                raise ValueError(
-                    f"Session {s['id']}.routing_experiment has unknown key(s) {unknown}; "
-                    "allowed: kind, proposal_id"
-                )
-            for f in ("kind", "proposal_id"):
-                if f not in rx:
-                    raise ValueError(
-                        f"Session {s['id']}.routing_experiment.{f} is required — an "
-                        "untagged canary record is indistinguishable from an ordinary "
-                        "one in the ledger, which defeats the point of tagging it"
-                    )
-                if not isinstance(rx[f], str) or not rx[f].strip():
-                    raise ValueError(
-                        f"Session {s['id']}.routing_experiment.{f} must be a non-empty string"
-                    )
-
-        # Dispatch block (optional but if present, validate)
-        d = s.get("dispatch")
-        if d is not None:
-            if not isinstance(d, dict):
-                raise ValueError(f"Session {s['id']}.dispatch must be an object")
-            for f in (
-                "subagent_type",
-                "parallel_group",
-                "isolation",
-                "integrates_group",
-                "depends_on",
-                "requires_human_checkpoint",
-                "max_retries",
-            ):
-                if f in d and d[f] is not None:
-                    if f in ("subagent_type", "parallel_group", "isolation",
-                             "integrates_group") and not isinstance(d[f], str):
-                        raise ValueError(f"Session {s['id']}.dispatch.{f} must be a string or null")
-                    if f == "depends_on" and not isinstance(d[f], list):
-                        raise ValueError(f"Session {s['id']}.dispatch.depends_on must be a list")
-                    if f == "requires_human_checkpoint" and not isinstance(d[f], bool):
-                        raise ValueError(
-                            f"Session {s['id']}.dispatch.requires_human_checkpoint must be bool"
-                        )
-                    if f == "max_retries" and not isinstance(d[f], int):
-                        raise ValueError(f"Session {s['id']}.dispatch.max_retries must be int")
-            if d.get("max_retries", 0) < 0 or d.get("max_retries", 0) > 5:
-                raise ValueError(f"Session {s['id']}.dispatch.max_retries must be 0..5")
-            # A human gate without its decision brief is a build error (owner
-            # policy 2026-07-11): the operator who hits the gate weeks later must
-            # see why it exists and what they are deciding, not just "review s07".
-            if d.get("requires_human_checkpoint"):
-                _validate_checkpoint_brief(
-                    d.get("checkpoint"), f"Session {s['id']}.dispatch"
-                )
-            # checkpoint_policy (optional) — OR-03 per-gate autonomy for the
-            # AWAITS_REVIEW-ack gate. Only "block" | "notify-and-continue".
-            cpol = d.get("checkpoint_policy")
-            if cpol is not None and cpol not in ("block", "notify-and-continue"):
-                raise ValueError(
-                    f"Session {s['id']}.dispatch.checkpoint_policy must be "
-                    f"'block' or 'notify-and-continue', got {cpol!r}"
-                )
-            if d.get("guards_irreversible") is not None and not isinstance(
-                d.get("guards_irreversible"), bool
-            ):
-                raise ValueError(
-                    f"Session {s['id']}.dispatch.guards_irreversible must be bool"
-                )
-            # codex_shell (optional, 2026-07-29) — the shell capabilities this
-            # session needs from a `codex exec` dispatch. Absent = today's
-            # `--sandbox workspace-write` with nothing added, which MEASURABLY
-            # denies writes outside the repo, all network, and nested
-            # `codex exec`/vendor CLIs. A session that needs any of those must
-            # SAY SO, or a `--harness codex` run fails it one session at a time.
-            sh = d.get("codex_shell")
-            if sh is not None:
-                if not isinstance(sh, dict):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell must be an object with keys "
-                        "writable_roots / network / sandbox / env_include"
-                    )
-                unknown = set(sh) - {"writable_roots", "network", "sandbox", "env_include"}
-                if unknown:
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell has unknown key(s) "
-                        f"{sorted(unknown)}; allowed: writable_roots, network, sandbox, env_include"
-                    )
-                wr = sh.get("writable_roots")
-                if wr is not None and (
-                    not isinstance(wr, list)
-                    or not all(isinstance(x, str) and x.strip() for x in wr)
-                ):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell.writable_roots must be a "
-                        "list of non-empty path strings (e.g. [\"~/.dyno\"])"
-                    )
-                if sh.get("network") is not None and not isinstance(sh.get("network"), bool):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell.network must be bool"
-                    )
-                env_include = sh.get("env_include")
-                if env_include is not None and (
-                    not isinstance(env_include, list)
-                    or not all(
-                        isinstance(name, str)
-                        and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
-                        for name in env_include
-                    )
-                ):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell.env_include must be a "
-                        "list of environment variable names"
-                    )
-                sbx = sh.get("sandbox")
-                if sbx is not None and sbx not in ("workspace-write", "danger-full-access"):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.codex_shell.sandbox must be "
-                        "'workspace-write' (the default) or 'danger-full-access', got {!r}".format(sbx)
-                    )
-                if sbx == "danger-full-access":
-                    # Only nested `codex exec` / vendor-CLI dispatch needs this, and
-                    # it hands the dispatched agent an UNSANDBOXED shell. Two rules,
-                    # both build-time: no redundant narrower keys beside it, and a
-                    # human must gate the session. run.py re-checks the gate at
-                    # dispatch (a manifest is editable; the invariant must not be).
-                    if wr or sh.get("network"):
-                        raise ValueError(
-                            f"Session {s['id']}.dispatch.codex_shell: sandbox "
-                            "'danger-full-access' already grants writes anywhere and network — "
-                            "drop writable_roots/network so the command has one reading"
-                        )
-                    gated = bool(
-                        d.get("guards_irreversible")
-                        or d.get("requires_human_checkpoint")
-                        or (s.get("task_class") or "").strip().lower() == "linchpin"
-                        or "irreversible_change" in (s.get("peer_triggers") or [])
-                    )
-                    if not gated:
-                        raise ValueError(
-                            f"Session {s['id']} asks for codex_shell.sandbox "
-                            "'danger-full-access' (an UNSANDBOXED dispatched agent) but no "
-                            "human gates it. Add dispatch.guards_irreversible: true (or "
-                            "requires_human_checkpoint with its checkpoint brief), or drop to "
-                            "'workspace-write' with writable_roots/network instead."
-                        )
-            # depends_on_policy (optional) — how to treat a terminally-failed dep.
-            pol = d.get("depends_on_policy")
-            if pol is not None and pol not in VALID_DEPENDS_ON_POLICY:
-                raise ValueError(
-                    f"Session {s['id']}.dispatch.depends_on_policy must be one of "
-                    f"{sorted(VALID_DEPENDS_ON_POLICY)}, got {pol!r}"
-                )
-            # model_fallbacks / reasoning_fallbacks (optional) — machine-readable
-            # degrade ladder the runner applies BEFORE dispatch (not prompt prose).
-            for fb in ("model_fallbacks", "reasoning_fallbacks"):
-                v = d.get(fb)
-                if v is not None and (not isinstance(v, list)
-                                      or not all(isinstance(x, str) for x in v)):
-                    raise ValueError(
-                        f"Session {s['id']}.dispatch.{fb} must be a list of strings"
-                    )
-
-        # Post-session shipping block (optional). Registry/probe resolution is a
-        # later guard (needs the project root) — here we only check structure.
-        if s.get("post_session") is not None:
-            _validate_post_session_block(
-                s["post_session"], f"Session {s['id']}.post_session", allow_checkpoint=False
-            )
-        # Verify block (optional). Gate-registry resolution is a later guard.
-        if s.get("verify") is not None:
-            _validate_verify_block(s["verify"], f"Session {s['id']}.verify")
-        # P4 — fork ignores the per-session model: a true fork (subagent_type
-        # "fork") inherits the orchestrator's context AND always runs the
-        # orchestrator's model. Pairing it with a dispatchable model is a
-        # contradiction the runner can't honor.
-        _fork_model_low = str(s.get("model", "")).strip().lower()
-        if d is not None and d.get("subagent_type") == "fork" and (
-            any(t in _fork_model_low for t in CLAUDE_MODEL_TOKENS) or _is_codex_model(_fork_model_low)
-        ):
-            print(
-                f"WARNING: Session {s['id']}.dispatch.subagent_type is 'fork' but model is "
-                f"{s.get('model')!r}. A fork inherits the orchestrator's context and ALWAYS runs "
-                "the orchestrator's model — the per-session model is ignored. Use a fresh agent "
-                "(omit subagent_type, or set a typed agent) to honor the model.",
-                file=sys.stderr,
-            )
-        if "phase" in s and not isinstance(s["phase"], str):
-            raise ValueError(f"Session {s['id']}.phase must be a string (phase id)")
-        if "acceptance_review" in s and not isinstance(s["acceptance_review"], bool):
-            raise ValueError(
-                f"Session {s['id']}.acceptance_review must be a boolean (true marks THE "
-                "closing plan-level acceptance review; omit otherwise)"
-            )
-
-    # Closing acceptance review (2026-07-26): the plan-level validation session.
-    # Session verify gates check the PARTS; nothing checked the WHOLE — a plan
-    # where every session closed DONE can still miss its objectives through
-    # accumulated deviations and descoped items. Exactly one session may carry
-    # the marker, and a plan big enough to drift should have one.
-    acceptance = [s["id"] for s in spec["sessions"] if s.get("acceptance_review")]
-    if len(acceptance) > 1:
-        raise ValueError(
-            f"Sessions {acceptance} all set acceptance_review — a plan has exactly ONE "
-            "closing acceptance review (it validates every other session's outcome)"
-        )
-    # ponytail: 4 is the "big enough to drift" line; raise it if small plans nag.
-    if not acceptance and len(spec["sessions"]) >= 4:
-        print(
-            f"WARNING: {len(spec['sessions'])}-session plan has no closing acceptance-review "
-            "session (no session sets acceptance_review: true). Session verify gates check "
-            "each part; nothing will check whether the PLAN's objectives were achieved. See "
-            "references/schemas.md -> 'Closing acceptance review'.",
-            file=sys.stderr,
-        )
-
-    _oversized_session_warning(spec)
-
-    # Optional top-level phases carrying phase_closer defaults that sessions
-    # inherit (phase-default + per-session override).
-    phase_ids = set()
-    for p in spec.get("phases", []) or []:
-        if "id" not in p:
-            raise ValueError(f"phase missing 'id': {p}")
-        _check_id("Phase", p["id"])
-        if p["id"] in phase_ids:
-            raise ValueError(f"Duplicate phase id: {p['id']}")
-        phase_ids.add(p["id"])
-        if p.get("phase_closer") is not None:
-            _validate_post_session_block(
-                p["phase_closer"], f"Phase {p['id']}.phase_closer", allow_checkpoint=True
-            )
-        if p.get("verify") is not None:
-            _validate_verify_block(p["verify"], f"Phase {p['id']}.verify")
-    for s in spec["sessions"]:
-        if s.get("phase") and s["phase"] not in phase_ids:
-            raise ValueError(f"Session {s['id']}.phase references unknown phase {s['phase']!r}")
+    _validate_plan_items(cat_keys, spec)
 
     _validate_dispatch_graph(spec["sessions"])
-    # The frozen parallel-group contract (§5, build-time call site) + the
-    # pure-chain warning. AFTER the graph check on purpose: R1 (dependency
-    # symmetry) stays enforced there for every schema version, so the contract's
-    # own R1 refusal never has to fire ungated from here.
-    _check_parallel_contract(spec)
-
-    info = spec["infographic"]
-    if info.get("type") not in VALID_INFOGRAPHIC_TYPES:
-        raise ValueError(
-            f"infographic.type must be one of {VALID_INFOGRAPHIC_TYPES}, got {info.get('type')!r}"
-        )
-    if info.get("type") == "custom":
-        if "svg_inline" not in info and "svg_inline_file" not in info:
-            raise ValueError(
-                "custom infographic requires 'svg_inline' (raw SVG markup) or 'svg_inline_file' (path)"
-            )
-        if "groups" not in info:
-            raise ValueError(
-                "custom infographic requires 'groups' (list of {id, items[]} for data binding)"
-            )
-        for g in info["groups"]:
-            for f in ["id", "items"]:
-                if f not in g:
-                    raise ValueError(f"custom group missing '{f}': {g}")
-
-    # Every item the progress bar should count must actually be in a group.
-    # Only fires when this infographic binds items at all: a shape with no
-    # bindings drives the bar from the item cards instead, and has no
-    # denominator to leave anything out of. Same rule the executor's
-    # containment gate applies as a WARNING at run time — enforced HERE, where
-    # it is still cheap to fix, because by run time the plan is already built.
-    if (spec.get("plan_schema_version") or 0) >= INFOGRAPHIC_COVERAGE_MIN_SCHEMA:
-        groups = info.get(INFOGRAPHIC_GROUP_KEYS.get(info.get("type"), ""), None)
-        if isinstance(groups, list) and groups:
-            placed = {i for g in groups if isinstance(g, dict) for i in (g.get("items") or [])}
-            if placed:
-                unplaced = [it["id"] for it in spec["items"] if it["id"] not in placed]
-                if unplaced:
-                    names = [str(g.get("name") or g.get("id")) for g in groups
-                             if isinstance(g, dict)]
-                    raise ValueError(
-                        f"infographic: item(s) {', '.join(unplaced)} are in no Plan "
-                        f"Achievement group, so the progress bar would count "
-                        f"{len(placed & {it['id'] for it in spec['items']})} of "
-                        f"{len(spec['items'])} items and report progress over a "
-                        f"subset while looking like it covers the whole plan. "
-                        f"Add each item to a group, or add a group for its "
-                        f"category. Groups: {names}"
-                    )
-
-    # Optional halt/complete notification hooks (opt-in command run when
-    # /plan-execute halts or finishes).
-    for hook in ("notify_on_halt", "notify_on_complete"):
-        notify = spec.get(hook)
-        if notify is not None:
-            if not isinstance(notify, dict):
-                raise ValueError(f"{hook} must be an object with a 'command' string")
-            cmd = notify.get("command")
-            if not isinstance(cmd, str) or not cmd.strip():
-                raise ValueError(f"{hook}.command must be a non-empty string")
-
+    _validate_infographic_and_hooks(spec)
+    expl.validate_explainer(spec)
     return True
 
 
@@ -1786,7 +1949,7 @@ def gen_session_strip(sessions):
     chips = []
     for s in sessions:
         sid = s["id"]
-        title_text = f"{sid.upper()} — {s['title']} · {s.get('model', 'Sonnet')}"
+        title_text = f"{sid.upper()} — {s['title']} · {s.get('model', rad.DISPATCH_LABEL)}"
         chips.append(
             f'  <a href="#{attr(sid)}" class="strip-chip" data-session="{attr(sid)}" '
             f'data-status="TODO" title="{attr(title_text)}">{esc(sid.upper())}</a>'
@@ -1921,37 +2084,8 @@ def gen_agent_instructions(instr):
 # --------------------------------------------------------------------------
 # Item card — dual layer
 # --------------------------------------------------------------------------
-def gen_item_article(item, item_to_session):
-    iid = item["id"]
-    sid = item_to_session.get(iid)
-    session_link = (
-        f'<span class="session-link"><strong>Session:</strong> <a href="#{attr(sid)}">{esc(sid.upper())}</a></span>'
-        if sid
-        else '<span class="session-link"><strong>Session:</strong> <em style="color:var(--text-subtle);font-style:italic;">trigger-deferred</em></span>'
-    )
-    pri = item.get("priority", "P3")
-    eff = item.get("effort", "M")
-    title = item["title"]
-    human_summary = item.get("human_summary", "")
-    deliverable = item.get("deliverable", "")
-    desc = item.get("description", "")
-    why = item.get("why", "")
-    owner = item.get("owner", "")
-    target = item.get("target", "")
-    touches = item.get("touches", "")
-    updated = item.get("updated", today_iso())
-
-    # AGENT spec body — only render if at least one technical field is present
-    agent_pieces = []
-    if desc and not human_summary:
-        # If there's no human_summary but a description, surface description in human layer instead — see below.
-        pass
-    elif desc:
-        agent_pieces.append(f"<h4>Detail</h4><p>{esc(desc)}</p>")
-    # Prior-art decision (RS-01/RS-02, 2026-08-12) -- rendered early in the agent
-    # spec since it's a decision the reader should see before dev steps. Exactly
-    # one of the two shapes is present (validate_spec enforces it), but render
-    # defensively either way.
+def _article_agent_spec(agent_pieces, item):
+    """The agent-spec section of one item's article."""
     pa = item.get("prior_art")
     if pa:
         pa_lines = [f"<strong>Decision:</strong> {esc(pa.get('decision', ''))}",
@@ -1984,9 +2118,48 @@ def gen_item_article(item, item_to_session):
     instr = item.get("agent_instructions")
     if instr:
         agent_pieces.append("<h4>Agent instructions</h4>" + gen_agent_instructions(instr))
+
+
+def _article_summary_and_prior_art(agent_pieces, desc, human_summary, item):
+    """The human summary and the prior-art line an item's article carries."""
+    if desc and not human_summary:
+        # If there's no human_summary but a description, surface description in human layer instead — see below.
+        pass
+    elif desc:
+        agent_pieces.append(f"<h4>Detail</h4><p>{esc(desc)}</p>")
+    # Prior-art decision (RS-01/RS-02, 2026-08-12) -- rendered early in the agent
+    # spec since it's a decision the reader should see before dev steps. Exactly
+    # one of the two shapes is present (validate_spec enforces it), but render
+    # defensively either way.
+    _article_agent_spec(agent_pieces, item)
     sch = gen_code_block(item.get("schema"), "SCHEMA")
     if sch:
         agent_pieces.append("<h4>Schema</h4>" + sch)
+
+
+def gen_item_article(item, item_to_session):
+    iid = item["id"]
+    sid = item_to_session.get(iid)
+    session_link = (
+        f'<span class="session-link"><strong>Session:</strong> <a href="#{attr(sid)}">{esc(sid.upper())}</a></span>'
+        if sid
+        else '<span class="session-link"><strong>Session:</strong> <em style="color:var(--text-subtle);font-style:italic;">trigger-deferred</em></span>'
+    )
+    pri = item.get("priority", "P3")
+    eff = item.get("effort", "M")
+    title = item["title"]
+    human_summary = item.get("human_summary", "")
+    deliverable = item.get("deliverable", "")
+    desc = item.get("description", "")
+    why = item.get("why", "")
+    owner = item.get("owner", "")
+    target = item.get("target", "")
+    touches = item.get("touches", "")
+    updated = item.get("updated", today_iso())
+
+    # AGENT spec body — only render if at least one technical field is present
+    agent_pieces = []
+    _article_summary_and_prior_art(agent_pieces, desc, human_summary, item)
     mk = gen_mockup_block(item.get("mockup"))
     if mk:
         agent_pieces.append("<h4>Mockup</h4>" + mk)
@@ -2196,195 +2369,72 @@ PLAN_CHANGES_SECTION = '''<!-- PLAN-CHANGES:BEGIN -->
 </section>
 <!-- PLAN-CHANGES:END -->'''
 
-
-# --------------------------------------------------------------------------
-# Per-session execution-bundle emitters
-# --------------------------------------------------------------------------
-def gen_post_session_section(post_session):
-    """Render a 'Post-session actions' section so the subagent KNOWS what will
-    fire after it returns, and leaves the working tree appropriately staged.
-    The subagent does NOT run these itself — /plan-execute does, after the
-    closeout is applied."""
-    if not post_session:
-        return ""
-    lines = ["", "## Post-session actions (run by /plan-execute, NOT by you)", ""]
-    git = post_session.get("git", "none")
-    if git != "none":
-        lines.append(f"- **git:** `{git}` — when you finish, leave the working tree in a "
-                     "coherent, committable state (no half-edits, no debug scratch).")
-    gates = post_session.get("pre_deploy_gates") or []
-    if gates:
-        lines.append(f"- **pre-deploy gates:** {', '.join(gates)} (must pass before any deploy).")
-    if post_session.get("deploy_argv"):
-        lines.append("- **deploy:** a project-local command vector will run after gates pass.")
-    elif post_session.get("deploy", "none") not in (None, "none"):
-        lines.append(f"- **deploy:** target `{post_session['deploy']}` will run after gates pass.")
-    if post_session.get("rollback_hint"):
-        lines.append(f"- **rollback hint (if this deploy is later invalidated):** "
-                     f"{post_session['rollback_hint']}")
-    if post_session.get("skip_if_partial"):
-        lines.append("- These actions are SKIPPED unless your result is `DONE`.")
-    lines.append("")
-    lines.append("Because these are plan-declared, they are pre-authorized and fire without "
-                 "re-prompting. Make sure your final state is shippable.")
-    return "\n".join(lines)
-
-
-def gen_verify_section(verify):
-    """Render a 'Verification gates' section so the subagent knows its claimed-
-    DONE work will be checked BEFORE it counts as done — and that a gate failure
-    re-dispatches it with the failure attached. The subagent does NOT run these;
-    /plan-execute does, at the apply boundary."""
-    has_gates = bool(verify and verify.get("gates"))
-    require_evidence = bool(verify and verify.get("require_evidence"))
-    checks = (verify or {}).get("checks") or []
-    if not has_gates and not require_evidence and not checks:
-        return ""
-    on_fail = verify.get("on_fail", "rework")
-    mr = verify.get("max_rework", 1)
-    lines = ["", "## Verification gates (run by /plan-execute, NOT by you)", ""]
-    if has_gates:
-        gates = ", ".join(f"`{g}`" for g in verify["gates"])
-        lines.append(f"After you return `DONE`, these gates MUST pass before the session counts as "
-                     f"done: {gates}.")
-    if require_evidence:
-        lines.append("This session **requires evidence**: your closeout MUST include an `evidence` "
-                     "array of paths to artifacts that PROVE the work engaged — e.g. an eval/metrics "
-                     "JSON, the saved output of a `grep -c <log-event>` (count > 0), a screenshot, or "
-                     "a command transcript. Write those files to disk (commit-safe locations), then "
-                     "list their paths. `DONE` is REFUSED until every listed path exists and is "
-                     "non-empty — a metric swing without log/grep proof of engagement does not count.")
-    if checks:
-        lines.append("**Evidence contracts** — produce EVERY one of these named artifacts; the runner "
-                     "asserts each path exists and is non-empty before `DONE` is granted (list them in "
-                     "your closeout `evidence` array):")
-        for c in checks:
-            a = f" — {c['assert']}" if c.get("assert") else ""
-            lines.append(f"  - `{c['evidence_path']}` ({c['name']}){a}")
-    if on_fail == "rework":
-        lines.append(f"- If a gate (or the evidence check) fails, you are re-dispatched with the "
-                     f"failure attached (up to {mr} rework attempt{'s' if mr != 1 else ''}), then the "
-                     f"session halts.")
+def _context_mockups(mk, sections):
+    """Mockup blocks for one item's context bundle."""
+    sections.append("### Mockup")
+    if isinstance(mk, dict):
+        if mk.get("svg"):
+            sections.append(mk["svg"])
+        elif mk.get("ascii"):
+            sections.append(f"```\n{mk['ascii']}\n```")
+        elif mk.get("img"):
+            sections.append(f"![mockup]({mk['img']})")
     else:
-        lines.append("- If a gate (or the evidence check) fails, the session halts immediately for "
-                     "human investigation.")
-    lines.append("- Do NOT claim `DONE` unless you believe these checks will pass — a self-reported "
-                 "`DONE` that fails is the exact failure this catches. If you cannot make them pass, "
-                 "return `PARTIAL` or `BLOCKED` with the reason in `notes`.")
-    lines.append("")
-    return "\n".join(lines)
+        sections.append(f"```\n{mk}\n```")
+    sections.append("")
 
 
-def gen_session_prompt_md(session, plan_dir_name, items_by_id, post_session=None, verify=None):
-    """Render the invocation prompt the orchestrator hands to the subagent.
+def _context_schemas(sch, sections):
+    """Schema blocks, each rendered in its declared language."""
+    sections.append("### Schema")
+    if isinstance(sch, dict):
+        lang = sch.get("lang", "")
+        code = sch.get("code", "")
+    else:
+        lang, code = "", str(sch)
+    sections.append(f"```{lang}\n{code}\n```\n")
 
-    The prompt body comes from session['prompt']. We wrap it with metadata
-    (which items are in scope, where the per-session context bundle lives), a
-    Post-session actions notice (so the subagent leaves the tree staged), and a
-    strict closeout contract. The subagent never edits PLAN.html — it returns a
-    structured closeout block.
-    """
-    sid = session["id"]
-    title = session.get("title", sid)
-    items = session.get("items", [])
-    body = session.get("prompt", "").strip()
-    if not body:
-        body = (
-            f"Execute the work for session {sid.upper()} — {title}. "
-            "Use the agent-spec content in the context bundle for details."
-        )
-    item_lines = []
-    for iid in items:
-        it = items_by_id.get(iid, {})
-        t = it.get("title", iid)
-        s = it.get("human_summary") or it.get("description") or ""
-        item_lines.append(f"- **{iid.upper()}** — {t}" + (f": {s}" if s else ""))
-    items_block = "\n".join(item_lines) if item_lines else "_(no items linked)_"
 
-    closeout_example = {
-        "session": sid,
-        "result": "DONE",
-        "items_completed": items,
-        "items_blocked": [],
-        "notes": {iid: "one-line outcome" for iid in items} | {sid: "one-line session outcome"},
-        "dispatch_next": True,
-        "human_checkpoint_reason": None,
-    }
-    check_paths = [c["evidence_path"] for c in (verify or {}).get("checks", []) if c.get("evidence_path")]
-    if verify and (verify.get("require_evidence") or check_paths):
-        closeout_example["evidence"] = check_paths or [
-            "docs/operations/<this-session>-evidence.md",
-            "_evidence/<this-session>/grep-count.txt",
-        ]
-    closeout_json = json.dumps(closeout_example, indent=2)
-    verify_block = gen_verify_section(verify)
-    post_session_block = gen_post_session_section(post_session)
+def _context_agent_instructions(instr, sections):
+    """Per-item agent instructions."""
+    sections.append("### Agent instructions")
+    if isinstance(instr, list):
+        for line in instr:
+            sections.append(f"- {line}")
+    else:
+        sections.append(str(instr))
+    sections.append("")
 
-    return f"""# Session {sid.upper()} — {title}
 
-You are executing **SESSION {sid.upper()}** as a subagent dispatched by `/plan-execute`.
-
-## Plan location
-The plan dashboard is at the sibling `PLAN.html` in this directory: `{plan_dir_name}/`.
-You do **NOT** edit PLAN.html — the orchestrator handles all state mutation.
-
-## Items in scope
-{items_block}
-
-## Context bundle
-For schemas, mockups, code excerpts, and agent instructions per item, read:
-`sessions/{sid}.context.md` (sibling of this file).
-
-## Work
-{body}
-{verify_block}
-{post_session_block}
-
-## Implementation notes
-
-Maintain a running implementation-notes log as you work. As much as a spec covers, there are always ambiguities and unknown unknowns — this log is your out to make a reasonable call and keep the human in the loop rather than stall or guess silently. Capture:
-- Design decisions where the spec was ambiguous
-- Intentional deviations from the item/spec, and why
-- Tradeoffs considered and the reasoning for the choice made
-- Open questions to confirm with the human later
-
-Fold anything material from this log into the closeout's `human_summary`/`notes` fields below — the closeout is what the plan's history actually retains.
-
-## If you hit an edge case not covered by the plan
-
-Pick the conservative option, keep going, and record it — don't stall waiting for a human unless you're genuinely blocked (see abort conditions above, if this session has them). Record each deviation as one short line under an OPTIONAL `deviations` array in your closeout JSON (alongside `notes`) — this is how plan-vs-reality drift reaches the next session instead of evaporating. Omit the field entirely if you didn't deviate.
-
-## If you fail twice at the SAME root cause — the stuck protocol
-
-**Trigger:** two consecutive failed attempts whose error has the SAME root-cause signature (same error class and same message locus, ignoring paths, line numbers and whitespace). A *different* error on the second attempt is progress — keep going, the protocol does not fire. Repeating the same one means your model of the problem is wrong, and a third blind retry will not fix that.
-
-This is not advisory. The orchestrator records a normalised failure signature and a consecutive counter for this session in `run_state.json` on every rework cycle; when the same signature repeats, the research pass below is injected into the feedback file your re-dispatch reads (`_verify_state/<session>.feedback.md`) and a `stuck_protocol_armed` event is written to `run.ndjson`.
-
-**Action, in order:**
-1. **One time-boxed research pass — 10 minutes, hard stop.** Look OUTSIDE this repository for this exact error class + locus. Tiered, first available wins, degrade gracefully: **Perplexity** (`mcp__perplexity-ask__perplexity_ask`) → **Exa** (`mcp__exa__web_search_exa`) → **Ref** (`mcp__ref__ref_search_documentation`). If a tier's MCP is not configured, drop to the next and say so; if none is available, the built-in web search counts. A pass that finds nothing is reported as "nothing found" — never silently skipped.
-2. **Then exactly one of two things:** apply the fix, citing what the research changed about your diagnosis — or close `BLOCKED` carrying a `decision_brief` (below). Never silence the check, weaken the assertion, or retry blind.
-
-This research pass is the rung between "retry" and "raise the model" on the standing escalation ladder. Do not jump past it to a model escalation.
-
-## Closeout — return EXACTLY this block at the END of your final message
-
-<plan-execute-closeout>
-{closeout_json}
-</plan-execute-closeout>
-
-Closeout contract:
-- `result`: one of `DONE` (all items in scope completed), `PARTIAL` (some items completed, session needs continuation), or `BLOCKED` (cannot proceed; explain in notes)
-- `items_completed`: list of item IDs in scope that are now finished
-- `items_blocked`: list of item IDs in scope that cannot be completed; explain each in `notes`
-- `notes`: object mapping each item ID (and optionally the session ID) to a one-line outcome
-- `dispatch_next`: hint for orchestrator; true normally, false if you set a human checkpoint
-- `human_checkpoint_reason`: null normally. Set it ONLY when a human must decide something specific — and then state the decision itself in plain language (what happened, what the options are, what you recommend), never just "please review". If you cannot name a decision, leave it null.
-- `evidence` (only if this session requires evidence — see "Verification gates" above): a list of paths to artifacts that prove the work engaged. Each path must exist and be non-empty or `DONE` is refused.
-- `deviations` (optional): array of strings, one per edge case where you deviated from the plan (conservative option chosen + why, one line each). Omit entirely if you didn't deviate — routine sessions should not generate noise.
-- `decision_brief`: **REQUIRED when `result` is `BLOCKED`** (recommended whenever you set `human_checkpoint_reason`). "Stuck, please advise" is not a report — a blocked closeout without this is REFUSED and reworks like any malformed closeout. Shape: `{{"attempts": ["what you tried", …], "findings": [{{"source": "…", "takeaway": "…"}}, …], "options": ["…"] (1-3), "recommendation": "…"}}`. `findings` carries what the stuck-protocol research pass turned up, with its sources — if it genuinely found nothing, say so as a finding (`{{"source": "none", "takeaway": "searched X and Y, nothing found"}}`). At most three options, and name the one you'd pick. The brief is rendered into `HALT_NOTICE.txt`, so the operator sees the options and your recommendation without opening any file.
-
-The closeout block must be the LAST non-whitespace content of your message. Do not embed it inside markdown code fences (no triple-backtick wrap). HTML-escaping of note text is handled by the orchestrator.
-"""
+def _context_item_sections(iid, items_by_id, sections):
+    """Append one item's context sections to the bundle."""
+    it = items_by_id.get(iid, {})
+    sections.append(f"## {iid.upper()} — {it.get('title', iid)}\n")
+    if it.get("human_summary"):
+        sections.append(f"**Summary:** {it['human_summary']}\n")
+    if it.get("deliverable"):
+        sections.append(f"**Deliverable:** {it['deliverable']}\n")
+    if it.get("description"):
+        sections.append(f"**Detail:** {it['description']}\n")
+    instr = it.get("agent_instructions")
+    if instr:
+        _context_agent_instructions(instr, sections)
+    sch = it.get("schema")
+    if sch:
+        _context_schemas(sch, sections)
+    mk = it.get("mockup")
+    if mk:
+        _context_mockups(mk, sections)
+    code = it.get("code")
+    if code:
+        sections.append("### Code excerpt")
+        if isinstance(code, dict):
+            lang, body = code.get("lang", ""), code.get("code", "")
+        else:
+            lang, body = "", str(code)
+        sections.append(f"```{lang}\n{body}\n```\n")
+    if it.get("touches"):
+        sections.append(f"**Touches:** `{it['touches']}`\n")
 
 
 def gen_session_context_md(session, items_by_id):
@@ -2394,93 +2444,22 @@ def gen_session_context_md(session, items_by_id):
     sid = session["id"]
     sections = [f"# {sid.upper()} — context bundle\n"]
     for iid in session.get("items", []):
-        it = items_by_id.get(iid, {})
-        sections.append(f"## {iid.upper()} — {it.get('title', iid)}\n")
-        if it.get("human_summary"):
-            sections.append(f"**Summary:** {it['human_summary']}\n")
-        if it.get("deliverable"):
-            sections.append(f"**Deliverable:** {it['deliverable']}\n")
-        if it.get("description"):
-            sections.append(f"**Detail:** {it['description']}\n")
-        instr = it.get("agent_instructions")
-        if instr:
-            sections.append("### Agent instructions")
-            if isinstance(instr, list):
-                for line in instr:
-                    sections.append(f"- {line}")
-            else:
-                sections.append(str(instr))
-            sections.append("")
-        sch = it.get("schema")
-        if sch:
-            sections.append("### Schema")
-            if isinstance(sch, dict):
-                lang = sch.get("lang", "")
-                code = sch.get("code", "")
-            else:
-                lang, code = "", str(sch)
-            sections.append(f"```{lang}\n{code}\n```\n")
-        mk = it.get("mockup")
-        if mk:
-            sections.append("### Mockup")
-            if isinstance(mk, dict):
-                if mk.get("svg"):
-                    sections.append(mk["svg"])
-                elif mk.get("ascii"):
-                    sections.append(f"```\n{mk['ascii']}\n```")
-                elif mk.get("img"):
-                    sections.append(f"![mockup]({mk['img']})")
-            else:
-                sections.append(f"```\n{mk}\n```")
-            sections.append("")
-        code = it.get("code")
-        if code:
-            sections.append("### Code excerpt")
-            if isinstance(code, dict):
-                lang, body = code.get("lang", ""), code.get("code", "")
-            else:
-                lang, body = "", str(code)
-            sections.append(f"```{lang}\n{body}\n```\n")
-        if it.get("touches"):
-            sections.append(f"**Touches:** `{it['touches']}`\n")
+        _context_item_sections(iid, items_by_id, sections)
     return "\n".join(sections)
 
 
-PLAN_SCHEMA_VERSION = 6
-"""The stamp a freshly built plan carries, and the ONE constant every
-version-gated executor feature keys off (`closeout_pipeline.plan_impact`,
-`closeout_pipeline.decision_brief`). `/plan-execute` accepts >= 2; the extra
-features switch on at 3/4/5, so plans built before each bump keep their exact
-old behaviour instead of gaining new refusals retroactively.
+PLAN_SCHEMA_VERSION = 8
+"""The highest stamp this builder writes (a spec below v8 keeps 7: `rad.fresh_stamp`),
+and the ONE constant every version-gated executor feature keys off (`closeout_pipeline.plan_impact`,
+`closeout_pipeline.decision_brief`, `plan_version_gate.ISOLATION_MIN_SCHEMA`).
+`/plan-execute` accepts >= 2; each extra feature switches on at its own version,
+so plans built before a bump keep their exact old behaviour instead of gaining
+new refusals retroactively.
 
-History: 2 — the executable-plan schema (2026-07). 3 — `plan_impact`
-closeouts + the REPLAN checkpoint + the rendered plan change log (2026-08-12).
-4 — the mandatory per-item prior-art decision (`prior_art` or
-`research_status: "skipped"`, RS-01/RS-02, 2026-08-12): validate_spec() refuses
-a build where an item carries neither, but ONLY on a spec that opts in — see
-`PRIOR_ART_MIN_SCHEMA` immediately below. (First shipped unconditional; broke
-11/15 plan-execute test shards plus the live mutation engine within the same
-session, because validate_spec() is shared plumbing dozens of unrelated
-callers reuse to materialize a throwaway spec — reworked same-day to gate on
-an explicit opt-in instead, exactly like every other v3+/v4+ feature here.)
-5 — the BLOCKED `decision_brief` (RS-04, 2026-08-12): a closeout with
-`result: "BLOCKED"` must carry attempts / sourced findings / at most three
-options / a recommendation, or the closeout is refused. Gated by
-`closeout_pipeline.DECISION_BRIEF_MIN_SCHEMA` on the MANIFEST's stamp, so every
-plan already on disk (all at 3 or 4) keeps the old contract — measured against
-all ten live plans in `_plans/` before the bump landed, none newly refused.
-6 — the UPWARD ESCALATION climb (ESC-02, 2026-08-13): a session whose gate keeps
-failing at the same root cause is re-dispatched one rung UP the SSOT's ladder
-instead of on the same rung forever. Gated by
-`plan-execute/scripts/escalation.ESCALATION_MIN_SCHEMA` on the MANIFEST's stamp,
-so every plan already on disk dispatches byte-identically — proved by a FROZEN v5
-fixture manifest (`plan-execute/fixtures/v5-claude-lane/`) whose `begin` output is
-asserted unchanged, not by regenerating historical plans (a read-only probe found
-only 1 of 26 plans on disk regenerates identically TODAY, before any change, so a
-regenerate-and-compare gate would have been false on arrival). A session opts out
-with `escalation: false`. The same version carries the optional
-`routing_experiment: {kind, proposal_id}` session tag, validated here and
-propagated into the manifest for the outcome ledger to read back.
+The full per-version history — what each bump turned on, which constant
+gates it, and what was measured before it landed — is
+`plan-builder/references/plan-schema-history.md`. It is a changelog, and it
+outgrew this docstring at version 7.
 """
 
 INFOGRAPHIC_COVERAGE_MIN_SCHEMA = 5
@@ -2531,7 +2510,7 @@ one layer earlier (input-side instead of runtime-manifest-side): same
 """
 
 
-def gen_manifest(spec, plan_schema_version=PLAN_SCHEMA_VERSION):
+def gen_manifest(spec, plan_schema_version=None):
     """Build the IMMUTABLE dispatch graph. Mutable runtime state lives in
     run_state.json — never write halt/lock/etc. here."""
     phases_by_id = {p["id"]: p for p in spec.get("phases", []) if "id" in p}
@@ -2544,6 +2523,7 @@ def gen_manifest(spec, plan_schema_version=PLAN_SCHEMA_VERSION):
             "title": s.get("title", s["id"]),
             "items": s.get("items", []),
             "model": s.get("model", "Sonnet"),
+            **rad.manifest_override_fields(s, spec),  # v8: no default model; why_model
             "effort": s.get("effort", ""),
             "reasoning": s.get("reasoning", ""),
             # Structured second-model-review gate (Layer 1, 2026-07-10). Declared
@@ -2551,18 +2531,20 @@ def gen_manifest(spec, plan_schema_version=PLAN_SCHEMA_VERSION):
             # non-empty list without an adversarial-review gate into a 🔴. Validated
             # in validate_peer_triggers() below (called before manifest write).
             "peer_triggers": s.get("peer_triggers", []) or [],
-            # Routing task_class (s06, EXE-01 — optional, additive). Consumed by
-            # /plan-execute's executor_policy enforcement: under a codex-focused
-            # dial (active_provider: openai) only a session whose task_class is
-            # opted into the SSOT's executor_policy.executor_for may auto-dispatch
-            # to Codex; unset/unknown FAILS CLOSED to Claude execution. `linchpin`
-            # is permanently barred from unsupervised Codex execution.
+            # Routing task_class (s06, EXE-01; REQUIRED from spec v8, which resolves
+            # the model from it at dispatch). Under a codex-focused dial only a class
+            # opted into the SSOT's executor_policy.executor_for may auto-dispatch to
+            # Codex; unset/unknown FAILS CLOSED to Claude. `linchpin` never runs on
+            # unsupervised Codex.
             "task_class": (s.get("task_class") or "").strip().lower(),
             # Marks THE closing plan-level acceptance review (2026-07-26). Read by
             # /plan-execute (surface its verdict at `complete` instead of a bare
             # "success") and by plan-harden's `acceptance-review-missing` lint. At
             # most one session per plan — validated in validate_spec().
             "acceptance_review": bool(s.get("acceptance_review", False)),
+            # schemas.md. DECLARED = PRESENT, even if empty: "always" adds `[]` to
+            # older plans, "non-empty only" drops it -- either = state-drift.
+            **({"review_scope": pl.review_scope(s)} if "review_scope" in s else {}),
             # ESC-02 opt-OUT + the routing-canary tag. BOTH are emitted ONLY when
             # the spec declares them, so a manifest for a spec that carries
             # neither is byte-identical to the one the previous builder wrote.
@@ -2620,9 +2602,10 @@ def gen_manifest(spec, plan_schema_version=PLAN_SCHEMA_VERSION):
             sess["verify"] = vb
         sessions.append(sess)
     manifest = {
-        "plan_schema_version": plan_schema_version,
+        "plan_schema_version": plan_schema_version or rad.fresh_stamp(spec),
         "title": spec["title"],
-        "created": today_iso(),
+        # The spec's date WINS -- impure w.r.t. the clock otherwise; see stamp_spec.
+        "created": spec.get("created") or today_iso(),
         "items": [
             {
                 "id": it["id"],
@@ -2635,9 +2618,9 @@ def gen_manifest(spec, plan_schema_version=PLAN_SCHEMA_VERSION):
                 # contract-freeze time: 307 manifest items in this repo, 0 with
                 # `touches`, against 177 spec items that declared one — i.e. both
                 # tree-protecting rules were keyed on a field the builder never
-                # wrote. Emitted only when declared, so a manifest for a spec
-                # without it is unchanged. See parallel-group-contract.md §2 M2a.
-                **({"touches": it["touches"]} if str(it.get("touches") or "").strip() else {}),
+                # wrote. Emitted only when declared (at v8 `[]` is a declaration),
+                # so a pre-v8 manifest is unchanged. parallel-group-contract.md §2 M2a.
+                **rad.manifest_touches(it, spec),
             }
             for it in spec["items"]
         ],
@@ -2692,30 +2675,30 @@ GITIGNORE_LINES = [
     "_plans/*/run.ndjson",
     "_plans/*/run_state.json",
     "_plans/*/HALT_NOTICE.txt",
+    "_plans/*/LAND_NOTICE.txt",
+    "_plans/*/_worktrees/",
 ]
 
 
 def amend_gitignore(project_root):
     """Add plan-execute runtime-state lines to project's .gitignore (idempotent)."""
     gi = Path(project_root) / ".gitignore"
-    existing = gi.read_text() if gi.exists() else ""
-    needed = [ln for ln in GITIGNORE_LINES if ln not in existing]
-    if not needed:
+    new_body = gitignore_append(gi.read_bytes() if gi.exists() else b"")
+    if new_body is None:
         return None
-    new_body = (
-        existing.rstrip()
-        + (
-            "\n\n# plan-execute runtime state (auto-added by plan-builder)\n"
-            + "\n".join(needed)
-            + "\n"
-        )
-        if existing
-        else "# plan-execute runtime state (auto-added by plan-builder)\n"
-        + "\n".join(needed)
-        + "\n"
-    )
-    gi.write_text(new_body)
+    gi.write_bytes(new_body)
     return gi
+
+
+GITIGNORE_HEADER = "# plan-execute runtime state (auto-added by plan-builder)"
+
+
+def gitignore_append(old):
+    """``old`` byte for byte plus the missing rules, or None. finish shares this writer."""
+    have = {ln.rstrip() for ln in old.decode("utf-8", "replace").splitlines() if ln[:1] != "#"}
+    needed = [ln for ln in GITIGNORE_LINES if ln not in have]
+    sep = (b"" if old.endswith(b"\n") else b"\n") + b"\n" if old else b""
+    return old + sep + "\n".join([GITIGNORE_HEADER, *needed, ""]).encode() if needed else None
 
 
 # --------------------------------------------------------------------------
@@ -2765,7 +2748,7 @@ def session_purpose_fallback(session_title, item_ids, items_by_id):
     return f"Cover {len(titles)} items: {head}, and {len(titles) - 2} more."
 
 
-def gen_session_article(session, sessions_list, idx, items_by_id=None):
+def gen_session_article(session, sessions_list, idx, items_by_id=None, v8=False):
     sid = session["id"]
     total = len(sessions_list)
     model = session.get("model", "Sonnet")
@@ -2885,7 +2868,7 @@ def gen_session_article(session, sessions_list, idx, items_by_id=None):
       <h3 class="title">{esc(session["title"])}</h3>
       <span class="pill status-TODO">TODO</span>
       <span class="pill ship-badge status-TODO" data-role="ship-badge" title="Post-session shipping status (committed / pushed / PR-open / deployed / SHIP-FAILED)">—</span>
-      <span class="chip model-{attr(_model_css_class(model_lower))}">{esc(model)}</span>
+      {rad.model_chips(session, v8, f'<span class="chip model-{attr(_model_css_class(model_lower))}">{esc(model)}</span>')}
       {f'<span class="chip chip-effort">{esc(effort)}</span>' if effort else ""}
       {f'<span class="chip chip-reasoning reasoning-{attr(reasoning_lower)}" title="Reasoning effort">◐ {esc(reasoning)}</span>' if reasoning else ""}
     </header>
@@ -2902,9 +2885,9 @@ def gen_session_article(session, sessions_list, idx, items_by_id=None):
 '''
 
 
-def gen_sessions_block(sessions, items_by_id=None):
+def gen_sessions_block(sessions, items_by_id=None, v8=False):
     return "\n".join(
-        gen_session_article(s, sessions, i, items_by_id) for i, s in enumerate(sessions)
+        gen_session_article(s, sessions, i, items_by_id, v8) for i, s in enumerate(sessions)
     )
 
 
@@ -3127,6 +3110,18 @@ def render_html(spec, plan_dir):
         meta_line = spec["meta"]
     if not meta_line:
         meta_line = f"{len(spec['sessions'])} sessions · {len(spec['items'])} items"
+    else:
+        # A counts-form meta string is FROZEN at build time, so every mutation
+        # that adds or removes a session/item rendered it stale — and the
+        # header-totals containment check then (correctly) refused the
+        # mutation wholesale; measured 2026-08-18, add-session could never run
+        # on a plan whose meta carried "N sessions · M items · … supersedes …".
+        # Refresh just the leading counts; keep any authored suffix verbatim.
+        m = re.match(r"^(\d+ sessions · \d+ items)(.*)$", meta_line)
+        if m:
+            meta_line = (
+                f"{len(spec['sessions'])} sessions · "
+                f"{len(spec['items'])} items{m.group(2)}")
     template = template.replace("{{PLAN_META_LINE}}", meta_line)
 
     first_sess = (
@@ -3137,7 +3132,7 @@ def render_html(spec, plan_dir):
     template = template.replace(
         "{{FIRST_SESSION_TITLE}}", f"{first_sess['id'].upper()} — {esc(first_sess['title'])}"
     )
-    template = template.replace("{{FIRST_SESSION_MODEL}}", esc(first_sess.get("model", "Sonnet")))
+    template = template.replace("{{FIRST_SESSION_MODEL}}", esc(first_sess.get("model", rad.DISPATCH_LABEL)))
     template = template.replace("{{FIRST_SESSION_EFFORT}}", esc(first_sess.get("effort", "")))
     template = template.replace("{{FIRST_SESSION_ID}}", attr(first_sess["id"]))
 
@@ -3151,7 +3146,7 @@ def render_html(spec, plan_dir):
     cat_colors = gen_category_colors_css(spec["categories"])
     plan_achievement = gen_plan_achievement_section(spec)
     items_by_id = {it["id"]: it for it in spec["items"]}
-    sessions_html = gen_sessions_block(spec["sessions"], items_by_id)
+    sessions_html = gen_sessions_block(spec["sessions"], items_by_id, rad.is_v8(spec))
     cat_sections = "\n".join(
         gen_category_section(c, spec["items"], item_to_session) for c in spec["categories"]
     )
@@ -3169,6 +3164,7 @@ def render_html(spec, plan_dir):
 
     template = template.replace("<!-- INSERT_SESSION_STRIP -->", session_strip)
     template = template.replace("<!-- INSERT_PLAN_ACHIEVEMENT -->", plan_achievement)
+    template = template.replace("<!-- INSERT_EXPLAINER -->", expl.render_explainer_section(spec))
     template = template.replace(
         "<!-- INSERT_DECISION_HOTSPOTS -->", decision_hotspots + scope_section
     )
@@ -3356,20 +3352,15 @@ def build(spec, out_path, project_root=None, preserve_state=False):
     # Idempotent, so a --rebuild does not stack duplicates.
     spec = with_integration_sessions(spec)
     validate_spec(spec)
-    # RS-06 (2026-08-13): stamp the build-time research-environment record onto
-    # the spec BEFORE anything renders or serializes it, so PLAN.html, spec.json
-    # and manifest.json all describe the same observation. Returns None — and so
-    # changes nothing at all — for a spec that makes no research-skip claim,
-    # which is every plan built before today.
-    _env = research_env_record(spec)
-    if _env is not None:
-        spec = dict(spec)
-        spec["research_env"] = _env
+    stamp = rad.manifest_stamp(spec, prior_manifest(out_path).get("plan_schema_version"), preserve_state)
+    rad.check_locked_files(spec, project_root, out_path)
+    spec = stamp_spec(spec, out_path)
     # Build-time shipping guard: deploy targets / gates must resolve and git
     # adapter flags must exist BEFORE manifest.json is written.
-    validate_shipping_resolves(spec, project_root)
+    reg_root = registry_root(project_root, out_path)
+    validate_shipping_resolves(spec, reg_root)
     # Build-time verify guard: every verify gate id must resolve in the registry.
-    validate_verify_resolves(spec, project_root)
+    validate_verify_resolves(spec, reg_root)
     # Build-time peer-review guard: peer_triggers values are valid AND any
     # declared trigger carries an adversarial-review gate (Layer 1, 2026-07-10).
     validate_peer_triggers(spec)
@@ -3404,9 +3395,12 @@ def build(spec, out_path, project_root=None, preserve_state=False):
     # 2. spec.json (authoring input, kept for re-builds)
     (plan_dir / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False))
 
-    # 3. manifest.json — IMMUTABLE dispatch graph (regenerate each build)
-    manifest = gen_manifest(spec)
-    (plan_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    # 3. manifest.json — IMMUTABLE dispatch graph (regenerate each build).
+    # Under --preserve-state, keep the plan's published CONTRACT too (`stamp`,
+    # above): the stamp gates runtime behaviour (isolation at >=7, escalation at
+    # >=6, ...), so a retrofit rebuild must not opt a mid-run plan into features
+    # its author never chose. A contract upgrade rebuilds WITHOUT --preserve-state.
+    write_manifest(plan_dir, gen_manifest(spec, plan_schema_version=stamp))
 
     # 4. run_state.json — mutable. Only seed if missing (preserve runtime).
     rs_path = plan_dir / "run_state.json"
@@ -3443,7 +3437,16 @@ def register_plan_in_project(plan_html_path, spec, project_root):
     try:
         rel_dir = plan_dir.relative_to(project_root)
     except ValueError:
-        rel_dir = plan_dir
+        # ponytail: a plan built OUTSIDE the project has no path the index can
+        # link to. Writing the absolute build path leaked 4 dead
+        # /private/var/folders/.../tmp.XXXX entries into this repo's index — one
+        # per temp build, because the de-dup regex below keys on that same path.
+        print(
+            f"WARNING: {plan_dir} is outside {project_root} — not registering it in "
+            f"{index_path.name}. Rebuild the plan inside the project to register it.",
+            file=sys.stderr,
+        )
+        return None, None
     rel_html = f"{rel_dir}/PLAN.html"
 
     title = spec["title"]
@@ -3565,16 +3568,16 @@ def main():
     # applies it again — it is idempotent).
     spec = with_integration_sessions(spec)
 
-    if args.dry_run_shipping:
-        _print_shipping_dry_run(spec, args.register_in)
-        return
-
     if args.output:
         out_path = Path(args.output)
     else:
         slug = slugify(spec["title"])
         anchor = Path(args.register_in) if args.register_in else Path.cwd()
         out_path = anchor / "_plans" / f"{slug}-{today_iso()}"
+
+    if args.dry_run_shipping:
+        _print_shipping_dry_run(spec, registry_root(args.register_in, out_path))
+        return
 
     if out_path.exists() and out_path.is_dir() and not args.rebuild:
         existing = list(out_path.iterdir())
@@ -3595,6 +3598,7 @@ def main():
 
     if args.register_in:
         index_path, snippet = register_plan_in_project(plan_html, spec, args.register_in)
+    if args.register_in and index_path:  # None when the plan is outside the project
         print(f"Registered in {index_path}")
         print()
         print("=" * 72)

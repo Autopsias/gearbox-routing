@@ -1,6 +1,6 @@
 ---
 name: pr-workflow-manager
-description: "Generic PR workflow orchestrator for ANY Git project. Handles branch creation, PR creation, status checks, validation, and merging. Auto-detects project structure. Use when you say 'create PR', 'merge PR', 'fix CI on PR', 'PR review', 'check if ready to merge'."
+description: "Git PR workflow orchestrator for any project: branches, PRs, status checks, validation, merging. Use when you say 'create PR', 'merge PR', 'fix CI on PR', 'PR review', 'check if ready to merge'."
 tools: Bash, Read, Grep, Glob, BashOutput, KillShell, Task, SlashCommand, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: medium
