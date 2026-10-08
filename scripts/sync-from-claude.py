@@ -494,15 +494,64 @@ TARGETED_TRANSFORMS: dict[str, "callable"] = {
 }
 
 
-def prune_settings_hooks(harness_dir: Path) -> list[str]:
-    """Drop settings.json hook entries that invoke a script this export does not ship.
+# A hook command names a harness file as ~/.claude/<rel>, $HOME/.claude/<rel>
+# or ${HOME}/.claude/<rel>; <rel> runs to the first shell delimiter or quote.
+_HOOK_FILE_REF = re.compile(r"""(?:~|\$HOME|\$\{HOME\})/\.claude/([^\s"'`;|&<>()]+)""")
+_UNSAFE_REF_CHARS = set("$*?[]{}\\")
 
-    s06 finding SC-07. The source deployment's settings.json wires SessionStart /
-    PreToolUse hooks by path. Some of those scripts are private-tier and have no
-    manifest verdict, so they are (correctly) never copied — but the WIRING was
-    still shipping. That is two bugs in one line: a fresh install references a
-    file that does not exist, and the hook's name/statusMessage discloses an
-    internal system the export deliberately excludes.
+
+def hook_file_refs(command) -> list[str] | None:
+    """Harness-relative files a hook command names, or None when it cannot be parsed.
+
+    FAIL CLOSED: every ".claude" in the command must be consumed by one anchored
+    reference, and no reference may carry a shell expansion, glob or "..". Any
+    other shape (a project-relative path, a variable-built path) returns None, and
+    the caller drops the hook rather than guess whether its file ships.
+    """
+    if not isinstance(command, str):
+        return None
+    refs = _HOOK_FILE_REF.findall(command)
+    if command.count(".claude") != len(refs):
+        return None
+    for ref in refs:
+        if _UNSAFE_REF_CHARS & set(ref) or ".." in ref.split("/"):
+            return None
+    return refs
+
+
+def _hook_drop_reason(hook, harness_dir: Path, exclude: frozenset = frozenset()) -> str | None:
+    """Why this settings.json hook must not ship, or None when it may."""
+    if not isinstance(hook, dict):
+        return "malformed hook entry (not an object)"
+    if hook.get("type") != "command" and "command" not in hook:
+        return None  # prompt/agent-style hook: names no file
+    refs = hook_file_refs(hook.get("command"))
+    if refs is None:
+        return "unparseable file reference"
+    for ref in refs:
+        if ref in exclude:
+            return f"excluded by manifest settings_hook_exclude: {ref}"
+        if not (harness_dir / ref).is_file():
+            return f"names a file not in the export: {ref}"
+    return None
+
+
+def settings_hook_exclude(manifest: dict) -> frozenset:
+    """Manifest key `settings_hook_exclude`: harness-relative paths whose hooks stay unwired."""
+    raw = manifest.get("settings_hook_exclude", [])
+    if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
+        raise fatal("manifest settings_hook_exclude must be a list of harness-relative path strings")
+    return frozenset(raw)
+
+
+def prune_settings_hooks(harness_dir: Path, exclude: frozenset = frozenset()) -> list[str]:
+    """Keep a settings.json hook only when every file its command names ships.
+
+    s06 finding SC-07, widened in REP-03. The source settings.json wires hooks by
+    path, under hooks/, scripts/ or any other folder. A hook survives only when
+    each file it names exists in the exported harness/ tree and is not listed in
+    the manifest's `settings_hook_exclude`; an unparseable reference is dropped
+    (fail closed). Empty matcher groups and empty events go too.
 
     Run AFTER the copy, so "does this export actually contain the script" is a
     fact read off disk rather than a hardcoded list that drifts every time a
@@ -512,28 +561,64 @@ def prune_settings_hooks(harness_dir: Path) -> list[str]:
     if not settings.is_file():
         return []
     data = json.loads(settings.read_text(encoding="utf-8"))
+    hooks = data.get("hooks", {})
+    if not isinstance(hooks, dict):
+        raise fatal("settings.json 'hooks' is not an object — refusing to export it")
     dropped: list[str] = []
-
-    def script_is_exported(command: str) -> bool:
-        m = re.search(r"~/\.claude/(hooks/[A-Za-z0-9_.\-]+)", command)
-        if not m:
-            return True  # not a hooks/ script reference — inline shell, leave it
-        return (harness_dir / m.group(1)).is_file()
-
-    for event, groups in list(data.get("hooks", {}).items()):
+    for event in list(hooks):
+        groups = hooks[event] if isinstance(hooks[event], list) else []
+        kept_groups = []
         for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                dropped.append(f"{event}: malformed matcher group")
+                continue
             kept = []
-            for hook in group.get("hooks", []):
-                if script_is_exported(hook.get("command", "")):
+            for hook in group["hooks"]:
+                reason = _hook_drop_reason(hook, harness_dir, exclude)
+                if reason is None:
                     kept.append(hook)
                 else:
-                    dropped.append(f"{event}: {hook.get('command')}")
-            group["hooks"] = kept
-        data["hooks"][event] = [g for g in groups if g.get("hooks")]
-
-    if dropped:
-        settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                    cmd = hook.get("command") if isinstance(hook, dict) else hook
+                    dropped.append(f"{event}: {cmd} ({reason})")
+            if kept:
+                group["hooks"] = kept
+                kept_groups.append(group)
+        if kept_groups:
+            hooks[event] = kept_groups
+        else:
+            del hooks[event]
+    settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return dropped
+
+
+def check_settings_hooks(repo_dir: Path) -> list[str]:
+    """Scan check: every hook command in harness/settings.json names only files in harness/.
+
+    Runs inside the blocked-pattern layer, so the pre-push hook enforces it too.
+    """
+    settings = repo_dir / "harness" / "settings.json"
+    if not settings.is_file():
+        return []
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+    except ValueError as e:
+        return [f"harness/settings.json: not valid JSON ({e})"]
+    hooks = data.get("hooks", {}) if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        return ["harness/settings.json: 'hooks' is not an object"]
+    hits = []
+    for event, groups in hooks.items():
+        for group in groups if isinstance(groups, list) else [None]:
+            entries = group.get("hooks") if isinstance(group, dict) else None
+            if not isinstance(entries, list):
+                hits.append(f"harness/settings.json: {event}: malformed matcher group")
+                continue
+            for hook in entries:
+                reason = _hook_drop_reason(hook, repo_dir / "harness")
+                if reason:
+                    cmd = hook.get("command") if isinstance(hook, dict) else hook
+                    hits.append(f"harness/settings.json: {event}: dangling hook {cmd!r} ({reason})")
+    return hits
 
 
 def scrub_tree(dest: Path, rules: list) -> None:
@@ -1185,6 +1270,7 @@ def run_blocked_pattern_scan(repo_dir: Path, blocked_patterns: list[str]) -> tup
             continue
         hits += _match_all(str(rel), raw, compiled)
     hits += check_provenance_stamp(repo_dir)
+    hits += check_settings_hooks(repo_dir)
     # Same identifier found in several decodings is one leak, not many.
     hits = list(dict.fromkeys(hits))
     output = (
@@ -1262,8 +1348,13 @@ def main(argv: list[str] | None = None) -> int:
         except SyncError as e:
             print(f"FATAL: {e}", file=sys.stderr)
             return 2
-        for entry in prune_settings_hooks(harness_dir):
-            print(f"DROPPED settings.json hook wiring for a non-exported script: {entry}", file=sys.stderr)
+        try:
+            pruned = prune_settings_hooks(harness_dir, settings_hook_exclude(manifest))
+        except SyncError as e:
+            print(f"FATAL: {e}", file=sys.stderr)
+            return 2
+        for entry in pruned:
+            print(f"DROPPED settings.json hook: {entry}", file=sys.stderr)
         scrub_tree(harness_dir, scrub_rules)
         try:
             private_sha, authoritative, ledger_path = write_provenance(
