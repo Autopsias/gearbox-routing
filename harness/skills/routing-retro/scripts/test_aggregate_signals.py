@@ -593,3 +593,23 @@ def test_value_epoch_range_admits_record_only_bumps():
     # no floor -> old exact-match rule
     assert not retro_cohorts.is_default_current_epoch(cohort(16), 18, None)
     assert retro_cohorts.is_default_current_epoch(cohort(18), 18, None)
+
+
+# --------------------------------------------------------------------------
+# First-attempt pass rate ignoring review-only reworks (operator 2026-10-09)
+# --------------------------------------------------------------------------
+def test_pass_rate_ignoring_review_counts_only_review_gate_reworks():
+    def coh(result, gates=None):
+        rec = {"result": result, "gates_failed": gates}
+        return {"records": [rec], "terminal": rec}
+    pool = [
+        coh("passed"),
+        coh("rework", ["gate:llm-review-medium", "gate:cross-family-review-medium"]),  # review only
+        coh("rework", ["gate:adversarial-review", "gate:pytest-fast"]),                # tests involved
+        coh("rework", []),                                                              # no gate named
+        coh("rework", "gate:llm-review-medium"),                                        # not a list
+    ]
+    st = retro_cohorts._stats(pool)
+    assert st["first_attempt_pass_rate"] == 0.2
+    assert st["first_attempt_pass_rate_ignoring_review"] == 0.4
+    assert retro_cohorts._stats([])["first_attempt_pass_rate_ignoring_review"] is None

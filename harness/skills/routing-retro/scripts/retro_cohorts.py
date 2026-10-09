@@ -275,12 +275,25 @@ def cost_cells(records):
             for k, c in sorted(cells.items())]
 
 
+def _review_only_rework(rec):
+    """A rework whose failed gates are ALL review gates (llm-review, cross-family-review,
+    adversarial-review, code-review-gate) — the build passed its tests, a reviewer sent it back.
+    Operator decision: report it beside the plain pass rate, so a retro can tell a
+    weaker build from a stricter review (74% of agentic_build attempt-1 reworks were this)."""
+    gates = rec.get("gates_failed")
+    if rec.get("result") != "rework" or not isinstance(gates, list) or not gates:
+        return False
+    return all(isinstance(g, str) and "review" in g for g in gates)
+
+
 def _stats(cohorts):
     n = len(cohorts)
     if n == 0:
-        return {"n": 0, "first_attempt_pass_rate": None, "escalation_rate": None,
+        return {"n": 0, "first_attempt_pass_rate": None, "first_attempt_pass_rate_ignoring_review": None,
+                "escalation_rate": None,
                 "attempts_per_success": None, "successful": 0, "cost_per_success": "n/a"}
     passes = sum(1 for c in cohorts if c["records"][0].get("result") == "passed")
+    review_only = sum(1 for c in cohorts if _review_only_rework(c["records"][0]))
     escalated = sum(1 for c in cohorts if any(r.get("escalated_from") for r in c["records"]))
     successful = [c for c in cohorts if c["terminal"].get("result") == "passed"]
     total_attempts = sum(len(c["records"]) for c in cohorts)
@@ -297,6 +310,7 @@ def _stats(cohorts):
     return {
         "n": n,
         "first_attempt_pass_rate": round(passes / n, 4),
+        "first_attempt_pass_rate_ignoring_review": round((passes + review_only) / n, 4),
         "escalation_rate": round(escalated / n, 4),
         "attempts_per_success": attempts_per_success,
         "successful": len(successful),
@@ -355,7 +369,9 @@ def cell_proposal(key, agg, epoch, existing_canary_pids):
         return {
             "proposal_id": pid, "kind": "upgrade", "class": task_class, "backend": backend,
             "current_cell": cell_label, "ssot_version": epoch, "n": n,
-            "first_attempt_pass_rate": pass_rate, "escalation_rate": esc_rate,
+            "first_attempt_pass_rate": pass_rate,
+            "first_attempt_pass_rate_ignoring_review": stats["first_attempt_pass_rate_ignoring_review"],
+            "escalation_rate": esc_rate,
             "recommendation": f"raise the {task_class} class default one rung above {cell_label}",
             "apply_path": "/routing-update",
         }, "upgrade"

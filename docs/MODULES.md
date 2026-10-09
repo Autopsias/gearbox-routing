@@ -55,7 +55,7 @@ path on the card, and read the cautions.
 | [Context compaction policy](modules/compaction.md) | Holds automatic compaction back until a safe moment | macOS, Linux |
 | [Status line](modules/statusline.md) | Rate limits, context, cache and model at the bottom of the screen | macOS, Linux — needs `jq` |
 | [Small hooks](modules/small-hooks.md) | A reminder for long subagents, and four hooks you can skip | Any |
-| [Machine governor](modules/govrun.md) | Makes heavy test runs take turns | macOS, Linux |
+| [Machine governor](modules/govrun.md) | Makes heavy test runs take turns, and can refuse a heavy run that skips the queue | macOS, Linux |
 | [Agent janitor](modules/agent-janitor.md) | Kills leftover agent processes and deletes old temp files, without asking | **macOS only** |
 
 ## Cost, routing and authoring
@@ -72,7 +72,7 @@ path on the card, and read the cautions.
 
 | Module | What it does | Platform |
 |---|---|---|
-| [General commands](modules/general-commands.md) | `/review`, `/research`, `/wait-what`, `/nextsession`, `/improve`, `/pr` | Any |
+| [General commands](modules/general-commands.md) | `/review`, `/research`, `/wait-what`, `/nextsession`, `/improve`, `/pr`, and what is archived | Any |
 | [Reference docs](modules/reference-docs.md) | Background docs, a rule file, the original global instructions, key bindings | Any |
 
 ## Not for general use

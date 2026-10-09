@@ -7,11 +7,11 @@ install them.** This page exists so that you know what they are.
 
 | File | What it does in the original setup | Why it does not work for you |
 |---|---|---|
-| `harness/scripts/gearbox` | `deploy`, `drift` and `harvest` between a private source repo and `~/.claude`. | Needs `~/.claude` to be a clone of that repo, and a `gearbox-codex.py` that is not shipped. `deploy` and `harvest` commit and push. |
+| `harness/scripts/gearbox`, `gearbox-codex.py` | `deploy`, `drift` and `harvest` between a private source repo and `~/.claude`, and the Codex skill copies. | Needs `~/.claude` to be a clone of that repo. `deploy` and `harvest` commit and push. |
 | `harness/scripts/gearbox-classify.py`, `deploy.pathspec` | Sort changed paths in `~/.claude` for `gearbox`. | Used only by `gearbox`. |
-| `harness/scripts/gearbox-weekly-drift.sh` | A weekly drift check with a macOS notification. | Calls a `doc_check.py` that is not shipped. |
+| `harness/scripts/gearbox-weekly-drift.sh`, `doc_check.py` | A weekly drift check and a check of the claims in the docs, with a macOS notification. | Checks the layout of that private repo. |
 | `harness/scripts/quiesce-check.sh` | Checks that no session writes to `~/.claude` before a deploy. | Used only by `gearbox deploy`. |
-| `harness/scripts/verify-assignments.sh` | Checks the model table of the `/epic-dev` command. | Needs files that are not shipped. |
+| `harness/scripts/verify-assignments.sh`, `harness/epic-dev-assignments.yaml` | Checks the model and effort of each `/epic-dev` subagent against one table. | Works only on a home laid out like the original one. |
 | `harness/scripts/install-hooks.sh`, `harness/githooks/` | Wires git hooks into the private source repo. | The script looks for a top-level `githooks/` folder; here the folder is `harness/githooks/`, so it stops with an error. The hooks also need that repo's files. |
 | `harness/hooks/gearbox-drift-warn.sh` | Runs `gearbox drift` at session start. | Expired; see [small hooks](small-hooks.md). |
 | `harness/skills/*/codex/` and `*/manifest.toml` | Codex CLI versions of some skills, which `gearbox deploy` copies into `~/.codex/skills/`. | There is no installer for them here. You can copy one `SKILL.md` by hand at your own risk. |

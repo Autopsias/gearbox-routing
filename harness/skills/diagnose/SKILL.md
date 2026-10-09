@@ -33,7 +33,7 @@ investigators were collapsed into it (`~/.claude/SKILL-UNIFICATION-ROUTING.md`):
   re-implementing it here:
   - Dispatch the `digdeep` worker — Five-Whys + deep-research root-cause analysis
     (analysis-only; never executes code). This is the same worker that `/ci-orchestrate`
-    strategic mode and the parallel-orchestrator already dispatch — preserved, not moved.
+    strategic mode already dispatches — preserved, not moved.
   - For forensic, evidence-graded case reconstruction, invoke the `bmad-investigate`
     skill as the deep mode's investigator. It is a project skill of the example-project repo
     (`~/DeveloperFolder/example-project`), not installed at user level, so only a session in

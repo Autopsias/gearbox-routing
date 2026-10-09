@@ -19,7 +19,7 @@
 
 *Test Plan Created: $(date)*
 *High-Context Analysis: Complete requirements discovery and scenario design*
-*Ready for execution via /user_testing ${functionalityMatch}*
+*Ready for execution: run the scenarios by hand or with a browser-automation tool*
 ```
 
 ## Completion
@@ -36,7 +36,7 @@ Display results:
 
 🚀 Next Steps:
 1. Review the comprehensive test plan in $PLANS_DIR/
-2. Execute tests using: /user_testing ${functionalityMatch} --mode=[automated|interactive|hybrid]
+2. Execute the scenarios by hand, or with a browser-automation tool you have installed
 3. Test plan can be reused and refined for multiple execution sessions
 4. Plan includes specialized prompts for all 7 subagents
 

@@ -32,10 +32,9 @@ Do not describe what you will do. DO IT NOW.
 - "/commit_orchestrate" -> Auto-stage, quality fix, and commit all changes
 - "/commit_orchestrate 'feat: add new feature' --quality-first" -> Run quality checks before staging
 - "/commit_orchestrate --stage-all --push-after" -> Full workflow with remote push
-- "/commit_orchestrate 'fix: resolve issues' --skip-hooks" -> Commit with hook bypass
 
 **PRE-COMMIT HOOK INTEGRATION:**
 If pre-commit hooks fail after quality fixes:
 - Automatically retry commit ONCE to include hook modifications
 - If hooks fail again, report specific hook failures for manual intervention
-- Never bypass hooks unless explicitly requested with --skip-hooks
+- Never bypass hooks (no `--no-verify`); fix the failure instead

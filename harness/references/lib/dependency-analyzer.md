@@ -377,13 +377,6 @@ Add cluster context parameters:
 - `parallel_peers`: List of files being refactored in parallel
 - `test_scope`: Which test files this refactor may affect
 
-### For parallel-orchestrator.md
-
-Add refactoring-specific rules:
-- ALWAYS call dependency-analyzer first for safe-refactor work
-- Group files by cluster (shared deps/tests)
-- Serialize within shared-test clusters
-
 ---
 
 ## Error Handling

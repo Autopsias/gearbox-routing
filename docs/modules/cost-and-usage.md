@@ -50,9 +50,9 @@ rm ~/.claude/reflection-notes.md      # optional: the self-assessment log
 
 ## Cautions
 
-- **Add your own model ids to `model_prices:` first.** The shipped block has
-  four example rows. A model with no row is skipped and listed on a
-  `NOT PRICED` line, so the totals are low.
+- **Check `model_prices:` against the models you use.** The shipped block has
+  rows for the current Claude models (prices as of 2026-10-09). A model with
+  no row is skipped and listed on a `NOT PRICED` line, so the totals are low.
 - The dollar figures are API-equivalent prices, not your bill on a subscription.
 - Both read every session transcript, so the reports can contain private text.
 - `/myusage-self-assessment` sends many subagents over your history. It is

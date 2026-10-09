@@ -318,7 +318,8 @@ def render_markdown(cell_entries, canaries, apex, epoch):
         p = c["proposal"]
         lines.append(f"## {p['kind'].upper()} — {p['class']} ({p['current_cell']}) "
                       f"— proposal_id `{p['proposal_id']}`")
-        lines.append(f"- N={p['n']}, first-attempt pass={p['first_attempt_pass_rate']}, "
+        lines.append(f"- N={p['n']}, first-attempt pass={p['first_attempt_pass_rate']} "
+                      f"(ignoring review-only reworks: {p.get('first_attempt_pass_rate_ignoring_review')}), "
                       f"escalation={p['escalation_rate']}")
         lines.append(f"- {p['recommendation']}")
         lines.append("")

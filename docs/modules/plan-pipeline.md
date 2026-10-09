@@ -111,8 +111,9 @@ project's `_plans/` folder.
 - The default review gate `code-review-gate` has no portable default and fails
   on purpose. Bind your review gates to the `llm-review-*` gates, or define your
   own in `<project>/.claude/eval-gates.json`.
-- The default gate file names an `eval` skill that is not in this repo. A plan
-  that uses the `eval-smoke-baseline` gate fails.
+- The default gate file has an `eval-smoke-baseline` gate for a project that
+  has its own `eval` skill. This repo does not ship one, so do not name that
+  gate in a plan unless your project has the skill.
 - It refuses to run on a folder that iCloud, Dropbox or a network drive syncs,
   unless you pass `--unsafe-lock`.
 - Three tier agents (`tier-opus-max`, `tier-sonnet-low`, `tier-sonnet-max`) are

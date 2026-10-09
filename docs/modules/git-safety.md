@@ -21,6 +21,7 @@ uncommitted work (`git reset --hard`, `git checkout .`, `git restore .`,
 mkdir -p ~/.claude/hooks ~/.claude/rules
 cp harness/hooks/git-tree-guard.py ~/.claude/hooks/
 cp harness/rules/git-safety.md ~/.claude/rules/
+mkdir -p ~/.claude/docs && cp harness/docs/reference_git_safety_playbook.md ~/.claude/docs/   # optional: the worked patterns the rule points to
 ```
 
 Merge this entry into the `"PreToolUse"` list in `~/.claude/settings.json`:
@@ -49,5 +50,3 @@ Then delete the `PreToolUse` entry.
   script gets past it. It is a seat belt, not a security boundary.
 - To allow one reset on purpose, start the command with
   `GEARBOX_ALLOW_DIRTY_RESET=1`.
-- `git-safety.md` names a playbook file that is not in this repo. Only the
-  name is missing; the rule still works.

@@ -161,4 +161,4 @@ This reduces token usage by 80-90% per agent response.
 | ci-infrastructure-builder | sonnet | Implementation complexity |
 | All tactical fixers | sonnet | Balanced speed + quality |
 | linting-fixer, import-error-fixer | haiku | Simple pattern matching |
-| ci-documentation-generator | haiku | Template-based docs |
+| general-purpose (docs) | haiku | Template-based docs |

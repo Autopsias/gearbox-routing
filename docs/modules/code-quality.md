@@ -52,7 +52,6 @@ rm -r ~/.claude/agents/references/safe-refactor
 ## Cautions
 
 - `--fix` starts subagents that edit and split your files. Run it on a clean branch.
-- `--loop` calls a script that is not in this repo. Only `--loop` fails.
 - `--generate-baseline` accepts the current debt as the starting point. Do not
   run it while someone else edits the tree.
 - `/declutter` starts one subagent per area of the repo. On a large repo that is expensive.

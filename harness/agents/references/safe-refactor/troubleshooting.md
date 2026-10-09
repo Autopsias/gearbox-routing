@@ -146,7 +146,7 @@ When a conflict is detected:
 ## INVOCATION
 
 This agent can be invoked via:
-1. **Skill**: `/safe-refactor path/to/file.py`
+1. **By name**: "use the safe-refactor agent on path/to/file.py" (it is a subagent, not a slash command)
 2. **Task delegation**: `Task(subagent_type="safe-refactor", ...)`
 3. **Intent detection**: "split this file into smaller modules"
 4. **Orchestrator dispatch**: With cluster context for parallel safety

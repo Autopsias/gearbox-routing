@@ -7,6 +7,15 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 ## [Unreleased]
 
 ### Added
+- **Harness files that other harness files named but the export did not ship
+  (2026-10-09):** the `govrun` enforcement hook and its parser
+  (`hooks/governor-hook.py`, `hooks/governor_parse.py`), the test-gate
+  discovery script for `/usertestgates` (`lib/testgates_discovery.py`), the
+  git-safety playbook and the rules rationale (`docs/`), the front-door
+  routing table (`SKILL-UNIFICATION-ROUTING.md`), the rubric's
+  dangling-reference check (`skills/.s08-verify-dangling-refs.sh`),
+  `scripts/improve_ask_classes.py`, `scripts/doc_check.py`,
+  `scripts/gearbox-codex.py` and `epic-dev-assignments.yaml`.
 - **Modular docs (2026-10-09).** A new install guide (`docs/INSTALL.md`)
   covers the routing installer step by step, including update and removal.
   A module catalogue (`docs/MODULES.md`) and 30 module cards
@@ -42,6 +51,24 @@ All notable changes to the Gearbox routing policy and framework. Format follows
     unchanged: it installs the routing policy only.
 
 ### Fixed
+- **Dead references in the harness (2026-10-09).**
+  - `/parallel` and `/user-testing` moved to `harness/commands-archive/`: the
+    subagents they call were retired.
+  - The retired `--loop` mode (its runner script was deleted in June) is gone
+    from `/ci-orchestrate`, `/code-quality` and `/test-orchestrate`.
+  - The `--strategic` modes now use subagents that exist
+    (`ci-strategy-analyst`, and `general-purpose` for the docs step).
+  - `/commit-orchestrate` no longer has `--skip-hooks`, which skipped the git
+    hooks.
+  - Every hook entry in `harness/settings.json` now checks that its file
+    exists, so a deleted hook file no longer causes an error.
+  - The safe-refactor hook names the `safe-refactor` agent; it pointed at a
+    `/safe-refactor` command that does not exist.
+  - The memo critic uses the current Codex model, `write-a-skill` counts 17
+    rubric criteria, and a project-folder regex in `/improve` works for any
+    user name.
+  - A stale `harness/docs/reference_user_agents_and_commands.md`, left behind
+    by an older export, is removed.
 - **Wrong facts in the docs.**
   - `ARCHITECTURE.md` §1 put `agentic_build` on the frontier tier; the policy
     file puts it on `workhorse`.
@@ -68,6 +95,12 @@ All notable changes to the Gearbox routing policy and framework. Format follows
   `scripts/`, so a failing test can no longer sit unseen.
 
 ### Changed
+- **`claude/model-routing.yaml` → v2.5.0 (MINOR: prices).** Anthropic prices
+  re-checked on 2026-10-09 against platform.claude.com/docs/en/about-claude/pricing.
+  `claude-sonnet-5` corrected to $2/$10 (the planned $3/$15 rise was
+  cancelled), and `model_prices` gains rows for `claude-opus-5-5`,
+  `claude-sonnet-5-5` and `claude-haiku-5-5`, so `/cost-audit` prices current
+  models instead of listing them as `NOT PRICED`.
 - **`claude/model-routing.yaml` → v2.4.0 (MINOR: a new provider profile and
   additive blocks; no `task_classes` row moved).** Five lessons from a private
   deployment's history, written without its calibration data:

@@ -1,10 +1,10 @@
 #!/bin/bash
 # Safe Refactor Advisory Hook (Interactive)
-# Detects potential file splitting/refactoring and lets user choose to use /safe-refactor
+# Detects potential file splitting/refactoring and lets user choose to use the safe-refactor agent
 #
 # Returns:
 # - exit 0: Continue with original operation
-# - exit 2: Block operation (user can then invoke /safe-refactor)
+# - exit 2: Block operation (user can then ask for the safe-refactor agent)
 
 set -euo pipefail
 
@@ -83,7 +83,7 @@ if is_refactor_scenario; then
 ╠══════════════════════════════════════════════════════════════════════╣
 ║  OPTIONS:                                                            ║
 ║                                                                      ║
-║  [REJECT] → Then run: /safe-refactor <original_file>                 ║
+║  [REJECT] → Then ask Claude: use the safe-refactor agent on <file>   ║
 ║             Uses test-safe workflow with:                            ║
 ║             • Test baseline verification                             ║
 ║             • Facade pattern for backward compatibility              ║

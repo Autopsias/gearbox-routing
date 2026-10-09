@@ -1,0 +1,48 @@
+# epic-dev-assignments.yaml — SINGLE SOURCE OF TRUTH for /epic-dev model + effort tuning.
+#
+# Collapses the divergent per-phase definitions into one machine-readable file:
+#   (1) each epic-* agent's frontmatter  (~/.claude/agents/epic-*.md : model:/effort:)
+#   (2) each phase's primary Task(model=) (~/.claude/references/epic-dev/full/phase-N-*.md)
+# `verify-assignments.sh` (sibling in ~/.claude/scripts/) DERIVES both from disk and fails
+# loudly on any drift. This file is the authority; if a source disagrees, fix the source — not this file.
+#
+# SSOT cross-reference (added s04, GRD-01/example-routing-plan-2026-07-02): the wider
+# per-agent routing SSOT ~/.claude/model-routing.yaml COMPOSES OVER this file for the
+# epic_* rows — it never absorbs or overrides them. This file stays AUTHORITATIVE for
+# epic-dev assignments; model-routing.yaml's `agents:` block carries a mechanical
+# snapshot of the epic_* rows and cross-checks them warn-only (verify-routing.sh's
+# epic_* composed-cross-check). Zero assignment changes here — this is a pointer only,
+# so the two SSOTs are visibly one system rather than two that happen to agree today.
+#
+# RETIRED with the Ralph bash runner: the old sources "(3) ralph ORCH_EFFORT" and "(4) get_status_model()
+# per-phase orchestrator model". The in-session `--auto` loop has no per-phase orchestrator-model script —
+# the orchestrator IS the session, so its effort is the session's (run it sharp on money-path epics if you
+# like). Money-path EMPHASIS still lives in the `ultrathink` nudge on phases 3/5/8. The per-phase SUBAGENT
+# model/effort below — which does the actual work — remains the real, drift-guarded lever.
+#
+# NOTE (re-verified, binary 2.1.170): agent `effort:` frontmatter is HONORED on the
+# Task-subagent dispatch path (low vs xhigh A/B: child-opus medians 719 vs 1019 out-tokens,
+# non-overlapping, p≈0.004 — was INERT on 2.1.167; it activated in between). The per-phase
+# effort column below is therefore LIVE, and frontmatter > session effort, so the session level no
+# longer floor-raises pinned workers (it still sets the orchestrator's own effort). `ultrathink`
+# prompt nudges on money-path phases 3/5/8 still stack on top.
+# Re-run the canary after EVERY Claude Code version bump (effort is unobservable post-hoc):
+#   bash ~/.claude/fixtures/effort-ab-canary/run_trials.sh   (results.log there has the convention)
+
+phases:
+  1: { agent: epic-story-creator,   model: opus,   effort: high }
+  2: { agent: epic-story-validator, model: sonnet, effort: medium }
+  3: { agent: epic-atdd-writer,     model: opus,   effort: high }   # v1.3 2026-07-04: xhigh->high — opus high->xhigh = +2.7pts for +78% cost (DeepSWE, routing v1.2 follow-up flag; operator-approved)
+  4: { agent: epic-implementer,     model: opus,   effort: high }   # S07: sonnet->opus (3-3 green-but-broken test-gaming + false-fix-claims; opus dev all epics, operator-elected 2026-06-09)
+  5: { agent: epic-code-reviewer,   model: opus,   effort: high }   # v1.3 2026-07-04: xhigh->high (same DeepSWE weak-rung evidence as phase 3)
+  6: { agent: epic-test-expander,   model: sonnet, effort: medium }
+  7: { agent: epic-test-reviewer,   model: sonnet, effort: medium }   # S02: reassigned from haiku (Death-A silent-lie guard needs judgment)
+  8: { agent: epic-quality-gate,    model: opus,   effort: high }    # S06 split: dedicated Phase-8 agent (Write-less toolset); v1.3 2026-07-04: xhigh->high (same DeepSWE weak-rung evidence as phase 3)
+
+# Gate-fix loops (Gates 2.5/3.5/4.5/5.5/6.5/7.5) — S06 split: dedicated agent with the
+# gate-corruption guard (tests/** + golden read-only, diagnose-first, whole-tree sha256 fail-closed).
+gate_fix: { agent: epic-test-fixer, model: opus,   effort: medium }   # S07: sonnet->opus (same rationale as phase 4; opus gate-fix all epics, operator-elected 2026-06-09)
+
+# (The `orchestrator:` + `orchestrator_phase_model:` blocks were removed with the Ralph runner —
+#  see the header. Money-path emphasis = the `ultrathink` nudge on phases 3/5/8; run the in-session
+#  --auto orchestrator in a sharp session for money-path epics 2/4/6/7 if you want extra orchestrator depth.)

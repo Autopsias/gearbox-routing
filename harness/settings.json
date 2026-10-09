@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/hooks/routing-cadence-check.py",
+            "command": "p=\"$HOME/.claude/hooks/routing-cadence-check.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
             "timeout": 5,
             "statusMessage": "Checking routing outcome cadence"
           }
@@ -51,6 +51,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\"; s=$?; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
             "timeout": 10
           }
@@ -71,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/safe-refactor-advisory.sh"
+            "command": "p=\"$HOME/.claude/hooks/safe-refactor-advisory.sh\"; [ -f \"$p\" ] || exit 0; exec bash \"$p\""
           }
         ]
       }

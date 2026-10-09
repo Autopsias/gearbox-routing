@@ -1,6 +1,6 @@
 ---
 description: "Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via ruff C901, plus an advisory slop scan) and dispatches safe-refactor agents to fix them. Use when you say 'check code/file size and complexity', 'files too large', 'reduce complexity', 'split large files', or 'adopt quality gates in this repo' (--adopt)."
-argument-hint: "[--check] [--fix] [--dry-run] [--adopt] [--refresh-exceptions] [--focus=file-size|function-length|complexity] [--path=...] [--max-parallel=N] [--no-chain] [--continue] [--loop N] [--loop-delay S] [--fix-single-rule]"
+argument-hint: "[--check] [--fix] [--dry-run] [--adopt] [--refresh-exceptions] [--focus=file-size|function-length|complexity] [--path=...] [--max-parallel=N] [--no-chain] [--continue] [--fix-single-rule]"
 allowed-tools: ["Task", "Bash", "Grep", "Read", "Glob", "SlashCommand", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
@@ -40,9 +40,6 @@ Parse flags from "$ARGUMENTS":
   WARNING: Without Ralph fallback, hallucinated files will be marked as failed (no retry)
 - `--lightweight`: Force lightweight mode (no git operations) for ALL file types
   Use when refactoring shell scripts or when git safety is causing more harm than good
-- `--loop N`: Enable fresh-context loop mode (spawns new Claude instances for unattended execution)
-  Max N iterations with completely fresh 200K context per iteration
-- `--loop-delay S`: Seconds to wait between loop iterations (default: 5)
 
 If no arguments provided, default to `--check` (analysis only).
 
@@ -63,7 +60,7 @@ and sets up the ratchet so enforcement applies to changed code going forward.
 
 ## STEP 1.25: Ralph Loop Mode Detection (Fresh Context)
 
-**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode Detection" section. If `--loop` is present, launch the runner script and EXIT. Otherwise proceed to STEP 1.26.
+**Instructions:** Read `~/.claude/references/code-quality/chaining-logic.md` and follow the "Ralph Loop Mode Detection" section. `--loop` was retired; proceed to STEP 1.26.
 
 ---
 

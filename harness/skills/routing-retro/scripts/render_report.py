@@ -82,7 +82,9 @@ def _card_html(p, idx):
     if "recommendation" in p:  # cell proposal
         title = f"{(p.get('kind') or '').upper()} — {p.get('class')} ({p.get('current_cell')})"
         body = p.get("recommendation", "")
-        evidence = f"N={p.get('n')}, first-attempt pass={p.get('first_attempt_pass_rate')}, escalation={p.get('escalation_rate')}"
+        evidence = (f"N={p.get('n')}, first-attempt pass={p.get('first_attempt_pass_rate')} "
+                    f"(ignoring review-only reworks: {p.get('first_attempt_pass_rate_ignoring_review')}), "
+                    f"escalation={p.get('escalation_rate')}")
     else:  # adoption-ready canary
         st = p.get("stats", {})
         title = f"ADOPT CANARY — {p.get('class')} ({p.get('cell')})"

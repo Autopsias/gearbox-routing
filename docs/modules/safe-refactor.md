@@ -29,7 +29,7 @@ chmod +x ~/.claude/hooks/safe-refactor-advisory.sh
 Optional: merge this entry into the `"PreToolUse"` list in `~/.claude/settings.json`:
 
 ```json
-{ "matcher": "Write", "hooks": [ { "type": "command", "command": "~/.claude/hooks/safe-refactor-advisory.sh" } ] }
+{ "matcher": "Write", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/safe-refactor-advisory.sh\"; [ -f \"$p\" ] || exit 0; exec bash \"$p\"" } ] }
 ```
 
 ## Check it works
@@ -49,12 +49,10 @@ rm ~/.claude/agents/safe-refactor.md ~/.claude/hooks/safe-refactor-advisory.sh
 rm -r ~/.claude/agents/references/safe-refactor
 ```
 
-Delete the `settings.json` entry **before** you delete the hook file.
+Then delete the `PreToolUse` entry.
 
 ## Cautions
 
-- **The hook entry has no file check.** If you delete the script and keep the
-  entry, every Write shows a hook error.
-- The hook blocks the write. You then choose: run the subagent, or approve the
-  write.
+- The hook blocks the write. You then choose: ask Claude to use the
+  safe-refactor agent, or approve the write.
 - The `/code-quality` command and the `repo-health` skill also use this subagent.

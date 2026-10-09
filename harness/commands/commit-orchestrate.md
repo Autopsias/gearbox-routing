@@ -1,6 +1,6 @@
 ---
 description: "Runs pre-commit quality checks (ruff, mypy, pytest) in parallel, stages changes intelligently, and commits with proper formatting — optionally pushing after. Use when you say 'commit changes', 'quality commit', 'commit this', or 'commit and push'/'commit this and push'/'push it'/'push my changes' (invoke with --push-after), or need an automated commit/push workflow. commit-orchestrate does NOT open a PR or watch CI — for the full commit→push→PR→CI-to-green chain in one step, use /ship-tail instead. disable-model-invocation: false (intentionally auto-triggers on the conversational phrases above per CLAUDE.md's routing table, not explicit-invocation-only)."
-argument-hint: "[commit_message] [--stage-all] [--skip-hooks] [--quality-first] [--push-after] [--intent=<block>]"
+argument-hint: "[commit_message] [--stage-all] [--quality-first] [--push-after] [--intent=<block>]"
 allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
@@ -21,7 +21,6 @@ USER_PROVIDED_MESSAGE=$(echo "$ARGUMENTS" | grep -vE '^--' | head -1)
 ```
 - Commit message or "auto-generate" (`USER_PROVIDED_MESSAGE`, set above — empty means auto-generate)
 - --stage-all flag (stage all changes)
-- --skip-hooks flag (bypass pre-commit hooks)
 - --quality-first flag (run all quality checks before staging)
 - --push-after flag (push to remote after successful commit)
 - `--intent=<block>` = the change's INTENT (what it was meant to do, incl. deliberate

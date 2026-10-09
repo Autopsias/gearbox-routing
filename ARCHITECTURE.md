@@ -289,18 +289,19 @@ later change can reopen them with a real driving case:
 ## 7. The harness tree: wired hooks and platform limits
 
 `harness/` is a synced copy of a working Claude Code setup, not part of the
-routing schema above. Its `settings.json` wires these hooks. Most commands
-skip themselves when their file is missing; the two noted do not.
+routing schema above. Its `settings.json` wires these hooks. Every command
+skips itself when its file is missing.
 
 | Event | Matcher | Hook | What it does |
 |---|---|---|---|
 | `Stop` | all | `turnend-guard.py` | Refuses to end a turn while a plan this session dispatched still has unfinished work |
-| `SessionStart` | all | `routing-cadence-check.py` | Nudges you when routing outcomes have piled up unanalysed (no skip guard: it errors if the file is missing) |
+| `SessionStart` | all | `routing-cadence-check.py` | Nudges you when routing outcomes have piled up unanalysed |
 | `SessionStart` | `compact` | `compact-policy.py session-start` | Restores context after a compaction |
 | `UserPromptSubmit` | all | `compact-policy.py prompt` | Applies the compaction policy to each prompt |
+| `PreToolUse` | `Bash` | `governor-hook.py` | Refuses a heavy test run that skips the `govrun` queue |
 | `PreToolUse` | `Bash` | `git-tree-guard.py` | Blocks risky git commands on a shared tree |
 | `PreToolUse` | `Bash`, `Write`, `Edit`, `MultiEdit`, `NotebookEdit` | `verify-state-guard.py` | Stops a dispatched agent from writing a plan's review-gate record |
-| `PreToolUse` | `Write` | `safe-refactor-advisory.sh` | Pauses a file split and offers `/safe-refactor` (no skip guard: it errors if the file is missing) |
+| `PreToolUse` | `Write` | `safe-refactor-advisory.sh` | Pauses a file split and offers the `safe-refactor` agent |
 | `PreCompact` | `auto` | `compact-policy.py pre-compact` | Saves state before an automatic compaction |
 | `PostCompact` | all | `compact-policy.py post-compact` | Re-orients the agent after compaction |
 

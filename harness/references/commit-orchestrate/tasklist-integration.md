@@ -95,13 +95,6 @@ TaskUpdate(taskId=task_id_commit, status="completed", metadata={
 })
 ```
 
-### SKIP-HOOKS MODE
+### Hooks always run
 
-When --skip-hooks is specified, create simplified task chain:
-
-```
-IF --skip-hooks:
-  TaskCreate(subject="Fast Commit (skip hooks)", description="Direct commit without validation", activeForm="Committing")
-  # Skip quality check tasks
-END IF
-```
+There is no hook-skipping mode: commits always run the repo's hooks (never `--no-verify`).

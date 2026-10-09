@@ -710,39 +710,9 @@ TaskUpdate(
 )
 ```
 
-### Ralph Loop Bridge Pattern (for --loop mode)
+### Ralph Loop Bridge Pattern (retired)
 
-Before exiting session in --loop mode, persist task state:
-
-```python
-# BEFORE spawning fresh Claude instance
-def persist_tasks_for_ralph():
-    tasks = TaskList()
-    bridge_data = {
-        "session_id": current_session,
-        "command": "code-quality",
-        "tasks": [{"id": t.id, "subject": t.subject, "status": t.status,
-                   "blockedBy": t.blockedBy, "metadata": t.metadata}
-                  for t in tasks],
-        "ralph_state": {
-            "current_rule": STATE.ralph_state.current_rule,
-            "rules_completed": STATE.ralph_state.rules_completed,
-            "rules_remaining": STATE.ralph_state.rules_remaining
-        },
-        "timestamp": now()
-    }
-    write_json(".claude/state/task-bridge-code-quality.json", bridge_data)
-
-# AT session start (first action in --loop iteration)
-def restore_tasks_from_ralph():
-    if exists(".claude/state/task-bridge-code-quality.json"):
-        bridge = read_json(".claude/state/task-bridge-code-quality.json")
-        for task in bridge["tasks"]:
-            if task["status"] != "completed":
-                TaskCreate(subject=task["subject"],
-                          blockedBy=task["blockedBy"],
-                          metadata=task["metadata"])
-```
+`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
 
 ### Progress Summary Pattern
 

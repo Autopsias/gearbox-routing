@@ -16,17 +16,17 @@ Small slash commands. Install only the rows you want.
 | `/research <topic>` | Marks the session as research, so that automatic compaction waits much longer. | The [compaction policy](compaction.md) hook. Without it the command changes nothing. | A large context costs more on each turn. |
 | `/wait-what` | Asks Claude to explain its last reply again in plain words. Uses no tools. | Nothing | — |
 | `/nextsession [focus]` | Writes a self-contained prompt to continue the work in a new session. | Nothing | — |
-| `/improve [focus]` | Looks back over your sessions and proposes missing rules, skills and memory; `/improve audit` scores what exists and proposes deletions. | `harness/references/improve/` | It edits `CLAUDE.md`, skills, memory and settings after you accept a finding. Some steps assume the original author's deploy tool; skip them. One optional step calls a script that is not shipped. |
+| `/improve [focus]` | Looks back over your sessions and proposes missing rules, skills and memory; `/improve audit` scores what exists and proposes deletions. | `harness/references/improve/`, `harness/scripts/improve_ask_classes.py` | It edits `CLAUDE.md`, skills, memory and settings after you accept a finding. Some steps assume the original author's deploy tool; skip them. |
 | `/pr [status\|sync\|create\|merge]` | `/pr` alone stages, commits and pushes. Other forms show the PR status, merge the base branch in, or hand off to a subagent. | `git`, `gh` (signed in), `jq`; the `pr-workflow-manager` subagent for `create` and `merge`. | **`/pr` alone runs `git add -A`, commits and pushes without asking.** |
-| `/parallel <task>` | Splits a task across specialist subagents. | — | **Does not work as shipped:** the `parallel-orchestrator` subagent it calls is not in this repo. |
 
 ## Install
 
 ```bash
-mkdir -p ~/.claude/commands ~/.claude/references ~/.claude/agents
+mkdir -p ~/.claude/commands ~/.claude/references ~/.claude/agents ~/.claude/scripts
 cp harness/commands/{review,research,wait-what,nextsession,pr}.md ~/.claude/commands/
 cp harness/commands/improve.md ~/.claude/commands/
 cp -R harness/references/improve ~/.claude/references/
+cp harness/scripts/improve_ask_classes.py ~/.claude/scripts/
 cp harness/agents/pr-workflow-manager.md ~/.claude/agents/      # for /pr create and /pr merge
 ```
 
@@ -41,5 +41,12 @@ no tool runs. In a repo with no pull request, `/pr status` prints
 ```bash
 rm ~/.claude/commands/{review,research,wait-what,nextsession,improve,pr}.md
 rm -r ~/.claude/references/improve
+rm ~/.claude/scripts/improve_ask_classes.py
 rm ~/.claude/agents/pr-workflow-manager.md
 ```
+
+## Archived
+
+`harness/commands-archive/` holds `/parallel` and `/user-testing`. The
+subagents they call were retired, so the original setup archived them too.
+Do not install them.

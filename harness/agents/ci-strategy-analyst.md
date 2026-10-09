@@ -107,7 +107,7 @@ Propose fixes for root causes, not symptoms: a symptom fix recurs unless the und
 
 Your output will be used by:
 - `ci-infrastructure-builder` agent to create GitHub Actions and configs
-- `ci-documentation-generator` agent to create runbooks
+- `general-purpose` agent (`model="haiku"`) to create runbooks
 - The main orchestrator to decide next steps
 
 Be specific and actionable. Vague recommendations like "improve test quality" are not helpful.

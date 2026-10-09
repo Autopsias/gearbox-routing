@@ -1,3 +1,5 @@
+> **Retired 2026-06-20.** The runner script this page describes was removed; no command launches it any more. Kept for history. For unattended runs use `/loop` or `/epic-dev --auto`.
+
 # Ralph Loop Pattern Library
 
 Provides the fresh-context loop pattern for unattended/overnight command execution.

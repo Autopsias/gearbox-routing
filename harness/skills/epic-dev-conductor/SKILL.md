@@ -9,7 +9,7 @@ A top-level conductor for **any** BMAD build. It **orchestrates `/epic-dev`** �
 
 ## What this is — and is NOT (read once)
 
-- **Driver = `/epic-dev` + the ralph loop.** This skill picks the mode, drives one epic to its next boundary, and stops at the gates. The 8-phase per-story cycle, the DoD, and `sprint-status.yaml` belong to `/epic-dev`.
+- **Driver = `/epic-dev` (with `--auto` for unattended runs).** This skill picks the mode, drives one epic to its next boundary, and stops at the gates. The 8-phase per-story cycle, the DoD, and `sprint-status.yaml` belong to `/epic-dev`.
 - **NOT a Workflow; NOT "ultracode-driven".** Workflows cannot span the build's many sessions or pause for human gates, so they cannot host the build. This skill uses a Workflow **only** for bounded verification at epic boundaries (Step 6).
 - **Run as the top-level agent.** `/epic-dev`'s `Task` delegation silently no-ops inside a subagent or Workflow agent. If you are not the main thread, STOP and say so.
 
@@ -49,7 +49,6 @@ Epic-Dev Conductor — Epic N
    - **Never `--force-model` on a high-risk epic.** Headless gates degrade unpredictably and can mark a FAIL story `done`.
    - Correctness and plumbing epics → **`--yolo` in this live session** (you stay reachable for gate escalations).
    - High-risk / irreversible epics → **`--interactive`**.
-   - Fully headless `--loop` → trivial plumbing only, watching `/tmp/ralph-loop-*.log`.
 5. **Drive the epic — STORY-BY-STORY.** Run `/epic-dev <N> --full <mode>` but drive it **one story at a time** so the conductor regains control at every story boundary (don't hand the whole epic to `/epic-dev`'s internal multi-story loop, or the per-story CI gate is skipped). Let `/epic-dev` own each story's 8-phase cycle; after each story reaches `done`, run **Step 5a, then auto-advance per Step 5b (do not pause for the operator between two clean stories)**.
    - **Resilience + throughput (every phase, every story — [REFERENCE.md](REFERENCE.md) §7):** if a delegated phase dies on the harness watchdog (~600 s no output) or returns nothing, **inspect on-disk state** and either re-dispatch with a tightened/bounded scope or accept the work on evidence — never assume pass/fail from a stall. When a phase will run a long, quiet step (full test suite, big build), tell the agent to background-and-poll it and emit progress so it doesn't trip the watchdog. Use the project's fastest/parallel test invocation for any verification you run, run independent checks (typecheck/lint/contracts/tests) concurrently, and don't redundantly re-run an identical just-green suite — this throughput rule never overrides the §3 correctness re-derivations.
 5a. **Inter-story CI gate (after EVERY story `done`, before the next story starts).** This is a **hard gate — the next story does not begin until CI is green.** See [REFERENCE.md](REFERENCE.md) §6 for the exact procedure. In short:

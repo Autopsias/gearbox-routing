@@ -177,6 +177,11 @@ a whole. You pick modules from [`MODULES.md`](MODULES.md) and copy their files.
 5. **Read the card's "Cautions" first.** Some modules block commands, kill
    processes or delete files. The card says which.
 
+Some skills and commands tell you to edit `~/your-private-harness` and run
+`gearbox deploy`. That is the original author's deploy flow: a private source
+repo that deploys to `~/.claude`. Without it, edit the files in `~/.claude`
+directly and skip those steps.
+
 ### The steps for one module
 
 1. Open the module's card in [`MODULES.md`](MODULES.md).
@@ -195,7 +200,6 @@ with their context cost. It asks before it changes anything
 ### Remove a module
 
 Do the card's **Remove** steps: delete the files it lists, and delete its
-entries from `~/.claude/settings.json`. If you merged a hook entry and then
-delete its file, most hook entries skip themselves when the file is missing,
-but two do not (`routing-cadence-check.py` and `safe-refactor-advisory.sh`).
-Delete their `settings.json` entries too, or every session shows an error.
+entries from `~/.claude/settings.json`. Every hook entry on the cards starts
+with a check that its file exists, so a hook file that you delete first does no
+harm; still delete its entry to keep the settings file clean.

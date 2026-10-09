@@ -42,9 +42,9 @@ This file contains the detailed agent mapping, parallel execution rules, conflic
 
 ### SECURITY & PERFORMANCE FAILURES
 - Security vulnerability detection → security-scanner
-- Performance regression detection → performance-test-fixer
+- Performance regression detection → unit-test-fixer
 - Dependency vulnerabilities → security-scanner
-- Load testing failures → performance-test-fixer
+- Load testing failures → unit-test-fixer
 
 ### INFRASTRUCTURE FAILURES
 - GitHub Actions workflow syntax → general-purpose (workflow config)
@@ -63,7 +63,7 @@ This file contains the detailed agent mapping, parallel execution rules, conflic
 | Database tests | database-test-fixer | sonnet |
 | E2E tests | e2e-test-fixer | sonnet |
 | Security | security-scanner | sonnet |
-| Performance | performance-test-fixer | sonnet |
+| Performance | unit-test-fixer | sonnet |
 | Infrastructure | general-purpose | sonnet |
 
 ## CI Work Package Analysis (READ-ONLY)

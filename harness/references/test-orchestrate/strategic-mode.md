@@ -29,7 +29,7 @@ If STRATEGIC_MODE=true:
 ### 7a. Launch Test Strategy Analyst
 
 ```
-Task(subagent_type="test-strategy-analyst",
+Task(subagent_type="ci-strategy-analyst",
      model="opus",
      description="Analyze recurring test failures",
      prompt="Analyze test failures in this project using Five Whys methodology.
@@ -63,7 +63,7 @@ If fixes are recommended, proceed to STEP 8 (agent dispatch).
 
 If significant insights were found:
 ```
-Task(subagent_type="test-documentation-generator",
+Task(subagent_type="general-purpose",
      model="haiku",
      description="Generate test knowledge documentation",
      prompt="Based on the strategic analysis results, generate:

@@ -22,7 +22,7 @@ in the source worktree `~/your-private-harness`, then deploy (`gearbox-deploy` o
    - Additional reference files if content exceeds 500 lines
    - Utility scripts if deterministic operations needed
 
-3. **Score against the quality rubric** - before presenting, walk the 16 criteria in
+3. **Score against the quality rubric** - before presenting, walk the 17 criteria in
    [references/skill-quality-rubric.md](references/skill-quality-rubric.md) (TRIGGER /
    STRUCTURE / STEERING / PRUNING). Nothing ships with a criterion at 0. The same rubric
    applies when UPDATING an existing skill, not just creating one.
@@ -112,4 +112,4 @@ After drafting, verify:
 - [ ] Consistent terminology
 - [ ] Concrete examples included
 - [ ] References one level deep
-- [ ] Full 16-criterion pass: [references/skill-quality-rubric.md](references/skill-quality-rubric.md) — also mandatory when updating existing skills
+- [ ] Full 17-criterion pass: [references/skill-quality-rubric.md](references/skill-quality-rubric.md) — also mandatory when updating existing skills

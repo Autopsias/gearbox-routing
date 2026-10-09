@@ -56,17 +56,22 @@ Keep `references/shared` and `references/lib` if another module uses them.
 - **They edit code, commit and push.** `/test-orchestrate` chains to
   `/commit-orchestrate` unless you pass `--no-chain`. `/ship-tail` pushes and
   opens a pull request.
-- `--loop` (in `/test-orchestrate`, `/ci-orchestrate` and `/code-quality`)
-  calls a script that is not in this repo. Only `--loop` fails.
-- The `--strategic` modes call three subagents that are not in this repo
-  (`test-strategy-analyst`, `test-documentation-generator`,
-  `ci-documentation-generator`). Only those modes fail.
-- `/commit-orchestrate` has a `--skip-hooks` flag. Do not use it to skip your
-  repo's checks.
+- The `--strategic` modes use the `ci-strategy-analyst` subagent from
+  [support agents](support-agents.md).
+- `/commit-orchestrate` always runs your repo's git hooks. It has no flag to
+  skip them.
 
-## Not working as shipped: `/user-testing` and `/usertestgates`
+## Test gates for BMAD projects (`/usertestgates`)
 
-`harness/commands/user-testing.md` and `usertestgates.md` say in their headers
-that they are project-specific. `/user-testing` needs six subagents, and
-`/usertestgates` needs a `~/.claude/lib/testgates_discovery.py` script. None of
-them are in this repo. Do not install these two.
+`/usertestgates` finds the next test gate that has not run, from the gate list
+in your project's `docs/epics.md`, and runs its script from `user-testing/scripts/`.
+Its header says it is project-specific: it fits a BMAD project with that layout.
+
+```bash
+mkdir -p ~/.claude/commands ~/.claude/references ~/.claude/lib
+cp harness/commands/usertestgates.md ~/.claude/commands/
+cp -R harness/references/usertestgates ~/.claude/references/
+cp harness/lib/testgates_discovery.py ~/.claude/lib/
+```
+
+`/user-testing` is archived (see [general commands](general-commands.md#archived)).

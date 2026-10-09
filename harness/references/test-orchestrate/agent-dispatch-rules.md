@@ -284,12 +284,12 @@ If no intent block is present, classify on objective grounds only.]
 
 | Agent Type | Model | Rationale |
 |------------|-------|-----------|
-| test-strategy-analyst | opus | Complex research + Five Whys |
+| ci-strategy-analyst | opus | Complex research + Five Whys |
 | unit/api/database/e2e-test-fixer | sonnet | Balanced speed + quality |
 | type-error-fixer | sonnet | Type inference complexity |
 | import-error-fixer | haiku | Simple pattern matching |
 | linting-fixer | haiku | Rule-based fixes |
-| test-documentation-generator | haiku | Template-based docs |
+| general-purpose (docs) | haiku | Template-based docs |
 
 ## Dispatch Example (with Model Strategy + JSON Output)
 

@@ -130,12 +130,12 @@ never what you read for. Never import an item from it.>
 
 ### Rung 1 — cross-vendor CLI, read-only, pinned model
 
-The default wherever the probe passes. Verified against codex-cli 0.146.0.
+The default wherever the probe passes. Verified against codex-cli 0.146.0; the model pin moved to gpt-6.1-sol (probed with `--output-schema` on codex-cli 0.159.3), matching `codex_orchestrator.model` in model-routing.yaml.
 
 ```bash
 codex exec \
   -s read-only \
-  -m gpt-5.6-sol -c model_reasoning_effort=xhigh \
+  -m gpt-6.1-sol -c model_reasoning_effort=xhigh \
   -C "$RUN_DIR" --skip-git-repo-check \
   --output-schema "$RUN_DIR/critic-schema.json" \
   -o "$RUN_DIR/critique/critic-response.json" \
@@ -147,7 +147,7 @@ Every flag is load-bearing:
 
 - **`-s read-only`** is what makes "the critic cannot edit" structural. The sandbox denies writes; the
   model cannot drift out of it. Never raise it, never substitute `workspace-write`.
-- **`-m gpt-5.6-sol -c model_reasoning_effort=xhigh`** — both pinned explicitly on every dispatch, never
+- **`-m gpt-6.1-sol -c model_reasoning_effort=xhigh`** — both pinned explicitly on every dispatch, never
   inherited from the local Codex config, so the critic is the same critic on every machine. The lane is
   never `ultra`.
 - **`--output-schema`** enforces the envelope at the transport, so Step 4's validation is the second
@@ -163,7 +163,7 @@ python3 ~/.claude/scripts/codex_supervised.py \
   --prompt-file "$RUN_DIR/critique/critic-prompt.md" \
   --out        "$RUN_DIR/critique/critic-response.json" \
   --log        "$RUN_DIR/critique/critic-events.jsonl" \
-  --model gpt-5.6-sol --effort xhigh \
+  --model gpt-6.1-sol --effort xhigh \
   --cwd "$RUN_DIR" --sandbox read-only \
   --idle-timeout 180 --max-attempts 3 --total-deadline 1800
 ```

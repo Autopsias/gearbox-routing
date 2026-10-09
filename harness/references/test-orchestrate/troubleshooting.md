@@ -1,70 +1,13 @@
 # Troubleshooting & Error Handling
 
 ## Contents
-- [Ralph Loop Mode (--loop)](#ralph-loop-mode---loop)
 - [Type-Level Mode (--fix-single-type)](#type-level-mode---fix-single-type)
 - [Depth Protection](#depth-protection-prevent-infinite-loops)
 - [Intelligent Chain Invocation (STEP 10)](#intelligent-chain-invocation-step-10)
 
-## Ralph Loop Mode (--loop)
+## Ralph Loop Mode (retired)
 
-**If `--loop` is present in arguments, launch the real Ralph Loop runner script.**
-
-This spawns fresh Claude instances per iteration via `~/.claude/scripts/ralph-loop-runner.sh`.
-Each iteration gets clean context with the command file injected via `--append-system-prompt`.
-
-```
-IF "$ARGUMENTS" contains "--loop":
-
-  # Extract loop parameters
-  loop_max = extract_number_after("--loop", default=10)
-  loop_delay = extract_number_after("--loop-delay", default=5)
-
-  # Determine inner command flags (preserve all except --loop)
-  inner_flags = "$ARGUMENTS" without "--loop" and "--loop-delay"
-
-  Output: "════════════════════════════════════════════════════════"
-  Output: "RALPH LOOP MODE ACTIVATED (Test Orchestration)"
-  Output: "════════════════════════════════════════════════════════"
-  Output: "  Max iterations: {loop_max}"
-  Output: "  Delay between iterations: {loop_delay}s"
-  Output: "  Fresh context per iteration: YES"
-  Output: "  Mode: Unattended test fixing"
-  Output: "  Inner flags: {inner_flags}"
-  Output: "  Runner: ~/.claude/scripts/ralph-loop-runner.sh"
-  Output: "════════════════════════════════════════════════════════"
-  Output: ""
-
-  # Launch the real bash runner script in background via Bash tool
-  # with run_in_background=true and timeout=600000 (10 hours max)
-  Run via Bash(run_in_background=true, timeout=600000):
-
-  ```bash
-  nohup bash "$HOME/.claude/scripts/ralph-loop-runner.sh" \
-    --command "test-orchestrate" \
-    --args "{inner_flags} --fix-single-type" \
-    --max-iterations {loop_max} \
-    --delay {loop_delay} \
-    --timeout 12 \
-    --model sonnet \
-    --completion-regex "All tests passing|PYTEST_FAILURES=0.*VITEST_FAILURES=0|0 failures" \
-    > /tmp/ralph-loop-test-orchestrate.log 2>&1 &
-  echo "PID=$!"
-  ```
-
-  Output:
-  - "Ralph loop started in background"
-  - "PID: {pid}"
-  - "Log: /tmp/ralph-loop-test-orchestrate.log"
-  - "Monitor: tail -f /tmp/ralph-loop-test-orchestrate.log"
-  - "Stop: kill {pid}"
-  EXIT
-
-ELSE:
-  # Normal execution - continue to STEP 1
-  PROCEED TO STEP 1
-END IF
-```
+`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
 
 ## Type-Level Mode (--fix-single-type)
 

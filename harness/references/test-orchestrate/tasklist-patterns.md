@@ -87,9 +87,9 @@ TaskUpdate(
 TaskUpdate(taskId=type_task, status="completed")
 ```
 
-## Ralph Loop Bridge Pattern
+## Cross-Session Task Persistence
 
-When using `--loop`, persist task state for cross-session recovery:
+To persist task state for cross-session recovery:
 
 ```
 # Before exiting session:

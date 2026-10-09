@@ -1,6 +1,6 @@
 ---
 description: "Analyzes CI/CD pipeline failures, categorizes issues (lint, type, test, build), and dispatches parallel specialist agents to fix them. Use when you say 'fix CI', 'CI is failing', 'pipeline broken', 'fix GitHub Actions'."
-argument-hint: "[issue] [--fix-all] [--strategic] [--research] [--docs] [--force-escalate] [--check-actions] [--quality-gates] [--performance] [--intent=<block>] [--only-stage=<stage>] [--loop N] [--loop-delay S] [--fix-single-category]"
+argument-hint: "[issue] [--fix-all] [--strategic] [--research] [--docs] [--force-escalate] [--check-actions] [--quality-gates] [--performance] [--intent=<block>] [--only-stage=<stage>] [--fix-single-category]"
 allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "WebSearch", "WebFetch", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
@@ -9,8 +9,6 @@ allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "W
 Use TaskList tools to track CI category fixes and provide visibility into orchestration progress.
 
 **Workflow:** After mode detection, check `TaskList()` for existing state. After category detection, create priority-ordered tasks (P0: imports/types, P1: linting/tests, P2: security) with `blockedBy` dependencies. When dispatching agents, create agent-level tasks and update status on completion.
-
-**Ralph Loop Bridge:** When using `--loop`, persist task state to `.claude/state/task-bridge.json` before exiting and restore on next session start.
 
 **Progress Summary:** Always include a TaskList summary table in output showing task ID, subject, and status.
 
@@ -75,40 +73,7 @@ fi
 **STEP 0.1.5: Execute Targeted Stage (if --only-stage specified)**
 If `TARGET_STAGE != "all"`: detect CI platform from workflow files, check for `skip_to_stage` input support, trigger via `gh workflow run` with `-f skip_to_stage="$TARGET_STAGE"`, then exit.
 
-**STEP 0.1.6: Ralph Loop Mode Detection**
-
-If `--loop` is present, launch the Ralph Loop runner script in background:
-
-```
-IF "$ARGUMENTS" contains "--loop":
-  loop_max = extract_number_after("--loop", default=10)
-  loop_delay = extract_number_after("--loop-delay", default=5)
-  inner_flags = "$ARGUMENTS" without "--loop" and "--loop-delay"
-
-  IF "{inner_flags}" contains "--strategic":
-    timeout_minutes = 20, model = "opus"
-  ELSE:
-    timeout_minutes = 10, model = "sonnet"
-
-  Run via Bash(run_in_background=true, timeout=600000):
-  ```bash
-  nohup bash "$HOME/.claude/scripts/ralph-loop-runner.sh" \
-    --command "ci-orchestrate" \
-    --args "{inner_flags} --fix-single-category" \
-    --max-iterations {loop_max} \
-    --delay {loop_delay} \
-    --timeout {timeout_minutes} \
-    --model {model} \
-    --completion-regex "All CI checks passing|CI_STATUS.*passing|CI pipeline.*PASS" \
-    > /tmp/ralph-loop-ci-orchestrate.log 2>&1 &
-  echo "PID=$!"
-  ```
-
-  Output PID, log path, monitor/stop commands. EXIT.
-ELSE:
-  PROCEED TO STEP 0.2
-END IF
-```
+`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
 
 **STEP 0.2: Check for Auto-Escalation**
 
@@ -187,7 +152,7 @@ CRITICAL: Launch multiple Task agents simultaneously in a SINGLE response. NEVER
 | Strategic research | ci-strategy-analyst | opus |
 | Root cause analysis | digdeep | opus |
 | Infrastructure | ci-infrastructure-builder | sonnet |
-| Documentation | ci-documentation-generator | haiku |
+| Documentation | general-purpose (docs) | haiku |
 | Linting/formatting | linting-fixer | haiku |
 | Type errors | type-error-fixer | sonnet |
 | Import errors | import-error-fixer | haiku |

@@ -1,7 +1,7 @@
 ---
 name: test-orchestrate
 description: "Analyzes test failures and dispatches parallel specialist agents (unit-test-fixer, api-test-fixer, database-test-fixer, e2e-test-fixer) to fix them. Use when you say 'fix tests', 'tests are failing', 'test orchestrator', or need strategic test failure analysis. For the full commit->push->PR->CI-green chain, use /ship-tail instead (which calls this internally as its test-fix step)."
-argument-hint: "[test_scope] [--run-first] [--coverage] [--fast] [--strategic] [--research] [--force-escalate] [--no-chain] [--intent=<block>] [--api-only] [--database-only] [--vitest-only] [--pytest-only] [--playwright-only] [--only-category=<unit|integration|e2e|acceptance>] [--loop N] [--loop-delay S] [--fix-single-type]"
+argument-hint: "[test_scope] [--run-first] [--coverage] [--fast] [--strategic] [--research] [--force-escalate] [--no-chain] [--intent=<block>] [--api-only] [--database-only] [--vitest-only] [--pytest-only] [--playwright-only] [--only-category=<unit|integration|e2e|acceptance>] [--fix-single-type]"
 allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 disable-model-invocation: false
 ---
@@ -20,7 +20,6 @@ Execute this test orchestration procedure for: "$ARGUMENTS"
 
 ```
 [ ] STEP 0    Mode detection + auto-escalation + depth protection
-[ ] STEP 0.5  Ralph Loop mode detection (--loop)
 [ ] STEP 0.6  Type-level mode detection (--fix-single-type)
 [ ] STEP 1    Parse arguments
 [ ] STEP 2    Discover cached test results
@@ -104,7 +103,7 @@ Report the mode: "Operating in [TACTICAL/STRATEGIC] mode."
 
 ## STEP 0.5: Ralph Loop Mode Detection
 
-**If `--loop` is present:** Read `~/.claude/references/test-orchestrate/troubleshooting.md` for Ralph Loop launch instructions, then EXIT.
+`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
 
 ---
 
@@ -415,8 +414,8 @@ Then: Run tests in VS Code -> `/test_orchestrate` reads cached results -> Fixes 
 | Selectors, timeouts, E2E | e2e-test-fixer | sonnet | Required |
 | Type annotations, mypy | type-error-fixer | sonnet | Required |
 | Imports, modules, paths | import-error-fixer | haiku | Required |
-| Strategic analysis | test-strategy-analyst | opus | Required |
-| Documentation | test-documentation-generator | haiku | Required |
+| Strategic analysis | ci-strategy-analyst | opus | Required |
+| Documentation | general-purpose (docs) | haiku | Required |
 
 ## Findings output: the Uniform Findings Contract
 

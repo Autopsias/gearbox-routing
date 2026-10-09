@@ -131,7 +131,7 @@ DO NOT include full file contents.")
 Generate documentation for team reference:
 
 ```
-Task(subagent_type="ci-documentation-generator",
+Task(subagent_type="general-purpose",
      model="haiku",
      description="Generate CI docs",
      prompt="Create/update CI documentation based on analysis and infrastructure changes:
@@ -165,4 +165,4 @@ DO NOT include file contents.")
 | ci-strategy-analyst | opus | 1 (Research) | CI best practices research |
 | digdeep | opus | 1 (Research) | Five Whys root cause analysis |
 | ci-infrastructure-builder | sonnet | 2 (Infra) | CI config improvements |
-| ci-documentation-generator | haiku | 3 (Docs) | Runbook/strategy docs |
+| general-purpose (docs) | haiku | 3 (Docs) | Runbook/strategy docs |

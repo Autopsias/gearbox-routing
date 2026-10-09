@@ -60,5 +60,3 @@ Delete each agent file and its `references/<agent>/` folder.
 - **`general-purpose.md` changes every untyped subagent on your machine.**
   Install it only if you want that.
 - `digdeep` and the AWS agents can spend money on paid search tools.
-- `harness/agents/references/` also holds folders for two agents that are not
-  shipped (`chrome-browser-executor`, `parallel-orchestrator`). Ignore them.
