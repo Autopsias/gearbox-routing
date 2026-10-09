@@ -112,9 +112,10 @@ def test_the_exported_runner_can_climb_the_mirrored_policy(tmp_path):
 def test_task_token_rewrite_fails_closed_on_an_unknown_id():
     import pytest
 
-    bad = "providers:\n  anthropic:\n    models:\n      cheap_fast: mystery-model\n"
-    with pytest.raises(sync.SyncError):
-        sync.to_task_tokens(bad)
+    for provider, model in (("anthropic", "mystery-model"), ("zai", "glm-5.3-flashx"), ("zai", "glm-mystery")):
+        bad = f"providers:\n  {provider}:\n    models:\n      cheap_fast: {model}\n"
+        with pytest.raises(sync.SyncError):
+            sync.to_task_tokens(bad)
 
 
 def test_mirror_fails_closed_when_the_public_policy_is_missing(tmp_path):

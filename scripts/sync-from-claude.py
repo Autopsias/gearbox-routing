@@ -643,9 +643,11 @@ _HARNESS_POLICY_NOTE = ("# HARNESS COPY of claude/model-routing.yaml, written by
 def _task_token(provider: str, model_id: str) -> str | None:
     if provider == "anthropic":
         return next((t for t in ("haiku", "sonnet", "opus", "fable") if t in model_id), None)
-    if model_id.startswith("glm-"):
-        return "sonnet" if model_id.endswith("-flash") else "opus"
-    return None
+    if re.fullmatch(r"glm-\d+(\.\d+)*-flash", model_id):
+        return "sonnet"
+    if re.fullmatch(r"glm-\d+(\.\d+)*", model_id):
+        return "opus"
+    return None   # e.g. glm-5.3-flashx: no known Task-token slot, so the export stops
 
 
 def to_task_tokens(text: str) -> str:

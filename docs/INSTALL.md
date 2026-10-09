@@ -65,8 +65,10 @@ drift between the policy file and the files made from it.
 
 Exit codes: `0` installed and the check passed · `1` installed, but the check
 found drift · `2` refused before it wrote anything (bad flag, missing opt-in,
-version guard, or `ROUTING` markers in `CLAUDE.md` that the renderer refuses —
-it tries the render on a scratch copy first).
+version guard, a missing source file, or `ROUTING` markers in `CLAUDE.md` that
+the renderer refuses — it tries the render on a scratch copy first). A tool
+failure after the first write also exits `2`; the ledger below then lists what
+was already written, and `--uninstall` reverts it.
 
 Every backup the installer makes and every file it creates is listed in
 `<home>/claude/.gearbox-install-ledger`. `--uninstall` reads that list.
@@ -174,9 +176,13 @@ first case.
   them as `created`; delete those files yourself if you want them gone. Do not
   delete whole folders: a folder can also hold files that uninstall just
   restored.
-- An install made before the ledger existed has no list. Uninstall then looks
-  for `.bak-*` files only in `claude/`, `skills/routing-update/`,
-  `skills/routing-retro/` and next to `CLAUDE.md`.
+- An install made before the ledger existed has no list. Uninstall then
+  restores only the installer's own backups (`<file>.bak-<14-digit timestamp>`)
+  of the files it manages, the oldest one per file. The first update of such an
+  install records those backups in a new ledger first, so they stay the restore
+  target. One limit remains for these older installs: if the installer created
+  `CLAUDE.md` and a later update backed it up, that backup already holds the
+  routing block. Remove the block by hand if it is still there after uninstall.
 
 ---
 

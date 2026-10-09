@@ -24,12 +24,14 @@ All notable changes to the Gearbox routing policy and framework. Format follows
   the run up front instead of after the files were copied.
 - **A symlink to `~/.claude` under another name** now needs the live-home
   opt-in like the real path.
-- **`/cost-audit` and `/routing-retro` price long Haiku 5.5 requests right.**
+- **`/cost-audit` prices long Haiku 5.5 requests right.**
   `claude/model-routing.yaml` → v2.7.0 (MINOR: price data): the
   `claude-haiku-5-5` price row gains a `long_prompt` row. A request over
   100,000 prompt tokens bills whole at $0.50 / $2.50 per MTok. Per-dispatch
   plan costs still use the short rate, because a dispatch total cannot be split
-  by request size.
+  by request size. Known issue: the exported `routing-retro` scanner
+  (`harness/skills/routing-retro/scripts/retro_scan.py`) expects the private
+  flat `prices:` layout and stops on this repo's per-provider `prices:` block.
 - **`/test-orchestrate` and the other chains call `/commit-orchestrate`** (and
   `/test-orchestrate`, `/ci-orchestrate`); they called underscore names that
   do not exist.

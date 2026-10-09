@@ -28,8 +28,9 @@
 #
 # Exit codes: 0 = installed clean, guard PASS. 1 = guard FAIL (installed but
 # drift found). 2 = refused before installing anything (bad flags, missing
-# opt-in, version/force guard tripped, CLAUDE.md markers the renderer refuses —
-# checked on a scratch copy before the first write) or a tooling failure.
+# opt-in, version/force guard tripped, a missing source file, CLAUDE.md markers
+# the renderer refuses — all checked before the first write), or a tooling
+# failure after the first write (the ledger then lists what was written).
 #
 # Every backup this script makes and every file it creates is recorded in
 # <home>/claude/.gearbox-install-ledger (first state per file wins), so
@@ -110,6 +111,47 @@ fi
 REAL_HOME_CLAUDE="$(cd "$HOME" && pwd -P)/.claude"
 [[ -d "$REAL_HOME_CLAUDE" ]] && REAL_HOME_CLAUDE="$(cd "$REAL_HOME_CLAUDE" && pwd -P)"
 LEDGER="$CLAUDE_HOME/claude/.gearbox-install-ledger"
+
+# Every path install.sh writes (src in this repo : dst under the target home).
+# claude/model-routing.yaml and CLAUDE.md are handled separately below.
+declare -a COPY_PAIRS=(
+  "claude/model-routing.digest.md:claude/model-routing.digest.md"
+  "claude/skills/routing-update:skills/routing-update"
+  "claude/skills/routing-retro:skills/routing-retro"
+  "claude/scripts/verify-routing.sh:claude/scripts/verify-routing.sh"
+  "claude/scripts/render-routing-digest.py:claude/scripts/render-routing-digest.py"
+  "claude/scripts/resolve_route.py:claude/scripts/resolve_route.py"
+  "claude/evals/routing:claude/evals/routing"
+  "claude/fixtures/routing-guard:claude/fixtures/routing-guard"
+  "claude/fixtures/route-resolver:claude/fixtures/route-resolver"
+)
+
+
+managed_rels() {
+  # The files install.sh writes, relative to the target home, one per line.
+  printf '%s\n' "claude/model-routing.yaml" "CLAUDE.md"
+  local pair src_rel dst_rel
+  for pair in "${COPY_PAIRS[@]}"; do
+    src_rel="${pair%%:*}"; dst_rel="${pair##*:}"
+    if [[ -d "$REPO_DIR/$src_rel" ]]; then
+      (cd "$REPO_DIR/$src_rel" && find . -type f | sed "s|^\./|$dst_rel/|")
+    else
+      printf '%s\n' "$dst_rel"
+    fi
+  done
+}
+
+legacy_backups() {
+  # For an install made before the ledger existed: the OLDEST backup install.sh
+  # made of each file it manages (its own .bak-<14-digit timestamp> names only),
+  # as "rel<TAB>bak-rel" lines. Other tools' backups never match.
+  local rel bak
+  while IFS= read -r rel; do
+    bak="$(cd "$CLAUDE_HOME" && ls -1 "$rel".bak-* 2>/dev/null | grep -E '\.bak-[0-9]{14}$' | sort | head -1 || true)"
+    [[ -n "$bak" ]] && printf '%s\t%s\n' "$rel" "$bak"
+  done < <(managed_rels)
+  return 0
+}
 if [[ "$CLAUDE_HOME" == "$REAL_HOME_CLAUDE" && $UNDERSTAND_LIVE -ne 1 ]]; then
   echo "FATAL: --claude-home resolves to your real $HOME/.claude." >&2
   echo "This installer refuses to touch the live Claude home without an explicit opt-in." >&2
@@ -140,10 +182,11 @@ if [[ $UNINSTALL -eq 1 ]]; then
     # `created` = the file did not exist before install.sh wrote it.
     while IFS=$'\t' read -r kind rel bak; do
       if [[ "$kind" == "backup" ]]; then
+        # CLAUDE.md existed before install.sh: never strip it, even if its backup is gone.
+        [[ "$CLAUDE_HOME/$rel" == "$claude_md" ]] && claude_md_had_backup=1
         if [[ -f "$CLAUDE_HOME/$bak" ]]; then
           cp -p "$CLAUDE_HOME/$bak" "$CLAUDE_HOME/$rel"
           echo "  restored: $CLAUDE_HOME/$rel (from $bak)"
-          [[ "$CLAUDE_HOME/$rel" == "$claude_md" ]] && claude_md_had_backup=1
           restored=$((restored + 1))
         else
           echo "  WARNING: recorded backup $bak is missing — $rel left as is" >&2
@@ -151,22 +194,15 @@ if [[ $UNINSTALL -eq 1 ]]; then
       fi
     done < "$LEDGER"
   else
-    # Installs made before the ledger existed: look only where install.sh writes,
-    # never at other tools' backups elsewhere under the home. Newest first, so the
-    # oldest backup of a file is copied last and wins.
-    echo "== uninstall: no install ledger — restoring .bak-* files in install.sh's own paths =="
-    roots=()
-    for r in "$CLAUDE_HOME/claude" "$CLAUDE_HOME/skills/routing-update" "$CLAUDE_HOME/skills/routing-retro"; do
-      [[ -d "$r" ]] && roots+=("$r")
-    done
-    while IFS= read -r -d '' bak; do
-      orig="${bak%.bak-*}"
-      cp -p "$bak" "$orig"
-      echo "  restored: $orig (from $(basename "$bak"))"
-      [[ "$orig" == "$claude_md" ]] && claude_md_had_backup=1
+    # Installs made before the ledger existed: restore only install.sh's own
+    # backups of the files it manages, the oldest one per file.
+    echo "== uninstall: no install ledger — restoring install.sh's own backups of the files it manages =="
+    while IFS=$'\t' read -r rel bak; do
+      cp -p "$CLAUDE_HOME/$bak" "$CLAUDE_HOME/$rel"
+      echo "  restored: $CLAUDE_HOME/$rel (from $bak)"
+      [[ "$rel" == "CLAUDE.md" ]] && claude_md_had_backup=1
       restored=$((restored + 1))
-    done < <( { [[ ${#roots[@]} -gt 0 ]] && find "${roots[@]}" -name '*.bak-*' -print0
-                find "$CLAUDE_HOME" -maxdepth 1 -name 'CLAUDE.md.bak-*' -print0; } | sort -z -t- -k99 -r)
+    done < <(legacy_backups)
   fi
   echo "  restored $restored file(s) from backup."
   echo
@@ -270,18 +306,6 @@ fi
 # anthropic; the previously-installed file has whatever --provider set it to)
 # and spuriously back up + rewrite on every single run, breaking idempotency.
 # ---------------------------------------------------------------------------
-declare -a COPY_PAIRS=(
-  "claude/model-routing.digest.md:claude/model-routing.digest.md"
-  "claude/skills/routing-update:skills/routing-update"
-  "claude/skills/routing-retro:skills/routing-retro"
-  "claude/scripts/verify-routing.sh:claude/scripts/verify-routing.sh"
-  "claude/scripts/render-routing-digest.py:claude/scripts/render-routing-digest.py"
-  "claude/scripts/resolve_route.py:claude/scripts/resolve_route.py"
-  "claude/evals/routing:claude/evals/routing"
-  "claude/fixtures/routing-guard:claude/fixtures/routing-guard"
-  "claude/fixtures/route-resolver:claude/fixtures/route-resolver"
-)
-
 backups=()
 copies=()
 
@@ -290,6 +314,11 @@ ledger_note() {
   # state recorded for a path wins: that is the state before the first install.
   local kind="$1" rel="${2#"$CLAUDE_HOME"/}" bak="${3:+${3#"$CLAUDE_HOME"/}}"
   mkdir -p "$(dirname "$LEDGER")"
+  if [[ ! -f "$LEDGER" && -f "$CLAUDE_HOME/claude/model-routing.yaml" ]]; then
+    # First update of an install made before the ledger existed: its original
+    # backups are the pre-install state, so record them before anything newer.
+    legacy_backups | awk -F'\t' '{ printf "backup\t%s\t%s\n", $1, $2 }' > "$LEDGER"
+  fi
   if [[ -f "$LEDGER" ]] && awk -F'\t' -v p="$rel" '$2 == p { f = 1 } END { exit !f }' "$LEDGER"; then
     return 0
   fi
@@ -351,6 +380,14 @@ if [[ $STAGE_RC -ne 0 ]]; then
   rm -f "$staged_ssot"
   exit 2
 fi
+
+# Pre-flight: every source file must exist before the first write.
+for pair in "${COPY_PAIRS[@]}"; do
+  if [[ ! -e "$REPO_DIR/${pair%%:*}" ]]; then
+    echo "FATAL: expected source path missing: $REPO_DIR/${pair%%:*} — nothing was written." >&2
+    rm -f "$staged_ssot"; exit 2
+  fi
+done
 
 # Pre-flight: render CLAUDE.md onto a scratch copy first, so marker states the
 # renderer refuses (duplicate or malformed ROUTING markers) stop the run before

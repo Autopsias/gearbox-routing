@@ -84,3 +84,46 @@ def test_a_symlink_to_the_real_home_needs_the_opt_in(tmp_path):
     assert out.returncode == 2, out.stdout + out.stderr
     assert "real" in out.stderr
     assert not (fake_home / ".claude" / "claude").exists()
+
+
+def _make_legacy(home):
+    """An install made before the ledger existed."""
+    (home / "claude" / ".gearbox-install-ledger").unlink()
+
+
+def test_legacy_uninstall_ignores_other_backups_in_its_folders(tmp_path):
+    home = tmp_path / "home"
+    assert _install(home).returncode == 0
+    _make_legacy(home)
+    (home / "claude" / "notes.txt").write_text("mine\n")
+    (home / "claude" / "notes.txt.bak-20990101000000").write_text("not install.sh's\n")
+    assert _run(home, "--uninstall").returncode == 0
+    assert (home / "claude" / "notes.txt").read_text() == "mine\n"
+
+
+def test_updating_a_legacy_install_keeps_the_original_as_the_restore_target(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "CLAUDE.md").write_text("my own rules\n")
+    assert _install(home).returncode == 0
+    _make_legacy(home)
+    import time
+    time.sleep(1.1)  # a new timestamp for the next backup
+    switch = _run(home, "--accept-example-profile", "--provider", "openai")
+    assert switch.returncode == 0, switch.stdout + switch.stderr
+    assert len(list(home.glob("CLAUDE.md.bak-*"))) == 2
+    assert _run(home, "--uninstall").returncode == 0
+    assert (home / "CLAUDE.md").read_text() == "my own rules\n"
+
+
+def test_a_missing_backup_never_strips_a_claude_md_that_existed(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "CLAUDE.md").write_text("my own rules\n")
+    assert _install(home).returncode == 0
+    for bak in home.glob("CLAUDE.md.bak-*"):
+        bak.unlink()
+    out = _run(home, "--uninstall")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "missing" in out.stderr
+    assert "BEGIN ROUTING" in (home / "CLAUDE.md").read_text()
