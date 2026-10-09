@@ -155,10 +155,12 @@ leak as already-compromised secret material:
 5. **Never** a silent later redaction commit with no rotation and no
    history rewrite — that leaves the secret live and byte-for-byte
    retrievable from history, while looking fixed at HEAD.
-6. Add the leaked pattern to `.gitleaks.toml`'s `gearbox-confidential-identifiers`
-   rule (or a new rule) so the pre-commit hook and CI catch a recurrence —
-   the pipeline that missed it needs the same fix a human catch would
-   trigger.
+6. Add the leaked pattern to the **private** identifier list that the export
+   scans with (the confidential manifest's blocked patterns), and fix the scrub
+   rule that missed it, so the next export refuses a recurrence. Never add the
+   identifier itself to the published `.gitleaks.toml`: that file is public, so
+   doing so would publish the name again. CI here scans for credentials only;
+   identifier scanning happens in the local hooks and the export.
 
 ## Installing harness modules
 

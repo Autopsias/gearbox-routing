@@ -53,6 +53,7 @@ Then delete the `PreToolUse` entry.
 
 ## Cautions
 
-- The hook blocks the write. You then choose: ask Claude to use the
-  safe-refactor agent, or approve the write.
+- The hook blocks the write (exit 2) and has no approval step: the same write
+  is blocked again. To change a large file, ask Claude to use the safe-refactor
+  agent, or remove the `PreToolUse` entry above for that session.
 - The `/code-quality` command and the `repo-health` skill also use this subagent.

@@ -28,7 +28,12 @@
 #
 # Exit codes: 0 = installed clean, guard PASS. 1 = guard FAIL (installed but
 # drift found). 2 = refused before installing anything (bad flags, missing
-# opt-in, version/force guard tripped, tooling failure).
+# opt-in, version/force guard tripped, CLAUDE.md markers the renderer refuses —
+# checked on a scratch copy before the first write) or a tooling failure.
+#
+# Every backup this script makes and every file it creates is recorded in
+# <home>/claude/.gearbox-install-ledger (first state per file wins), so
+# --uninstall restores exactly those files and nothing else under <home>.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,11 +71,11 @@ usage: install.sh [--claude-home DIR] [--provider NAME] [--accept-example-profil
   --i-understand-this-mutates-live-claude
                                          required IN ADDITION to --claude-home "$HOME/.claude"
                                          before this script will touch the real live home
-  --uninstall                           copy the .bak-* backups under --claude-home back
-                                         (the oldest backup of a file wins) and strip the
-                                         ROUTING block; does not
-                                         delete files that were newly created (never destroys
-                                         work install.sh didn't itself create a backup for)
+  --uninstall                           restore each file install.sh backed up to its state
+                                         before the first install (read from the install
+                                         ledger), and strip the ROUTING block from a CLAUDE.md
+                                         that install.sh created; never touches backups other
+                                         tools made, and does not delete newly created files
   -h, --help                            this message
 EOF
 }
@@ -92,12 +97,19 @@ done
 if [[ -z "$CLAUDE_HOME" ]]; then
   CLAUDE_HOME="$(pwd)/gearbox-install-${TIMESTAMP}"
 fi
-# Resolve to an absolute path (target may not exist yet).
-CLAUDE_HOME="$(cd "$(dirname "$CLAUDE_HOME")" 2>/dev/null && pwd)/$(basename "$CLAUDE_HOME")" || {
-  echo "FATAL: --claude-home parent directory does not exist: $CLAUDE_HOME" >&2; exit 2;
-}
+# Resolve to an absolute, symlink-free path (target may not exist yet), so a
+# symlink to ~/.claude under another name cannot slip past the live-home check.
+if [[ -d "$CLAUDE_HOME" ]]; then
+  CLAUDE_HOME="$(cd "$CLAUDE_HOME" && pwd -P)"
+else
+  CLAUDE_HOME="$(cd "$(dirname "$CLAUDE_HOME")" 2>/dev/null && pwd -P)/$(basename "$CLAUDE_HOME")" || {
+    echo "FATAL: --claude-home parent directory does not exist: $CLAUDE_HOME" >&2; exit 2;
+  }
+fi
 
-REAL_HOME_CLAUDE="$(cd "$HOME" && pwd)/.claude"
+REAL_HOME_CLAUDE="$(cd "$HOME" && pwd -P)/.claude"
+[[ -d "$REAL_HOME_CLAUDE" ]] && REAL_HOME_CLAUDE="$(cd "$REAL_HOME_CLAUDE" && pwd -P)"
+LEDGER="$CLAUDE_HOME/claude/.gearbox-install-ledger"
 if [[ "$CLAUDE_HOME" == "$REAL_HOME_CLAUDE" && $UNDERSTAND_LIVE -ne 1 ]]; then
   echo "FATAL: --claude-home resolves to your real $HOME/.claude." >&2
   echo "This installer refuses to touch the live Claude home without an explicit opt-in." >&2
@@ -119,17 +131,43 @@ if [[ $UNINSTALL -eq 1 ]]; then
     echo "FATAL: nothing to uninstall — $CLAUDE_HOME does not exist" >&2
     exit 2
   fi
-  echo "== uninstall: restoring most-recent .bak-* files under $CLAUDE_HOME =="
   claude_md="$CLAUDE_HOME/CLAUDE.md"
   claude_md_had_backup=0
   restored=0
-  while IFS= read -r -d '' bak; do
-    orig="${bak%.bak-*}"
-    cp -p "$bak" "$orig"
-    echo "  restored: $orig (from $(basename "$bak"))"
-    [[ "$orig" == "$claude_md" ]] && claude_md_had_backup=1
-    restored=$((restored + 1))
-  done < <(find "$CLAUDE_HOME" -name '*.bak-*' -print0 | sort -z -t- -k99 -r)
+  if [[ -f "$LEDGER" ]]; then
+    echo "== uninstall: restoring the files install.sh backed up (ledger: $LEDGER) =="
+    # One line per file, its FIRST recorded state: `backup` = the pre-install copy,
+    # `created` = the file did not exist before install.sh wrote it.
+    while IFS=$'\t' read -r kind rel bak; do
+      if [[ "$kind" == "backup" ]]; then
+        if [[ -f "$CLAUDE_HOME/$bak" ]]; then
+          cp -p "$CLAUDE_HOME/$bak" "$CLAUDE_HOME/$rel"
+          echo "  restored: $CLAUDE_HOME/$rel (from $bak)"
+          [[ "$CLAUDE_HOME/$rel" == "$claude_md" ]] && claude_md_had_backup=1
+          restored=$((restored + 1))
+        else
+          echo "  WARNING: recorded backup $bak is missing — $rel left as is" >&2
+        fi
+      fi
+    done < "$LEDGER"
+  else
+    # Installs made before the ledger existed: look only where install.sh writes,
+    # never at other tools' backups elsewhere under the home. Newest first, so the
+    # oldest backup of a file is copied last and wins.
+    echo "== uninstall: no install ledger — restoring .bak-* files in install.sh's own paths =="
+    roots=()
+    for r in "$CLAUDE_HOME/claude" "$CLAUDE_HOME/skills/routing-update" "$CLAUDE_HOME/skills/routing-retro"; do
+      [[ -d "$r" ]] && roots+=("$r")
+    done
+    while IFS= read -r -d '' bak; do
+      orig="${bak%.bak-*}"
+      cp -p "$bak" "$orig"
+      echo "  restored: $orig (from $(basename "$bak"))"
+      [[ "$orig" == "$claude_md" ]] && claude_md_had_backup=1
+      restored=$((restored + 1))
+    done < <( { [[ ${#roots[@]} -gt 0 ]] && find "${roots[@]}" -name '*.bak-*' -print0
+                find "$CLAUDE_HOME" -maxdepth 1 -name 'CLAUDE.md.bak-*' -print0; } | sort -z -t- -k99 -r)
+  fi
   echo "  restored $restored file(s) from backup."
   echo
   # Only strip the ROUTING block from CLAUDE.md if it had NO backup — a
@@ -160,8 +198,8 @@ PY
     echo "  no CLAUDE.md at $claude_md — nothing to strip"
   fi
   echo
-  echo "Uninstall complete. Newly-created files (ones with no .bak-* backup) were left in place —"
-  echo "remove $CLAUDE_HOME yourself if you want a full clean sweep."
+  echo "Uninstall complete. Files install.sh created new were left in place; the ledger"
+  echo "($LEDGER) lists them as 'created'."
   exit 0
 fi
 
@@ -247,6 +285,17 @@ declare -a COPY_PAIRS=(
 backups=()
 copies=()
 
+ledger_note() {
+  # kind (backup|created), absolute path, [absolute backup path]. The first
+  # state recorded for a path wins: that is the state before the first install.
+  local kind="$1" rel="${2#"$CLAUDE_HOME"/}" bak="${3:+${3#"$CLAUDE_HOME"/}}"
+  mkdir -p "$(dirname "$LEDGER")"
+  if [[ -f "$LEDGER" ]] && awk -F'\t' -v p="$rel" '$2 == p { f = 1 } END { exit !f }' "$LEDGER"; then
+    return 0
+  fi
+  printf '%s\t%s\t%s\n' "$kind" "$rel" "$bak" >> "$LEDGER"
+}
+
 backup_if_differs() {
   local dst="$1"
   local src="$2"
@@ -258,7 +307,10 @@ backup_if_differs() {
       local bak="${dst}.bak-${TIMESTAMP}"
       cp -p "$dst" "$bak"
       backups+=("$dst -> $(basename "$bak")")
+      ledger_note backup "$dst" "$bak"
     fi
+  else
+    ledger_note created "$dst"
   fi
 }
 
@@ -299,6 +351,23 @@ if [[ $STAGE_RC -ne 0 ]]; then
   rm -f "$staged_ssot"
   exit 2
 fi
+
+# Pre-flight: render CLAUDE.md onto a scratch copy first, so marker states the
+# renderer refuses (duplicate or malformed ROUTING markers) stop the run before
+# anything under the target home is written — exit 2 then really means "nothing
+# changed".
+preflight_dir="$(mktemp -d)"
+[[ -f "$CLAUDE_HOME/CLAUDE.md" ]] && cp -p "$CLAUDE_HOME/CLAUDE.md" "$preflight_dir/CLAUDE.md"
+if ! python3 "$REPO_DIR/claude/scripts/render-routing-digest.py" \
+     --repo-dir "$REPO_DIR" --yaml "$staged_ssot" \
+     --source "$REPO_DIR/claude/model-routing.digest.md" \
+     --target "$preflight_dir/CLAUDE.md" --install >/dev/null; then
+  echo "FATAL: render-routing-digest.py would refuse $CLAUDE_HOME/CLAUDE.md (see message above) —" >&2
+  echo "nothing was written. Fix the ROUTING markers in that file and re-run." >&2
+  rm -rf "$preflight_dir" "$staged_ssot"
+  exit 2
+fi
+rm -rf "$preflight_dir"
 
 echo "== copying framework files into $CLAUDE_HOME =="
 mkdir -p "$(dirname "$target_ssot")"
@@ -360,6 +429,8 @@ pre_render_snapshot=""
 if [[ -f "$target_claude_md" ]]; then
   pre_render_snapshot="$(mktemp)"
   cp -p "$target_claude_md" "$pre_render_snapshot"
+else
+  ledger_note created "$target_claude_md"
 fi
 
 echo "== rendering + splicing CLAUDE.md routing digest =="
@@ -382,6 +453,7 @@ if [[ -n "$pre_render_snapshot" ]] && ! cmp -s "$pre_render_snapshot" "$target_c
   bak="${target_claude_md}.bak-${TIMESTAMP}"
   cp -p "$pre_render_snapshot" "$bak"
   backups+=("$target_claude_md -> $(basename "$bak")")
+  ledger_note backup "$target_claude_md" "$bak"
   echo "  backed up pre-existing CLAUDE.md -> $(basename "$bak")"
 fi
 [[ -n "$pre_render_snapshot" ]] && rm -f "$pre_render_snapshot"

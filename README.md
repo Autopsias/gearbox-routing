@@ -164,7 +164,7 @@ Good places to start:
 
 ## Status
 
-- **Routing framework:** policy version 2.6.0. CI runs the drift check, the
+- **Routing framework:** policy version 2.7.0. CI runs the drift check, the
   unit tests, a docs check and a scratch install on every pull request and on
   every push to `master`.
 - **Harness modules:** a copy of one person's daily setup, refreshed from time

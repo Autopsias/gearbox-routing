@@ -68,10 +68,13 @@ Delete the `SessionEnd` entry if you added it.
 
 - **After `install`, it kills processes and deletes files without asking.**
   - It kills only processes that belong to a session that is dead for more
-    than 10 minutes, at most 20 per run. Other matches are reported, not killed.
-  - Once a day it deletes, at most 20 GB and 500 paths per run: session scratch
-    folders older than 14 days under `/private/tmp/claude-<uid>/`, plugin temp
-    folders older than 7 days, and Codex session logs older than 60 days.
+    than 10 minutes. If a run would kill more than 20, it refuses the whole run
+    (exit 3) and kills nothing. Other matches are reported, not killed.
+  - Once a day it deletes: session scratch folders older than 14 days under
+    `/private/tmp/claude-<uid>/`, plugin temp folders older than 7 days, Codex
+    session logs older than 60 days, and `/private/tmp/claude-*-cwd` marker
+    files older than 7 days. If a run would delete more than 20 GB or 500
+    paths, it refuses the whole run and deletes nothing.
   - A protect list stops it from deleting your projects, settings, skills,
     hooks, history and credentials. It refuses to delete in a scratch folder
     that another user owns or can write.

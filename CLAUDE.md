@@ -10,7 +10,7 @@
 ## Task routing — classify before you start
 
 Classify the task, set the tier. Authority: `claude/model-routing.yaml`
-(v2.6.0, active_provider=anthropic).
+(v2.7.0, active_provider=anthropic).
 
 | Class | Cues | Resolved tier |
 |---|---|---|

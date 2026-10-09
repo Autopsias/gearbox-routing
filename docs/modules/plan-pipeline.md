@@ -124,4 +124,9 @@ project's `_plans/` folder.
   asks for those pairs.
 - **Two policy files.** `install.sh` writes the routing policy to
   `~/.claude/claude/model-routing.yaml`; this module reads
-  `~/.claude/model-routing.yaml`. If you use both, keep the two files the same.
+  `~/.claude/model-routing.yaml`. They are meant to differ in one way:
+  `harness/model-routing.yaml` writes the Anthropic and Z.ai models as Claude
+  Code tokens (`haiku`, `sonnet`, `opus`, `fable`), because plan-execute
+  dispatches and escalates by token. Keep every other value the same. To
+  refresh it, copy `harness/model-routing.yaml` again; do not copy
+  `claude/model-routing.yaml` over it, or escalation stops working.

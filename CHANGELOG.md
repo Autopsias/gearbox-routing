@@ -6,6 +6,42 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Fixed (trust review of the public docs)
+- **Plan escalation works in the exported harness.** `harness/model-routing.yaml`
+  now names the Anthropic and Z.ai models with Claude Code's Task tokens
+  (`haiku`, `sonnet`, `opus`, `fable`), the names plan-execute dispatches and
+  escalates by. The export copied the public policy with vendor ids, so the
+  runner found no rung and silently dispatched every session as authored; Z.ai
+  sessions also lost their model. The export script now writes the tokens and
+  stops if the expected lines are not there.
+- **`--uninstall` restores only what `install.sh` backed up.** The installer now
+  records every backup and every new file in `claude/.gearbox-install-ledger`.
+  Uninstall used to copy back every `.bak-*` file anywhere under the target,
+  other tools' backups included, and could restore a `CLAUDE.md` backup that
+  already held the routing block.
+- **Exit `2` now means nothing was written.** The installer renders `CLAUDE.md`
+  on a scratch copy before its first write, so broken `ROUTING` markers refuse
+  the run up front instead of after the files were copied.
+- **A symlink to `~/.claude` under another name** now needs the live-home
+  opt-in like the real path.
+- **`/cost-audit` and `/routing-retro` price long Haiku 5.5 requests right.**
+  `claude/model-routing.yaml` → v2.7.0 (MINOR: price data): the
+  `claude-haiku-5-5` price row gains a `long_prompt` row. A request over
+  100,000 prompt tokens bills whole at $0.50 / $2.50 per MTok. Per-dispatch
+  plan costs still use the short rate, because a dispatch total cannot be split
+  by request size.
+- **`/test-orchestrate` and the other chains call `/commit-orchestrate`** (and
+  `/test-orchestrate`, `/ci-orchestrate`); they called underscore names that
+  do not exist.
+- **Docs corrected against the code:** the provider switch renders `CLAUDE.md`
+  before the check; the installer's keep-or-replace rule for an installed
+  policy; removal advice no longer deletes whole folders; the janitor's real
+  limits (it refuses an oversized run) and its fourth delete path; Node.js for
+  `/adversarial-review`; the safe-refactor hook has no approval step; the
+  author-specific dangling-reference gate is no longer installed by default;
+  and the leak runbooks no longer tell you to put a leaked identifier in the
+  published `.gitleaks.toml`.
+
 ### Changed
 - **`claude/model-routing.yaml` → v2.6.0 (MINOR: model ids).** Every example
   profile moved to the lineup current on 2026-10-09, checked against each

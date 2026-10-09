@@ -627,6 +627,48 @@ def check_settings_hooks(repo_dir: Path) -> list[str]:
 # (see _scrub_claude_md), so the harness gets the PUBLIC, hand-maintained policy.
 HARNESS_LAYOUT_COPIES = (("claude/model-routing.yaml", "model-routing.yaml"),)
 
+# The harness runs inside Claude Code and dispatches subagents by Task token
+# (haiku / sonnet / opus / fable); plan-execute's escalation matches the policy's
+# model ids against those tokens. The public policy names vendor ids for any
+# tool to read, so the harness copy rewrites the Claude-Code-dispatched profiles
+# to tokens. Z.ai runs through Claude Code's env remap (opus -> glm-N,
+# sonnet -> glm-N-flash). Every other profile and the price tables keep vendor ids.
+_TIER_LINE = re.compile(r"^(\s+)(cheap_fast|workhorse|frontier_reasoner|apex_model):(\s+)([\w.-]+)(.*)$")
+_TOKEN_PROFILES = {"anthropic": 4, "zai": 3}   # tier lines expected per profile (fail closed)
+_HARNESS_POLICY_NOTE = ("# HARNESS COPY of claude/model-routing.yaml, written by scripts/sync-from-claude.py:\n"
+                        "# the anthropic and zai model ids are Claude Code Task tokens (haiku/sonnet/opus/fable),\n"
+                        "# the names plan-execute dispatches by. Edit claude/model-routing.yaml, not this file.\n")
+
+
+def _task_token(provider: str, model_id: str) -> str | None:
+    if provider == "anthropic":
+        return next((t for t in ("haiku", "sonnet", "opus", "fable") if t in model_id), None)
+    if model_id.startswith("glm-"):
+        return "sonnet" if model_id.endswith("-flash") else "opus"
+    return None
+
+
+def to_task_tokens(text: str) -> str:
+    """The harness copy of the policy: Anthropic and Z.ai tier ids as Task tokens."""
+    out, provider, in_providers, done = [], None, False, {p: 0 for p in _TOKEN_PROFILES}
+    for line in text.splitlines(keepends=True):
+        if re.match(r"^\S", line):                   # a top-level key ends the providers block
+            in_providers = line.startswith("providers:")
+            provider = None
+        elif in_providers and re.match(r"^  [\w-]+:\s*(#.*)?$", line):
+            provider = line.split(":")[0].strip()
+        m = _TIER_LINE.match(line)
+        if m and provider in _TOKEN_PROFILES:
+            token = _task_token(provider, m.group(4))
+            if token is None:
+                raise fatal(f"harness policy: no Task token for {provider} id {m.group(4)!r}")
+            line = f"{m.group(1)}{m.group(2)}:{m.group(3)}{token}{m.group(5)}\n"
+            done[provider] += 1
+        out.append(line)
+    if done != _TOKEN_PROFILES:
+        raise fatal(f"harness policy: expected tier lines {_TOKEN_PROFILES}, rewrote {done}")
+    return _HARNESS_POLICY_NOTE + "".join(out)
+
 
 def mirror_public_files(repo_dir: Path, harness_dir: Path) -> list[str]:
     """Copy each HARNESS_LAYOUT_COPIES source from the export repo into harness/."""
@@ -637,7 +679,7 @@ def mirror_public_files(repo_dir: Path, harness_dir: Path) -> list[str]:
             raise fatal(f"harness layout copy: {src_rel} is missing from the export repo")
         dst = harness_dir / dst_rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src, dst)
+        dst.write_text(to_task_tokens(src.read_text(encoding="utf-8")), encoding="utf-8")
         out.append(dst_rel)
     return out
 

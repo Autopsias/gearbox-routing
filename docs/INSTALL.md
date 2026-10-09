@@ -59,13 +59,17 @@ drift between the policy file and the files made from it.
 | `--claude-home DIR` | The target folder. Without it, the installer makes a new `./gearbox-install-<timestamp>` folder. |
 | `--accept-example-profile` | The shipped model ids, prices and effort maps are dated **examples**, not a researched policy. This flag says you know that. Use `--profile FILE` instead when you have your own policy file. |
 | `--provider NAME` | Which shipped profile becomes active: `anthropic` (default), `openai`, `gemini` or `zai`. See [`PROVIDERS.md`](PROVIDERS.md). |
-| `--force` | Lets the installer replace a target policy file that has the same or a higher version, or that has no `EXAMPLE` markers. The old file is still backed up. |
+| `--force` | Lets the installer replace a target policy file it would otherwise keep: one with a higher version, or the same version without `EXAMPLE` markers. The old file is still backed up. |
 | `--i-understand-this-mutates-live-claude` | Needed in addition to `--claude-home "$HOME/.claude"` before the installer writes to your real Claude home. |
-| `--uninstall` | Restores the backups and removes the routing block. See [Remove](#remove). |
+| `--uninstall` | Restores the files the installer backed up and removes the routing block. See [Remove](#remove). |
 
 Exit codes: `0` installed and the check passed · `1` installed, but the check
 found drift · `2` refused before it wrote anything (bad flag, missing opt-in,
-version guard).
+version guard, or `ROUTING` markers in `CLAUDE.md` that the renderer refuses —
+it tries the render on a scratch copy first).
+
+Every backup the installer makes and every file it creates is listed in
+`<home>/claude/.gearbox-install-ledger`. `--uninstall` reads that list.
 
 ### Step 2: what lands where
 
@@ -120,12 +124,27 @@ python3 claude/scripts/resolve_route.py
 
 ### Change the provider
 
+**On the shipped example policy,** run `install.sh` again with the same flags
+and the new `--provider`. It sets `active_provider:`, renders the `CLAUDE.md`
+block and runs the check. It also replaces the installed policy file with this
+repo's copy (the old one is backed up), so use the next steps instead if you
+edited the installed policy.
+
+**On a policy you edited,** run these from the install target:
+
 1. Set `active_provider:` in `claude/model-routing.yaml`. This is the only line
    a provider change edits.
-2. Run `verify-routing.sh --full` (above). It fails if the new provider cannot
-   serve every task class.
-3. Run `install.sh` again with the new `--provider`. This updates the
-   `CLAUDE.md` block.
+2. Render the `CLAUDE.md` block from the edited policy:
+
+   ```bash
+   python3 claude/scripts/render-routing-digest.py --repo-dir "$PWD" \
+     --yaml "$PWD/claude/model-routing.yaml" \
+     --source "$PWD/claude/model-routing.digest.md" --target "$PWD/CLAUDE.md"
+   ```
+
+3. Run `verify-routing.sh --full` (above). It fails if the new provider cannot
+   serve every task class. Run it after step 2: before the render, the
+   `CLAUDE.md` block still shows the old provider and the check fails.
 
 Details: [`PROVIDERS.md`](PROVIDERS.md).
 
@@ -134,9 +153,11 @@ Details: [`PROVIDERS.md`](PROVIDERS.md).
 1. Run `git pull` in your clone.
 2. Run `install.sh` again with the same flags.
 
-If your installed policy file has the same or a higher version, or has no
-`EXAMPLE` markers, the installer refuses (exit `2`) so that it does not
-overwrite your own policy. Add `--force` only if you want the shipped file.
+The installer keeps your installed policy file (exit `2`, nothing written)
+when its version is higher than the shipped one, or the same version without
+`EXAMPLE` markers. An older installed file is replaced, even one you edited;
+it is backed up first. Add `--force` only if you want the shipped file in the
+first case.
 
 ### Remove
 
@@ -144,14 +165,18 @@ overwrite your own policy. Add `--force` only if you want the shipped file.
 ./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude --uninstall
 ```
 
-- It copies every `.bak-*` file back, newest first. When one file has several
-  backups, the oldest one is copied last, so the file returns to its state
-  before your first install. The `.bak-*` files stay in place.
-- It removes the routing block from `CLAUDE.md`, but only if `CLAUDE.md` had no
-  backup (that is, the installer created it).
-- It does **not** delete files that the installer added new. Delete
-  `~/.claude/claude/`, `~/.claude/skills/routing-update/` and
-  `~/.claude/skills/routing-retro/` yourself if you want them gone.
+- It restores each file the installer backed up to its state before your
+  first install, from the list in `claude/.gearbox-install-ledger`. It does not
+  touch `.bak-*` files that other tools made. The `.bak-*` files stay in place.
+- It removes the routing block from `CLAUDE.md` when the installer created
+  that file; a `CLAUDE.md` you had before is restored from its backup instead.
+- It does **not** delete files that the installer added new. The ledger lists
+  them as `created`; delete those files yourself if you want them gone. Do not
+  delete whole folders: a folder can also hold files that uninstall just
+  restored.
+- An install made before the ledger existed has no list. Uninstall then looks
+  for `.bak-*` files only in `claude/`, `skills/routing-update/`,
+  `skills/routing-retro/` and next to `CLAUDE.md`.
 
 ---
 

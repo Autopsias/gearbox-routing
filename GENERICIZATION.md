@@ -210,5 +210,8 @@ If something published anyway, in this order:
 
 Before committing ported content, grep the staged diff for your own
 confidential identifiers — client names, username, vault/knowledge-base name,
-real project paths — plus `epic-` (dropped rows). Maintain this list in your
-fork's `.gitleaks.toml` and CI sweep. Any hit is a stop-and-fix, not a warning.
+real project paths — plus `epic-` (dropped rows). Keep this list OUT of the
+repo: in a git-ignored local file or an untracked scan config that your
+pre-commit hook reads. Never put real identifiers in the tracked
+`.gitleaks.toml` — that file is published, so the list would publish the very
+names it protects. Any hit is a stop-and-fix, not a warning.

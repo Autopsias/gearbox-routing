@@ -84,12 +84,37 @@ def test_scan_goes_red_on_a_planted_dangling_hook(tmp_path):
     assert not green and "planted.py" in output
 
 
-def test_public_policy_is_mirrored_into_the_harness_layout(tmp_path):
-    repo, harness = tmp_path / "repo", tmp_path / "repo" / "harness"
-    (repo / "claude").mkdir(parents=True)
-    (repo / "claude" / "model-routing.yaml").write_text("version: \"9.9.9\"\n")
+def test_public_policy_is_mirrored_with_task_tokens(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    harness = tmp_path / "harness"
     assert sync.mirror_public_files(repo, harness) == ["model-routing.yaml"]
-    assert (harness / "model-routing.yaml").read_text() == "version: \"9.9.9\"\n"
+    text = (harness / "model-routing.yaml").read_text()
+    for line in ("      cheap_fast:        haiku ", "      workhorse:         sonnet ",
+                 "      frontier_reasoner: opus ", "      apex_model: fable ",
+                 "      frontier_reasoner: glm-5.3".replace("glm-5.3", "opus")):
+        assert line in text, line
+    assert "gpt-6.1-sol" in text                     # other profiles keep vendor ids
+    assert "  claude-haiku-5-5:" in text             # so does the price table
+
+
+def test_the_exported_runner_can_climb_the_mirrored_policy(tmp_path):
+    """plan-execute walks the ladder from Task tokens; with vendor ids it found nothing."""
+    repo = Path(__file__).resolve().parents[1]
+    sync.mirror_public_files(repo, tmp_path)
+    spec = importlib.util.spec_from_file_location("rr", repo / "harness" / "scripts" / "resolve_route.py")
+    rr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rr)
+    nxt = rr.escalate("agentic_build", "anthropic", current={"model_id": "sonnet", "native_effort": "high"},
+                      ssot_path=str(tmp_path / "model-routing.yaml"))
+    assert nxt != rr.EXHAUSTED and nxt["model_id"] in ("sonnet", "opus"), nxt
+
+
+def test_task_token_rewrite_fails_closed_on_an_unknown_id():
+    import pytest
+
+    bad = "providers:\n  anthropic:\n    models:\n      cheap_fast: mystery-model\n"
+    with pytest.raises(sync.SyncError):
+        sync.to_task_tokens(bad)
 
 
 def test_mirror_fails_closed_when_the_public_policy_is_missing(tmp_path):

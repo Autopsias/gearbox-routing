@@ -8,7 +8,7 @@ hardened version and has Codex check it again.
 |---|---|
 | **Status** | Optional · stable |
 | **Platform** | Any with `bash` and `python3` |
-| **Needs** | The Codex CLI (`codex` on your `PATH`). For a review of a git diff, also the Codex plugin for Claude Code (the command calls `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`). |
+| **Needs** | The Codex CLI (`codex` on your `PATH`) and Node.js (`node` on your `PATH`). For a review of a git diff, also the Codex plugin for Claude Code (the command runs `node ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`). |
 
 ## What you get
 

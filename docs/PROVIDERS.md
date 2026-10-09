@@ -39,13 +39,17 @@ changes when you switch). To switch:
 2. Confirm the target profile's `calibration.status` is `researched`, not
    `unresearched` — an unresearched profile as the *active* one is a hard
    validation error (see below), not a soft warning.
-3. Re-run the drift guard: `claude/scripts/verify-routing.sh`. It checks that
-   every `task_classes[*].tier` resolves under the new
-   `providers[active_provider].models`, and that the version/consumers are in
-   sync.
-4. Re-render the digest so `CLAUDE.md` reflects the new provider's resolved
-   model names (`claude/scripts/render-routing-digest.py`, or re-run
-   `install.sh` against the already-installed target — it's idempotent).
+3. Re-render the digest so `CLAUDE.md` reflects the new provider's resolved
+   model names: run `claude/scripts/render-routing-digest.py` on the edited
+   policy (the exact command is in
+   [INSTALL.md § Change the provider](INSTALL.md#change-the-provider)). Do not
+   re-run `install.sh` with your old flags for this: it copies this repo's
+   policy over the installed one and sets the provider from `--provider`, which
+   undoes your edit.
+4. Re-run the drift guard: `claude/scripts/verify-routing.sh --full`. It checks
+   that every `task_classes[*].tier` resolves under the new
+   `providers[active_provider].models`, that the version stamps match, and that
+   the `CLAUDE.md` block matches the policy — so run it after step 3.
 
 There is no partial-switch state: either the guard is green on the new
 provider, or you haven't actually switched.

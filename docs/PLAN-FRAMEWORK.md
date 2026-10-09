@@ -33,8 +33,11 @@ flowchart TD
     J -- yes --> K["Stops with a decision brief<br/>you answer, it resumes"]
     J -- no --> E
     K --> E
-    E -- "all sessions done" --> L["Land: merge into your main branch,<br/>re-run every gate, wait for your approval"]
-    L --> M["Finish: push the plan record, read CI,<br/>save lessons to project memory"]
+    E -- "all sessions done" --> L["Land: merge your main branch into the plan,<br/>re-run every gate on the result"]
+    L --> N{"You approve<br/>the land?"}
+    N -- yes --> P["Push to your main branch"]
+    P --> M["Finish: push the plan record, read CI"]
+    M --> Q["Save lessons to project memory"]
 ```
 
 ## The ideas behind it

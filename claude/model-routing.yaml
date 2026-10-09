@@ -62,8 +62,8 @@
 #      `^version:` / `^last_reviewed:` pair.
 # ============================================================================
 
-version: "2.6.0"
-last_reviewed: 2026-10-09   # v2.6.0: every example profile moved to the lineup current at this date (Anthropic Haiku/Sonnet/Opus 5.5; OpenAI gpt-6-luna/gpt-6.1-sol/gpt-6-astra; Gemini 3.5 Flash-Lite/3.8 Flash/3.1 Pro; Z.ai prices added), each checked against the vendor's own pages. v2.5.0: Anthropic prices re-checked (claude-sonnet-5 corrected to $2/$10; rows added for claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5). v2.4.0: five generic lessons from a private deployment's history (effort_policy, apex_model, orchestrator_lane, providers.zai, model_prices + cost_accounting) and ADR 0001. No task_classes row moved. v2.3.0 de-calibrated the EXAMPLE grid; this file still demonstrates the SHAPE of a routing policy, never a measured one.
+version: "2.7.0"
+last_reviewed: 2026-10-09   # v2.7.0: model_prices claude-haiku-5-5 gains a long_prompt row, because a request over 100k prompt tokens bills whole at 0.50/2.50 (platform.claude.com pricing); /cost-audit and /routing-retro price per request. v2.6.0: every example profile moved to the lineup current at this date (Anthropic Haiku/Sonnet/Opus 5.5; OpenAI gpt-6-luna/gpt-6.1-sol/gpt-6-astra; Gemini 3.5 Flash-Lite/3.8 Flash/3.1 Pro; Z.ai prices added), each checked against the vendor's own pages. v2.5.0: Anthropic prices re-checked (claude-sonnet-5 corrected to $2/$10; rows added for claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5). v2.4.0: five generic lessons from a private deployment's history (effort_policy, apex_model, orchestrator_lane, providers.zai, model_prices + cost_accounting) and ADR 0001. No task_classes row moved. v2.3.0 de-calibrated the EXAMPLE grid; this file still demonstrates the SHAPE of a routing policy, never a measured one.
 
 active_provider: anthropic   # the only line a provider swap edits — see ARCHITECTURE.md §3
 
@@ -506,7 +506,7 @@ model_prices:
   claude-sonnet-5:   { in: 2.00, out: 10.00, cache_read: 0.20, cache_write_5m: 2.50, cache_write_1h: 4.00 }   # $2/$10 is the standard price; the planned $3/$15 rise was cancelled (as_of 2026-10-09)
   claude-opus-5-5:   { in: 4.00, out: 20.00, cache_read: 0.20, cache_write_5m: 5.00, cache_write_1h: 8.00 }   # cache hits at 0.05x input (as_of 2026-10-09)
   claude-sonnet-5-5: { in: 2.00, out: 10.00, cache_read: 0.10, cache_write_5m: 2.50, cache_write_1h: 4.00 }   # cache hits at 0.05x input (as_of 2026-10-09)
-  claude-haiku-5-5:  { in: 0.10, out:  0.50, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.20 }  # prompts up to 100k tokens; above that the whole request bills 0.50/2.50 (as_of 2026-10-09)
+  claude-haiku-5-5:  { in: 0.10, out:  0.50, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.20, long_prompt: { over: 100000, in: 0.50, out: 2.50, cache_read: 0.05, cache_write_5m: 0.625, cache_write_1h: 1.00 } }  # prompts up to 100k tokens; above that the whole request bills 0.50/2.50 (as_of 2026-10-09)
   claude-haiku-4-5:  { in: 1.00, out:  5.00, cache_read: 0.10, cache_write_5m: 1.25, cache_write_1h: 2.00 }
   claude-fable-5-1:  { in: 10.00, out: 50.00, cache_read: 0.25, cache_write_5m: 12.50, cache_write_1h: 20.00 }   # the apex example; as_of 2026-09-05
 

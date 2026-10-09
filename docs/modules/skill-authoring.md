@@ -23,7 +23,6 @@ reviews one. `/codex-skill-sync` copies your Claude Code skills into
 ```bash
 mkdir -p ~/.claude/skills
 cp -R harness/skills/write-a-skill ~/.claude/skills/
-cp harness/skills/.s08-verify-dangling-refs.sh ~/.claude/skills/   # the rubric's dangling-reference gate
 cp -R harness/skills/mods ~/.claude/skills/                 # optional
 cp -R harness/skills/codex-skill-sync ~/.claude/skills/     # optional, Codex users only
 ```
@@ -50,6 +49,11 @@ rm -r ~/.claude/skills/write-a-skill ~/.claude/skills/mods ~/.claude/skills/code
 - Some text tells you to write skills in the original author's private repo
   and deploy them with `gearbox deploy`. Ignore it and edit
   `~/.claude/skills/` directly.
+- The rubric asks you to run `~/.claude/skills/.s08-verify-dangling-refs.sh`.
+  That gate checks the original author's command layout: it needs
+  `~/.claude/SKILL-UNIFICATION-ROUTING.md` and about twenty specific commands
+  and agents, so it fails on any other setup. Skip that rubric line unless you
+  installed the whole harness.
 - `codex-skill-sync --apply` writes into `~/.agents/skills` and can delete old
   copies that it made. Its lists of protected skills are the original author's.
 - `mod_inventory.py` runs `claude plugin validate` on each installed plugin.
