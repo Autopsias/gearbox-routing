@@ -3,7 +3,10 @@
 `/routing-update` researches a model change (a new model, a price change, a
 deprecation) against live provider docs and updates the routing policy in one
 approved change. `/routing-retro` reads past sessions and reports where the
-routing did not fit the work. It writes nothing unless you confirm one new entry for the misroute ledger.
+routing did not fit the work. It never changes the routing policy. It writes
+working files (scan output and a report under `/tmp`; the harness version also
+keeps a small `.last-aggregated` bookkeeping file next to the outcome log), and
+it adds an entry to the misroute ledger only after you confirm it.
 
 | | |
 |---|---|
@@ -38,8 +41,9 @@ cp -R harness/skills/routing-retro harness/skills/routing-update ~/.claude/skill
 
 ## Check it works
 
-In a new session, type `/routing-retro`. It reads the policy and reports. It
-writes to the misroute ledger only if you confirm an entry.
+In a new session, type `/routing-retro`. It reads the policy and reports. Apart
+from its working files under `/tmp` and the bookkeeping file, it writes only to
+the misroute ledger, and only if you confirm an entry.
 
 ## Remove
 

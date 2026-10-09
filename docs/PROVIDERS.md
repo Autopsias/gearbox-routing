@@ -92,8 +92,10 @@ release, or at least quarterly.** When you do:
 3. Run the drift guard — it only warns (it does not fail) once
    `calibration.date` crosses the staleness horizon, including in the normal
    CI build (`.github/workflows/verify.yml`). A separate weekly job
-   (`.github/workflows/staleness.yml`) fails and opens an issue on a stale
-   `as_of`, so a re-verify that isn't stamped will surface on its own.
+   (`.github/workflows/staleness.yml`) fails and opens an issue when a
+   provider's `calibration.date` is stale, so a re-verify that isn't stamped
+   will surface on its own. Neither job reads the `as_of` dates on model and
+   price lines: keep those in step with `calibration.date` yourself.
 4. Land the update through `/routing-update` so the version bump and
    CHANGELOG entry travel with it (`docs/METHODOLOGY.md` §4).
 

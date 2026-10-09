@@ -5,11 +5,9 @@
 If you find a security issue in Gearbox (the guard scripts, resolver, or
 install/uninstall paths — e.g. a way to make `install.sh` write outside its
 declared target, or a way to make `verify-routing.sh` report a false PASS),
-please report it privately rather than opening a public issue:
-
-- Open a GitHub private security advisory on this repository
-  (`Security` tab → `Report a vulnerability`), or
-- Email the maintainers listed in `CODEOWNERS`.
+please report it privately rather than opening a public issue. Use GitHub's
+private vulnerability reporting on this repository: open the `Security` tab and
+choose `Report a vulnerability`. Only the maintainers see the report.
 
 Please include: the affected script/version, a reproduction (ideally against
 a throwaway `--claude-home`, never against a live install), and the
