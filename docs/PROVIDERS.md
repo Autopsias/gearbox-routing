@@ -13,11 +13,15 @@ and fill in* a provider (including a brand-new one), see
 ## Choosing at install time
 
 ```bash
-./install.sh --provider anthropic     # default
-./install.sh --provider openai
-./install.sh --provider gemini
-./install.sh --provider zai           # an effort-steep example (see below)
+./install.sh --accept-example-profile --provider anthropic     # default
+./install.sh --accept-example-profile --provider openai
+./install.sh --accept-example-profile --provider gemini
+./install.sh --accept-example-profile --provider zai           # an effort-steep example (see below)
 ```
+
+Add `--claude-home DIR` to choose the target (see [`INSTALL.md`](INSTALL.md)).
+`--accept-example-profile` is required because the shipped profiles are dated
+examples; pass `--profile FILE` instead once you have your own.
 
 `--provider` sets `active_provider:` in the installed copy of
 `claude/model-routing.yaml` and re-renders the routing digest so

@@ -30,14 +30,18 @@ and model releases):
 
 ```yaml
 task_classes:
-  mechanical:     { tier: cheap_fast,        intent: light }
-  standard_build: { tier: workhorse,         intent: standard }
-  agentic_build:  { tier: frontier_reasoner, intent: thorough }
-  deep_reasoning: { tier: frontier_reasoner, intent: standard }
-  linchpin:       { tier: frontier_reasoner, intent: thorough }
+  mechanical:     { tier: cheap_fast,        effort: light    }
+  standard_build: { tier: workhorse,         effort: standard }
+  agentic_build:  { tier: workhorse,         effort: thorough }
+  deep_reasoning: { tier: frontier_reasoner, effort: thorough }
+  linchpin:       { tier: frontier_reasoner, effort: thorough }
 ```
 
-`intent` is defined next — it is **not** an effort level.
+The `effort:` key in `task_classes:` holds an **intent** (`light`, `standard`,
+`thorough`), defined next — it is **not** a provider's effort level. Which tier
+`agentic_build` uses is calibration, not vocabulary: the shipped example puts
+it on `workhorse`, and [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) §2 tells you
+how to measure it on your own models.
 
 ---
 
@@ -187,17 +191,17 @@ position; the caller owns both. One call = one decision:
 
 ### The vendored resolver
 
-`claude/scripts/resolve_route.py` (built in a later session) is the portable path:
+`claude/scripts/resolve_route.py` is the portable path:
 it reads `(task_class, active_provider)` from the policy file and resolves
 `{model_id, native_effort}`, then — **on a failure/refusal signal supplied by its
 caller** (the resolver detects nothing itself; `escalation.trigger` prose is a
 human/consumer contract, not resolver logic) — walks the profile's escalation ladder
 on reported failure and the degrade ladder on refusal, for **any** provider whose
-profile supplies the blocks above. A consumer embedded in a specific harness (e.g. Claude
-Code's `plan-execute/run.py`) may keep a mirror of its own ladder for its one
+profile supplies the blocks above. A consumer embedded in a specific harness (e.g. the harness's
+`plan-execute/scripts/run.py`) may keep a mirror of its own ladder for its one
 consumer, but that mirror MUST be guard-verified against this policy file (byte- or
-contract-checked, the same shape as the existing drift guard) so it cannot silently
-diverge; Gearbox's resolver is the reference implementation the schema is tested
+contract-checked; the harness copy of `verify-routing.sh` does this for `run.py`)
+so it cannot silently diverge; Gearbox's resolver is the reference implementation the schema is tested
 against.
 
 ---
@@ -268,7 +272,7 @@ any other provider.
 ## 6. Open questions (deferred by design — dual-model review 2026-07-05)
 
 Raised by the adversarial review, accepted as deferred rather than fixed now, so a
-later session can reopen with a real driving case:
+later change can reopen them with a real driving case:
 
 - **Split `thorough` into two neutral axes (reasoning depth vs agentic
   persistence)?** Deferred (YAGNI). §2 keeps intent task-shaped and provider-owned;
@@ -277,7 +281,7 @@ later session can reopen with a real driving case:
   three price/reasoning tiers?** Out of scope for a coding-task router; a v2 concern
   if Gearbox ever routes non-coding work.
 - **Operational task-class definitions (inclusion/exclusion/tie-break table).** Lives
-  in the consuming digest (the CLAUDE.md routing block a later session ports), not in
+  in the consuming digest (the CLAUDE.md routing block), not in
   this schema doc — noted here as a downstream requirement so it isn't lost.
 
 ---
@@ -302,34 +306,8 @@ skip themselves when their file is missing; the two noted do not.
 
 `harness/settings.json` also sets the status line (`scripts/statusline.sh`).
 
-### Opt-in: the agent janitor's session-end hook
-
-The janitor (`scripts/agent_janitor.py`) **runs only on macOS** and **kills
-orphaned agent processes and deletes old temp files and Codex session logs
-without asking.** Nothing runs until you run
-`python3 ~/.claude/scripts/agent_janitor.py install`. The session-end hook
-(`hooks/agent-janitor-sessionend.py`) is not wired by default. To opt in, add
-this under `"hooks"` in `~/.claude/settings.json`:
-
-```json
-"SessionEnd": [
-  {
-    "hooks": [
-      {
-        "type": "command",
-        "command": "~/.claude/hooks/agent-janitor-sessionend.py",
-        "timeout": 30,
-        "async": true
-      }
-    ]
-  }
-]
-```
-
-### The machine governor
-
-`scripts/govrun.py` queues heavy jobs (`govrun -- pytest -n auto`) behind a
-limited number of slots. Its POSIX record locks live under your home
-directory, in `~/.machine-governor` (override with `GOVRUN_STATE_DIR`). The
-PreToolUse hook that refuses an unwrapped heavy command is not part of this
-export, so `govrun --status` reports DISARMED.
+Each hook belongs to a module. Its card in [`docs/MODULES.md`](docs/MODULES.md)
+gives the files to copy, the `settings.json` entry to merge, and how to remove
+it. The [agent janitor](docs/modules/agent-janitor.md) and the
+[machine governor](docs/modules/govrun.md) have their own cards, with their
+platform limits.

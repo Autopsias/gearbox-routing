@@ -13,6 +13,11 @@ contributions fall into one of three shapes:
 3. **A guard/skill/doc fix** — typos, clarifications, guard bugs. Business
    as usual: branch, PR, CI green.
 
+`harness/` is generated from a private source repo, so a pull request that
+edits files under `harness/` cannot be merged as is. Open an issue that
+describes the change instead. Pull requests to the module cards in
+`docs/modules/` are welcome.
+
 ## Before you open a PR
 
 - Run `./install.sh --claude-home <tempdir> --accept-example-profile` and
@@ -26,6 +31,10 @@ contributions fall into one of three shapes:
   `git config core.hooksPath`. That wires all three: pinned `gitleaks` at
   pre-commit, the no-trailers rule at commit-msg, and the full fail-closed
   identifier sweep at pre-push.
+- If you change a doc or a module card, run
+  `python3 -m pytest scripts/test_docs.py -q`. It fails on a broken relative
+  link, on a card that names a `harness/` path that does not exist, and on a
+  skill, command or agent that no card names.
 - If you're adding or editing a provider profile, follow the scrub rules in
   `GENERICIZATION.md` — no personal identifiers, no real corpus/vault paths,
   no concrete production policy data.
@@ -33,7 +42,7 @@ contributions fall into one of three shapes:
 ## CI
 
 Every PR runs **structural checks only**: `verify-routing.sh --full --strict`,
-`install.sh` into a fresh dir, pinned gitleaks (credentials), and an integrity
+the unit tests and the docs check (`pytest claude scripts`), `install.sh` into a fresh dir, pinned gitleaks (credentials), and an integrity
 check of the local hook files (see `.github/workflows/verify.yml`).
 
 **CI does not scan for confidential identifiers and cannot** — that sweep needs

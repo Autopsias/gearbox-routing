@@ -1,79 +1,62 @@
-# HARNESS.md — the harness/ tree, sync-from-claude.py, and the two-tier workflow
+# HARNESS.md — how `harness/` is exported
 
-`harness/` is the public, shareable home of the author's Claude Code harness
-(skills, commands, hooks, scripts, rules, agents) — continuously synced from
-his private `~/.claude` deployment. It ships as an ADDITIVE tree beside
-`claude/` (the routing SSOT); nothing here changes routing's own versioning
-or install behavior (see `docs/VERSIONING.md`). Full layout rationale lives in the private-tier plan directory that designed
-this tree (`_plans/<your-plan>-<date>/_evidence/s01/integration-map.md`) and is
-not part of this public repo.
+This page is for maintainers. To **use** the harness, read
+[`MODULES.md`](MODULES.md) and [`INSTALL.md`](INSTALL.md) instead.
+
+`harness/` is a snapshot of the original author's Claude Code setup (skills,
+commands, hooks, scripts, rules, agents). An export script copies it from a
+private source repo, removes personal data, and scans the result. It sits
+beside `claude/` (the routing framework) and does not change the routing
+framework's versioning or install behaviour (see `docs/VERSIONING.md`).
 
 ## The three tiers
 
-Two git remotes, three roles. Which file you edit depends on which role you
-are in — get this wrong and the edit is silently overwritten by the next sync.
+Three places, three roles. Which file you edit depends on the role — get this
+wrong and the next export overwrites the edit.
 
 | # | Tier | Where | Role |
 |---|---|---|---|
-| 1 | **Source** | `<your-org>/<your-private-harness>` (a private GitHub repo) | The source of truth. Every harness change originates here. |
-| 2 | **Deployed clone** | `~/.claude` on each machine, remote `private` → tier 1 | The live, running harness — and the working copy you actually edit. Push it to tier 1. |
-| 3 | **Genericized export** | this repo, `Autopsias/gearbox-routing` (public) | A scrubbed, provider-abstract **derivative**. Never a source. |
+| 1 | **Source** | a private repo, cloned to an edit clone (`~/your-private-harness`) | The source of truth. Every harness change starts here. |
+| 2 | **Deploy target** | `~/.claude` on each machine | The running setup. It only fast-forwards from tier 1; nobody edits it by hand. |
+| 3 | **Public export** | this repo, `Autopsias/gearbox-routing` | A scrubbed copy of the publishable parts. Never a source for `harness/`. |
 
-1. **Source + deployed clone** — `~/.claude` is a clone of the private repo,
-   so "source" and "working copy" are the same tree in practice; the remote is
-   the durable copy. Real client names, real paths, real credentials-adjacent
-   config. **Never** browsable by anyone but the harness owner.
-   *(Renamed 2026-07-25 from `claude-harness-private` → `your-private-harness`, so
-   the source repo's name says "gearbox" rather than "claude": Gearbox is a
-   provider-neutral harness meant to be usable with other LLM providers.
-   GitHub redirects the old name, so existing clones keep working — but update
-   your remote URL. See ADR-0001 in the private repo.)*
-2. **Public tier** — this repo (`gearbox-routing`), including `harness/`.
-   Every file here has been through the scrub + scan pipeline below. It ships
-   full git history publicly — anything that lands in a commit here is
-   public **forever**, even if a later commit "removes" it (see the runbook
-   at the bottom).
+**Direction is one-way: tier 1 → tier 2, and tier 1 → tier 3.** An edit made
+in `harness/` here is lost at the next export. The other parts of this repo
+(`claude/`, the docs, `install.sh`, `scripts/`) are maintained here directly.
 
-**Direction is one-way: tier 2 → tier 1 → tier 3.** Editing tier 3 as if it
-were a source loses the edit at the next sync.
-
-Guard hooks are tracked in the source repo under `githooks/` and wired into a
-clone by `scripts/install-hooks.sh` (`core.hooksPath=githooks`) — git cannot
-version `.git/hooks`, so a fresh clone has no guard until that runs.
-`verify-routing.sh` fails closed when the hooks are not wired.
+A public repo ships its full git history: anything that lands in a commit here
+is public **forever**, even if a later commit removes it (see the runbook at
+the bottom).
 
 ## Ongoing workflow
 
 ```
- 1. improve ~/.claude (edit a skill, fix a script, add a rule, etc.)
- 2. commit + push to the PRIVATE remote AS-IS — no scrubbing needed here,
-    this remote is confidential by design
-        git -C ~/.claude add -A && git -C ~/.claude commit -m "..."
-        git -C ~/.claude push private main
- 3. run the sync pipeline (from the Gearbox repo):
+ 1. edit the private source clone (a skill, a script, a rule, …)
+ 2. commit and push it to the PRIVATE remote; deploy it to ~/.claude
+ 3. run the export (from this repo):
         scripts/sync-from-claude.py \
           --manifest /path/to/private/manifest.json \
           --source ~/path/to/your-private-harness \
-          --private-commit <the SHA you just pushed in step 2> \
+          --private-commit <the SHA you pushed in step 2> \
           --scan-report-out /tmp/scan-report.txt \
           --scan-status-out /tmp/scan-status.json
-    This copies every `publish`/`scrub-then-publish` manifest entry into
-    harness/, applies scrub transforms, stamps harness/SYNCED-FROM with the
-    export date + pipeline version, records the step-2 SHA in the private
-    provenance ledger beside your manifest (NOT in this repo — see
-    scripts/README.md §Provenance), then hard-fails if either scan layer
-    finds a hit. NEVER weaken the scan to make it pass — fix the manifest
-    transform or the source file instead.
- 4. review the scrubbed diff (git diff / git status inside Gearbox) —
-    this is a human checkpoint, not automated
- 5. gated PUBLIC push: only after review, commit + push to `origin`
-    (the public gearbox-routing remote) on a real branch / PR, same
-    review discipline as any other change to this repo
+    It copies every `publish` / `scrub-then-publish` manifest entry into
+    harness/, applies the scrub transforms, stamps harness/SYNCED-FROM with
+    the export date and pipeline version, records the step-2 SHA in the
+    private provenance ledger beside the manifest (NOT in this repo — see
+    scripts/README.md §Provenance), then fails if either scan layer finds a
+    hit. NEVER weaken the scan to make it pass — fix the manifest transform
+    or the source file instead.
+ 4. run the docs check: python3 -m pytest scripts/test_docs.py -q
+    It fails when a module card in docs/modules/ names a harness path that
+    the export renamed or dropped, or when a new skill, command or agent has
+    no card. Update docs/modules/ and docs/MODULES.md to match.
+ 5. review the diff (git diff / git status) — a human checkpoint
+ 6. commit and push to `origin` (the public remote), only after the review
 ```
 
-Step 3 never commits or pushes anything itself — it only writes into the
-working tree. Steps 2 and 5 are the only pushes, to two different remotes,
-and step 5 always follows a human diff review (step 4).
+Step 3 never commits or pushes anything. Steps 2 and 6 are the only pushes,
+to two different remotes, and step 6 always follows the human review in step 5.
 
 ## Adding a manifest entry
 
@@ -103,8 +86,8 @@ even considers, in either tier) covers: `mcp.json`/`config.json`/
 `file-history/`, `paste-cache/`, `image-cache/`, `session-env/`,
 `shell-snapshots/`, `telemetry/`, `debug/`, `cache/`, `tasks/`, `sessions/`,
 `backups/`, `plugins/cache/` (272MB+ re-installable cache with nested `.git`
-repos), `security/` (re-installable venv/tooling cache), and this plan's own
-`_evidence/`/manifest files (see "Why the manifest lives outside this repo"
+repos), `security/` (re-installable venv/tooling cache), and the export's own
+evidence and manifest files (see "Why the manifest lives outside this repo"
 below). None of these are runtime state anyone would want public, and
 several are simply too large or too volatile to be worth versioning anywhere.
 
@@ -138,7 +121,7 @@ strings too, and the gate doesn't trust subtree scoping.
    only `exported_at` and `pipeline_version`, so a re-added source-repo SHA (or
    any other new key) is a hit here — see `GENERICIZATION.md` §Provenance.
 
-`_evidence/s06/scan-status.json`-shaped output (`{status, blocked_pattern_hits,
+The JSON that `--scan-status-out` writes (`{status, blocked_pattern_hits,
 secret_findings, scanner, scanner_version, scan_scope, tree_or_commit_hash}`)
 is what a CI job or reviewer should parse — `status=="green"` requires BOTH
 hit counts to be exactly zero; a scanner-absent run without
@@ -177,14 +160,8 @@ leak as already-compromised secret material:
    the pipeline that missed it needs the same fix a human catch would
    trigger.
 
-## Optional module, install.sh extension
+## Installing harness modules
 
-`harness/` install wiring (`install.sh --with-harness`) is a **separate,
-later** piece of work — this doc describes the export/sync side only. See
-the S01 integration map's install.sh extension design for that when it
-lands.
-
-ponytail: one script + one external manifest, no daemon, no git hook wiring
-in this pipeline yet. A future `/harness-sync` skill wrapper would call
-`scripts/sync-from-claude.py` with the same flags shown above — nothing
-about the script's contract needs to change for that to work.
+`install.sh` installs only the routing framework. Harness modules are copied
+by hand, one module at a time: see [`MODULES.md`](MODULES.md) and
+[`INSTALL.md`](INSTALL.md) Part 2.

@@ -43,8 +43,8 @@ itself needs a row, not more judgment calls at dispatch time (see §4).
 
 ## 2. Pick a `(tier, effort)` default for YOUR models
 
-The three provider profiles shipped in `claude/model-routing.yaml`
-(`anthropic`, `openai`, `gemini`) are **dated, verify-before-use examples**,
+The four provider profiles shipped in `claude/model-routing.yaml`
+(`anthropic`, `openai`, `gemini`, `zai`) are **dated, verify-before-use examples**,
 not settings to trust as-is. To calibrate your own:
 
 1. **Confirm your `models:` map is current.** Tier → model id drifts every

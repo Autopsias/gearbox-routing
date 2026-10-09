@@ -2,176 +2,139 @@
 
 **The right gear for every task.**
 
-> **EXPORT — do not edit this repo as a source.** This repo is the public,
-> genericized export of a private source repo (`<your-org>/<your-private-harness>`).
-> **The edit surface is that source-repo clone** (`~/your-private-harness`): edits
-> there deploy to `~/.claude` (`git pull --ff-only`) and separately export to
-> this repo — never the reverse. Edits made directly here are overwritten by
-> the next sync. See [`docs/HARNESS.md`](docs/HARNESS.md) §The three tiers.
+[![verify](https://github.com/Autopsias/gearbox-routing/actions/workflows/verify.yml/badge.svg)](https://github.com/Autopsias/gearbox-routing/actions/workflows/verify.yml)
 
-Gearbox is a provider-agnostic **model + reasoning-effort routing policy**
-for coding agents — one versioned file (`claude/model-routing.yaml`) that
-says, per task class, *which capability tier of model to use and how hard to
-drive it*, plus the guard scripts and skills that keep every consumer
-surface (CLAUDE.md, agents, CI) in sync with that one file.
+Gearbox tells a coding agent which model to use for each kind of task, and how
+hard to make it think. It also ships an optional set of Claude Code skills,
+commands, subagents and hooks that you can install one module at a time.
 
-It answers two questions for every task, separately:
+## What you get
 
-1. **Which model?** — a capability tier (`cheap_fast` / `workhorse` /
-   `frontier_reasoner`), not a hardcoded model id.
-2. **How hard should it think?** — an effort intent (`light` / `standard` /
-   `thorough`), translated into whatever native dial your provider actually
-   exposes (Anthropic `effort`, OpenAI `reasoning_effort`, Gemini
-   `thinking_level` — three different *kinds* of control, not just different
-   names for the same thing; see [`ARCHITECTURE.md`](ARCHITECTURE.md) §2).
-
-Swapping provider is a one-line edit (`active_provider:`). The task
-vocabulary never changes; only the tier→model and effort→dial translation
-does.
-
-## Requirements
-
-- **A coding agent/harness that honours model + effort routing** — Claude
-  Code, or anything that reads the rendered CLAUDE.md digest and acts on it.
-- **Required for `/routing-update` to self-calibrate:** one research-capable
-  MCP provider (Exa, Ref, or Perplexity) — it's how the skill verifies model
-  ids/prices/effort semantics against live docs instead of guessing from
-  memory.
-- **Optional:** the `openai-codex` plugin, only if you want the codex peer
-  lane for adversarial second-model review.
-
-Gearbox does **not** require ponytail / code-review / frontend-design /
-security-guidance or any domain MCP — those are orthogonal to routing, don't
-install them on Gearbox's account.
-
-## The provider table (illustrative — verify before use)
-
-> **The tiers, model ids, and prices below are dated, illustrative
-> examples**, not settings to trust as-is. Re-verify against each provider's
-> current docs and rebase onto your own models before relying on them — see
-> [`docs/PROVIDERS.md`](docs/PROVIDERS.md) for the staleness cadence and
-> [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) §2 for how to redo the
-> calibration yourself.
-
-| Provider | Example models (cheap_fast / workhorse / frontier_reasoner) | Native effort control |
+| Part | What it is | Install |
 |---|---|---|
-| `anthropic` | claude-haiku-4-5 / claude-sonnet-5 / claude-opus-4-8 | `effort` (low…max) — shapes token spend *and* agentic behavior |
-| `openai` | gpt-5.4-mini / gpt-5.4 / gpt-5.5 | `reasoning_effort` — bounds internal reasoning depth |
-| `gemini` | gemini-3.1-flash-lite / gemini-3.5-flash / gemini-3.1-pro-preview | `thinking_level` — a maximum-depth ceiling |
+| **Routing framework** — `claude/` | One versioned policy file (`model-routing.yaml`) that maps five task classes to a model tier and an effort level, for Anthropic, OpenAI, Gemini or Z.ai. Scripts check the file, resolve a route, and write a routing table into your `CLAUDE.md`. | `install.sh` — one command, with backups and an uninstall |
+| **Harness modules** — `harness/` | About 30 optional modules from one working Claude Code setup: a plan runner, two-model code review, git safety hooks, a status line, cost reports and more. | By hand, one module at a time. Each module has a card with its install, check and remove steps. |
 
-There is **no cross-provider effort equivalence** — each profile's
-`effort.map` is that provider's own translation, calibrated independently.
-See `docs/PROVIDERS.md` for the full per-provider breakdown.
+The two parts are independent. Take one, the other, or both.
 
-## Quickstart
+## Quickstart — the routing framework
+
+Install into a scratch folder first. The installer never writes to your real
+`~/.claude` unless you ask twice.
 
 ```bash
 git clone https://github.com/Autopsias/gearbox-routing.git
 cd gearbox-routing
-git config core.hooksPath .githooks   # required if you will ever push — see below
-./install.sh --claude-home /path/to/a/fresh/dir --accept-example-profile --provider anthropic
+./install.sh --claude-home /tmp/gearbox-try --accept-example-profile --provider anthropic
 ```
 
-> **If you intend to push to a fork, the `core.hooksPath` line is not
-> optional.** Git does not wire repo-local hooks on clone. Those hooks are the
-> only gate that scans for confidential identifiers before a push — CI runs
-> structural checks only and cannot do it, because the denylist itself is
-> private. See [`GENERICIZATION.md`](GENERICIZATION.md) §"Why CI cannot scan for
-> identifiers".
+The last lines show `guard: PASS`. Look at `/tmp/gearbox-try/CLAUDE.md` to see
+the routing table it wrote:
 
-> **What CI tests.** The verify workflow runs pytest on `claude/` and
-> `scripts/` only, with an empty `HOME`. It does **not** run the tests under
-> `harness/`: that tree is a synced copy of a private deployment, and many of
-> its tests expect a live `~/.claude`, macOS, or tools a CI runner lacks. If
-> you change `harness/`, run its tests locally.
+| Class | Cues | Resolved tier (Anthropic example) |
+|---|---|---|
+| mechanical | rename, format, codemod, doc edit | claude-haiku-4-5 |
+| standard_build | CRUD, wiring, templated feature | claude-sonnet-5 · medium |
+| agentic_build | multi-file, integration, non-obvious debug | claude-sonnet-5 · high |
+| deep_reasoning | architecture, security, hard root cause | claude-opus-4-8 · high |
+| linchpin | one-shot irreversible call | claude-opus-4-8 · high |
 
-> **The default install target is a fresh directory — never your real
-> `~/.claude`.** Run it against a throwaway dir first. Pointing it at your
-> live `~/.claude` requires *both* `--claude-home "$HOME/.claude"` **and**
-> `--i-understand-this-mutates-live-claude` as an explicit, separate opt-in
-> — see `install.sh --help`.
+The model ids and prices are **dated examples**, which is why
+`--accept-example-profile` is required. Check them against your provider
+before you rely on them ([`docs/PROVIDERS.md`](docs/PROVIDERS.md)).
 
-`--provider` picks which shipped example profile (`anthropic` / `openai` /
-`gemini` / `zai`) becomes `active_provider:`. `--accept-example-profile` is required
-because the shipped profiles are verify-before-use examples, not your
-researched policy — pass `--profile <your-file>` instead once you have one.
+Next: [`docs/INSTALL.md`](docs/INSTALL.md) — install into your real Claude
+home, change the provider, update and remove.
 
-Where each piece lands under `--claude-home`:
+## Pick harness modules
 
-```
-claude/model-routing.yaml        the SSOT policy file (--provider swaps active_provider:)
-claude/model-routing.digest.md   rendered summary spliced into CLAUDE.md's ROUTING block
-claude/scripts/                  verify-routing.sh (drift guard), resolve_route.py (resolver), renderer
-claude/skills/routing-update/    model-landscape change -> researched changeset -> all surfaces regenerated
-claude/skills/routing-retro/     read-only retrospective — is routing actually working?
-claude/evals/routing/            eval runbook + MISROUTES.md ledger template
-claude/fixtures/                 guard + resolver test fixtures
-CLAUDE.md                        gets a <!-- BEGIN/END ROUTING --> block installed or updated in place
-```
+Browse the catalogue in [`docs/MODULES.md`](docs/MODULES.md). Each card says
+what the module does, what it needs, the exact copy commands, how to check it,
+how to remove it, and what it does without asking.
 
-The install is idempotent (re-running with the same flags is a no-op diff)
-and ends by running `claude/scripts/verify-routing.sh --full` as a final
-guard — a non-zero exit means the install left drift, not a clean pass.
+Install only what you will use. Claude Code puts the name and description of
+every installed skill, command and subagent into its context on every turn.
 
-## The `/routing-update` + `/routing-retro` loop
+Not sure where to start? These three are small and stand alone:
 
-- **`/routing-update`** — run when a provider ships a new model, changes
-  pricing, or changes effort-dial semantics. Researches the change against
-  live docs (needs a research MCP — see Requirements), proposes an
-  operator-approved changeset, and regenerates every consumer surface
-  (digest, CHANGELOG, version bump) through one commit. See
-  `docs/METHODOLOGY.md` §4.
-- **`/routing-retro`** — read-only. Run periodically (roughly weekly, or
-  every ~30 sessions) to judge whether the current routing is actually
-  working: over/under-modeled tasks, cost outliers, receipt mismatches
-  against `MISROUTES.md`. It never edits the policy file itself — findings
-  route back through `/routing-update`.
+- [Git safety guard](docs/modules/git-safety.md) — blocks `git reset --hard` and similar commands when you have uncommitted work.
+- [Status line](docs/modules/statusline.md) — shows rate limits, context use and cache state.
+- [Grilling](docs/modules/grilling.md) — interviews you about a plan before you build it.
 
-## What is new in the harness
+## How routing works
 
-The `harness/` tree is a synced copy of a working Claude Code setup. The latest
-refresh adds the parts below; each links to the file to read first.
+For every task, Gearbox answers two questions separately:
 
-- **Plan runner upgrades** — per-plan branches and worktrees, a land stage,
-  output-judged gates. See `harness/skills/plan-execute/`.
-- **Skills** — review, cost, repo-health and harness-cleanup skills. Browse
-  `harness/skills/` (start with `adversarial-review`, `cost-audit`, `repo-health`).
-- **Guard and compaction hooks** — stop risky git and plan-state commands, and
-  manage context compaction. See `harness/hooks/` and the hook list in
-  [`ARCHITECTURE.md`](ARCHITECTURE.md) §7.
-- **Agent janitor** — `harness/scripts/agent_janitor.py`. **macOS only, and it
-  kills processes and deletes files without asking.** Nothing runs until you
-  install it, and its session-end hook is opt-in (snippet in
-  [`ARCHITECTURE.md`](ARCHITECTURE.md) §7).
-- **Machine governor (`govrun`)** — `harness/scripts/govrun.py` queues heavy
-  test runs. Its slot locks live under your home directory
-  (`~/.machine-governor`, or `GOVRUN_STATE_DIR`).
-- **Quality ratchet, efficiency rule, status line and route resolver** —
-  `harness/scripts/quality/`, `harness/rules/llm-review-and-agent-efficiency.md`,
-  `harness/scripts/statusline.sh`, `harness/scripts/resolve_route.py`.
+1. **Which model?** A capability tier (`cheap_fast`, `workhorse`,
+   `frontier_reasoner`), not a fixed model id. Each provider profile maps the
+   tiers to its own models.
+2. **How hard should it think?** An effort intent (`light`, `standard`,
+   `thorough`). Each provider profile translates it into that provider's own
+   control: Anthropic `effort`, OpenAI `reasoning_effort`, Gemini
+   `thinking_level`. These controls differ in kind, so Gearbox never assumes
+   one provider's "high" equals another's.
 
-Installing: `install.sh` is unchanged and installs only the routing policy.
-To use the harness, copy the parts you want from `harness/` into your Claude
-home. Most hooks in `harness/settings.json` skip themselves when their file is
-missing; two do not (see [`ARCHITECTURE.md`](ARCHITECTURE.md) §7). Read the changelog entry before you copy the janitor or the governor.
+To change provider, you edit one line (`active_provider:`). The task classes
+stay the same. When a task fails twice at the same root cause, the resolver
+walks an escalation ladder: more effort first, then a stronger tier.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) has the full schema.
 
-## Further reading
+## Documentation
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — tier vocabulary, provider-profile
-  schema, resolver contract.
-- [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — how to classify a task,
-  calibrate a provider profile for your own models, and add a new provider.
-- [`docs/VERSIONING.md`](docs/VERSIONING.md) — semver rules for the policy
-  file and CHANGELOG conventions.
-- [`docs/PROVIDERS.md`](docs/PROVIDERS.md) — choosing/switching providers,
-  per-provider effort semantics, staleness cadence for the example profiles.
-- [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — how a consumer (orchestrator,
-  lint step, CI check) binds to the policy file and resolver.
-- [`CHANGELOG.md`](CHANGELOG.md) — policy + framework changes.
-- [`GENERICIZATION.md`](GENERICIZATION.md) — scrub rules applied to
-  everything ported into this public repo.
+| I want to… | Read |
+|---|---|
+| Install, update or remove | [`docs/INSTALL.md`](docs/INSTALL.md) |
+| Choose harness modules | [`docs/MODULES.md`](docs/MODULES.md) |
+| Understand the routing model | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Calibrate the policy for my own models | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) |
+| Choose or switch a provider | [`docs/PROVIDERS.md`](docs/PROVIDERS.md) |
+| Call the resolver from my own tool or CI | [`docs/INTEGRATION.md`](docs/INTEGRATION.md) |
+| Know what changed | [`CHANGELOG.md`](CHANGELOG.md) · versioning rules: [`docs/VERSIONING.md`](docs/VERSIONING.md) |
+| Contribute | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Report a security issue | [`SECURITY.md`](SECURITY.md) |
+| Understand how `harness/` is exported | [`docs/HARNESS.md`](docs/HARNESS.md) · [`GENERICIZATION.md`](GENERICIZATION.md) |
+
+## Requirements
+
+- **Claude Code**, or another agent that reads a `CLAUDE.md` file.
+- **bash**, **git** and **Python 3**. The routing scripts use only the Python
+  standard library. CI runs them on Python 3.12.
+- **For `/routing-update`:** one research MCP server (Exa, Ref or Perplexity).
+  It checks model ids and prices against live docs instead of memory.
+- Harness modules list their own needs on their cards.
 
 ## Status
 
-Pre-release. See [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) for the
-current gate status before this is published.
+- **Routing framework:** policy version 2.4.0. CI runs the drift check, the
+  unit tests, a docs check and a scratch install on every pull request and on
+  every push to `master`.
+- **Harness:** a snapshot of one person's working setup, refreshed from time
+  to time. CI does not run the harness tests, because many of them expect a
+  live `~/.claude`, macOS, or tools a CI runner does not have. The module cards
+  say which parts are stable, experimental or author-specific.
+
+## About this repo
+
+`harness/` is generated. An export script copies it from a private source
+repo, removes personal data, and scans the result
+([`docs/HARNESS.md`](docs/HARNESS.md)). A change made directly in `harness/`
+is lost at the next export. Everything else — the docs, `claude/`,
+`install.sh` and `scripts/` — is maintained here.
+
+If you clone this repo to push changes, run `git config core.hooksPath .githooks`
+first. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Credits
+
+- Several harness skills (`grill-me`, `grill-with-docs`, `tdd`,
+  `improve-codebase-architecture`, `setup-matt-pocock-skills`) are adapted from
+  [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
+- `harness/scripts/repo-profile-cache.py` is adapted from
+  [everyinc/compound-engineering-plugin](https://github.com/everyinc/compound-engineering-plugin)
+  (MIT).
+- `harness/skills/repo-health/vendor/` holds a pinned copy of Sentry's
+  `gha-security-review` skill (Apache-2.0; its licence ships beside it).
+
+## License
+
+[MIT](LICENSE)

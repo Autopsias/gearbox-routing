@@ -66,36 +66,40 @@ plain string list, never coerced to a boolean the way a bare `on:` key would
 be by a YAML-1.1-style loader — this resolver never uses one, and the key is
 named `signals:` rather than `on:` precisely to avoid that trap outright).
 
-## 2. One consumer that mirrors the ladder in code: Claude Code's `run.py`
+## 2. One consumer that mirrors the ladder in code: the harness's `run.py`
 
 Some harnesses can't call a Python module directly at dispatch time (their
 dispatcher already hardcodes constants for a completely different reason —
-e.g. speed, or an existing non-Python runner). Claude Code's
-`plan-execute` skill is exactly this case: its `scripts/run.py` carries its
-own `_FALLBACK_LADDER` / `_DEGRADE_EFFORT` dicts, used at dispatch time
+e.g. speed, or an existing non-Python runner). The harness's
+`plan-execute` skill (`harness/skills/plan-execute/`) is exactly this case: its
+`scripts/run.py` carries its own `_FALLBACK_LADDER` / `_DEGRADE_EFFORT` dicts, used at dispatch time
 without importing `resolve_route.py`. That mirror is a second, harness-local
 copy of the **same ladder the SSOT and `resolve_route.py` express** — and it
 is only safe because it's guard-verified against the SSOT (byte- or
 contract-checked), never a freestanding copy that can drift unnoticed.
 
 ```python
-# claude/skills/plan-execute/scripts/run.py (excerpt — Claude Code's dispatcher)
-#
-# SSOT LOCKSTEP: this dict is CODE-AUTHORITATIVE per model-routing.yaml's header
-# carve-out — the SSOT MIRRORS this constant, not the other way round.
-# verify-routing.sh ast-parses this file (never imports/executes it) and fails
-# the drift guard if `_FALLBACK_LADDER` byte-diverges from the SSOT
-# `degradation.ladder` block. Edit both sides together; the guard is what keeps
-# them honest, not this comment.
-_FALLBACK_LADDER = {"fable": "opus", "opus": "sonnet"}
-_DEGRADE_EFFORT = {"opus": "xhigh", "sonnet": "high"}  # keyed by TARGET model
+# harness/skills/plan-execute/scripts/run.py (shortened excerpt)
+# The dicts are keyed by provider; they MUST stay static literals, because the
+# guard reads them with ast.literal_eval.
+_FALLBACK_LADDER = {
+    "anthropic": {"fable": "opus", "opus": "sonnet"},
+    "zai": {"opus": "sonnet"},
+    # …one entry per provider
+}
+_DEGRADE_EFFORT = {  # keyed by TARGET model, per provider
+    "anthropic": {"opus": "high", "sonnet": "high"},
+    # …
+}
 ```
 
-**What the byte-match binding actually asserts:** `verify-routing.sh` reads
-`run.py` as text (AST-parsed, never imported or executed — no code from a
+**What the byte-match binding actually asserts:** the harness copy of the
+guard, `harness/scripts/verify-routing.sh`, reads `run.py` as text (AST-parsed, never imported or executed — no code from a
 consumer runs inside the guard), extracts `_FALLBACK_LADDER`'s literal dict,
-and fails the drift guard the moment it stops matching
-`claude/model-routing.yaml`'s `degradation:`/provider `degrade:` block. This
+and fails the drift guard the moment it stops matching the policy file's
+`degrade:` blocks. The routing framework's own guard
+(`claude/scripts/verify-routing.sh`) does not run this check, because
+`plan-execute` is not part of the routing framework. This
 keeps a harness-local dispatcher honest **for that one consumer** — it is
 not how every other harness must integrate. Any other harness calls
 `resolve_route.py` directly instead of hand-writing its own mirror dict; the
@@ -115,7 +119,7 @@ task-class defaults **from the SSOT when present**, falling back to a
 schema-file rubric only if the SSOT is missing or fails to parse:
 
 ```markdown
-<!-- ~/.claude/commands/references/plan-harden/model-lint.md (excerpt) -->
+<!-- harness/references/plan-harden/model-lint.md (excerpt) -->
 Data source: read task-class defaults from `~/.claude/model-routing.yaml`
 (`task_classes:` block) when it exists and parses; fall back to
 `~/.claude/skills/plan-builder/references/schemas.md` → "Model + reasoning

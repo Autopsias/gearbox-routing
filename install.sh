@@ -54,7 +54,7 @@ usage: install.sh [--claude-home DIR] [--provider NAME] [--accept-example-profil
                                          Must name a provider already in model-routing.yaml,
                                          or be paired with --profile supplying your own.
   --accept-example-profile              required when installing a shipped EXAMPLE provider
-                                         profile (anthropic/openai/gemini) as if it were live
+                                         profile (anthropic/openai/gemini/zai) as if it were live
                                          policy. Omit this by supplying --profile instead.
   --profile FILE                        use FILE as the installed model-routing.yaml instead
                                          of this repo's copy (your own researched profile) —
@@ -65,8 +65,9 @@ usage: install.sh [--claude-home DIR] [--provider NAME] [--accept-example-profil
   --i-understand-this-mutates-live-claude
                                          required IN ADDITION to --claude-home "$HOME/.claude"
                                          before this script will touch the real live home
-  --uninstall                           restore the most recent .bak-* backups under
-                                         --claude-home and strip the ROUTING block; does not
+  --uninstall                           copy the .bak-* backups under --claude-home back
+                                         (the oldest backup of a file wins) and strip the
+                                         ROUTING block; does not
                                          delete files that were newly created (never destroys
                                          work install.sh didn't itself create a backup for)
   -h, --help                            this message

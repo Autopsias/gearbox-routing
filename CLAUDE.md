@@ -1,9 +1,10 @@
-> **EXPORT — do not edit this repo as a source.** Gearbox is the genericized,
-> scrubbed export of a private source repo (`<your-org>/<your-private-harness>`).
-> **The edit surface is that source-repo clone** (`~/your-private-harness`): edits
-> there deploy to `~/.claude` and separately export to this repo. Edits made
-> here are lost at the next sync. Change the source, then re-run the sync
-> pipeline (`docs/HARNESS.md` §The three tiers).
+> **`harness/` is an export — do not edit it here.** It is generated from a
+> private source repo (`<your-org>/<your-private-harness>`); an edit made in
+> `harness/` is lost at the next export. Change the source, then re-run the
+> export (`docs/HARNESS.md` §The three tiers). Everything else in this repo —
+> `claude/`, the docs, `install.sh`, `scripts/` — is maintained here. When an
+> export changes `harness/`, run `python3 -m pytest scripts/test_docs.py -q` and
+> update the module cards in `docs/modules/`.
 
 <!-- BEGIN ROUTING -->
 ## Task routing — classify before you start

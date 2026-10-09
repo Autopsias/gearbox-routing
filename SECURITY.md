@@ -22,7 +22,7 @@ impact you believe it has.
   fixture tricking `install.sh` or `verify-routing.sh` into unsafe file
   operations (path traversal, clobbering files outside `--claude-home`,
   silently passing a guard that should fail).
-- **The shipped example provider profiles (anthropic/openai/gemini) are not
+- **The shipped example provider profiles (anthropic/openai/gemini/zai) are not
   a security boundary** — they're dated, illustrative pricing/model data.
   Treat inaccuracies there as a data-quality bug (`docs/PROVIDERS.md`
   staleness cadence), not a vulnerability, unless they cause an unsafe code

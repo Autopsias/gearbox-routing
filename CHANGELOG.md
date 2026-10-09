@@ -7,6 +7,15 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 ## [Unreleased]
 
 ### Added
+- **Modular docs (2026-10-09).** A new install guide (`docs/INSTALL.md`)
+  covers the routing installer step by step, including update and removal.
+  A module catalogue (`docs/MODULES.md`) and 30 module cards
+  (`docs/modules/*.md`) say, for each harness module, what it does, what it
+  needs, the exact copy commands, the `settings.json` entries, how to check
+  it, how to remove it, and what it does without asking. The README is
+  shorter and starts with what you get. A docs check
+  (`scripts/test_docs.py`, run in CI) fails on a broken relative link, on a
+  card path that does not exist, and on a harness part that no card names.
 - **Second harness refresh: new skills, hooks and scripts (2026-10-09).**
   - **Skills:** `adversarial-review`, `codex-skill-sync`, `cost-audit`, `eli5`, `janitor-status`, `janitor-stop`, `jev-fit-scan`,
     `memo-loop`, `mods`, `plan-harden`, `repo-health` and `worth-adopting`.
@@ -33,6 +42,20 @@ All notable changes to the Gearbox routing policy and framework. Format follows
     unchanged: it installs the routing policy only.
 
 ### Fixed
+- **Wrong facts in the docs.**
+  - `ARCHITECTURE.md` §1 put `agentic_build` on the frontier tier; the policy
+    file puts it on `workhorse`.
+  - `docs/HARNESS.md` said `~/.claude` is the copy you edit; the private
+    source clone is, and `~/.claude` only fast-forwards from it.
+  - The install examples in `docs/PROVIDERS.md` failed without
+    `--accept-example-profile`.
+  - `docs/INTEGRATION.md` said the routing guard checks `run.py`; only the
+    harness copy of the guard does.
+  - The README linked a release checklist that is not published.
+  - `install.sh --help` described `--uninstall` wrongly.
+- **Documented a known limitation:** `install.sh` puts `routing-update` and
+  `routing-retro` under `claude/skills/`, where Claude Code does not look for
+  skills. `docs/modules/routing-skills.md` gives the workaround.
 - **Two security fixes in the refreshed harness.** `jev-fit-scan` deep mode
   no longer gives its judge web access, and it wraps all fetched web text in
   marked untrusted-data blocks that the agents are told never to obey. The
