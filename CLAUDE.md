@@ -10,15 +10,15 @@
 ## Task routing — classify before you start
 
 Classify the task, set the tier. Authority: `claude/model-routing.yaml`
-(v2.5.0, active_provider=anthropic).
+(v2.6.0, active_provider=anthropic).
 
 | Class | Cues | Resolved tier |
 |---|---|---|
-| mechanical | rename/format · codemod · doc edit | claude-haiku-4-5 |
-| standard_build | CRUD · wiring · templated feature · scaffold | claude-sonnet-5 · medium |
-| agentic_build | multi-file · integration · non-obvious debug | claude-sonnet-5 · high |
-| deep_reasoning | architecture · security · ambiguous · hard root-cause | claude-opus-4-8 · high |
-| linchpin | one-shot irreversible · plan-foundational call | claude-opus-4-8 · high |
+| mechanical | rename/format · codemod · doc edit | claude-haiku-5-5 · low |
+| standard_build | CRUD · wiring · templated feature · scaffold | claude-sonnet-5-5 · medium |
+| agentic_build | multi-file · integration · non-obvious debug | claude-sonnet-5-5 · high |
+| deep_reasoning | architecture · security · ambiguous · hard root-cause | claude-opus-5-5 · high |
+| linchpin | one-shot irreversible · plan-foundational call | claude-opus-5-5 · high |
 
 - **Effort = default + escalation, not a ceiling** — never a floor on judgement work.
 - **Fan-out pins an explicit tier** — never the frontier tier across N agents (see `fanout_policy`).

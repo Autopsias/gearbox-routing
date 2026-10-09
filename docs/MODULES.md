@@ -20,7 +20,7 @@ path on the card, and read the cautions.
 
 | Module | What it does | Platform |
 |---|---|---|
-| [Plan pipeline](modules/plan-pipeline.md) | Builds a multi-session plan with a dashboard, runs it through subagents with checks, and merges only after your approval | Any |
+| [Plan pipeline](modules/plan-pipeline.md) | Builds a multi-session plan with a dashboard, runs it through subagents with checks, and merges only after your approval. How it works: [the plan framework](PLAN-FRAMEWORK.md) | Any |
 | [BMAD and epic builds](modules/bmad.md) | 52 BMAD method commands and `/epic-dev`, which builds an epic story by story | Any — needs BMAD in your project |
 
 ## Review and decisions

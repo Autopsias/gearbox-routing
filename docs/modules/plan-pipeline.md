@@ -12,6 +12,9 @@ human review before anything merges.
 
 ## How it works
 
+The full explanation, with a diagram, is in [the plan framework](../PLAN-FRAMEWORK.md).
+
+
 1. `/plan-builder` interviews you and writes a plan folder, `_plans/<slug>-<date>/`, in your project: a `PLAN.html` dashboard, a `manifest.json` and one prompt per session.
 2. `/plan-execute <plan folder>` sends each ready session to a subagent at the model and effort that the plan asks for, checks the result, and stops at each human checkpoint.
 3. When every session is done, `land` merges the plan into your default branch, but only after you approve it with `land-ack`. `finish` then pushes the plan record and reads CI.

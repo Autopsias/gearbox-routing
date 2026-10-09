@@ -4,7 +4,7 @@
 Ported from the source deployment's ~/.claude/scripts/render-routing-digest.py (S05,
 this port), made PROVIDER-AWARE: the rendered task-class table now shows each class's
 tier resolved to the ACTIVE PROVIDER's real model id, not just the abstract tier
-label — the whole point of GUARD-02 (an "sonnet" reader should see "claude-sonnet-5",
+label — the whole point of GUARD-02 (an "sonnet" reader should see "claude-sonnet-5-5",
 whichever provider is active).
 
 Reads the SOURCE TEMPLATE (model-routing.digest.md), extracts the requested VARIANT

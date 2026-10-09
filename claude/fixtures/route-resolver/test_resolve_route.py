@@ -35,13 +35,16 @@ class TestBaselineResolveRealProviders(unittest.TestCase):
 
     def test_anthropic_agentic_build(self):
         result = rr.resolve("agentic_build", "anthropic", ssot_path=REAL_SSOT)
-        self.assertEqual(result, {"model_id": "claude-sonnet-5", "native_effort": "high"})
+        self.assertEqual(result, {"model_id": "claude-sonnet-5-5", "native_effort": "high"})
 
-    def test_anthropic_mechanical_no_effort_dial(self):
-        # cheap_fast tier is all-null for anthropic -> native_effort is None
-        # (omit the dial), never a substituted value.
+    def test_anthropic_mechanical(self):
         result = rr.resolve("mechanical", "anthropic", ssot_path=REAL_SSOT)
-        self.assertEqual(result["model_id"], "claude-haiku-4-5")
+        self.assertEqual(result, {"model_id": "claude-haiku-5-5", "native_effort": "low"})
+
+    def test_tier_without_effort_dial_omits_it(self):
+        # A tier whose model rejects the dial maps every intent to null ->
+        # native_effort is None (omit the dial), never a substituted value.
+        result = rr.resolve("mechanical", "no_ladder_provider", ssot_path=FIXTURE_SSOT)
         self.assertIsNone(result["native_effort"])
 
     def test_openai_deep_reasoning(self):
@@ -51,7 +54,7 @@ class TestBaselineResolveRealProviders(unittest.TestCase):
         # to `high`. This test expected `medium` from the day it was written, while
         # the policy said `thorough`; CI never ran pytest, so nobody saw it.
         result = rr.resolve("deep_reasoning", "openai", ssot_path=REAL_SSOT)
-        self.assertEqual(result, {"model_id": "gpt-5.5", "native_effort": "high"})
+        self.assertEqual(result, {"model_id": "gpt-6-astra", "native_effort": "high"})
 
     def test_gemini_linchpin(self):
         result = rr.resolve("linchpin", "gemini", ssot_path=REAL_SSOT)
@@ -72,30 +75,30 @@ class TestEscalationLadder(unittest.TestCase):
 
     def test_anthropic_agentic_build_escalation_sequence(self):
         base = rr.resolve("agentic_build", "anthropic", ssot_path=REAL_SSOT)
-        self.assertEqual(base, {"model_id": "claude-sonnet-5", "native_effort": "high"})
+        self.assertEqual(base, {"model_id": "claude-sonnet-5-5", "native_effort": "high"})
 
         rung1 = rr.escalate("agentic_build", "anthropic", current=base, ssot_path=REAL_SSOT)
-        self.assertEqual(rung1, {"model_id": "claude-sonnet-5", "native_effort": "xhigh"})
+        self.assertEqual(rung1, {"model_id": "claude-sonnet-5-5", "native_effort": "xhigh"})
 
         # workhorse effort_ladder is [medium, high, xhigh] -> spent. Advance to
         # frontier_reasoner at ITS FIRST rung (low), not its intent-map level.
         rung2 = rr.escalate("agentic_build", "anthropic", current=rung1, ssot_path=REAL_SSOT)
-        self.assertEqual(rung2, {"model_id": "claude-opus-4-8", "native_effort": "low"})
+        self.assertEqual(rung2, {"model_id": "claude-opus-5-5", "native_effort": "low"})
 
         rung3 = rr.escalate("agentic_build", "anthropic", current=rung2, ssot_path=REAL_SSOT)
-        self.assertEqual(rung3, {"model_id": "claude-opus-4-8", "native_effort": "medium"})
+        self.assertEqual(rung3, {"model_id": "claude-opus-5-5", "native_effort": "medium"})
 
     def test_escalation_exhausts_at_top_rung(self):
-        top = {"model_id": "claude-opus-4-8", "native_effort": "max"}
+        top = {"model_id": "claude-opus-5-5", "native_effort": "max"}
         result = rr.escalate("linchpin", "anthropic", current=top, ssot_path=REAL_SSOT)
         self.assertEqual(result, "exhausted")
 
     def test_escalation_first_entry_with_no_prior_effort(self):
         # current has a model but no native_effort recorded yet (e.g. a
         # no-effort-dial tier) -> escalation enters at the ladder's first rung.
-        current = {"model_id": "claude-sonnet-5", "native_effort": None}
+        current = {"model_id": "claude-sonnet-5-5", "native_effort": None}
         result = rr.escalate("standard_build", "anthropic", current=current, ssot_path=REAL_SSOT)
-        self.assertEqual(result, {"model_id": "claude-sonnet-5", "native_effort": "medium"})
+        self.assertEqual(result, {"model_id": "claude-sonnet-5-5", "native_effort": "medium"})
 
 
 class TestDegradeLadder(unittest.TestCase):
@@ -104,14 +107,14 @@ class TestDegradeLadder(unittest.TestCase):
 
     def test_anthropic_linchpin_degrades_to_workhorse(self):
         base = rr.resolve("linchpin", "anthropic", ssot_path=REAL_SSOT)
-        self.assertEqual(base["model_id"], "claude-opus-4-8")
+        self.assertEqual(base["model_id"], "claude-opus-5-5")
 
         degraded = rr.degrade("linchpin", "anthropic", current=base, signal="unavailable", ssot_path=REAL_SSOT)
-        self.assertEqual(degraded, {"model_id": "claude-sonnet-5", "native_effort": "high"})
+        self.assertEqual(degraded, {"model_id": "claude-sonnet-5-5", "native_effort": "high"})
 
     def test_floor_blocks_further_degrade(self):
         # Already at the floor tier (workhorse) -> exhausted, never drops to cheap_fast.
-        at_floor = {"model_id": "claude-sonnet-5", "native_effort": "high"}
+        at_floor = {"model_id": "claude-sonnet-5-5", "native_effort": "high"}
         result = rr.degrade("linchpin", "anthropic", current=at_floor, signal="unavailable", ssot_path=REAL_SSOT)
         self.assertEqual(result, "exhausted")
 

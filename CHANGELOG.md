@@ -6,6 +6,21 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **`claude/model-routing.yaml` → v2.6.0 (MINOR: model ids).** Every example
+  profile moved to the lineup current on 2026-10-09, checked against each
+  vendor's own pages: Anthropic `claude-haiku-5-5` / `claude-sonnet-5-5` /
+  `claude-opus-5-5` (Haiku 5.5 now takes the effort dial); OpenAI
+  `gpt-6-luna` / `gpt-6.1-sol` / `gpt-6-astra`; Gemini `gemini-3.5-flash-lite` /
+  `gemini-3.8-flash` / `gemini-3.1-pro-preview`; Z.ai ids unchanged. Tier
+  prices updated to match. The resolver test for a tier with no effort dial now
+  runs on the fixture profile.
+- **README rewritten around what Gearbox offers.** It now leads with the plan
+  framework and the six areas of the harness, shows the current models, and
+  suggests starting sets of modules. New page:
+  [`docs/PLAN-FRAMEWORK.md`](docs/PLAN-FRAMEWORK.md) explains how a plan is
+  built, checked and run.
+
 ### Added
 - **Harness files that other harness files named but the export did not ship
   (2026-10-09):** the `govrun` enforcement hook and its parser
