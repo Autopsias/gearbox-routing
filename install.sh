@@ -2,7 +2,8 @@
 # install.sh — one-command Gearbox installer (REL-01).
 #
 # Copies the routing framework (SSOT + guard + resolver + renderer + skills +
-# fixtures + evals) into a TARGET home, sets --provider, splices the CLAUDE.md
+# fixtures + evals) into a TARGET home (the two skills go to <home>/skills/, where
+# Claude Code loads personal skills when <home> is ~/.claude), sets --provider, splices the CLAUDE.md
 # routing digest, and runs the final all-artifact guard (verify-routing.sh).
 # Safe to re-run: running it twice with the same flags produces no diff and no
 # duplicate ROUTING block.
@@ -233,8 +234,8 @@ fi
 # ---------------------------------------------------------------------------
 declare -a COPY_PAIRS=(
   "claude/model-routing.digest.md:claude/model-routing.digest.md"
-  "claude/skills/routing-update:claude/skills/routing-update"
-  "claude/skills/routing-retro:claude/skills/routing-retro"
+  "claude/skills/routing-update:skills/routing-update"
+  "claude/skills/routing-retro:skills/routing-retro"
   "claude/scripts/verify-routing.sh:claude/scripts/verify-routing.sh"
   "claude/scripts/render-routing-digest.py:claude/scripts/render-routing-digest.py"
   "claude/scripts/resolve_route.py:claude/scripts/resolve_route.py"

@@ -80,9 +80,15 @@ All notable changes to the Gearbox routing policy and framework. Format follows
     harness copy of the guard does.
   - The README linked a release checklist that is not published.
   - `install.sh --help` described `--uninstall` wrongly.
-- **Documented a known limitation:** `install.sh` puts `routing-update` and
-  `routing-retro` under `claude/skills/`, where Claude Code does not look for
-  skills. `docs/modules/routing-skills.md` gives the workaround.
+- **`install.sh` now registers the two routing skills.** It put
+  `routing-update` and `routing-retro` under `<home>/claude/skills/`, where
+  Claude Code does not look for skills, so `/routing-update` and
+  `/routing-retro` never appeared. They now go to `<home>/skills/`. The retro
+  scanner finds the policy in either layout, and its skill calls the scanner
+  through `${CLAUDE_SKILL_DIR}`, so it works from any project.
+  `/routing-update` says to run it in a clone of this repo. A test
+  (`scripts/test_install.py`) holds the new layout. An older install keeps
+  its `<home>/claude/skills/` copies; delete them by hand.
 - **Two security fixes in the refreshed harness.** `jev-fit-scan` deep mode
   no longer gives its judge web access, and it wraps all fetched web text in
   marked untrusted-data blocks that the agents are told never to obey. The

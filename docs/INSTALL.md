@@ -74,8 +74,8 @@ version guard).
 <target>/claude/model-routing.digest.md   the template for the CLAUDE.md routing block
 <target>/claude/scripts/                  verify-routing.sh (drift check), resolve_route.py (resolver),
                                           render-routing-digest.py (writes the CLAUDE.md block)
-<target>/claude/skills/routing-update/    researches a model change and updates the policy
-<target>/claude/skills/routing-retro/     reads past sessions and reports misroutes (read-only)
+<target>/skills/routing-update/           /routing-update: researches a model change and updates the policy
+<target>/skills/routing-retro/            /routing-retro: reads past sessions and reports misroutes (read-only)
 <target>/claude/evals/routing/            runbook and an empty misroute ledger (MISROUTES.md)
 <target>/claude/fixtures/                 test fixtures for the check and the resolver
 <target>/CLAUDE.md                        gets a <!-- BEGIN ROUTING --> … <!-- END ROUTING --> block
@@ -84,14 +84,13 @@ version guard).
 The installer backs up every existing file that it changes to
 `<file>.bak-<timestamp>`. A second run with the same flags changes nothing.
 
-> **Known limitation — the two skills are not registered.** The installer puts
-> `routing-update` and `routing-retro` under `claude/skills/`. Claude Code loads
-> personal skills only from `~/.claude/skills/<name>/SKILL.md`
-> ([Claude Code docs: skills](https://code.claude.com/docs/en/skills)), so it
-> does not offer `/routing-update` or `/routing-retro` after this install. The
-> two skills also read `claude/model-routing.yaml` relative to the folder you
-> start Claude Code in. If you want the two commands now, install the harness
-> versions instead: see the **Routing skills** card in [`MODULES.md`](MODULES.md).
+The two skills land in `<target>/skills/`, which is where Claude Code loads
+personal skills when the target is `~/.claude`
+([Claude Code docs: skills](https://code.claude.com/docs/en/skills)). After an
+install into `~/.claude`, start a new session and `/routing-retro` and
+`/routing-update` are available. Run `/routing-update` in your clone of this
+repo: it edits the policy and the changelog there, and you then run `install.sh`
+again. See the [routing skills](modules/routing-skills.md) card.
 
 ### Step 3: install into your Claude home
 
@@ -151,7 +150,8 @@ overwrite your own policy. Add `--force` only if you want the shipped file.
 - It removes the routing block from `CLAUDE.md`, but only if `CLAUDE.md` had no
   backup (that is, the installer created it).
 - It does **not** delete files that the installer added new. Delete
-  `~/.claude/claude/` yourself if you want them gone.
+  `~/.claude/claude/`, `~/.claude/skills/routing-update/` and
+  `~/.claude/skills/routing-retro/` yourself if you want them gone.
 
 ---
 

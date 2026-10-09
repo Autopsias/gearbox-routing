@@ -19,8 +19,13 @@ once that file exists in your deployment). Calibration-level changes (a class de
 an agent pin, an elasticity, a price row) are handed to `/routing-update` — one
 apply-path, one guard, one approval protocol.
 
+**Where the files are.** The policy is `claude/model-routing.yaml` in a clone of the
+Gearbox repo, and `~/.claude/claude/model-routing.yaml` after `install.sh` installs into
+`~/.claude`. The scanner finds it on its own (`--ssot` overrides); read the same file it
+reports. "The policy" below means that file.
+
 **Read, never hardcode.** Expected classes, default pairs, and prices come from
-`claude/model-routing.yaml` AT RUN TIME — specifically `prices.<active_provider>` and
+the policy AT RUN TIME — specifically `prices.<active_provider>` and
 `providers.<active_provider>`. This skill's prose carries no tier values, no model
 names, and no price numbers.
 
@@ -37,7 +42,7 @@ names, and no price numbers.
 ### 1. Deterministic scan (cheap, no raw-JSONL reading by the model)
 
 ```bash
-python3 claude/skills/routing-retro/scripts/retro_scan.py \
+python3 "${CLAUDE_SKILL_DIR}/scripts/retro_scan.py" \
   --last 20 --exclude-session <CURRENT-SESSION-ID> > /tmp/retro-scan.json
 ```
 

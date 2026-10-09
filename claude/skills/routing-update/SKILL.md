@@ -22,6 +22,13 @@ after the snapshot step and ask the operator to supply the researched numbers
 directly — do not assert a model id, price, or effort-dial fact unverified, and do not
 silently fall back to training-data knowledge of "what model X probably costs."
 
+**Where to run it.** This skill edits the policy, bumps its version and writes a
+CHANGELOG entry, so run it in your clone (or fork) of the Gearbox repo: the folder that
+holds `claude/model-routing.yaml` and `CHANGELOG.md`. If the current folder has no
+`claude/model-routing.yaml`, STOP and tell the operator to start Claude Code in that
+clone. After the change is committed, re-run `install.sh` to copy the new policy into
+`~/.claude`.
+
 **Prime directive — read, never hardcode.** This skill reads `claude/model-routing.yaml`
 (the SSOT) at runtime for every tier value, price, agent pin, and trigger. Nothing in
 this skill's own prose carries a model name, price, or effort tier as ground truth — so

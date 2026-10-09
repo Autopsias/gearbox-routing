@@ -67,6 +67,21 @@ def _sub_block(text, key, indent):
     return text[body_start:end]
 
 
+def default_ssot():
+    """The policy file for the layout this script was installed in.
+
+    In the repo the script sits in claude/skills/routing-retro/scripts/, so the
+    policy is three levels up (claude/model-routing.yaml). install.sh puts the skill
+    in <home>/skills/routing-retro/scripts/, and the policy in
+    <home>/claude/model-routing.yaml. Return the first candidate that exists, else
+    the first one (so the error names a real path).
+    """
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+    candidates = [os.path.join(base, "model-routing.yaml"),
+                  os.path.join(base, "claude", "model-routing.yaml")]
+    return next((c for c in candidates if os.path.isfile(c)), candidates[0])
+
+
 def parse_ssot(ssot_path, provider_override=None):
     """Returns (active_provider, {tier: (in_rate, out_rate)}, {raw_model_id: tier})."""
     with open(ssot_path, encoding="utf-8") as f:
@@ -264,8 +279,9 @@ def main():
     ap.add_argument("--since", default=None, help="only sessions modified on/after YYYY-MM-DD")
     ap.add_argument("--project", default=None, help="substring filter on the project dir name")
     ap.add_argument("--exclude-session", action="append", default=[], help="session id to skip (pass the CURRENT session id)")
-    ap.add_argument("--ssot", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "model-routing.yaml"),
-                     help="path to model-routing.yaml (default: repo-relative claude/model-routing.yaml)")
+    ap.add_argument("--ssot", default=default_ssot(),
+                     help="path to model-routing.yaml (default: the first that exists of "
+                          "<three levels up>/model-routing.yaml and <three levels up>/claude/model-routing.yaml)")
     ap.add_argument("--projects-dir", default=os.path.expanduser("~/.claude/projects"),
                      help="root dir containing <project>/<session>.jsonl transcripts")
     ap.add_argument("--provider", default=None, help="price against this provider instead of the SSOT's active_provider")

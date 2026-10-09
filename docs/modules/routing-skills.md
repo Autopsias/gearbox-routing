@@ -13,38 +13,28 @@ routing did not fit the work. It changes nothing.
 
 ## Which copy
 
-This repo has two copies of each skill:
+This repo has two copies of each skill. Install one copy or the other, never
+both: they have the same names.
 
 | | `claude/skills/` (installed by `install.sh`) | `harness/skills/` |
 |---|---|---|
-| Reads the policy at | `claude/model-routing.yaml`, relative to the folder you start Claude Code in | `~/.claude/model-routing.yaml` |
-| `routing-retro` | One scanner script. Writes only to the misroute ledger, after you confirm. | 16 scripts. Also reads the outcome logs that the [plan pipeline](plan-pipeline.md) and the [compaction policy](compaction.md) write. |
-| `routing-update` | Stand-alone | Needs the plan pipeline. Some steps assume the original author's deploy tool. |
-| Shows up as a slash command after install | **No** (see below) | Yes, if you copy it to `~/.claude/skills/` |
-
-**Known limitation.** `install.sh` puts its copies in `<target>/claude/skills/`.
-Claude Code loads personal skills only from `~/.claude/skills/<name>/`, so the
-installed copies do not show up as `/routing-update` and `/routing-retro`.
+| Reads the policy at | `~/.claude/claude/model-routing.yaml` after `install.sh`; `claude/model-routing.yaml` in a clone of this repo | `~/.claude/model-routing.yaml` |
+| `routing-retro` | One scanner script. Works from any project. Writes only to the misroute ledger, after you confirm. | 16 scripts. Also reads the outcome logs that the [plan pipeline](plan-pipeline.md) and the [compaction policy](compaction.md) write. |
+| `routing-update` | Run it in your clone of this repo; then run `install.sh` again. | Needs the plan pipeline. Some steps assume the original author's deploy tool. |
 
 ## Install
 
-**If you use the plan pipeline**, take the harness copies:
+**If you use only the routing framework**, `install.sh` installs these skills
+for you ([`INSTALL.md`](../INSTALL.md)). With `--claude-home "$HOME/.claude"`
+they land in `~/.claude/skills/`, and Claude Code offers them in the next
+session.
+
+**If you use the plan pipeline**, take the harness copies instead:
 
 ```bash
 mkdir -p ~/.claude/skills
 cp -R harness/skills/routing-retro harness/skills/routing-update ~/.claude/skills/
 ```
-
-**If you use only the routing framework**, copy the `claude/` versions into
-your skills folder, and start Claude Code in the folder that holds
-`claude/model-routing.yaml` (your install target, or this repo):
-
-```bash
-mkdir -p ~/.claude/skills
-cp -R claude/skills/routing-retro claude/skills/routing-update ~/.claude/skills/
-```
-
-Install one copy or the other, never both: they have the same names.
 
 ## Check it works
 
