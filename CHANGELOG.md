@@ -15,9 +15,10 @@ All notable changes to the Gearbox routing policy and framework. Format follows
   `gemini-3.8-flash` / `gemini-3.1-pro-preview`; Z.ai ids unchanged. Tier
   prices updated to match. The resolver test for a tier with no effort dial now
   runs on the fixture profile.
-- **README rewritten around what Gearbox offers.** It now leads with the plan
-  framework and the six areas of the harness, shows the current models, and
-  suggests starting sets of modules. New page:
+- **README rewritten around what Gearbox offers.** Six areas with equal
+  weight (routing, plans, review, repo health, session safety, cost), a "Works
+  with" section for providers and harnesses (Claude Code, Codex CLI, any agent
+  or CI job), the current models, and starting sets of modules. New page:
   [`docs/PLAN-FRAMEWORK.md`](docs/PLAN-FRAMEWORK.md) explains how a plan is
   built, checked and run.
 

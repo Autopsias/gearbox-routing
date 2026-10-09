@@ -4,76 +4,88 @@
 
 [![verify](https://github.com/Autopsias/gearbox-routing/actions/workflows/verify.yml/badge.svg)](https://github.com/Autopsias/gearbox-routing/actions/workflows/verify.yml)
 
-Gearbox is a working setup for Claude Code that you can take in parts. Its
-centre is a **plan framework**: it turns a large job into a plan of sessions,
-runs each session in a fresh subagent on the right model and effort, checks
-each result before it counts, and stops for you where a human decision
-matters. Around it sit a **model-routing policy**, **two-model code review**,
-**session safety hooks** and **cost reports**.
+Gearbox is a toolkit for running AI coding agents well. It picks the model and
+the effort level each task needs, runs large jobs as checked sessions, reviews
+work with two different models, keeps repos healthy, and guards your sessions.
+It is not tied to one vendor: the routing policy ships profiles for Anthropic,
+OpenAI, Gemini and Z.ai, and the toolkit runs on Claude Code and on OpenAI's
+Codex CLI. You take only the parts you want.
 
 ## What Gearbox gives you
 
-### Plan framework — large jobs as checked sessions
-- `/plan-builder` interviews you and writes a plan: a dashboard (`PLAN.html`) and one prompt per session.
-- `/plan-execute` runs each session in a fresh subagent, on the model and effort its task needs.
-- A session counts as done only after its verify gates pass: your tests, an LLM review, or a second model.
-- It stops at human checkpoints with a short decision brief, and merges into your main branch only after you approve.
-- `/plan-harden` stress-tests a plan before you run it.
-
-[How the plan framework works →](docs/PLAN-FRAMEWORK.md)
-
-### Model routing — the right model and effort for each task
-- One policy file maps five task classes, from a mechanical rename to a one-shot irreversible call, to a model tier and an effort level.
-- Shipped profiles for Anthropic, OpenAI, Gemini and Z.ai. To change provider, you edit one line.
-- After two failures at the same root cause, the next attempt gets more effort, then a stronger model.
-- `/routing-update` updates the policy when models or prices change; `/routing-retro` checks that the routing works.
+### Model and effort routing
+- One policy file maps five task classes — from a mechanical rename to a one-shot irreversible call — to a model tier and an effort level.
+- Provider profiles for Anthropic, OpenAI, Gemini and Z.ai. To change provider, you edit one line; the task classes stay the same.
+- After two failures at the same root cause, the next attempt gets more effort, then a stronger model. Nothing starts on the expensive model just because a task feels hard.
+- `/routing-update` updates the policy when a model or a price changes; `/routing-retro` reads past sessions and reports where the routing did not fit.
 
 [Routing at a glance ↓](#routing-at-a-glance) · [Architecture →](ARCHITECTURE.md)
 
+### Plan framework
+- `/plan-builder` turns a large job into a plan of sessions with a dashboard; `/plan-harden` stress-tests the plan.
+- `/plan-execute` runs each session in a fresh subagent on the model its task class needs, and counts it as done only when its checks pass (tests, an LLM review, a second model).
+- It stops at human checkpoints with a short brief, and merges into your main branch only after you approve.
+
+[The plan framework →](docs/PLAN-FRAMEWORK.md)
+
 ### Review and decisions
-- `/adversarial-review`: Claude and OpenAI's Codex review the same code or plan separately, then the findings are merged.
+- `/adversarial-review`: Claude and OpenAI's Codex review the same code or plan separately; the findings are then merged.
 - `/grill-me` interviews you about a design until each decision is settled; `/blindspot` finds the traps in unfamiliar code; `/diagnose` takes a hard bug to a fix and a test.
 
-### Shipping and quality
-- `/repo-health` scores a repo from 0 to 100 on a dashboard; `/code-quality` holds file-size and complexity limits.
+[Modules →](docs/MODULES.md#review-and-decisions)
+
+### Repo health and quality
+- `/repo-health` scores a repo from 0 to 100 on a dashboard, splits findings into BLOCKING and ADVISORY, and keeps the history.
+- `/code-quality` holds file-size, function-length and complexity limits as a ratchet that only lets debt go down.
 - Test and CI fixers sort failures and send specialist subagents; `/ship-tail` takes a branch to a pull request with green CI, and never merges.
 
+[Modules →](docs/MODULES.md#code-quality-and-testing)
+
 ### Session safety
-- Hooks block `git reset --hard` on uncommitted work, hold automatic compaction back until a safe moment, and queue heavy test runs.
+- Hooks block `git reset --hard` on uncommitted work, hold automatic compaction back until a safe moment, and queue heavy test runs so they do not all run at once.
 - On macOS, a janitor cleans up leftover agent processes. A status line shows rate limits, context use and cache state.
 
+[Modules →](docs/MODULES.md#session-safety-and-context)
+
 ### Cost and learning
-- `/cost-audit` measures what your sessions cost, from the local transcripts.
+- `/cost-audit` measures what your sessions cost from the local transcripts: cache hits, cache rewrites, effort used and dollars per model.
 - `/improve` looks back over your sessions and proposes rules, skills and memory. Plans write their lessons to project memory, and the next plan reads them.
+
+[Modules →](docs/MODULES.md#cost-routing-and-authoring)
 
 There are also 52 [BMAD method](https://github.com/bmad-code-org/BMAD-METHOD)
 commands and an epic builder for teams that use BMAD. Every part has a
 [module card](docs/MODULES.md) with what it needs and how to install, check and
 remove it.
 
-## How a plan runs
+## Works with
 
-```mermaid
-flowchart TD
-    A["/plan-builder<br/>writes the plan and its dashboard"] --> B["/plan-execute<br/>takes the next ready session"]
-    B --> C["picks model + effort<br/>from the routing policy"]
-    C --> D["a fresh subagent<br/>does the work"]
-    D --> E{"verify gates<br/>pass?"}
-    E -- no --> F["rework, then more effort<br/>or a stronger model"]
-    F --> D
-    E -- yes --> G{"human<br/>checkpoint?"}
-    G -- yes --> H["you decide<br/>from a short brief"]
-    H --> B
-    G -- no --> B
-    B -- "all sessions done" --> I["land: merge into main<br/>after your approval"]
-```
+**Model providers.** The routing policy has a profile for each provider:
 
-Details, commands and costs: [The plan framework](docs/PLAN-FRAMEWORK.md).
+| Provider | Cheap tier | Workhorse tier | Strongest tier | Effort control |
+|---|---|---|---|---|
+| Anthropic | Claude Haiku 5.5 | Claude Sonnet 5.5 | Claude Opus 5.5 (Fable 5.1 as escalation-only top) | `effort` |
+| OpenAI | `gpt-6-luna` | `gpt-6.1-sol` | `gpt-6-astra` | `reasoning.effort` |
+| Gemini | `gemini-3.5-flash-lite` | `gemini-3.8-flash` | `gemini-3.1-pro-preview` | `thinking_level` |
+| Z.ai | `glm-5.3-flash` | `glm-5.3-flash` | `glm-5.3` | `reasoning_effort` |
+
+The model ids and prices were checked against each vendor's own pages on
+2026-10-09. They are examples: check them before you rely on them
+([`docs/PROVIDERS.md`](docs/PROVIDERS.md)).
+
+**Agent harnesses.**
+
+| Harness | What works |
+|---|---|
+| **Claude Code** | Everything. Gearbox is built and used daily on Claude Code. Hooks, the status line and subagent files are Claude Code features, so those parts work only here. |
+| **OpenAI Codex CLI** | The plan runner can run a plan from Codex (`--harness codex`). `/adversarial-review`, `/plan-harden` and the memo critic ship Codex versions. A sync script mirrors the other skills into Codex's skill folder, and another script renders your global rules into Codex's `AGENTS.md`. |
+| **Claude Code on other models** | The plan runner has a lane that runs plans on Z.ai's GLM models from a separate Claude Code config. A guide shows how to run Claude Code against a Gemini model through a proxy (experimental). |
+| **Any other agent or CI job** | The routing policy is a plain YAML file and the resolver is a standard-library Python function, so any tool can read the policy or ask it for a route ([`docs/INTEGRATION.md`](docs/INTEGRATION.md)). The routing table also renders into any `CLAUDE.md`-style instruction file. |
 
 ## Routing at a glance
 
 Each task class resolves to a model and an effort level for the active
-provider. With the shipped Anthropic example profile:
+provider. With the Anthropic example profile:
 
 | Task class | Typical work | Model · effort |
 |---|---|---|
@@ -83,17 +95,11 @@ provider. With the shipped Anthropic example profile:
 | `deep_reasoning` | architecture, security, hard root cause | Claude Opus 5.5 · high |
 | `linchpin` | a one-shot call the rest of a plan rests on | Claude Opus 5.5 · high |
 
-When a task fails twice at the same root cause, the next attempt gets more
-effort, then a stronger tier; Claude Fable 5.1 sits at the top as an
-escalation-only model. The other shipped profiles use OpenAI
-(`gpt-6-luna`, `gpt-6.1-sol`, `gpt-6-astra`), Gemini (`gemini-3.5-flash-lite`,
-`gemini-3.8-flash`, `gemini-3.1-pro-preview`) and Z.ai (`glm-5.3-flash`,
-`glm-5.3`). To change provider, you edit one line.
-
-The model ids and prices were checked against each vendor's own pages on
-2026-10-09. They are examples: models change, so check them before you rely on
-them ([`docs/PROVIDERS.md`](docs/PROVIDERS.md)), and measure your own task mix
-([`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)).
+The same five classes resolve to OpenAI, Gemini or Z.ai models when you switch
+`active_provider:`. The effort controls differ in kind between vendors, so each
+profile translates the intent into its own vendor's control; Gearbox never
+assumes one vendor's "high" equals another's. To measure the right tier for
+your own task mix, see [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
 ## Get started
 
@@ -114,15 +120,19 @@ to install into `~/.claude`, which also adds `/routing-update` and
 `/routing-retro`.
 
 **Everything else** you copy one module at a time from `harness/`, following
-its card. Install only what you will use: every installed skill, command and
-subagent adds its name and description to Claude's context on every turn.
+its card. The cards give Claude Code paths (`~/.claude/…`); the
+[Codex row above](#works-with) says what runs in Codex. Install only what you
+will use: every installed skill, command and subagent adds its name and
+description to the agent's context on every turn.
 Good places to start:
 
 | If you want… | Install |
 |---|---|
-| The plan framework | [Plan pipeline](docs/modules/plan-pipeline.md), plus [adversarial review](docs/modules/adversarial-review.md) and [grilling](docs/modules/grilling.md) for `/plan-harden` |
-| Small, safe wins | [Git safety guard](docs/modules/git-safety.md), [status line](docs/modules/statusline.md), [grilling](docs/modules/grilling.md) |
-| A quality pass on a repo | [Repo health](docs/modules/repo-health.md), [code quality](docs/modules/code-quality.md), [test and CI commands](docs/modules/test-and-ci.md) with the [support agents](docs/modules/support-agents.md) |
+| The right model for each task | The routing framework (above), then the [routing skills](docs/modules/routing-skills.md) |
+| A health check and quality pass on a repo | [Repo health](docs/modules/repo-health.md), [code quality](docs/modules/code-quality.md), [test and CI commands](docs/modules/test-and-ci.md) with the [support agents](docs/modules/support-agents.md) |
+| Second-model review of code and plans | [Adversarial review](docs/modules/adversarial-review.md), [grilling](docs/modules/grilling.md), [investigation](docs/modules/investigation.md) |
+| Large jobs run as checked sessions | [Plan pipeline](docs/modules/plan-pipeline.md), plus adversarial review and grilling for `/plan-harden` |
+| Small, safe wins | [Git safety guard](docs/modules/git-safety.md), [status line](docs/modules/statusline.md) |
 | To see what your sessions cost | [Cost and usage](docs/modules/cost-and-usage.md) |
 
 ## Documentation
@@ -143,8 +153,9 @@ Good places to start:
 
 ## Requirements
 
-- **Claude Code.** The routing framework also works with any agent that reads a
-  `CLAUDE.md` file.
+- **An agent harness.** Claude Code runs every part; OpenAI's Codex CLI runs
+  the parts listed under [Works with](#works-with); the routing policy works
+  with any agent or CI job.
 - **bash**, **git** and **Python 3**. The scripts use only the Python standard
   library. CI runs them on Python 3.12.
 - **Optional:** the Codex CLI for two-model reviews; one research MCP server

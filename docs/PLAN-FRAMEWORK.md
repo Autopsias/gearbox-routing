@@ -6,7 +6,9 @@ expensive model. The plan framework breaks a large job into **sessions**, runs
 each session in its own subagent at the right model and effort, checks each
 result before it counts, and stops for you where a human decision matters.
 
-It is three Claude Code skills that work together:
+It is three skills that work together. They run in Claude Code, and a plan can
+also run from OpenAI's Codex CLI (`--harness codex`); `/plan-harden` ships a
+Codex version.
 
 | Skill | What it does |
 |---|---|

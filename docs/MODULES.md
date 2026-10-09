@@ -1,7 +1,10 @@
 # Harness modules
 
-`harness/` is a copy of one working Claude Code setup: skills, slash commands,
-subagents, hooks and scripts. You do not install it as a whole. You pick the
+`harness/` is a copy of one working setup: skills, slash commands, subagents,
+hooks and scripts. It is built on Claude Code, and the cards give Claude Code
+paths. Three skills (`adversarial-review`, `plan-harden`, `memo-loop`) also ship
+a Codex CLI version in their `codex/` folder; hooks, the status line and
+subagent files are Claude Code features. You do not install it as a whole. You pick the
 modules you want, and each module has a card that says what it does, what it
 needs, and how to install, check and remove it.
 
