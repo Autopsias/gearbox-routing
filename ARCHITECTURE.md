@@ -196,7 +196,9 @@ it reads `(task_class, active_provider)` from the policy file and resolves
 `{model_id, native_effort}`, then — **on a failure/refusal signal supplied by its
 caller** (the resolver detects nothing itself; `escalation.trigger` prose is a
 human/consumer contract, not resolver logic) — walks the profile's escalation ladder
-on reported failure and the degrade ladder on refusal, for **any** provider whose
+on reported failure and the degrade ladder on refusal (only when the profile lists
+that signal in its `degrade.signals`; otherwise the resolver raises an error and the
+signal goes to the operator), for **any** provider whose
 profile supplies the blocks above. A consumer embedded in a specific harness (e.g. the harness's
 `plan-execute/scripts/run.py`) may keep a mirror of its own ladder for its one
 consumer, but that mirror MUST be guard-verified against this policy file (byte- or

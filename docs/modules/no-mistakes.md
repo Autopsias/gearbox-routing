@@ -25,8 +25,9 @@ cp -R harness/skills/no-mistakes ~/.claude/skills/
 cp harness/workflows/*.js harness/workflows/README.md ~/.claude/workflows/
 ```
 
-Then install the `no-mistakes` tool from its repo and run `no-mistakes init`
-once in each repo.
+Then install the `no-mistakes` tool by following its own README. The tool also
+has a per-repo setup step (`no-mistakes init`); read the tool's README for what
+it changes in your repo, because this repo does not ship or test it.
 
 ## Check it works
 

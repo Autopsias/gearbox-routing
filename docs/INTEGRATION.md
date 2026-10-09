@@ -68,12 +68,14 @@ named `signals:` rather than `on:` precisely to avoid that trap outright).
 
 ## 2. One consumer that mirrors the ladder in code: the harness's `run.py`
 
-Some harnesses can't call a Python module directly at dispatch time (their
-dispatcher already hardcodes constants for a completely different reason —
-e.g. speed, or an existing non-Python runner). The harness's
-`plan-execute` skill (`harness/skills/plan-execute/`) is exactly this case: its
-`scripts/run.py` carries its own `_FALLBACK_LADDER` / `_DEGRADE_EFFORT` dicts, used at dispatch time
-without importing `resolve_route.py`. That mirror is a second, harness-local
+Some harnesses keep a static copy of the ladder in their dispatcher instead of
+reading the policy at every step (for example for speed, or because of an
+existing non-Python runner). The harness's `plan-execute` skill
+(`harness/skills/plan-execute/`) is this case: its `scripts/run.py` carries its
+own `_FALLBACK_LADDER` / `_DEGRADE_EFFORT` dicts, used for the downward
+(degrade) lookup without calling `resolve_route.py`. `run.py` does import
+`resolve_route.py` lazily to compute the upward escalation rung. The static
+mirror is a second, harness-local
 copy of the **same ladder the SSOT and `resolve_route.py` express** — and it
 is only safe because it's guard-verified against the SSOT (byte- or
 contract-checked), never a freestanding copy that can drift unnoticed.
@@ -130,10 +132,13 @@ The lint then flags sessions whose declared `(model, effort)` disagrees with
 what the SSOT would recommend for that session's apparent task shape (dead
 rungs, `opusplan`-style build/design mismatches, a hard session left at a
 soft effort, an unpinned specialist agent, a codex-peer trigger with no
-adversarial-review gate). Every flag is capped at Polish/Known-debt
-severity — this lint never blocks a plan outright; it's advisory-with-a-
-paper-trail, the same posture as the main-session advisory default in
-`ARCHITECTURE.md` §1.
+adversarial-review gate). Most flags are capped at Polish/Known-debt
+severity: advisory-with-a-paper-trail, the same posture as the main-session
+advisory default in `ARCHITECTURE.md` §1. Two kinds of flag do block. The
+structural flags (`task-class-missing`, `override-without-reason`,
+`override-incomplete`, `override-below-floor`) and `peer-gate-missing` (a
+session with a non-empty `peer_triggers` list and no `adversarial-review` gate)
+are plan-killers, because each is a declared field, not a heuristic.
 
 **The binding is the data-source line, not a fork.** `plan-harden` (and by
 extension `plan-builder`, which shares the same rubric reference) needs
@@ -154,8 +159,11 @@ pre-commit hook, or a one-off script just needs to:
    `resolve_route.py` if it also needs escalation/degrade behavior.
 3. Register itself in the SSOT's own `consumers:` block with a `stamp:` value
    describing how it binds (`rendered-block`, `lint-reads`,
-   `prose-rationale`, or a new stamp shape if none fit) — this is what the
-   drift guard iterates over to know what to check.
+   `prose-rationale`, or a new stamp shape if none fit). This documents the
+   consumer for readers. The drift guard (`claude/scripts/verify-routing.sh`)
+   does not iterate this block: it checks a fixed set of surfaces (agent
+   frontmatter, the resolver, the `CLAUDE.md` digest), so a new consumer needs
+   its own check if you want drift caught.
 
 Never hand-copy tier→model or task_class→tier mappings into a new consumer's
 source. If the mapping isn't reachable by parsing the SSOT at the point you
@@ -177,7 +185,7 @@ dependency.
 asserting a model fact from memory when it has no way to verify current
 provider docs. It needs **any one** of:
 
-- **Exa** (`mcp__exa__*` / `web_search_exa` / `deep_researcher_*`), or
+- **Exa** (`mcp__exa__*` / `web_search_exa` / `agent_run`), or
 - **Ref** (`mcp__ref__ref_search_documentation` / `ref_read_url`), or
 - **Perplexity** (`perplexity_ask` or equivalent).
 
@@ -188,8 +196,9 @@ rather than guess.
 ### (b) Optional — the codex peer lane
 
 `model-routing.yaml`'s `codex_peer:` block (architecture/irreversible/
-security triggers → `/adversarial-review`; a stuck-after-escalation trigger
-→ a rescue subagent, e.g. `codex:rescue`) needs the **openai-codex plugin**
+security triggers → `/adversarial-review`; a stuck-after-escalation trigger →
+a second-model review (`peer_review`); a separate `stuck` trigger → a rescue
+subagent, e.g. `codex:rescue`) needs the **openai-codex plugin**
 (or whatever provides your `adversarial-review`/rescue tooling) to actually
 fire. A consumer without that plugin installed simply **never fires that
 lane** — the SSOT still names the trigger and the lint-keyword matching in

@@ -11,7 +11,7 @@ settled. Each question comes with a recommended answer.
 
 ## What you get
 
-- `harness/skills/grill-me/` — the interview. It changes no files. It ends with a table of decisions and a prompt you can paste to start the work.
+- `harness/skills/grill-me/` — the interview. It changes no files in your repo. If no plan file exists, the last step writes one to `~/.codex/plans/` (see Cautions). It ends with a table of decisions and a prompt you can paste to start the work.
 - `harness/skills/grill-with-docs/` — the same interview. It also writes the terms you agree into `CONTEXT.md` and offers an ADR (a short decision record in `docs/adr/`) for hard-to-reverse decisions. Includes `CONTEXT-FORMAT.md` and `ADR-FORMAT.md`.
 - `harness/skills/_shared/grill-adversarial-review.md` — the shared opening and closing text. Both skills read it from `~/.claude/skills/_shared/`.
 

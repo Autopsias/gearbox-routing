@@ -1,6 +1,6 @@
 # Utility scripts
 
-Three stand-alone scripts that report on your Claude Code setup. They change nothing.
+Three stand-alone scripts for your Claude Code setup. `memory_budget.py` and `mcp-health.py` only report. `render-codex-instructions.py` writes a file unless you pass `--check`.
 
 | | |
 |---|---|
@@ -14,7 +14,7 @@ Three stand-alone scripts that report on your Claude Code setup. They change not
 |---|---|
 | `harness/scripts/memory_budget.py` | For each project's auto-memory: the size of `MEMORY.md`, the note count, stale notes, and notes that nothing links to. Options: `--root` (default `~/.claude/projects`), `--age-days`. |
 | `harness/scripts/mcp-health.py` (with `mcp-health.md`) | Counts 401, 403, quota and expired-token errors per MCP server in your recent session transcripts. Options: `--days`, `--json`. |
-| `harness/scripts/render-codex-instructions.py` | Builds one Codex `AGENTS.md` file from a `CLAUDE.md` plus `rules/*.md`. Text between `<!-- claude-only -->` markers stays out. `--check` reports a stale render. |
+| `harness/scripts/render-codex-instructions.py` | Writes `codex/global-instructions.md` (under `--repo`) from a `CLAUDE.md` plus `rules/*.md`. Text between `<!-- claude-only -->` markers stays out. It does not create `AGENTS.md`: you link `~/.codex/AGENTS.md` to the output yourself. `--check` only reports a stale render and writes nothing. |
 
 ## Install
 

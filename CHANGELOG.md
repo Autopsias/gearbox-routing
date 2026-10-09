@@ -6,6 +6,17 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Fixed (trust review follow-up: should-fix items)
+- **32 doc statements corrected against the code** across README, ARCHITECTURE,
+  GENERICIZATION, INTEGRATION, METHODOLOGY, PROVIDERS, the routing guard README,
+  the routing skills and 12 module cards: the guard's real modes and checks
+  (default `--core`, `--strict` separate, no stamp or runtime-override check),
+  which plan-harden lint flags block, how `run.py` uses the resolver, the
+  `stuck` vs `stuck_after_escalation` actions, the staleness job, Exa's
+  `agent_run`, and side effects several cards called "none".
+- `claude/model-routing.yaml` → v2.7.1 (PATCH: comment only): the epic-dev suite
+  ships under `harness/`; only its rows are dropped from this policy.
+
 ### Fixed (trust review of the public docs)
 - **Plan escalation works in the exported harness.** `harness/model-routing.yaml`
   now names the Anthropic and Z.ai models with Claude Code's Task tokens
@@ -100,7 +111,9 @@ All notable changes to the Gearbox routing policy and framework. Format follows
     files and Codex session logs without asking. `govrun` keeps its slot locks
     under your home directory (`~/.machine-governor`, or `GOVRUN_STATE_DIR`).
   - **Docs.** `ARCHITECTURE.md` §7 lists every hook `harness/settings.json`
-    wires and gives the opt-in snippet for the janitor's session-end hook. The
+    wires and links to the janitor's module card
+    (`docs/modules/agent-janitor.md`), which holds the opt-in settings snippet
+    for the session-end hook. The
     README has a short "What is new in the harness" section. `install.sh` is
     unchanged: it installs the routing policy only.
 

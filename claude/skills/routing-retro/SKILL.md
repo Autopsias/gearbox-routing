@@ -120,10 +120,10 @@ If a prior `/routing-update` or retro applied changes (check the SSOT's `version
 `last_reviewed:` history and CHANGELOG.md), verify they're still in place:
 
 - Guard-covered surfaces: run your deployment's routing drift-guard (e.g. `bash
-  claude/scripts/verify-routing.sh --full`, once it exists), read-only — green means
-  SSOT/agents/digest still agree.
-- NOT guard-blocking: any local runtime settings file (the guard, if present, only
-  warns) and *behavioral* adherence (are receipts actually being emitted? are
+  claude/scripts/verify-routing.sh --full`), read-only — green means
+  SSOT/agents/resolver/digest still agree.
+- NOT covered by the guard: any local runtime settings file (the Gearbox guard does
+  not check them at all) and *behavioral* adherence (are receipts actually being emitted? are
   fan-outs pinning tiers per `fanout_policy:` rather than inheriting the main-session
   default?) — check both here, from the scan data.
 

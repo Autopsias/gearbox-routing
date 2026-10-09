@@ -48,8 +48,11 @@ changes when you switch). To switch:
    undoes your edit.
 4. Re-run the drift guard: `claude/scripts/verify-routing.sh --full`. It checks
    that every `task_classes[*].tier` resolves under the new
-   `providers[active_provider].models`, that the version stamps match, and that
-   the `CLAUDE.md` block matches the policy — so run it after step 3.
+   `providers[active_provider].models`, that `version:` is present and
+   semver-shaped, that `resolve_route.py` resolves every task class for every
+   provider, and that the `CLAUDE.md` block matches the policy — so run it after
+   step 3. It does not check other consumers you may have registered in the
+   policy's `consumers:` block; keep those in sync yourself.
 
 There is no partial-switch state: either the guard is green on the new
 provider, or you haven't actually switched.
@@ -86,9 +89,11 @@ release, or at least quarterly.** When you do:
    first-party docs (never memory — see `docs/METHODOLOGY.md` §2).
 2. Bump `calibration.date` (and `provider_version` if the provider names
    one) to the day you checked.
-3. Run the drift guard — it warns (not fails) once `calibration.date` crosses
-   the staleness horizon, and CI fails the build on a stale `as_of` past that
-   point, so a re-verify that isn't stamped will surface on its own.
+3. Run the drift guard — it only warns (it does not fail) once
+   `calibration.date` crosses the staleness horizon, including in the normal
+   CI build (`.github/workflows/verify.yml`). A separate weekly job
+   (`.github/workflows/staleness.yml`) fails and opens an issue on a stale
+   `as_of`, so a re-verify that isn't stamped will surface on its own.
 4. Land the update through `/routing-update` so the version bump and
    CHANGELOG entry travel with it (`docs/METHODOLOGY.md` §4).
 

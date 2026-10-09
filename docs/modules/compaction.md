@@ -80,7 +80,9 @@ removing it, set `GEARBOX_COMPACT_POLICY=off` or create the file
   for sessions that set a "hold" mark, and when a turn is already running. It
   always allows a manual `/compact`, an unknown context size, and any case with
   less than 100,000 tokens left.
-- It fails open: on any error it prints nothing and allows.
+- It fails open: when the hook hits an error, compaction goes ahead. If one of
+  its modules fails to import, it prints one line to stderr saying it is
+  disabled. The operator subcommands refuse and exit with code 2 instead.
 - It writes its state outside `~/.claude`, in `~/.gearbox-state/compaction/`.
 - It knows some command names by heart (`/plan-execute`, `/plan-builder`,
   `/grill-me` and others). Without those skills, it classifies a session from

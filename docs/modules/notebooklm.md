@@ -23,6 +23,8 @@ cp -R harness/skills/nlm-skill ~/.claude/skills/
 ```
 
 Install the `nlm` tool or the MCP server yourself; this repo does not ship them.
+The skill's commands and flags follow `nlm` 0.3.19. Run `nlm --help` to check
+them against the version you install.
 
 ## Check it works
 
@@ -38,5 +40,7 @@ rm -r ~/.claude/skills/nlm-skill
 ## Cautions
 
 - What you add to a notebook goes to Google.
-- A sign-in expires after about 20 minutes; run `nlm login` again.
+- The skill's own notes say a NotebookLM sign-in lasts about 20 minutes; run
+  `nlm login` again when commands start failing. That is the upstream service's
+  behaviour, not something this repo can check.
 - Only you can start it.

@@ -127,8 +127,13 @@ precisely so a stuck task can climb:
 
 - **Raise effort one rung first** — cheaper than raising tier, and the more
   common fix (the model had the right approach but didn't push far enough).
+- **Then ask an advisor for a plan.** A single advisory agent reads the stuck
+  worker's state and hands back a plan; the original worker keeps its own tier
+  (`consult_advisor` in the policy).
 - **Then raise tier one rung** — only after the current tier's effort ladder
   is exhausted.
+- **Then, only if the provider declares an apex model, use it** — and only
+  once the frontier tier's ladder is spent (`raise_to_apex_model`).
 - **Then pull in a second-model peer** (`codex_peer` block) — for
   architecture decisions, irreversible changes, security-sensitive work, or a
   task that's stuck even after escalating.

@@ -62,8 +62,8 @@
 #      `^version:` / `^last_reviewed:` pair.
 # ============================================================================
 
-version: "2.7.0"
-last_reviewed: 2026-10-09   # v2.7.0: model_prices claude-haiku-5-5 gains a long_prompt row, because a request over 100k prompt tokens bills whole at 0.50/2.50 (platform.claude.com pricing); /cost-audit and /routing-retro price per request. v2.6.0: every example profile moved to the lineup current at this date (Anthropic Haiku/Sonnet/Opus 5.5; OpenAI gpt-6-luna/gpt-6.1-sol/gpt-6-astra; Gemini 3.5 Flash-Lite/3.8 Flash/3.1 Pro; Z.ai prices added), each checked against the vendor's own pages. v2.5.0: Anthropic prices re-checked (claude-sonnet-5 corrected to $2/$10; rows added for claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5). v2.4.0: five generic lessons from a private deployment's history (effort_policy, apex_model, orchestrator_lane, providers.zai, model_prices + cost_accounting) and ADR 0001. No task_classes row moved. v2.3.0 de-calibrated the EXAMPLE grid; this file still demonstrates the SHAPE of a routing policy, never a measured one.
+version: "2.7.1"
+last_reviewed: 2026-10-09   # v2.7.1: comment fix (the epic-dev suite ships under harness/). v2.7.0: model_prices claude-haiku-5-5 gains a long_prompt row, because a request over 100k prompt tokens bills whole at 0.50/2.50 (platform.claude.com pricing); /cost-audit and /routing-retro price per request. v2.6.0: every example profile moved to the lineup current at this date (Anthropic Haiku/Sonnet/Opus 5.5; OpenAI gpt-6-luna/gpt-6.1-sol/gpt-6-astra; Gemini 3.5 Flash-Lite/3.8 Flash/3.1 Pro; Z.ai prices added), each checked against the vendor's own pages. v2.5.0: Anthropic prices re-checked (claude-sonnet-5 corrected to $2/$10; rows added for claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5). v2.4.0: five generic lessons from a private deployment's history (effort_policy, apex_model, orchestrator_lane, providers.zai, model_prices + cost_accounting) and ADR 0001. No task_classes row moved. v2.3.0 de-calibrated the EXAMPLE grid; this file still demonstrates the SHAPE of a routing policy, never a measured one.
 
 active_provider: anthropic   # the only line a provider swap edits — see ARCHITECTURE.md §3
 
@@ -523,8 +523,9 @@ cost_accounting:
 # routing SSOT tracks, taken from one deployment's non-BMAD agent set at port
 # time. This is an EXAMPLE shape to regenerate from YOUR OWN agents — dump your
 # own agents' frontmatter into this shape rather than trusting these rows as
-# live data. (All BMAD/epic-* rows from the source deployment are dropped: the
-# epic-dev suite is not part of Gearbox — see GENERICIZATION.md "Drops".)
+# live data. (All BMAD/epic-* rows from the source deployment are dropped from
+# this policy; the epic-dev suite itself still ships under harness/ with its own
+# assignments file — see GENERICIZATION.md "Drops".)
 agents:
   # EXAMPLE SNAPSHOT — regenerate this block from your own ~/.claude/agents/
   # (or equivalent) frontmatter; do not treat these rows as prescriptive.

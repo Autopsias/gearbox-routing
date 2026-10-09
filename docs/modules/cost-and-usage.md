@@ -38,8 +38,9 @@ python3 ~/.claude/skills/cost-audit/scripts/cache_effort_baseline.py 14
 python3 ~/.claude/skills/myusage-self-assessment/scripts/digest_sessions.py --pretty --out /tmp/digest.json
 ```
 
-The first prints spend, cache rewrites and the effort mix for the last 14
-days. The second counts your sessions and costs no model calls.
+The first prints spend, cache rewrites and the effort mix for session files
+changed in the last 14 days. It counts every request in each such file, so a
+recently resumed old session also adds its older requests. The second counts your sessions and costs no model calls.
 
 ## Remove
 

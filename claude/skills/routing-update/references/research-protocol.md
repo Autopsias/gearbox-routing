@@ -13,7 +13,7 @@ SSOT.
 
 Before any research lane below runs, confirm at least ONE of these is connected:
 
-- **Exa** (`web_search_exa`, `deep_researcher_start` / `deep_researcher_check`)
+- **Exa** (`web_search_exa`, `agent_run`)
 - **Ref** (`ref_search_documentation`, `ref_read_url`)
 - **Perplexity** (its ask/search tool)
 

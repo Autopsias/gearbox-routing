@@ -122,8 +122,8 @@ to install into `~/.claude`, which also adds `/routing-update` and
 **Everything else** you copy one module at a time from `harness/`, following
 its card. The cards give Claude Code paths (`~/.claude/…`); the
 [Codex row above](#works-with) says what runs in Codex. Install only what you
-will use: every installed skill, command and subagent adds its name and
-description to the agent's context on every turn.
+will use: every installed skill, command and subagent that Claude can start on
+its own adds its name and description to the agent's context on every turn.
 Good places to start:
 
 | If you want… | Install |
@@ -156,15 +156,16 @@ Good places to start:
 - **An agent harness.** Claude Code runs every part; OpenAI's Codex CLI runs
   the parts listed under [Works with](#works-with); the routing policy works
   with any agent or CI job.
-- **bash**, **git** and **Python 3**. The scripts use only the Python standard
-  library. CI runs them on Python 3.12.
+- **bash**, **git** and **Python 3**. The routing scripts use only the Python standard
+  library. Some harness scripts need more (for example, the Codex skill sync
+  needs PyYAML); each module card lists its own needs. CI runs them on Python 3.12.
 - **Optional:** the Codex CLI for two-model reviews; one research MCP server
   (Exa, Ref or Perplexity) for `/routing-update`. Each module card lists its own
   needs.
 
 ## Status
 
-- **Routing framework:** policy version 2.7.0. CI runs the drift check, the
+- **Routing framework:** policy version 2.7.1. CI runs the drift check, the
   unit tests, a docs check and a scratch install on every pull request and on
   every push to `master`.
 - **Harness modules:** a copy of one person's daily setup, refreshed from time

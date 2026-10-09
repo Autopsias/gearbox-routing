@@ -27,8 +27,13 @@ mkdir -p ~/.claude/commands ~/.claude/references ~/.claude/scripts
 cp harness/commands/adversarial-review.md ~/.claude/commands/
 cp -R harness/references/adversarial-review ~/.claude/references/
 cp harness/scripts/codex_supervised.py harness/scripts/codex_watchdog.py ~/.claude/scripts/
-npm install -g @openai/codex@latest      # the Codex CLI, if you do not have it
 ```
+
+Install the Codex CLI if you do not have it, by the steps in OpenAI's own
+Codex repo (<https://github.com/openai/codex>). The command file
+(`harness/commands/adversarial-review.md`) suggests
+`npm install -g @openai/codex@latest` when a run fails on version. This repo
+cannot check that package name, so confirm it upstream.
 
 No `settings.json` change.
 
@@ -60,9 +65,10 @@ Keep the two scripts if you use the [plan pipeline](plan-pipeline.md) or
 - **It sends your code or plan to OpenAI through Codex.** Check that your
   project allows this.
 - It costs two model runs per review, and up to 3 more Codex runs for a plan.
-- The command pins a Codex model id. Model ids change; if your Codex CLI is
-  older than the pinned model, Codex returns an HTTP 400 error. Update the CLI
-  or change the pin.
+- The command pins a Codex model id. Model ids change. The command file
+  records past runs where an older Codex CLI failed with an HTTP 400 error on
+  the pinned model. That is Codex's own behaviour, not something this repo
+  controls. If a run fails that way, update the CLI or change the pin.
 - For a plan, it edits the plan file (it marks each change `[HARDENED]`) and
   adds a `*-REVIEW-LOG.md` file next to it, without asking first.
 - If Codex fails, it reports Claude's findings alone and says so.

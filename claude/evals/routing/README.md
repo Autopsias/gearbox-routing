@@ -12,15 +12,20 @@ session can't switch its own model — classify, recommend `/model`/`/effort`,
 log mismatches to `MISROUTES.md`).
 
 **Guard command:** `bash claude/scripts/verify-routing.sh [--core|--full]
-[--strict]`. Bare/default mode = `--full`. `--strict` promotes "unknown
-agent, no SSOT row" from WARN to FAIL — full mode implies `--strict`.
-Sub-checks: (a) agent frontmatter vs SSOT, (b) cheap_fast-tier-has-no-effort
-invariant (a tier whose model rejects the dial must carry no effort param),
-(c) prose-consumer version stamps (full mode only), (d) harness fallback-ladder
-lockstep where a consumer mirrors one (ast-parsed/byte-matched, never
-imported or executed), (e) `CLAUDE.md` digest re-render diff, (f) active
-runtime-override visibility (informational only — files can be green while
-the runtime routes elsewhere via an env override).
+[--strict]`. Bare/default mode = `--core`. `--full` adds the `CLAUDE.md`
+digest check (it needs a real `CLAUDE.md` to compare against). `--strict` is a
+separate flag, and neither mode turns it on: it promotes "unknown agent, no
+SSOT row" from WARN to FAIL. Sub-checks: (a) agent frontmatter vs SSOT, (b)
+cheap_fast-tier-has-no-effort invariant (a tier whose model rejects the dial
+must carry no effort param), every `task_classes` tier resolves under every
+provider's model map, `active_provider` is a valid key, `version:` is
+semver-shaped, and a WARN when a provider's `calibration.date` is stale; (f)
+`claude/scripts/resolve_route.py` exists, imports and resolves every task
+class for every provider (`--core` and `--full`); (e) `CLAUDE.md` digest
+re-render diff (`--full` only). The guard does not check prose-consumer
+version stamps, a harness fallback-ladder mirror, or runtime overrides: a
+green run does not prove the runtime routes where the policy says (an env
+override can route elsewhere), so check that separately.
 
 ## Enforcement point
 

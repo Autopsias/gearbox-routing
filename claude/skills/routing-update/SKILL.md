@@ -16,7 +16,7 @@ committed** — for whichever provider is currently `active_provider:` in the SS
 lineups, prices, and effort-dial semantics from CURRENT provider docs, never from
 memory — that is a hard project rule, not a style preference. Before starting, confirm
 at least ONE of the following is connected: **Exa** (`web_search_exa` +
-`deep_researcher_start`/`_check`), **Ref** (`ref_search_documentation` /
+`agent_run`), **Ref** (`ref_search_documentation` /
 `ref_read_url`), or **Perplexity**. Any one suffices. **If none is connected, STOP**
 after the snapshot step and ask the operator to supply the researched numbers
 directly — do not assert a model id, price, or effort-dial fact unverified, and do not

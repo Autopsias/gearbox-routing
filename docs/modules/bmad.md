@@ -52,6 +52,8 @@ rm -r ~/.claude/references/epic-dev ~/.claude/skills/epic-dev-conductor
 - **52 commands is a lot of context.** Each one adds its name and description
   to every session. Install them only if you use BMAD.
 - `/epic-dev --auto` turns off the confirmation prompts and runs many
-  subagents. It commits and pushes after each story.
+  subagents. It makes a local git commit after each phase of each story. The
+  ship step runs once the epic is done and opens a push and pull request through
+  `ship-tail`; skip it with `--no-ship`.
 - `/epic-dev --uat` uses the user-testing commands, which do not work as
   shipped (see [test and CI](test-and-ci.md)).

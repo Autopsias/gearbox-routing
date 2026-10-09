@@ -17,7 +17,7 @@ your own deployment, or when contributing back a change extracted from one.
 | Concrete model ids / tiers / prices | dated **verify-before-use examples** (see `ARCHITECTURE.md` §3) |
 | Your username, machine paths (`/Users/<you>/...`) | `~` or generic placeholders |
 | The source repo's commit SHA in `harness/SYNCED-FROM` | export date + pipeline version only (below) |
-| `scripts/deploy.pathspec`'s `[mode-0600]` credential-file list | fictional `REPLACE_ME_*` placeholders (below) |
+| `harness/scripts/deploy.pathspec`'s `[mode-0600]` credential-file list | fictional `REPLACE_ME_*` placeholders (below) |
 
 ### Provenance: what the export stamps, and what it does not
 
@@ -53,7 +53,7 @@ export treats them differently (`_scrub_deploy_pathspec` in
 
 The obvious objection is that fictional names ship a classifier that silently
 protects nothing — a missing file is skipped by design in that tighten-only
-`chmod` pass. So `scripts/gearbox` **refuses to deploy** while any `REPLACE_ME_`
+`chmod` pass. So `harness/scripts/gearbox` **refuses to deploy** while any `REPLACE_ME_`
 entry remains. Loud, at the point of harm, instead of quiet.
 
 Everything outside the section bodies is **regenerated from a template** rather
@@ -67,8 +67,10 @@ strings live in the manifest rather than in the published script.
 ## Drops
 
 - **All `epic-*` agent rows** in the policy `agents:` block, and the
-  epic-dev-assignments cross-check machinery that references them. The epic-dev
-  suite is not part of Gearbox.
+  epic-dev-assignments cross-check machinery that references them. The routing
+  policy does not assign models to the epic-dev suite. The suite itself still
+  ships in the harness (`harness/commands/epic-dev.md`,
+  `harness/agents/epic-implementer.md`).
 
 ## Exclusions (never ported at all)
 
