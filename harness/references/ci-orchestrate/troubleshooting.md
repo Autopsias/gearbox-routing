@@ -115,7 +115,7 @@ export SLASH_DEPTH=$((INVOCATION_DEPTH + 1))
 # If test failures were detected and fixed, run comprehensive test validation
 if [[ "$CI_ISSUES" =~ "test" ]] || [[ "$CI_ISSUES" =~ "pytest" ]]; then
     echo "Test-related CI issues were addressed. Running test orchestration for validation..."
-    SlashCommand(command="/test_orchestrate --run-first --fast")
+    SlashCommand(command="/test-orchestrate --run-first --fast")
 fi
 
 # If all CI issues resolved, check PR status
@@ -127,10 +127,10 @@ fi
 
 ## CI Orchestration Examples
 
-- "/ci_orchestrate" → Auto-detect and fix all CI failures in parallel
-- "/ci_orchestrate --check-actions" → Focus on GitHub Actions workflow fixes
-- "/ci_orchestrate linting and test failures" → Target specific CI failure types
-- "/ci_orchestrate --quality-gates" → Fix all quality gate violations in parallel
+- "/ci-orchestrate" → Auto-detect and fix all CI failures in parallel
+- "/ci-orchestrate --check-actions" → Focus on GitHub Actions workflow fixes
+- "/ci-orchestrate linting and test failures" → Target specific CI failure types
+- "/ci-orchestrate --quality-gates" → Fix all quality gate violations in parallel
 
 ## Token Efficiency: JSON Output Format
 

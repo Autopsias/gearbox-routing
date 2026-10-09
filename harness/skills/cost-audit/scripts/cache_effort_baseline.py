@@ -115,7 +115,7 @@ def main(days):
             u, model, chain = r["u"], r["model"], r["chain"]
             c = cost[(chain, model)]
             c["n"] += 1
-            rin, rout, rread = r["rate"][:3]
+            rin, rout, rread = model_prices.rates_for(BASE, model, ctx(u))[:3]  # long Haiku prompts bill the whole request higher
             c["read"] += (u.get("cache_read_input_tokens") or 0) * rread / 1e6
             c["write"] += (u.get("cache_creation_input_tokens") or 0) * rin * WRITE_MULT[chain] / 1e6
             c["out"] += (u.get("output_tokens") or 0) * rout / 1e6

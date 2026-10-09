@@ -208,7 +208,7 @@ def _scan_assistant_turn(d, msg, prices, s, model_rates=None):
             w5 = cw  # no TTL breakdown — assume the cheaper 5m rate
         # Price by the SERVED id: a family row prices an old model at today's
         # rate and uses one read multiplier for every model (2026-09-22 retro).
-        exact = model_prices.rates(model_rates or {}, msg.get("model"))
+        exact = model_prices.rates_for(model_rates or {}, msg.get("model"), tin + cr + cw)  # prompt = input + cache reads + writes
         if exact:
             in_rate, out_rate, read_rate = exact[:3]
         else:

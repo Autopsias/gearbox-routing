@@ -29,9 +29,9 @@ Do not describe what you will do. DO IT NOW.
 5. NEVER launch agents sequentially - parallel quality fixes are essential
 
 **COMMIT ORCHESTRATION EXAMPLES:**
-- "/commit_orchestrate" -> Auto-stage, quality fix, and commit all changes
-- "/commit_orchestrate 'feat: add new feature' --quality-first" -> Run quality checks before staging
-- "/commit_orchestrate --stage-all --push-after" -> Full workflow with remote push
+- "/commit-orchestrate" -> Auto-stage, quality fix, and commit all changes
+- "/commit-orchestrate 'feat: add new feature' --quality-first" -> Run quality checks before staging
+- "/commit-orchestrate --stage-all --push-after" -> Full workflow with remote push
 
 **PRE-COMMIT HOOK INTEGRATION:**
 If pre-commit hooks fail after quality fixes:

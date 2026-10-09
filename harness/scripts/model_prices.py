@@ -11,7 +11,9 @@ import re
 
 _ROW = re.compile(
     r"^\s{2}([\w.\-]+):\s*\{\s*in:\s*([\d.]+),\s*out:\s*([\d.]+),\s*cache_read:\s*([\d.]+)"
-    r"(?:,\s*cache_write_5m:\s*([\d.]+),\s*cache_write_1h:\s*([\d.]+))?",
+    r"(?:,\s*cache_write_5m:\s*([\d.]+),\s*cache_write_1h:\s*([\d.]+))?"
+    r"(?:,\s*long_prompt:\s*\{\s*over:\s*(\d+),\s*in:\s*([\d.]+),\s*out:\s*([\d.]+),"
+    r"\s*cache_read:\s*([\d.]+),\s*cache_write_5m:\s*([\d.]+),\s*cache_write_1h:\s*([\d.]+)\s*\})?",
     re.M,
 )
 # What may follow a table key inside a served id: nothing, a dated snapshot
@@ -21,7 +23,9 @@ _SUFFIX = re.compile(r"(-\d{8})?(\[[^\]]*\])?")
 
 def load(ssot_path):
     """{model_id: (in, out, cache_read, cache_write_5m, cache_write_1h)} in $/MTok; {} when the
-    block is absent. A row without explicit write rates gets 1.25x / 2x of `in`."""
+    block is absent. A row without explicit write rates gets 1.25x / 2x of `in`. A row with a
+    `long_prompt:` sub-row (a request whose prompt is over `over` tokens bills every token at
+    those rates) adds a second entry keyed "<model>><over>" — read it with `rates_for`."""
     with open(ssot_path, encoding="utf-8") as fh:
         text = fh.read()
     start = text.find("\nmodel_prices:\n")
@@ -35,7 +39,17 @@ def load(ssot_path):
         inp, out, read = (float(m.group(i)) for i in (2, 3, 4))
         w5, w1 = (float(m.group(i)) if m.group(i) else inp * k for i, k in ((5, 1.25), (6, 2)))
         table[m.group(1)] = (inp, out, read, w5, w1)
+        if m.group(7):
+            table[f"{m.group(1)}>{m.group(7)}"] = tuple(float(m.group(i)) for i in (8, 9, 10, 11, 12))
     return table
+
+
+def _key(table, model_id):
+    mid = (model_id or "").lower()
+    for key in sorted(table, key=len, reverse=True):
+        if ">" not in key and mid.startswith(key) and _SUFFIX.fullmatch(mid[len(key):]):
+            return key
+    return None
 
 
 def rates(table, model_id):
@@ -44,9 +58,19 @@ def rates(table, model_id):
     Longest key that the id starts with, and only when the rest of the id is a
     date or a `[1m]`-style marker: `claude-opus-5-5` never falls back to
     `claude-opus-5`, and an unknown `claude-opus-5-6` gets None, not Opus 5's
-    rates."""
-    mid = (model_id or "").lower()
-    for key in sorted(table, key=len, reverse=True):
-        if mid.startswith(key) and _SUFFIX.fullmatch(mid[len(key):]):
-            return table[key]
-    return None
+    rates. This is the short-prompt row; a caller with a per-request size uses `rates_for`."""
+    key = _key(table, model_id)
+    return table[key] if key else None
+
+
+def rates_for(table, model_id, prompt_tokens):
+    """`rates`, but a request whose prompt (input + cache reads + cache writes) is over the
+    model's `long_prompt` threshold gets the long row. Vendor rule: the higher rate bills the
+    WHOLE request, cached input included. No long row, or no size: same as `rates`."""
+    key = _key(table, model_id)
+    if key is None:
+        return None
+    for k, row in table.items():
+        if k.startswith(key + ">") and (prompt_tokens or 0) > int(k.split(">")[1]):
+            return row
+    return table[key]

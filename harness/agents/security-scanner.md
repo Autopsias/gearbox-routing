@@ -221,6 +221,6 @@ After fixing security vulnerabilities, invoke CI validation if depth allows:
 
 1. Check `SLASH_DEPTH` environment variable (default 0)
 2. If `SLASH_DEPTH >= 3`, do NOT invoke further commands (loop guard)
-3. If critical vulnerabilities were fixed, invoke `/ci_orchestrate --quality-gates`
-4. Invoke `/commit_orchestrate 'security: Fix vulnerabilities' --quality-first`
+3. If critical vulnerabilities were fixed, invoke `/ci-orchestrate --quality-gates`
+4. Invoke `/commit-orchestrate 'security: Fix vulnerabilities' --quality-first`
 5. Increment `SLASH_DEPTH` before each invocation

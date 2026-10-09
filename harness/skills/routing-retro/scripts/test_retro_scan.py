@@ -212,6 +212,21 @@ def test_cost_is_priced_by_the_served_model_id_not_the_family():
     assert s["family_priced_models"] == {"claude-opus-5-6": 1}
 
 
+def test_a_haiku_55_request_over_100k_prompt_tokens_is_priced_at_the_long_row():
+    """Vendor rule (pricing.md): a prompt over 100,000 tokens (input + cache reads
+    + cache writes) bills the WHOLE request at the long row, cached input included."""
+    short = (0.10, 0.50, 0.01, 0.125, 0.20)
+    table = {"claude-haiku-5-5": short, "claude-haiku-5-5>100000": (0.50, 2.50, 0.05, 0.625, 1.00)}
+    with tempfile.TemporaryDirectory() as td:
+        tp = os.path.join(td, "s.jsonl")
+        _write_transcript(tp, [("claude-haiku-5-5", {"cache_read_input_tokens": 1_000_000})])
+        s = retro_scan.scan_session(tp, {"haiku": (0.10, 0.50)}, table)
+        _write_transcript(tp, [("claude-haiku-5-5", {"cache_read_input_tokens": 99_999})])
+        s_short = retro_scan.scan_session(tp, {"haiku": (0.10, 0.50)}, table)
+    assert round(s["models"]["haiku"]["cost_usd"], 4) == 0.05       # 1M x 0.05, not 1M x 0.01
+    assert round(s_short["models"]["haiku"]["cost_usd"], 6) == 0.001  # 99,999 x 0.01 / 1e6, short row
+
+
 # ---- one API response split over several lines is counted ONCE ---------------
 
 

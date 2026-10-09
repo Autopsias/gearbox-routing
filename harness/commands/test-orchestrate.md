@@ -389,18 +389,18 @@ Alongside the report, include:
 
 | Command | Effect |
 |---------|--------|
-| `/test_orchestrate` | Use cached results if fresh (<15 min) |
-| `/test_orchestrate --run-first` | Run tests fresh, ignore cache |
-| `/test_orchestrate --pytest-only` | Only pytest failures |
-| `/test_orchestrate --strategic` | Force strategic mode (research + analysis) |
-| `/test_orchestrate --coverage` | Include coverage analysis |
-| `/test_orchestrate --no-chain` | Don't auto-invoke /commit_orchestrate |
+| `/test-orchestrate` | Use cached results if fresh (<15 min) |
+| `/test-orchestrate --run-first` | Run tests fresh, ignore cache |
+| `/test-orchestrate --pytest-only` | Only pytest failures |
+| `/test-orchestrate --strategic` | Force strategic mode (research + analysis) |
+| `/test-orchestrate --coverage` | Include coverage analysis |
+| `/test-orchestrate --no-chain` | Don't auto-invoke /commit-orchestrate |
 
 ## VS Code Integration
 
 pytest.ini must have: `addopts = --junitxml=test-results/pytest/junit.xml`
 
-Then: Run tests in VS Code -> `/test_orchestrate` reads cached results -> Fixes applied
+Then: Run tests in VS Code -> `/test-orchestrate` reads cached results -> Fixes applied
 
 ---
 

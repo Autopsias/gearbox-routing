@@ -35,12 +35,12 @@ git push --no-verify
 
 **When CI fails (not in --fast mode):**
 ```bash
-SlashCommand(command="/ci_orchestrate --check-actions")
+SlashCommand(command="/ci-orchestrate --check-actions")
 ```
 
 **When tests fail (not in --fast mode):**
 ```bash
-SlashCommand(command="/test_orchestrate --run-first")
+SlashCommand(command="/test-orchestrate --run-first")
 ```
 
 ### Optional Parallel Validation
@@ -79,7 +79,7 @@ fi
 
 # Spawn quality agents if needed
 if [[ "$CI_STATUS" == *"failure"* ]]; then
-    SlashCommand(command="/ci_orchestrate --fix-all")
+    SlashCommand(command="/ci-orchestrate --fix-all")
 fi
 ```
 

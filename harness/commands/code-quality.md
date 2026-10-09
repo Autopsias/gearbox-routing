@@ -255,7 +255,7 @@ Output final status:
 ### Suggested Next Steps
 - If violations remain: Run `/code_quality --fix` to auto-fix
 - If all passing: Run `/pr --fast` to commit changes
-- For skipped files: Run `/test_orchestrate` to investigate test failures
+- For skipped files: Run `/test-orchestrate` to investigate test failures
 ```
 
 ---

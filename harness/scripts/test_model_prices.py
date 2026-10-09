@@ -51,6 +51,40 @@ def _public_example_ssot():
     return not p.exists() or re.search(r'^version: "\d+\.\d+\.\d+"', p.read_text(), re.M) is not None
 
 
+LONG = SSOT.replace(
+    "  claude-haiku-4-5:",
+    "  claude-haiku-5-5: { in: 0.10, out: 0.50, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.20,"
+    " long_prompt: { over: 100000, in: 0.50, out: 2.50, cache_read: 0.05, cache_write_5m: 0.625, cache_write_1h: 1.00 } }\n"
+    "  claude-haiku-4-5:")
+SHORT_H = (0.10, 0.50, 0.01, 0.125, 0.20)
+LONG_H = (0.50, 2.50, 0.05, 0.625, 1.00)
+
+
+def test_a_haiku_request_over_100k_prompt_tokens_bills_the_long_row(tmp_path):
+    p = tmp_path / "ssot.yaml"
+    p.write_text(LONG)
+    t = model_prices.load(str(p))
+    assert model_prices.rates_for(t, "claude-haiku-5-5", 99_999) == SHORT_H
+    assert model_prices.rates_for(t, "claude-haiku-5-5", 100_000) == SHORT_H   # "over" 100,000, not at it
+    assert model_prices.rates_for(t, "claude-haiku-5-5-20261001", 100_001) == LONG_H
+    assert model_prices.rates(t, "claude-haiku-5-5") == SHORT_H                # no size: short row
+    assert model_prices.rates_for(t, "claude-haiku-5-5", None) == SHORT_H
+    # a model with no long row is unaffected by size, and the long entry never matches an id
+    assert model_prices.rates_for(t, "claude-opus-5-5", 900_000) == model_prices.rates(t, "claude-opus-5-5")
+    assert model_prices.rates_for(t, "claude-haiku-4-5", 900_000) == (1.0, 5.0, 0.1, 9.9, 7.7)
+    assert model_prices.rates_for(t, "claude-opus-5-6", 900_000) is None
+    assert model_prices.rates(t, "claude-haiku-5-5>100000") is None
+
+
+def test_the_live_ssot_haiku_55_has_the_vendor_long_prompt_row():
+    root = pathlib.Path(__file__).resolve().parents[1]
+    if not (root / "model-routing.yaml").exists() or _public_example_ssot():
+        pytest.skip("no live model-routing.yaml in this layout")
+    t = model_prices.load(str(root / "model-routing.yaml"))
+    assert model_prices.rates_for(t, "claude-haiku-5-5", 99_999) == SHORT_H
+    assert model_prices.rates_for(t, "claude-haiku-5-5", 100_001) == LONG_H
+
+
 @pytest.mark.skipif(_public_example_ssot(),
                     reason="no live model-routing.yaml in this layout (public export ships an example policy)")
 def test_the_live_ssot_prices_every_model_the_harness_runs():

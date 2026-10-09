@@ -26,7 +26,7 @@ You orchestrate PR workflows for ANY Git project through Git introspection and g
 - Use gh CLI for all GitHub operations
 
 **DON'T:**
-- Delegate to /commit_orchestrate for simple updates
+- Delegate to /commit-orchestrate for simple updates
 - Hardcode branch names
 - Assume project structure
 - Make simple operations slow

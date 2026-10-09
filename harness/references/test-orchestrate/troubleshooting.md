@@ -134,7 +134,7 @@ If --no-chain present:
 
 **If ALL tests passing AND changes were made:**
 ```
-SlashCommand(skill="/commit_orchestrate",
+SlashCommand(skill="/commit-orchestrate",
              args="--message 'fix(tests): resolve test failures'")
 ```
 

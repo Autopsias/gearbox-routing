@@ -326,7 +326,7 @@ After orchestration completes (or aborts), provide session summary:
 - `services/auth_handler.py` - Timeout (user chose continue)
 
 ### Recommendations
-- `services/user_utils.py`: Run `/test_orchestrate` to investigate test failures
+- `services/user_utils.py`: Run `/test-orchestrate` to investigate test failures
 - `services/auth_handler.py`: Check for resource contention, retry during low-load period
 
 ### Files Successfully Refactored

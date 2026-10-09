@@ -103,5 +103,5 @@ if tests_fixed > 0 and all_tests_passing:
         # If significant test improvements, commit them
         if tests_fixed > 10:
             print("Committing unit test improvements...")
-            SlashCommand(command="/commit_orchestrate 'test: Fix unit test failures and improve test reliability'")
+            SlashCommand(command="/commit-orchestrate 'test: Fix unit test failures and improve test reliability'")
 ```

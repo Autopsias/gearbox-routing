@@ -293,5 +293,5 @@ if total_files_modified > 5 or total_issues_fixed > 20:
 
         # Invoke commit orchestrator for significant improvements
         print("Invoking commit orchestrator for linting improvements...")
-        SlashCommand(command="/commit_orchestrate 'style: Major linting and formatting improvements' --quality-first")
+        SlashCommand(command="/commit-orchestrate 'style: Major linting and formatting improvements' --quality-first")
 ```

@@ -321,7 +321,7 @@ if [[ "$ARGUMENTS" != *"--no-chain"* ]]; then
     DEPTH=${SLASH_DEPTH:-0}
     if [ $DEPTH -lt 3 ]; then
         export SLASH_DEPTH=$((DEPTH + 1))
-        SlashCommand(command="/commit_orchestrate --message 'refactor: reduce file sizes'")
+        SlashCommand(command="/commit-orchestrate --message 'refactor: reduce file sizes'")
     fi
 fi
 ```

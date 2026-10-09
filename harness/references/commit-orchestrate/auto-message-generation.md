@@ -125,7 +125,7 @@ fi
 # Validate message quality
 if echo "$FULL_SUBJECT" | grep -qiE "stuff|things|update code|fix bug|changes"; then
   echo "⚠️  WARNING: Generated commit message may be too vague"
-  echo "Consider providing specific message via: /commit_orchestrate 'type(scope): specific description'"
+  echo "Consider providing specific message via: /commit-orchestrate 'type(scope): specific description'"
 fi
 
 echo "📝 Generated commit message:"
