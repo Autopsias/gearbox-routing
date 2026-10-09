@@ -96,7 +96,7 @@ def _fixture_shas(tmp_path):
 def generate_evidence(out_path=None, neuter_path=None):
     import tempfile
     root = SCRIPTS.parent.parent.parent
-    evidence = root / "_plans" / "plan-level-git-isolation-2026-08-20" / "_evidence" / "s10"
+    evidence = root / "_plans" / "example-isolation-plan-2026-08-20" / "_evidence" / "s10"
     out_path = Path(out_path) if out_path else evidence / "two-plan-e2e.json"
     neuter_path = Path(neuter_path) if neuter_path else evidence / "neuter-once.txt"
     argv = [sys.executable, "-m", "pytest", TEST_FILE, "-v"]

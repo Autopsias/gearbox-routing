@@ -1,4 +1,4 @@
-"""Self-checks for the compaction did-it-help retro (s07/PF-01).
+"""Self-checks for the compaction did-it-help retro.
 
 Every rule this session was hardened around gets a fixture here, because each
 one of them was a defect a review round found by reading rather than running:
@@ -19,7 +19,7 @@ import render_report as rr
 from retro_test_helpers import (
     act_row as _act,
     dec_row as _dec,
-    dyno_root as _root,
+    state_root as _root,
     hb_row as _hb,
     scan_of as _scan,
     sess_row as _sess,
@@ -585,7 +585,7 @@ def test_a_session_the_scanner_could_not_date_is_dated_from_its_heartbeat(tmp_pa
 
 
 # --------------------------------------------------------------------------
-# 9. Reader vocabulary matches the ONE writer (s07 rework 4)
+# 9. Reader vocabulary matches the ONE writer (a review rework)
 # --------------------------------------------------------------------------
 def test_a_block_decision_is_counted_as_a_veto():
     """hooks/compact-policy.py's verdict() emits "block", never "veto". A reader
@@ -751,7 +751,7 @@ def test_reader_and_writer_agree_on_the_intervention_names():
     """The writer (hooks/compact_activation.py) and the reader (compaction_ledger)
     each carry their own INTERVENTIONS tuple. A name the writer emits but the
     reader omits is counted as a malformed row and dropped — `compact_window`
-    was written on 2026-08-23 and reported as no-cohort on every retro until
+    was written and reported as no-cohort on every retro until
     2026-08-27, because only the writer knew the name."""
     import pathlib
 

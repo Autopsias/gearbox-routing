@@ -12,7 +12,7 @@ effort of its own. A subagent with no definition file inherits the parent sessio
 effort, and the Agent tool takes a `model` per call but no effort — so a session the
 operator ran at `max` spawned `general-purpose` agents at `max`, on sonnet too, where the
 routing SSOT calls that rung dead. A user-level agent of the same name replaces the
-built-in (probed 2026-09-19: session `high`, this agent ran at the pinned effort; a
+built-in (probed: session `high`, this agent ran at the pinned effort; a
 per-call `model` still wins over `model: inherit`). The main session is untouched: its
 model and effort are the operator's manual choice. Need another effort for one dispatch?
 Use a `tier-<model>-<effort>` agent.

@@ -81,7 +81,7 @@ def project_root(start):
     worktree finds nothing until it reaches the OUTER checkout, and every
     registry lookup and every relative cwd derived from it silently points back
     at the shared tree the plan exists to stay out of. ``git rev-parse
-    --show-toplevel`` reads the pointer file correctly (measured 2026-08-21), so
+    --show-toplevel`` reads the pointer file correctly (measured), so
     the top-level is the ceiling.
     """
     start = Path(start).resolve()
@@ -333,13 +333,13 @@ def resolve_evidence_path(plan_dir, session_id, raw):
     """Where a declared evidence path actually lives, under plan isolation.
 
     Absolute paths and parallel-group members keep ``worktree.resolve_evidence_path``
-    unchanged — that surface was patched on 2026-08-21 (7d5632a) and this must not
+    unchanged — that surface was patched (7d5632a) and this must not
     regress it. For a plain session under an isolated plan, §8 splits:
 
       * ``_evidence/...``      -> the OUTER plan directory (§8.a: RECORD)
       * ``_plans/<any>/...``   -> the OUTER checkout (§8.a: the same RECORD, spelled
         repo-relative — which is how a manifest actually declares it: this plan's
-        own manifest says ``_plans/plan-level-git-isolation-2026-08-20/_evidence/s02``)
+        own manifest says ``_plans/example-isolation-plan-2026-08-20/_evidence/s02``)
       * anything else          -> repo-relative, inside the plan worktree
 
     Both RECORD spellings are resolved in the OUTER checkout and NOWHERE ELSE —

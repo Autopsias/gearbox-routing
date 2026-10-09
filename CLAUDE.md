@@ -9,7 +9,7 @@
 ## Task routing — classify before you start
 
 Classify the task, set the tier. Authority: `claude/model-routing.yaml`
-(v2.3.0, active_provider=anthropic).
+(v2.4.0, active_provider=anthropic).
 
 | Class | Cues | Resolved tier |
 |---|---|---|
@@ -21,7 +21,7 @@ Classify the task, set the tier. Authority: `claude/model-routing.yaml`
 
 - **Effort = default + escalation, not a ceiling** — never a floor on judgement work.
 - **Fan-out pins an explicit tier** — never the frontier tier across N agents (see `fanout_policy`).
-- **Escalate on evidence:** after 2 failures at one root cause, raise effort → advisor → tier → second-model peer.
+- **Escalate on evidence:** after 2 failures at one root cause, raise effort → advisor → tier → apex model (if declared) → second-model peer.
 - **Main session advisory:** `main_session.advisory_default_tier`/`_effort` — recommend `/model`/`/effort` on mismatch; cannot self-switch.
 - **Routing receipt:** after delegate/escalate, log a one-liner (class → resolved tier) to `claude/evals/routing/MISROUTES.md` on any mismatch.
 <!-- END ROUTING -->

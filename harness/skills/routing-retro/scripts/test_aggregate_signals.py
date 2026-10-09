@@ -172,7 +172,7 @@ def test_canary_smoke_blocked_cohort_is_not_a_smoke_failure(tmp_path, ssot_path)
 
 
 def test_canary_counts_only_effort_bound_claude_cohorts(tmp_path, ssot_path):
-    # v25 (2026-09-11): every row tagged 4abfa765d726 ran prompt_directive_advisory —
+    # v25: every row tagged 4abfa765d726 ran prompt_directive_advisory —
     # no tier-opus-low agent existed, so each dispatch inherited the orchestrator's
     # effort and the canary "passed smoke" on a rung that never ran.
     # PLANT: unbound Claude cohorts must not count, even when they passed.

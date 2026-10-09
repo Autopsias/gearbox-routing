@@ -1,0 +1,112 @@
+# snapshot 2026-09-21
+# url<TAB>title<TAB>desc_hash<TAB>core_page_hash
+https://docs.typesafe.ai/agent-skill.md	Agent skill	ba8a0638cfcf49f6	5ed8f74a13376052
+https://docs.typesafe.ai/api.md	API reference	8fe79fed19f7119b	7ea1c82d9d16bd06
+https://docs.typesafe.ai/concepts/how-to-build-with-system-one.md	How to build with TypeSafe	90b31d408edec660	d9f4d34c1349bf5a
+https://docs.typesafe.ai/concepts/state.md	State	77248ab27a5bb66f	
+https://docs.typesafe.ai/concepts/system-one.md	System One	05edab9768b72346	e072211498bc1b6e
+https://docs.typesafe.ai/concepts/use-case-map.md	Example use cases	cd9d8c44dad12f15	
+https://docs.typesafe.ai/confidence.md	Confidence	ba16f2ef14745141	97dafe98b7797990
+https://docs.typesafe.ai/cookbooks/autoformat.md	Structure recovery	a7dffafc777299dd	
+https://docs.typesafe.ai/cookbooks/autoresearch_feature_discovery.md	Autoresearch feature discovery	d62c2311f826d369	
+https://docs.typesafe.ai/cookbooks/citation_check.md	Double-checking citations	c07b67718b77e1cb	
+https://docs.typesafe.ai/cookbooks/classification_using_confidence.md	Classification using confidence	2ef0e64699eed16b	
+https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md	Classifying RAG passages	7fc52dba22f9b1d0	
+https://docs.typesafe.ai/cookbooks/consistency_choice_cookbook.md	Self-consistency: choices	673c00b9ce57622a	
+https://docs.typesafe.ai/cookbooks/consistency_noul_cookbook.md	Self-consistency: nouls	8b7debd8c2660495	
+https://docs.typesafe.ai/cookbooks/date_extraction_cookbook.md	Date extraction	6cd928c76f11e06b	
+https://docs.typesafe.ai/cookbooks/entity_alignment.md	Knowledge graph entity alignment	6e8668af2dbef1a8	
+https://docs.typesafe.ai/cookbooks/function_calling.md	Function calling	274cd93403e1e66b	
+https://docs.typesafe.ai/cookbooks/hierarchical_classification.md	Hierarchical classification	8bdaa347920310f7	
+https://docs.typesafe.ai/cookbooks/llm_guardrails.md	Guardrails for LLMs	4def385caf2c90d6	
+https://docs.typesafe.ai/cookbooks/parallel_questions.md	Parallel questions	b3d0172957226405	
+https://docs.typesafe.ai/cookbooks/pre_parsed_value_extraction_cookbook.md	Pre-parsed value extraction	4e74f2cbf8284621	
+https://docs.typesafe.ai/cookbooks/rerank_typesafe.md	Re-ranking	c7e51c71f186f392	
+https://docs.typesafe.ai/cookbooks/sde_cascade.md	SDE cascade	35c11f6e3d068377	
+https://docs.typesafe.ai/cookbooks/semantic_find.md	Line-by-line search	2293fb547de85f41	
+https://docs.typesafe.ai/cookbooks/skill_suggestion.md	Skill suggestion	ebe4eafdf8a421ad	
+https://docs.typesafe.ai/demos.md	Demos	b47e54fa0e0bd79b	
+https://docs.typesafe.ai/demos/smart-home.md	Smart home assistant demo	0e68e063c8075585	
+https://docs.typesafe.ai/introduction.md	Introduction	597483513316349c	
+https://docs.typesafe.ai/introduction/coding-agents.md	Jev with coding agents	66b47484427ccec2	
+https://docs.typesafe.ai/introduction/machine-learning-primer.md	AI primer	632db92e39555a1e	
+https://docs.typesafe.ai/introduction/quickstart.md	Quick start	d13e9988438e63f8	
+https://docs.typesafe.ai/legal.md	Legal	62100122488e9f63	4141ec2e7efad5a2
+https://docs.typesafe.ai/model-jaggedness/jev-1.13.md	Jev 1.13 jaggedness	6fa5a73ac601408e	e69329bd32e91ac0
+https://docs.typesafe.ai/models.md	Models	e3b0c44298fc1c14	9d20bb3c90a01475
+https://docs.typesafe.ai/patterns.md	Patterns	9f3e11ffa969abb6	3c810e35f9587e04
+https://docs.typesafe.ai/patterns/composite-scoring.md	Composite scoring	8274f20495e672e0	
+https://docs.typesafe.ai/patterns/confidence-routing.md	Confidence-gated routing	d1fe11932e45f96f	
+https://docs.typesafe.ai/patterns/fan-out.md	Speculative fan-out	6eff94a82f8893a7	
+https://docs.typesafe.ai/patterns/intent-routing.md	Intent routing	2a7c5f46166750fd	
+https://docs.typesafe.ai/primitives.md	Primitives (Questions)	fd372b99428ba453	130d9136a2f01497
+https://docs.typesafe.ai/primitives/advanced.md	Advanced: structure	94518d403ac49e43	73eeedee0c3ff68e
+https://docs.typesafe.ai/primitives/choice.md	Choice	bf4b025bd207d221	4c55085131f8f2d7
+https://docs.typesafe.ai/primitives/noul.md	Noul	2457b12b6a55773d	aa7bff0d04bd4261
+https://docs.typesafe.ai/primitives/score.md	Score	128dbdc61fdc0b8a	5afe0db1d2d108c3
+https://docs.typesafe.ai/sdk.md	Client SDKs	d7b52255f128f498	
+https://docs.typesafe.ai/sdk/javascript.md	JavaScript SDK	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api.md	API reference	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/APIConnectionError.md	Class: APIConnectionError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/APIError.md	Class: APIError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/APIPromise.md	Class: APIPromise<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/APITimeoutError.md	Class: APITimeoutError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/APIUserAbortError.md	Class: APIUserAbortError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/AuthenticationError.md	Class: AuthenticationError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/BadRequestError.md	Class: BadRequestError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/InternalServerError.md	Class: InternalServerError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/NotFoundError.md	Class: NotFoundError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/PermissionDeniedError.md	Class: PermissionDeniedError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/RateLimitError.md	Class: RateLimitError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/TypeSafeClient.md	Class: TypeSafeClient	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/TypeSafeError.md	Class: TypeSafeError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/classes/UnprocessableEntityError.md	Class: UnprocessableEntityError	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/functions/choice.md	Function: choice()	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/functions/noul.md	Function: noul()	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/functions/score.md	Function: score()	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/ChoiceQuestion.md	Interface: ChoiceQuestion<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/ChoiceResponse.md	Interface: ChoiceResponse<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/Logger.md	Interface: Logger	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/ModelCard.md	Interface: ModelCard	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/Models.md	Interface: Models	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/NoulQuestion.md	Interface: NoulQuestion	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/NoulResponse.md	Interface: NoulResponse	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/Questions.md	Interface: Questions	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/RequestOptions.md	Interface: RequestOptions	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/RetryPolicy.md	Interface: RetryPolicy	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/ScoreQuestion.md	Interface: ScoreQuestion<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/ScoreResponse.md	Interface: ScoreResponse<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/SystemOneRequest.md	Interface: SystemOneRequest<Q>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/SystemOneRequestPayload.md	Interface: SystemOneRequestPayload	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/SystemOneResult.md	Interface: SystemOneResult<Q>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/TypeSafeClientConfig.md	Interface: TypeSafeClientConfig	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/Usage.md	Interface: Usage	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/interfaces/WithResponse.md	Interface: WithResponse<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/ChoiceCriteria.md	Type Alias: ChoiceCriteria	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/Description.md	Type Alias: Description	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/EntryType.md	Type Alias: EntryType	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/EnvVar.md	Type Alias: EnvVar	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/Fetch.md	Type Alias: Fetch	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/JsonValue.md	Type Alias: JsonValue	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/LogLevel.md	Type Alias: LogLevel	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/Question.md	Type Alias: Question	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/ResultFor.md	Type Alias: ResultFor<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/ScoreCriteria.md	Type Alias: ScoreCriteria	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/ScoreLegend.md	Type Alias: ScoreLegend<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/type-aliases/ScoreOf.md	Type Alias: ScoreOf<T>	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/variables/ENV.md	Variable: ENV	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/variables/LOG_LEVELS.md	Variable: LOG_LEVELS	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/api/variables/VERSION.md	Variable: VERSION	e3b0c44298fc1c14	
+https://docs.typesafe.ai/sdk/javascript/changelog.md	Changelog	e3b0c44298fc1c14	73389d4c01993603
+https://docs.typesafe.ai/sdk/python.md	TypeSafe Python SDK	4ba751b0c07f6d0f	
+https://docs.typesafe.ai/sdk/python/api.md	API reference	b777e53a46f61b81	
+https://docs.typesafe.ai/sdk/python/api/clients/async.md	Asynchronous client	7d2ebda3212329b9	
+https://docs.typesafe.ai/sdk/python/api/clients/sync.md	Synchronous client	8ac0f0511ec64812	
+https://docs.typesafe.ai/sdk/python/api/constants.md	Constants	ae65b4b3d985801d	
+https://docs.typesafe.ai/sdk/python/api/exceptions.md	Exceptions	bc8e275f28ebc3e8	
+https://docs.typesafe.ai/sdk/python/api/retries.md	Retries	cc214660c457a8c2	
+https://docs.typesafe.ai/sdk/python/api/types/common.md	Common types	6ad89500274d25f7	
+https://docs.typesafe.ai/sdk/python/api/types/questions.md	Questions	a512aa998c998344	
+https://docs.typesafe.ai/sdk/python/api/types/responses.md	Answers and responses	2f8d422a71be36e0	
+https://docs.typesafe.ai/sdk/python/changelog.md	Changelog	b777e53a46f61b81	47c90969dd76a832
+https://docs.typesafe.ai/sdk/python/usage.md	Usage	2173036a172666a9	

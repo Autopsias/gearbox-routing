@@ -69,7 +69,7 @@ def _canary(pid, n=12):
 
 
 def test_adoption_ready_canary_ranks_above_a_downgrade_open():
-    # s07 review round 2: the ranking key fell back from `kind` to `stage` with
+    # Review round 2: the ranking key fell back from `kind` to `stage` with
     # `or`, but a canary's `kind` is always the truthy "canary", so `stage` was
     # never consulted and every adoption-ready canary scored the unknown rank
     # and sorted LAST — the opposite of the documented order (upgrades, then
@@ -84,7 +84,7 @@ def test_adoption_ready_canary_ranks_above_a_downgrade_open():
 
 
 def test_no_action_proposal_never_takes_a_decision_card_slot():
-    # s07 review round 3: cell_proposal also emits a downgrade whose stage is
+    # Review round 3: cell_proposal also emits a downgrade whose stage is
     # "smoke-in-progress" — its recommendation text is only "canary already
     # underway, see canaries[]", i.e. nothing to act on. It scored rank 2 like a
     # real downgrade-open, and rank ties sort by N descending, so a stalled entry
@@ -103,7 +103,7 @@ def test_no_action_proposal_never_takes_a_decision_card_slot():
 
 
 # ---------------------------------------------------------------------------
-# s07 (PF-01): the Compaction section.
+# the Compaction section.
 # ---------------------------------------------------------------------------
 def _comp(**over):
     block = {"verdict_line": "hooks: underpowered", "vocabulary": ["underpowered"],

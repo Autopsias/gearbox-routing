@@ -159,7 +159,7 @@ def _js_check_preconditions(plan_dir):
     if not html_path.exists():
         return None, {"status": "skipped", "reason": "PLAN.html not found"}
     text = html_path.read_bytes().decode("utf-8")
-    # HTML COMMENTS FIRST (2026-08-25): the template explains the repaint/audit
+    # HTML COMMENTS FIRST: the template explains the repaint/audit
     # split in prose containing the literal text `<script>`, which the regex below
     # matched as a real tag — no `data-layout-audit` before its `>`, so the
     # exclusion never fired and eslint was handed English (3 of 4 plans failed).
@@ -196,7 +196,7 @@ def _eslint_verdict(proc):
     could not be interpreted must never be reported as clean.
     """
     # An EMPTY report is not a clean one: `npx --no-install --offline eslint` exits
-    # 1 with empty stdout on a cache miss (measured 2026-09-07) — the SAME rc as
+    # 1 with empty stdout on a cache miss (measured) — the SAME rc as
     # "found problems", so only the report itself tells those two apart.
     try:
         results = json.loads(proc.stdout or "[]")
@@ -238,7 +238,7 @@ def check_js_parses(plan_dir):
     combined = "\n;\n".join(scripts)
     # ESLint 9 flat config silently IGNORES a file outside its base path, and the
     # base path is the CWD (not the config's dir): exit 0, zero messages, and this
-    # gate read that as "passed" for every real plan until 2026-08-25 (6b45087).
+    # gate read that as "passed" for every real plan until it was fixed.
     # Scratch file beside the config + cwd there are BOTH load-bearing.
     tmp = _ESLINT_CONFIG.parent / f"_dashboard_script_check.{os.getpid()}.mjs"
     tmp.write_text(combined)

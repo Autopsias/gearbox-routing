@@ -43,7 +43,7 @@ evals/routing/results/**
 evals/routing/outcomes.ndjson
 evals/routing/.last-aggregated
 evals/routing/adoptions.ndjson
-evals/dyno/results/**
+evals/shadow/results/**
 improve-ledger.json
 improve-learnings.md
 

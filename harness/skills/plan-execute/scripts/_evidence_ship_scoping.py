@@ -390,7 +390,7 @@ def _next_session_base(plan_dir, tree):
     Under isolation every session commits to the same plan branch, so a base that
     is the branch's cut point makes session sNN's gate re-review every earlier
     session's commits and the surface grows with each session — the shape that
-    cost this repo 16 failed gate rounds in 21 hours (2026-08-20). A
+    cost this repo 16 failed gate rounds in 21 hours. A
     `dispatch_started` for a second session is appended (which is exactly what
     `begin` writes) and the base is read back through the REAL resolver at the
     REAL gate cwd.

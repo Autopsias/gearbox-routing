@@ -12,13 +12,13 @@ which files count. Every check here obeys it, ruff included.**
 Do not pass a per-call `--exclude` to the ruff scans below, and do not maintain a
 second list in a Makefile or a CI job. Ruff discovers `[tool.ruff].exclude` from
 any working directory inside the project, and an inline `--config key=value`
-override does not disable that discovery (probed 2026-08-18) — so the C901 and
+override does not disable that discovery (probed) — so the C901 and
 slop scans inherit the ratchet's scope for free. In this repo `[tool.ruff].exclude`
 mirrors the ratchet list verbatim and `scripts/test_quality_scope_alignment.py`
 fails if they drift.
 
 *Why:* when the two scopes disagree, ruff counts files the ratchet refuses to
-police, and the report reads worse than the repo is. Measured here on 2026-08-18:
+police, and the report reads worse than the repo is. Measured here:
 133 reported lint errors, 72 of them in `_plans` — harvested runtime output nobody
 writes by hand. Aligning the scopes moved the real numbers to 57 lint / 75
 complexity / 92 slop without a single line of code changing.

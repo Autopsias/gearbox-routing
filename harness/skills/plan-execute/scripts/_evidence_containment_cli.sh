@@ -4,7 +4,7 @@
 # Usage: _evidence_containment_cli.sh <output-transcript>
 set -u
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
-SRC="$(cd "$SCRIPTS/../../.." && pwd)/_plans/plan-framework-upgrade-2026-08-12"
+SRC="$(cd "$SCRIPTS/../../.." && pwd)/_plans/example-upgrade-plan-2026-08-12"
 TMP="$(mktemp -d)"
 WORK="$TMP/proj/_plans"
 mkdir -p "$WORK"

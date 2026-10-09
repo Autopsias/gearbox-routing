@@ -87,7 +87,7 @@ def test_cache_writes_count_toward_context():
 
 
 # ---------------------------------------------------------------------------
-# s07 (PF-01): the compaction retro's inputs. Each assertion pairs a PLANT with
+# the compaction retro's inputs. Each assertion pairs a PLANT with
 # a CONTROL, so a field that silently reads zero cannot pass as a measurement.
 # ---------------------------------------------------------------------------
 def _scan_raw(lines):

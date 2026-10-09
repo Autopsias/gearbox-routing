@@ -56,7 +56,7 @@ symmetric, conservative bar — N>=6, first-attempt pass>=0.90, escalation==0 at
 the CURRENT default cell — on the reasoning that a cell already clearing (or
 near) the eventual adoption bar AT ITS OWN rung is the honest signal that it
 may be over-modeled. Flagged for operator confirmation; see DOWNGRADE_OPEN_*
-below and the s06 closeout notes.
+below and the closeout notes.
 
 MALFORMED-LINE BOUND: >2% of scanned lines OR >=3 malformed lines FAILS the
 run outright (exit nonzero, `"proposals": []`, prior `.last-aggregated` stamp

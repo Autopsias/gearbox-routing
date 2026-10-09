@@ -1,6 +1,6 @@
 """Plan Achievement placement for add-session: which infographic group a new item or session joins.
 
-Split out of plan_mutate.py (file-size ratchet, 2026-09-29). plan_mutate sets up sys.path for
+Split out of plan_mutate.py (file-size ratchet). plan_mutate sets up sys.path for
 build_plan before it imports this module."""
 import build_plan as bp
 from plan_journal import MutationError

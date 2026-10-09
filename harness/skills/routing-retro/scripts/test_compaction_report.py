@@ -12,7 +12,7 @@ import compaction_retro as cr
 from retro_test_helpers import (
     act_row as _act,
     dec_row as _dec,
-    dyno_root as _root,
+    state_root as _root,
     hb_row as _hb,
     scan_of as _scan,
     sess_row as _sess,
@@ -154,7 +154,7 @@ def test_missing_hooks_activation_is_a_blind_spot_not_health(tmp_path):
 
 
 def test_a_deferred_compaction_pairs_with_its_measured_row(tmp_path):
-    """THE SHAPE THE WRITER NOW EMITS (2026-08-23). One compaction takes TWO
+    """THE SHAPE THE WRITER NOW EMITS. One compaction takes TWO
     ledger rows: `compacted` with ctx_after=None + ctx_after_deferred=True, and
     a later `compaction-measured` carrying the real number — because the
     post-compaction context cannot be read inside the PostCompact hook at all.

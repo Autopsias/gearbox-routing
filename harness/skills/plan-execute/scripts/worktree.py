@@ -1,7 +1,7 @@
 """Orchestrator-managed git worktree isolation for a `parallel_group`.
 
 The contract this implements: ``../references/parallel-group-contract.md``
-(contract v2, amended 2026-08-15). Read it first — this module is its
+(contract v2, amended). Read it first — this module is its
 mechanism, not its source of truth. The verdict fixes the mechanism by name:
 
     "A parallel group MAY declare worktree isolation. The mechanism is
@@ -289,7 +289,7 @@ def ensure_group(plan_dir, group, *, project_root):
 # --------------------------------------------------------------------------
 def member_branch(group, session_id, plan_slug=None):
     """``plan/<group>/<sid>``; ``plan/<slug>__<group>__<sid>`` under isolation
-    (operator decision 2026-08-22 — ``group_scope`` holds the measurement)."""
+    (operator decision — ``group_scope`` holds the measurement)."""
     return f"{BRANCH_PREFIX}/{gs.member_dirname(group, session_id, plan_slug)}"
 
 

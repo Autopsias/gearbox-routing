@@ -160,7 +160,7 @@ def _indeterminate(plan_dir, session_id, state, gate, excerpt):
     A review gate that times out or returns no parseable block exits its declared
     `indeterminate_exit` (2). That is neither a pass nor a finding: nothing was
     reviewed. Recording it as a failed rework charged the AGENT's budget for the
-    harness's own timeout -- measured 2026-08-20 on s13: the reviewer exceeded
+    harness's own timeout -- measured on s13: the reviewer exceeded
     600s twice on a 21-file surface, the session halted at 2/2 "exhausted", and
     not one finding had been raised. The feedback file carries the reason so the
     operator can raise the timeout FROM A MEASUREMENT or run the reviewer by
@@ -180,7 +180,7 @@ def _indeterminate(plan_dir, session_id, state, gate, excerpt):
     # nothing was right; recording nothing was not -- `sp.record_failure` has one
     # caller (`_gate_failed`), so routing every declared indeterminate here made
     # `_indeterminate_signature` unreachable in production and a gate that times
-    # out forever could never arm. Measured 2026-08-20 on s04: two 900s timeouts
+    # out forever could never arm. Measured on s04: two 900s timeouts
     # on a 5,543-line surface, nothing armed, nothing suggested splitting it.
     stuck = sp.record_failure(plan_dir, session_id, excerpt)
     if stuck["triggered"]:

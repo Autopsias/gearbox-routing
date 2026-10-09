@@ -188,7 +188,7 @@ do_harvest() {
       # This used to send the operator to `gearbox deploy`, which CANNOT do the job
       # harvest exists for: deploy's routine harvest stages classes
       # churn,live_state — TRACKED modifications only — so a brand-new file under a
-      # [live-state] path was never picked up by either command. Measured 2026-08-23:
+      # [live-state] path was never picked up by either command. Measured:
       # 28 auto-memory files for one project existed only in the deploy target, and
       # the first explicit harvest after this fix committed 83 untracked runtime
       # files. Both commands had been exiting 0 the whole time.

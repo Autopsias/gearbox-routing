@@ -49,7 +49,7 @@ def egress_root(tmp_path, monkeypatch):
 def _skip_browser_checks(monkeypatch):
     """Unit tests do NOT launch a browser or npx.
 
-    MEASURED 2026-08-14 by profiling one test: of 18.2 s wall clock, 17.9 s was
+    MEASURED by profiling one test: of 18.2 s wall clock, 17.9 s was
     subprocess — headless Chrome 6.6 s (render_verify) plus three `npx eslint`
     spawns totalling 5.2 s (structural_gate.js_check). The suite calls that path
     once per verify/apply test, which is most of its 16 min 33 s.
@@ -124,7 +124,7 @@ def _no_ambient_provider_env(monkeypatch):
     basename means the z.ai substrate). Both are AMBIENT in a GLM-tree session
     — the tree's settings.json exports them into every child, pytest included —
     and under them the suite's mainline-behavior tests resolved through the zai
-    profile and failed 12 at once (measured 2026-08-30, this suite run from
+    profile and failed 12 at once (measured, this suite run from
     inside a GLM session). A test must see only what it sets:
     test_zai_provider.py sets these explicitly per test and is unaffected.
     """

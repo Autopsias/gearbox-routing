@@ -46,7 +46,7 @@ def aggregate_canaries(experimental_cohorts, adoptions):
     out = []
     for pid, cohorts in by_pid.items():
         cohorts_sorted = sorted(cohorts, key=lambda c: c["terminal"].get("ts") or "")
-        # v25 (2026-09-11): 4abfa765d726 counted five opus@low cohorts that all ran at the
+        # v25: 4abfa765d726 counted five opus@low cohorts that all ran at the
         # orchestrator's effort. An unbound cohort is no evidence either way, so it
         # leaves the smoke batch and every statistic and is counted once, by name.
         unbound = [c for c in cohorts_sorted if _effort_unbound(c)]
@@ -245,7 +245,7 @@ def did_it_help(non_experimental_cohorts, adoptions):
 
 
 # --------------------------------------------------------------------------
-# Adoption registry (read-only, best-effort — s07 wires the writer)
+# Adoption registry (read-only, best-effort — another component wires the writer)
 # --------------------------------------------------------------------------
 def read_adoptions(path=None):
     path = Path(path) if path else default_adoptions_path()

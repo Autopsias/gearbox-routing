@@ -31,11 +31,11 @@ live in ``plan_teardown.py`` beside the land-success cleanup that already
 called the former; the move was a straight relocation to clear this file's
 500-LOC bound, not a redesign — see that module's docstring for the full
 picture. §6.4's stamp — ``build_plan.PLAN_SCHEMA_VERSION`` — was held at 6 while
-this was built and was FLIPPED TO 7 BY s10 (2026-08-23) after the two-plan
+this was built and was FLIPPED TO 7 BY s10 after the two-plan
 end-to-end proof and the real-plan canary. Isolation is therefore ON by default
 for every plan built from that point; every plan already on disk stays below the
-gate and is unaffected (measured: ``_evidence/s10/activation-sweep.json``,
-29 manifests scanned, zero crossings).
+gate and is unaffected (measured at the bump: the sweep counted the
+manifests it scanned as well as the crossings, and found none).
 """
 
 import json

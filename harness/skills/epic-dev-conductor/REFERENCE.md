@@ -49,7 +49,7 @@ These are verified against real `/epic-dev` internals (binary 2.1.x). Treat as l
 - **Empirically reproduce HIGH / security / Death-A findings — a green re-review is necessary but not sufficient.** *Why:* across one Epic-1 build, code-review surfaced ~10 HIGH defects that the *passing* test suites missed (a silent-NaN fail-open in the money kernel; serialization byte-identity holes; a vacuous CI gate that silently skipped; enforcement guards that never scanned real source; a secret-redaction filter that leaked the real broker session-token). For any HIGH or security/Death-A finding, the conductor independently **reproduces the issue and confirms its fix** (plant the forbidden import and watch the contract break; probe the redactor with the real credential shapes; re-derive the determinism golden across seeds/TZ) before accepting the fix — do not trust the re-review's "0 HIGH" alone. This caught a residual leak class a green suite had missed.
 - **Keep ralph's recursive-spawn design** (fresh context per story) — do **not** switch to an in-session Stop-hook loop, which accumulates context and degrades on a long gated build.
 
-### Gate autonomy policy — block vs notify-and-continue (OR-03, added 2026-07-03)
+### Gate autonomy policy — block vs notify-and-continue (OR-03, added)
 
 The reliability self-assessment found ~26% of April–May prompts were rubber-stamps (`proceed`/`c`/`y`/menu letters) answered to gates that historically ALWAYS got the same answer. The conductor mirrors plan-execute's per-gate policy field so a rubber-stamp gate default-continues **with a notification** instead of blocking for a poll — but the classification is a **fail-closed, per-gate-TYPE allowlist**, never a content heuristic.
 
@@ -154,7 +154,7 @@ A delegated phase/subagent can die on the harness **stream watchdog** (~600 s of
 3. **Work completed but it died before returning** (state shows the artifacts exist and gates pass) → accept the work *on the evidence* and author the phase result from it. Do **not** blindly re-run a completed phase — re-running can duplicate edits or double-apply migrations.
 4. Escalate to the operator only if a bounded re-dispatch also stalls, or the on-disk state is ambiguous.
 
-### Transport-error auto-retry (OR-01, added 2026-07-03)
+### Transport-error auto-retry (OR-01, added)
 
 Distinct from the no-return **stall** above: a dispatch can also fail
 immediately with a **transport-layer** error — connection refused, "failed

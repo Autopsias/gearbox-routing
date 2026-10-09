@@ -16,7 +16,7 @@ set -euo pipefail
 #      body ("hook returned invalid session start JSON output"); Claude Code
 #      accepts raw stdout and treats it as context. This script has nothing to
 #      say, so under Codex it prints one empty JSON object and nothing else.
-#      Verified 2026-08-15 against the ponytail runtime, whose Codex branch also
+#      Verified against the ponytail runtime, whose Codex branch also
 #      always writes a JSON object while its native-Claude branch writes raw text.
 #   2. State and logs belong to Codex. Generated audio and preferences fall back
 #      to the Claude tree so the existing assets keep working unchanged.
@@ -106,7 +106,7 @@ get_time_context() {
     # ("09:00") are zero-padded, and bash arithmetic reads a leading zero as
     # octal — so "08"/"09" raise "value too great for base", the [[ -ge ]] test
     # silently evaluates FALSE, and this function answered "after_hours" at every
-    # hour of the day. Measured 2026-08-15: with work_start="09", the unfixed
+    # hour of the day. Measured: with work_start="09", the unfixed
     # comparison returns false for 08, 09 AND 10.
     local hour_num=$((10#$hour))
     local work_start_num=$((10#$work_start))

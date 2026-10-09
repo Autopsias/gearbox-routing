@@ -491,11 +491,11 @@ def _build_ok(spec, label, check=None):
 
 
 def _check_codex_shell_grant():
-    """dispatch.codex_shell (2026-07-29) — declared shell capabilities for a
+    """dispatch.codex_shell — declared shell capabilities for a
     `codex exec` dispatch. The one invariant: `danger-full-access` (an
     UNSANDBOXED dispatched agent) is legal only on a session a human gates."""
     # ---------------------------------------------------------------------------
-    # dispatch.codex_shell (2026-07-29) — declared shell capabilities for a
+    # dispatch.codex_shell — declared shell capabilities for a
     # `codex exec` dispatch. The one invariant: `danger-full-access` (an UNSANDBOXED
     # dispatched agent) is legal only on a session a human already gates.
     # ---------------------------------------------------------------------------
@@ -518,7 +518,7 @@ def _check_codex_shell_grant():
     # Shape validation.
     _build_fails(_spec_with_shell({"sandbox": "read-only"}), "workspace-write",
                  "codex_shell rejects a sandbox mode the runner does not emit")
-    _build_fails(_spec_with_shell({"writable_roots": "~/.dyno"}), "list of non-empty path",
+    _build_fails(_spec_with_shell({"writable_roots": "~/.gearbox-state"}), "list of non-empty path",
                  "codex_shell rejects writable_roots that is not a list")
     _build_fails(_spec_with_shell({"nework": True}), "unknown key",
                  "codex_shell rejects a misspelled key instead of ignoring it")
@@ -535,8 +535,8 @@ def _check_codex_shell_grant():
     # The narrow grants need no gate, and land in the manifest verbatim.
     def _check_narrow(m):
         sh = m["sessions"][0]["dispatch"].get("codex_shell")
-        assert sh == {"writable_roots": ["~/.dyno"], "network": True}, sh
-    _build_ok(_spec_with_shell({"writable_roots": ["~/.dyno"], "network": True}),
+        assert sh == {"writable_roots": ["~/.gearbox-state"], "network": True}, sh
+    _build_ok(_spec_with_shell({"writable_roots": ["~/.gearbox-state"], "network": True}),
               "codex_shell writable_roots+network needs no gate and reaches manifest.json",
               _check_narrow)
 

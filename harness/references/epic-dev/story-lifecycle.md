@@ -24,7 +24,7 @@ Detailed phase-by-phase instructions for developing stories within `/epic-dev`. 
 This is an observational two-stage hook for an eligible `Agent`/`Task`
 delegation. It is **not** a new gate and must never change the primary prompt,
 result, retry path, or story state. It is inert until the operator has deployed
-the harness and explicitly enabled `~/.dyno/telemetry/shadow-config.json`.
+the harness and explicitly enabled `~/.gearbox-state/telemetry/shadow-config.json`.
 
 Before dispatching a build or repair `Task` that already has a resolved,
 rerunnable automated pass/fail gate, do this once:
@@ -35,14 +35,15 @@ rerunnable automated pass/fail gate, do this once:
    test-output excerpt, or a gate with environment dependencies into a shadow
    candidate. If no such descriptor exists, dispatch normally.
 2. Write the exact primary task prompt and the descriptor JSON only under
-   `~/.dyno/telemetry/epic-registration/`; never put either in this repository
-   or an evidence artifact. Invoke the deployed pure-Python helper:
+   `~/.gearbox-state/telemetry/epic-registration/`; never put either in this repository
+   or an evidence artifact. Invoke the deployed pure-Python helper (the shadow-sampling
+   hook is not part of this export; without it, skip to the ordinary dispatch):
 
    ```text
    ~/.claude/hooks/shadow-sampling.py register-epic \
      --session "epic-{epic_num}-{story_key}-{phase}-{iteration}" \
-     --prompt-file ~/.dyno/telemetry/epic-registration/<opaque>.prompt \
-     --gate-file ~/.dyno/telemetry/epic-registration/<opaque>.gate.json \
+     --prompt-file ~/.gearbox-state/telemetry/epic-registration/<opaque>.prompt \
+     --gate-file ~/.gearbox-state/telemetry/epic-registration/<opaque>.gate.json \
      --cwd {project_root}
    ```
 
@@ -56,7 +57,7 @@ The hook accepts only enabled, allowlisted gates and makes its deterministic
 selection from the Claude session ID; it later runs the shadow only after the
 primary completion event (`SubagentStop` for default background Agents, or a
 completed `PostToolUse(Agent)` response for foreground Agents). The shadow's result stays under
-`~/.dyno/telemetry/` and is never a source of story decisions. The production
+`~/.gearbox-state/telemetry/` and is never a source of story decisions. The production
 shadow lane has no Bash, Agent, Web, Skill, or MCP tools; no agent-initiated
 network; a disposable HOME/state directory; and a disposable worktree. (The
 already-approved model transport is distinct from a shadow agent action.)

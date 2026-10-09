@@ -28,7 +28,7 @@ failure this gate exists to avoid. A pass requires a parseable EMPTY findings
 block. Both 1 and 2 are gate failures for verify.py (non-zero), but they are
 distinguishable in the log and mean different things to the operator.
 
-Recognised findings-block shapes (measured 2026-08-12, CLI 2.1.229, see
+Recognised findings-block shapes (measured, CLI 2.1.229, see
 `fixtures/llm-review-gate/`):
   * `(none)`                       -> empty block           (level low, clean)
   * ```json [ {...}, ... ]```      -> N findings            (level medium/high)
@@ -156,7 +156,7 @@ def findings_digest(text):
     `classify()` answers *how many*; this answers *which ones*, and the stuck
     protocol needs the second. A gate's failure BANNER is byte-identical for every
     failure of that gate, so signing the banner makes two unrelated findings look
-    like one recurring root cause — measured 2026-08-15, two genuinely different
+    like one recurring root cause — measured, two genuinely different
     review findings both signed `6c61d90dec14`, and that counter is what buys a
     model-escalation rung.
 
@@ -241,7 +241,7 @@ def build_prompt(level, intent_text, new_files=(), base=None, diff_file=None,
         "above FOR FULL REVIEW, which the diff does not contain. Do NOT count "
         "the captured-output paths you were asked not to read. The gate counts both, so "
         "reporting only the diff's count reads as a short review and fails an "
-        "HONEST one (review, 2026-08-20). Report the TRUE number even if it differs from what you "
+        "HONEST one (review). Report the TRUE number even if it differs from what you "
         "were told -- the gate compares it and a mismatch is INDETERMINATE, never "
         "a pass. This exists because a reviewer once reviewed 2 files while the "
         "gate believed it had reviewed 33, and reported findings that looked "
@@ -251,7 +251,7 @@ def build_prompt(level, intent_text, new_files=(), base=None, diff_file=None,
         "a summary, a recommendation, a `Next:`/`Needs you:` line, an offer to "
         "apply the fixes, or any other trailing prose — those instructions are "
         "written for a human reader and this output is parsed by a program. "
-        "Measured 2026-08-20: two full reviews of a real 25-file diff both found "
+        "Measured: two full reviews of a real 25-file diff both found "
         "genuine defects, ended with a conversational sign-off instead of the "
         "array, and were therefore scored INDETERMINATE — 22 minutes of correct "
         "review work discarded over a closing sentence. Put every word you want "
@@ -469,7 +469,7 @@ def _review(args, attempt_ms, attempt_usd):
             # for one object per prior. judge() already returns fail=False for a
             # genuinely empty round with no priors, so the clause only ever
             # discarded judge()'s verdict. "Omission is not a fix" was enforced in
-            # the ledger and defeated one layer above it (review, 2026-08-20).
+            # the ledger and defeated one layer above it (review).
             if not fail:
                 if count:
                     print(f"\n--- reviewer findings ({count}), none blocking ---\n{data.get('result')}")

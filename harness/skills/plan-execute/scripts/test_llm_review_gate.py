@@ -37,7 +37,7 @@ def test_unparseable_shapes_are_never_a_pass():
 
 
 def test_intent_is_wrapped_in_untrusted_markers():
-    # The prompt is PROSE, not a bare slash command. Measured 2026-08-14 on CLI
+    # The prompt is PROSE, not a bare slash command. Measured on CLI
     # 2.1.232: `claude -p "/code-review high"` QUEUES the command and never runs
     # it (stalled transcripts held one `queue-operation` line and nothing else;
     # a level-low probe returned num_turns=0 with empty stdout). The old
@@ -75,7 +75,7 @@ def test_exit_codes_are_three_valued():
 # --------------------------------------------------------------------------
 # D1 — a NEW file is part of the change, and `git diff HEAD` does not contain it
 # --------------------------------------------------------------------------
-# Measured 2026-08-15 on S07: `render_report.py`, 173 new lines, was untracked and
+# Measured on S07: `render_report.py`, 173 new lines, was untracked and
 # therefore absent from the reviewed diff across three rounds that each reported a
 # clean PASS. Staging it and reading it found a real bug immediately.
 def _repo(tmp_path):
@@ -140,7 +140,7 @@ def test_the_prompt_puts_new_files_in_the_reviewed_surface():
 
 
 # --------------------------------------------------------------------------
-# The committed-work surface (2026-08-20). `git diff HEAD` is EMPTY once a
+# The committed-work surface. `git diff HEAD` is EMPTY once a
 # session commits, so the reviewer was handed nothing and its empty findings
 # array read as a PASS. Measured across four sessions of one plan.
 # --------------------------------------------------------------------------
@@ -201,7 +201,7 @@ def test_an_unresolvable_base_is_INDETERMINATE_never_a_pass(tmp_path, monkeypatc
 
 
 def test_the_prompt_overrides_a_trailing_sign_off_instruction():
-    """Measured 2026-08-20: two full reviews of a real 25-file diff found genuine
+    """Measured: two full reviews of a real 25-file diff found genuine
     defects, then closed with a `Next:`/`Needs you:` sign-off instead of the
     fenced array, and both scored INDETERMINATE. The prompt must tell the
     reviewer that the array outranks any output-style closing line."""
@@ -214,7 +214,7 @@ def test_a_base_prompt_still_carries_the_whole_findings_instruction():
     """The bypass the test above could not see. `--base` used to select its
     branch of an `A if base else B` that had the ENTIRE findings-block
     instruction concatenated onto the else-side, so a based run asked for a
-    review and never asked for an array. Measured 2026-08-20: two 660s reviews
+    review and never asked for an array. Measured: two 660s reviews
     of the s03 diff answered in prose and were scored INDETERMINATE.
 
     The no-base call is the control -- it passed throughout the outage."""
@@ -229,17 +229,17 @@ def test_a_base_prompt_still_carries_the_whole_findings_instruction():
 
 
 def test_another_plans_untracked_files_are_not_this_sessions_surface():
-    """Measured 2026-08-20 on s03: 5 of 6 blocking findings were against
+    """Measured on s03: 5 of 6 blocking findings were against
     already-EXECUTED evidence scripts of a CLOSED sibling plan and of a finished
     session of this one. The session could not fix them -- editing a script after
     it produced a recorded result destroys the thing that makes it evidence.
 
     Every keep below is the control: authored code, and the session's OWN
     evidence, must survive the rule that drops the rest."""
-    mine, sess = "_plans/model-portability-2026-08-19", "s03"
+    mine, sess = "_plans/example-portability-plan-2026-08-19", "s03"
 
     drop = {
-        "_plans/fix-upload-path-2026-08-15/_evidence/s04/s04_repair.py": "another plan",
+        "_plans/example-fix-plan-2026-08-15/_evidence/s04/s04_repair.py": "another plan",
         f"{mine}/_evidence/s02i/verify_merge.py": "another session",
         f"{mine}/_verify_state/s03.json": "bookkeeping",
         f"{mine}/_worktrees/g1.json": "bookkeeping",
@@ -261,7 +261,7 @@ def test_without_plan_context_the_scoping_rule_does_not_fire():
     """Fail-open on scoping: a gate run with no plan context cannot evaluate
     whose file this is, so it reviews it rather than guessing it away. Only the
     bookkeeping rule -- which needs no context -- still applies."""
-    other = "_plans/fix-upload-path-2026-08-15/_evidence/s04/s04_repair.py"
+    other = "_plans/example-fix-plan-2026-08-15/_evidence/s04/s04_repair.py"
     assert g._out_of_surface(other) is None
     assert g._out_of_surface("_plans/x/_verify_state/s03.json") == "harness bookkeeping"
 
@@ -308,7 +308,7 @@ def test_a_new_file_being_untracked_is_never_offered_as_a_defect():
     ADDS is untracked at review time. A reviewer that reads that as "not
     committed — a fresh checkout would ModuleNotFoundError" spends a rework
     attempt on the workflow instead of the code; it cost s14 of
-    repo-health-that-cannot-lie its last attempt on 2026-08-20 while the file was
+    repo-health-that-cannot-lie its last attempt while the file was
     provably not ignored and staged fine."""
     p = g.build_prompt("low", "", ["skills/repo-health/scripts/route_table.py"])
     assert "UNTRACKEDNESS is never itself a finding" in p
@@ -325,7 +325,7 @@ def test_an_EMPTY_answer_cannot_clear_an_open_prior_through_main(tmp_path, monke
     returned PASS before the verdict was used. `[]` is the LIKELY answer, not an
     exotic one: the base prompt asks for an empty array when nothing blocks while
     the prior section asks for one object per prior, and `[]` satisfies the first.
-    So a session could clear a HIGH prior by saying nothing (review, 2026-08-20)."""
+    So a session could clear a HIGH prior by saying nothing (review)."""
     repo = _repo(tmp_path)
     plan = tmp_path / "_plans" / "p"
     (plan / "_verify_state").mkdir(parents=True)
@@ -363,7 +363,7 @@ def test_the_attested_count_asks_for_the_SAME_number_the_gate_measures():
     that read everything and reported the diff's number failed the tolerance once
     untracked files exceeded about a third of the surface — UNTRACKED_MAX is 60,
     so it is reachable. That fails an HONEST review, costing an attempt while
-    never passing bad code (review, 2026-08-20)."""
+    never passing bad code (review)."""
     p = g.build_prompt("low", "", ["a/new.py", "b/new.py"], base="HEAD",
                        diff_file="/tmp/x.diff", diff_files=7)
     assert "= 9 in total" in p                 # 7 changed + 2 new, the measured number

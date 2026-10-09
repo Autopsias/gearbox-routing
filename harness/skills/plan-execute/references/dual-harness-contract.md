@@ -1,6 +1,6 @@
 # Dual-harness contract — one plan directory, two orchestrators
 
-**Status:** ACCEPTED (2026-07-28, plan `dual-harness-plan-skills-2026-07-28` session S01, item CP-01).
+**Status:** ACCEPTED (2026-07-28, plan `example-harness-plan-2026-07-28` session S01, item CP-01).
 **Scope:** how a single `_plans/<slug>-<date>/` directory (PLAN.html + manifest.json +
 `sessions/*`) is built and run from **either** Claude Code **or** Codex CLI.
 **Binding on:** CP-02 (`run.py --harness codex`), CP-03/04/05 (the three Codex skill
@@ -377,7 +377,7 @@ no new format — two existing mechanisms, one deterministic path. Before launch
 `<receipt>.stale.XXXXXX/last-message.txt` recovery directory. The current path is clear
 without deleting evidence. If archival fails, Codex does not launch; do not apply
 the old receipt as a new result. This replaces the deletion prefix rejected by the
-desktop shell on 2026-09-05; model, sandbox and receipt-path contracts are unchanged.
+desktop shell; model, sandbox and receipt-path contracts are unchanged.
 
 ### 3.7 The dispatch receipt — `apply` refuses a closeout with no dispatch
 
@@ -537,12 +537,12 @@ receipt that always prints the same reassuring line is one of those.
 
 **The hole.** Every decision above settles *which model* runs a session. None settles
 *what the dispatched process may do*, and `_codex_cmd()` hardcoded one answer for every
-plan: `--sandbox workspace-write`. Measured on codex-cli 0.145.0 (2026-07-29) from inside
+plan: `--sandbox workspace-write`. Measured on codex-cli 0.145.0 from inside
 exactly that command:
 
 ```
 echo probe > ./in-workspace.txt        -> IN_WS_OK
-echo probe > "$HOME/.dyno/probe.txt"   -> operation not permitted   (DENIED)
+echo probe > "$HOME/.gearbox-state/probe.txt"   -> operation not permitted   (DENIED)
 curl https://api.anthropic.com/        -> net=000                   (DENIED)
 env | grep CODEX_SANDBOX               -> CODEX_SANDBOX=seatbelt
                                           CODEX_SANDBOX_NETWORK_DISABLED=1
@@ -559,7 +559,7 @@ instance of this repo's "gates that cannot fail" defect class.
 
 | Need | Grant | Observed |
 |---|---|---|
-| write outside the workspace | `-c sandbox_workspace_write.writable_roots=["…"]` | `DYNO_WRITE_OK` |
+| write outside the workspace | `-c sandbox_workspace_write.writable_roots=["…"]` | `GEARBOX_WRITE_OK` |
 | network | `-c sandbox_workspace_write.network_access=true` | `net=404` — reached the host |
 | nested `codex exec` / vendor CLI | `--sandbox danger-full-access` **only** | P3 ✅; still DENIED under a loosened `workspace-write` |
 | declared parent environment variables | `shell_environment_policy.ignore_default_excludes=true` + exact `include_only` names | Codex config reference; default KEY/SECRET/TOKEN filtering otherwise removes them |
@@ -571,7 +571,7 @@ stray `config.toml`.
 **Decision.** A session may declare `dispatch.codex_shell`:
 
 ```json
-"codex_shell": {"writable_roots": ["~/.dyno"], "network": true}
+"codex_shell": {"writable_roots": ["~/.gearbox-state"], "network": true}
 "codex_shell": {"sandbox": "danger-full-access"}
 "codex_shell": {"env_include": ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]}
 ```
@@ -701,12 +701,12 @@ honours 0 and reports all 16. Until this was matched in `run.py`, every repo car
 no message anywhere saying why, while this document and the SSOT both claimed the file
 was honoured.
 
-**A pin is keyed on `<path>:<rule>`, and the pin COUNT is its bound (2026-08-15).**
+**A pin is keyed on `<path>:<rule>`, and the pin COUNT is its bound.**
 `run.py` drops the line number from the key it matches on. A gitleaks fingerprint is
 line-anchored, so any edit *above* a reviewed false positive silently unpins it and
 turns the whole tree DO-NOT-SEND — and the refusal reads exactly like a fresh secret,
-so nothing on the surface says the pin is merely stale. `profile-a-brain` stranded that
-way: commit `4cfb55a` (2026-08-05) dropped one line above a flagged docstring, moving it
+so nothing on the surface says the pin is merely stale. One project stranded that
+way: a commit dropped one line above a flagged docstring, moving it
 from 143 to 142; the text and its entropy (3.81) never changed. Same defect the quality
 gate fixed in `77278cd` by forgiving a function by NAME instead of by line number.
 
@@ -732,7 +732,7 @@ selected — **refuses**, naming the problem; there is deliberately no fallback 
 Both SSOT keys require an `expiry` and parse inline mappings only, so a commented-out,
 block-style, or out-of-block entry authorizes nothing.
 
-**The two rules have different scopes on purpose (fixed 2026-07-28, second pass).**
+**The two rules have different scopes on purpose (fixed, second pass).**
 Rule 2 first shipped over the full tree and was unusable on a real repo: 16 GB /
 103,727 files → **6 min 5 s and 826 findings**, every one of them inside git-ignored
 build output (`dist/` 2.9 GB, `_workspace/` 2.6 GB), on a repo whose real secret count
@@ -752,7 +752,7 @@ reports the resolved target in `File`, so a finding names the real repo path wit
 mapping back. Every scoped pass asserts gitleaks' own `scanned ~N bytes` line against
 the byte total of the candidate set and **refuses on an overshoot** — see the trap
 below. Cost after the fix, same 16 GB repo: **2.2 s walk + 1.0 s scan ≈ 3.4 s**
-(measured 2026-07-28, gitleaks 8.30.0; 3.1 s end to end for `plan --harness codex`).
+(measured, gitleaks 8.30.0; 3.1 s end to end for `plan --harness codex`).
 Stated honestly the other way: on a repo that ignores almost nothing — the harness
 repo itself, 39 MB, a 20 MB candidate set — scoping is about 0.3 s *slower* than the
 full-tree scan. The saving is proportional to what a repo ignores, and the repos where
@@ -839,7 +839,7 @@ existing provider-symmetric rule ("the non-executing family verifies") makes
 spawning Claude from the Codex shell, which is the same cross-vendor egress in
 reverse, and which an operator who chose Codex may specifically not want.
 
-**Settled 2026-08-25, both directions** (plan `cross-family-review-gate-2026-08-25`).
+**Settled 2026-08-25, both directions** (plan `example-review-plan-2026-08-25`).
 
 **Claude-built, verified by Codex.** The gate ids
 `cross-family-review-low|medium|high` route `llm_review_gate.py` to a read-only
@@ -971,7 +971,7 @@ rather than treat it as a working model.
 | PI-* (deploy) | The render step of § 6.2 — path-scoped, never `--delete`, stamped, non-fatal, after the `~/.claude` fast-forward. |
 | CL-02 / CL-03 | The fidelity losses measured in § 4.2 are the problem statement: flat effort maps for `frontier_reasoner`/`cheap_fast`, and the `xhigh`/`max` → `thorough` clamp in `_INTENT_FROM_REASONING`. |
 
-### 8.1 As-built notes — CP-02 + CL-03 (2026-07-28)
+### 8.1 As-built notes — CP-02 + CL-03
 
 Shipped in `run.py` (+ `test_codex_dispatch.py`, + the minimal `providers.openai`
 effort-map/degrade extension). Four points where the build had to settle something
@@ -1003,13 +1003,13 @@ this document left open or said twice; **CP-03 writes its SKILL.md against these
    `standard` cell for an unknown intent — a rung added on the code side alone would
    have DOWNGRADED `max`, not unclamped it (regression-proved both ways in
    `test_intent_rung_missing_from_effort_map_silently_downgrades`). Native ceilings
-   are measured, not assumed (`codex debug models`, codex-cli 0.145.0, 2026-07-28):
+   are measured, not assumed (`codex debug models`, codex-cli 0.145.0):
    sol/terra reach `max`, `gpt-5.5` stopped at `xhigh` — so § 4.2's `workhorse` row
    stayed honestly `clamped` at the top, and only `apex_reasoner.maximal` reached
    native `max`. (SSOT v16, 2026-08-13: gpt-5.5 and the whole `workhorse` tier are
    retired — every model in the 5.6-only lane reaches `max`, so nothing clamps.) `calibration.status` untouched (s07 owns it).
 
-### 8.2 As-built notes — CP-03 + CP-04 (2026-07-28)
+### 8.2 As-built notes — CP-03 + CP-04
 
 Shipped as `skills/plan-execute/codex/` and `skills/plan-builder/codex/`
 (`SKILL.md` + `manifest.toml` each), staged by hand into `~/.codex/skills/` and
@@ -1051,7 +1051,7 @@ run end to end. Evidence: `_evidence/s04/skill-discovery.txt`,
 Shipped as `scripts/gearbox-codex.py` (`drift` / `render` / `harvest-back`), the
 `[codex-target]` + `[codex-render]` sections of `scripts/deploy.pathspec`, three
 call sites in `scripts/gearbox`, and `scripts/test_gearbox_codex.py`. Evidence:
-`_plans/dual-harness-plan-skills-2026-07-28/_evidence/s06/drift-proof.txt`.
+`_plans/example-harness-plan-2026-07-28/_evidence/s06/drift-proof.txt`.
 Everything § 6.2 asked for landed unchanged (path-scoped, never `--delete`,
 stamped, non-fatal, after the `~/.claude` fast-forward, reading the deployed
 tree). Four things the build had to settle:
@@ -1102,8 +1102,8 @@ builds the two-session fixture in a throwaway git repo and walks the whole loop 
 
 ## 9. Decision D6 — the replan, mutation and worktree surface under Codex
 
-**Status:** AMENDMENT, ACCEPTED 2026-08-12 (plan `plan-framework-upgrade-2026-08-12`,
-session S12, item SH-01). Between this contract's last amendment (D3b, 2026-07-29)
+**Status:** AMENDMENT, ACCEPTED 2026-08-12 (plan `example-upgrade-plan-2026-08-12`,
+session S12, item SH-01). Between this contract's last amendment (D3b)
 and this one, six new `run.py` subcommands and one new closeout field shipped on
 `main` (sessions S03–S09 of the same plan): `ack-checkpoint`, `redispatch`,
 `resolve-replan`, `add-session`, `amend-session`, `retire-session`, `plan_impact`
@@ -1167,7 +1167,7 @@ Precedence (unchanged, harness-neutral): a closeout carrying BOTH
 `ack-checkpoint` raises the REPLAN afterwards. Plans below `plan_schema_version 3`
 ignore `plan_impact` entirely, in both harnesses.
 
-### 9.3 Worktree parallelism is harness-neutral — amended 2026-08-15
+### 9.3 Worktree parallelism is harness-neutral — amended
 
 The orchestrator-managed worktree lifecycle is now shared by both harnesses.
 `run.py::_isolation_prep()`, called from `cmd_begin` before the lock and before
@@ -1211,7 +1211,7 @@ amendment was written) — checked by grep, not assumed:
   Codex-side relay mechanism. § 3.2 step 4 already relays the **entire** closeout
   JSON blob, verbatim, through the `-o` last-message file to `run.py apply` —
   `decision_brief` would arrive as one more key inside that same blob, exactly as
-  `plan_impact` does today (§ D3, shipped 2026-07-28, before `decision_brief` was
+  `plan_impact` does today (§ D3, shipped, before `decision_brief` was
   even proposed). The only real work at that point is Claude-side/shared-script
   (parsing and presenting the field in `run.py`/`SKILL.md` prose), not a
   dispatch-transport change.
@@ -1241,13 +1241,13 @@ operator-facing name of their own — they hardened existing plumbing) across
 `skills/*/codex/`, and cross-checks § 9.4's declared gaps against
 `codex-out-of-scope.md`. It exits non-zero on any name that is neither found nor
 declared — proved both directions in this session's evidence
-(`_plans/plan-framework-upgrade-2026-08-12/_evidence/s12/port-coverage.md`): the
+(`_plans/example-upgrade-plan-2026-08-12/_evidence/s12/port-coverage.md`): the
 real run exits 0 over all thirteen required names and five declared gaps; a
 `--plant` run adding one deliberately-unported name exits 1.
 
 ## 10. Route at dispatch (plan schema v8) — the openai side
 
-Added by plan session S10 of `_plans/route-at-dispatch-2026-09-29/`. The rules are in `route-at-dispatch-contract.md`, which wins on any disagreement. This section records only what changes under `--harness codex`.
+Added by plan session S10 of `_plans/example-dispatch-plan-2026-09-29/`. The rules are in `route-at-dispatch-contract.md`, which wins on any disagreement. This section records only what changes under `--harness codex`.
 
 - **Provider.** `--harness codex` makes the active provider `openai` (contract 3.1). An unpinned v8 session resolves from the routing file's `openai` cells. Nothing new detects the lane.
 - **Effort.** The begin receipt's `effort_mechanism` is `codex_cli`; effort rides `-c model_reasoning_effort=`. Tier agents do not apply; the receipt's `dropped` list names the drop.

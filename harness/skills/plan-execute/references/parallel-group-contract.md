@@ -1,4 +1,4 @@
-# Parallel-group manifest contract — AMENDED 2026-08-21 (contract v3; supersedes v2, v1)
+# Parallel-group manifest contract — AMENDED (contract v3; supersedes v2, v1)
 
 **This file is the single statement of record for what a `parallel_group` may and
 may not do.** Where any other document (including
@@ -6,7 +6,7 @@ may not do.** Where any other document (including
 appears to say something different about worktree isolation in the plan dispatch
 path, this file wins.
 
-Originally frozen by plan session S06 (`_plans/plan-framework-upgrade-2026-08-12/`,
+Originally frozen by plan session S06 (`_plans/example-upgrade-plan-2026-08-12/`,
 item PL-02) *before* the executor (S06B) and builder (S07) implement against it.
 Contract v2 is the 2026-08-15 amendment that makes the already-built
 orchestrator-managed worktree lifecycle harness-neutral: Claude and Codex both
@@ -26,7 +26,7 @@ implementation that found it inconvenient.
 - [6. Version gate](#6-version-gate)
 - [7. What these gates do NOT catch](#7-what-these-gates-do-not-catch)
 - [8. Supersession](#8-supersession)
-- [9. Contract v3 amendment (2026-08-21) — groups under plan isolation](#9-contract-v3-amendment-2026-08-21--groups-under-plan-isolation)
+- [9. Contract v3 amendment — groups under plan isolation](#9-contract-v3-amendment--groups-under-plan-isolation)
 
 ## Verdict: ROUTE A, scoped to orchestrator-managed worktrees
 
@@ -354,8 +354,8 @@ R1 is deliberately ungated: it is enforced for all versions today, and a contrac
 that version-gated it would *regress* existing behaviour.
 
 This is load-bearing, not ceremony. At freeze time two v2 plans in this repo
-(`claude-code-reliability-selfassessment-2026-07-03`,
-`skill-quality-audit-2026-07-05`) carry parallel members with
+(`example-reliability-plan-2026-07-03`,
+`example-audit-plan-2026-07-05`) carry parallel members with
 `post_session.git: "commit"`, which M1 now forbids. Ungated, this contract would
 refuse to resume them.
 
@@ -393,7 +393,7 @@ verdict's advisory-containment paragraph and §3 rule 6, and leave the rest
 standing. "Frozen" means an implementer may not change it; it does not mean a
 later decision cannot.
 
-**Contract v3 (2026-08-21)** supersedes v2 on one axis only — where a group's
+**Contract v3** supersedes v2 on one axis only — where a group's
 branches and worktrees live when the plan itself is isolated — and is stated in
 full in §9. Every v2 rule (M1–M5, §3's integration rules, §4's lifecycle, §5's
 enforcement table, §6's version gate) stands unchanged. v3 is the amendment
@@ -402,9 +402,9 @@ contract's §1 nests group branches under a plan branch, which is a change to th
 file, and this file declares itself frozen against implementer change.
 
 
-## 9. Contract v3 amendment (2026-08-21) — groups under plan isolation
+## 9. Contract v3 amendment — groups under plan isolation
 
-Written by plan session S04 of `_plans/plan-level-git-isolation-2026-08-20/`
+Written by plan session S04 of `_plans/example-isolation-plan-2026-08-20/`
 (item CON-01), alongside `plan-isolation-contract.md` v1. It is a **decision**,
 in the sense §8 requires: it changes this contract because a plan-level
 authority now exists above it, not because an implementation found v2
@@ -428,13 +428,13 @@ When the enclosing plan is isolated (`plan_schema_version >= 7`, or
 gain the plan slug **only** above the version gate, so every existing plan keeps
 `plan/<group>/<sid>` exactly as measured today at `worktree.py:51-52` and `:292`.
 
-**AMENDED 2026-08-22 (operator decision, s07).** This row first read
+**AMENDED (operator decision, s07).** This row first read
 `plan/<plan-slug>/<group>/<sid>` — a name git cannot create. Git will not hold a
 ref and a ref-directory of the same name, so `refs/heads/plan/<slug>/<group>/<sid>`
 is refused (exit 128) while the plan's own branch `refs/heads/plan/<slug>` exists,
 and `git worktree add -b` fails the same way at exit 255. Measured as loose refs
 and after `git pack-refs --all`; transcript in
-`_plans/plan-level-git-isolation-2026-08-20/_evidence/s07/v3-member-branch-refused-by-git.txt`.
+`_plans/example-isolation-plan-2026-08-20/_evidence/s07/v3-member-branch-refused-by-git.txt`.
 Under the nested name that collision was not a rare legacy case but the shape of
 **every** group of **every** isolated plan, so the rule refused the design it
 belongs to. The member branch therefore uses the same `__` separator §1.1a already

@@ -662,12 +662,10 @@ no manifest yet, so the only honest input-side reading is the spec's own stamp �
 exactly the shape ``PRIOR_ART_MIN_SCHEMA`` uses one field over, and for the same
 measured reason. `validate_spec()` is shared plumbing: `plan_mutate._validate`
 calls it on the spec of a LIVE plan for every add/amend/retire, and
-`build_plan --rebuild` calls it on specs written months ago. Measured across this
-repo's `_plans/*/spec.json` on 2026-08-12: enforcing unconditionally would refuse
-5 of the 10 existing plans (M1 shipping members in
-`claude-code-reliability-selfassessment`, `skill-quality-audit`; M2a missing
-`touches` in `gearbox-source-of-truth`, `skill-unification`; M5 overlap in
-`kun-chen-harness-adaptations`) — i.e. strand five running plans' mutation
+`build_plan --rebuild` calls it on specs written months ago. Measured across a
+repo's `_plans/*/spec.json`: enforcing unconditionally would refuse about half
+of the existing plans (M1 shipping members, M2a missing `touches`, M5 overlap)
+— i.e. strand running plans' mutation
 engine on a rule their manifests are grandfathered out of anyway. Below the
 threshold the refusals are still PRINTED as warnings (naming each rule), so the
 diagnostic reaches the author instead of going silent.
@@ -839,7 +837,7 @@ def _width_warning(spec, rep):
     )
 
 
-# CALIBRATED, not guessed (2026-08-14). Measured across 207 sessions in 25 plans
+# CALIBRATED, not guessed. Measured across 207 sessions in 25 plans
 # on disk: p50 = 2,486 chars of `prompt`, p75 = 4,133, p90 = 6,409, p95 = 8,088.
 # The threshold is p90, so this fires on roughly one session in ten.
 #
@@ -1066,7 +1064,7 @@ def _check_parallel_contract(spec):
 
 
 # --------------------------------------------------------------------------
-# Research-tool availability probe (RS-06, 2026-08-13)
+# Research-tool availability probe (RS-06)
 # --------------------------------------------------------------------------
 # HONEST NAME FIRST. This is a *configuration* probe, NOT a reachability probe.
 # build_plan.py is a plain Python script: it does not hold the research tools,
@@ -1210,8 +1208,8 @@ def stamp_spec(spec, out_path=None):
     and `research_env.probed_at`. Either one moving rewrites manifest_digest,
     which is what _verify_state reads to declare state-drift, so the plan halts
     for a change nobody made. Fixing `created` alone left the identical defect on
-    its sibling -- a rebuild re-probed and moved the digest 1e021aeb -> a5283e62
-    (measured 2026-08-21). Hence one rule applied to every clock-derived key,
+    its sibling -- a rebuild re-probed and moved the digest
+    (measured). Hence one rule applied to every clock-derived key,
     rather than a guard per key: take what the spec carries, else what the plan
     already PUBLISHED in its manifest, else observe afresh.
 
@@ -1266,7 +1264,7 @@ def write_manifest(plan_dir, manifest):
     nothing here writes. Re-serialising value-identical content moves the digest,
     and every `_verify_state` bound to it then halts on state-drift for a change
     nobody made -- the same defect as the two clock keys, one level down.
-    Measured 2026-08-21 on _plans/plan-level-git-isolation-2026-08-20: a rebuild
+    Measured on _plans/example-isolation-plan-2026-08-20: a rebuild
     moved 75bd9a7c60aa -> 35271aafb96d over ONE byte and zero content.
 
     Comparing VALUES rather than bytes is the point -- a real graph change still
@@ -1395,7 +1393,7 @@ def _validate_research_status(rs, it):
                 "when research_status is 'skipped'"
             )
     else:
-        # research_status: "unavailable" (RS-06, 2026-08-13) — the ONE
+        # research_status: "unavailable" (RS-06) — the ONE
         # value that asserts the tooling was absent, and the one claim
         # the builder can adjudicate for itself instead of taking on
         # trust. NOT version-gated, and it needs no gate: the value was
@@ -1516,7 +1514,7 @@ def _validate_codex_shell(sh, s, d):
     ):
         raise ValueError(
             f"Session {s['id']}.dispatch.codex_shell.writable_roots must be a "
-            "list of non-empty path strings (e.g. [\"~/.dyno\"])"
+            "list of non-empty path strings (e.g. [\"~/.gearbox-state\"])"
         )
     if sh.get("network") is not None and not isinstance(sh.get("network"), bool):
         raise ValueError(
@@ -1627,7 +1625,7 @@ def _validate_dispatch_block(d, s):
         raise ValueError(
             f"Session {s['id']}.dispatch.guards_irreversible must be bool"
         )
-    # codex_shell (optional, 2026-07-29) — the shell capabilities this
+    # codex_shell (optional) — the shell capabilities this
     # session needs from a `codex exec` dispatch. Absent = today's
     # `--sandbox workspace-write` with nothing added, which MEASURABLY
     # denies writes outside the repo, all network, and nested
@@ -1704,7 +1702,7 @@ def _validate_session_verify_and_ship(s):
     if "model" in s and not any(t in model_low for t in CLAUDE_MODEL_TOKENS) and not _is_codex_model(model_low):
         _validate_session_model(s, model_low)
 
-    # escalation (optional, ESC-02, 2026-08-13) — the per-session opt-OUT of
+    # escalation (optional, ESC-02) — the per-session opt-OUT of
     # the upward rework climb. Only `false` is meaningful; `true` is the
     # default and writing it changes nothing. Validated as a strict bool so a
     # string "false" (which is truthy, and would silently leave escalation ON)
@@ -1712,7 +1710,7 @@ def _validate_session_verify_and_ship(s):
     if "escalation" in s and not isinstance(s["escalation"], bool):
         _validate_session_escalation(s)
 
-    # routing_experiment (optional, 2026-08-13) — tags a session as belonging
+    # routing_experiment (optional) — tags a session as belonging
     # to a named routing canary so the outcome ledger can separate its records
     # from the general population. The BUILDER owns validation + propagation;
     # the ledger only READS it back off the manifest, which is why it is
@@ -1834,7 +1832,7 @@ def _validate_plan_items(cat_keys, spec):
     for s in spec["sessions"]:
         _validate_session(s, spec, item_ids, session_ids)
 
-    # Closing acceptance review (2026-07-26): the plan-level validation session.
+    # Closing acceptance review: the plan-level validation session.
     # Session verify gates check the PARTS; nothing checked the WHOLE — a plan
     # where every session closed DONE can still miss its objectives through
     # accumulated deviations and descoped items. Exactly one session may carry
@@ -2127,7 +2125,7 @@ def _article_summary_and_prior_art(agent_pieces, desc, human_summary, item):
         pass
     elif desc:
         agent_pieces.append(f"<h4>Detail</h4><p>{esc(desc)}</p>")
-    # Prior-art decision (RS-01/RS-02, 2026-08-12) -- rendered early in the agent
+    # Prior-art decision (RS-01/RS-02) -- rendered early in the agent
     # spec since it's a decision the reader should see before dev steps. Exactly
     # one of the two shapes is present (validate_spec enforces it), but render
     # defensively either way.
@@ -2252,7 +2250,7 @@ def gen_decision_hotspots_section(items):
     optional item fields. Returns "" (section omitted) when no item uses
     tweak_likelihood, so specs that predate this feature build identically.
 
-    Also pulls in "build despite alternatives" items (RS-01, 2026-08-12): a
+    Also pulls in "build despite alternatives" items (RS-01): a
     `prior_art.decision == "build"` item that ALSO carries a `note` is, by
     definition, a build call made despite a credible alternative surfacing --
     exactly the kind of judgment call this section exists to surface, whether
@@ -2471,19 +2469,17 @@ same reason.
 WHY THE CHECK EXISTS: the progress bar counts through the group list, so an
 unplaced item is not merely undrawn — it is absent from the DENOMINATOR. The
 bar then reports progress over a subset while looking like it reports the whole
-plan. Measured on the 2026-08-12 framework-upgrade plan: five items sat in two
+plan. Measured on a real framework-upgrade plan: five items sat in two
 categories that had no group, and the bar counted 18 of 25 items. It read 100%
 complete while five items were still unfinished, and `plan-execute`'s
 containment gate could only WARN, because the plan already had the defect when
 each mutation ran.
 
-WHY IT IS GATED, not unconditional: measured 2026-08-13 across all 25 `spec.json`
-files under `_plans/` — 4 of them (gearbox-dyno-2026-07-26,
-kun-chen-harness-adaptations-2026-07-05, dual-harness-plan-skills-2026-07-28 and
-the framework-upgrade plan itself) leave at least one item unplaced and would be
-refused outright. None carries a `plan_schema_version` key, so all four keep
-building exactly as before. This is the s09 lesson applied at authoring time
-rather than after the rework.
+WHY IT IS GATED, not unconditional: measured across the existing `spec.json`
+files under `_plans/` — a few of them leave at least one item unplaced and would be
+refused outright. None carries a `plan_schema_version` key, so they all keep
+building exactly as before. This applies the framework-upgrade lesson at
+authoring time rather than after the rework.
 """
 
 PRIOR_ART_MIN_SCHEMA = 4
@@ -2526,7 +2522,7 @@ def gen_manifest(spec, plan_schema_version=None):
             **rad.manifest_override_fields(s, spec),  # v8: no default model; why_model
             "effort": s.get("effort", ""),
             "reasoning": s.get("reasoning", ""),
-            # Structured second-model-review gate (Layer 1, 2026-07-10). Declared
+            # Structured second-model-review gate (Layer 1). Declared
             # codex_peer triggers for this session; the §4.0 model-lint turns a
             # non-empty list without an adversarial-review gate into a 🔴. Validated
             # in validate_peer_triggers() below (called before manifest write).
@@ -2537,7 +2533,7 @@ def gen_manifest(spec, plan_schema_version=None):
             # Codex; unset/unknown FAILS CLOSED to Claude. `linchpin` never runs on
             # unsupervised Codex.
             "task_class": (s.get("task_class") or "").strip().lower(),
-            # Marks THE closing plan-level acceptance review (2026-07-26). Read by
+            # Marks THE closing plan-level acceptance review. Read by
             # /plan-execute (surface its verdict at `complete` instead of a bare
             # "success") and by plan-harden's `acceptance-review-missing` lint. At
             # most one session per plan — validated in validate_spec().
@@ -2626,7 +2622,7 @@ def gen_manifest(spec, plan_schema_version=None):
         ],
         "sessions": sessions,
     }
-    # Scope boundary + fog register (2026-08-01). Structured so plan-harden's
+    # Scope boundary + fog register. Structured so plan-harden's
     # decision-debt lint and the closing acceptance review read them from the
     # manifest instead of parsing PLAN.html. Omitted when unused.
     for f in ("out_of_scope", "open_questions"):
@@ -3114,7 +3110,7 @@ def render_html(spec, plan_dir):
         # A counts-form meta string is FROZEN at build time, so every mutation
         # that adds or removes a session/item rendered it stale — and the
         # header-totals containment check then (correctly) refused the
-        # mutation wholesale; measured 2026-08-18, add-session could never run
+        # mutation wholesale; measured, add-session could never run
         # on a plan whose meta carried "N sessions · M items · … supersedes …".
         # Refresh just the leading counts; keep any authored suffix verbatim.
         m = re.match(r"^(\d+ sessions · \d+ items)(.*)$", meta_line)
@@ -3193,7 +3189,7 @@ def _extract_inline_script(html_text):
 def validate_dashboard_js(html_text):
     """Static-check the dashboard's inline JS for undefined identifiers.
 
-    Guards the ``isOpus is not defined`` class (2026-06-06): a runtime
+    Guards the ``isOpus is not defined`` class: a runtime
     ``ReferenceError`` inside a render function aborts ``recomputeCounts()``
     mid-run and silently freezes the session-strip / nav / donuts at their
     authored fallback statuses — a broken dashboard that still *looks* valid.
@@ -3213,7 +3209,7 @@ def validate_dashboard_js(html_text):
         return
 
     # Unit-suite opt-out, same switch as render_verify / structural_gate.
-    # MEASURED 2026-08-14: the two `npx eslint` spawns below cost ~2.5 s EVERY
+    # MEASURED: the two `npx eslint` spawns below cost ~2.5 s EVERY
     # time a test builds a plan, which the plan-execute suite does per test.
     # DEFAULT IS ON — only conftest.py sets this, so a real plan build still
     # runs the no-undef guard. The warn-and-skip contract below already treats
@@ -3362,7 +3358,7 @@ def build(spec, out_path, project_root=None, preserve_state=False):
     # Build-time verify guard: every verify gate id must resolve in the registry.
     validate_verify_resolves(spec, reg_root)
     # Build-time peer-review guard: peer_triggers values are valid AND any
-    # declared trigger carries an adversarial-review gate (Layer 1, 2026-07-10).
+    # declared trigger carries an adversarial-review gate (Layer 1).
     validate_peer_triggers(spec)
 
     # Resolve plan_dir: accept either a directory or a legacy `*.html` path.

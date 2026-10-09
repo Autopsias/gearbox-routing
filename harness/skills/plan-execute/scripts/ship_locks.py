@@ -281,7 +281,7 @@ def our_lease(plan_dir, resource):
 # A lock file must NEVER be visible EMPTY. `O_EXCL` alone creates the entry
 # first and writes the JSON after it; a contender reading that window classes
 # the lease `unreadable` and steals it, and two plans hold one resource.
-# Reproduced by review 2026-08-21 -- the 4-contender barrier test missed it
+# Reproduced by review -- the 4-contender barrier test missed it
 # because three trials rarely land in a sub-millisecond window. So: write the
 # content to a private temp file, then `os.link` it in. `link` is atomic and
 # fails EEXIST, so the lock path only ever appears fully-formed.

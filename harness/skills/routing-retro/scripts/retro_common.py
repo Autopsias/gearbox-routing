@@ -61,9 +61,9 @@ MALFORMED_MAX_RATIO = 0.02          # > this ratio -> abort
 APEX_REVISIT_THRESHOLD = 5
 
 # [HARDENED finding 6] cost_per_success reads each attempt's `usage.cost_usd`
-# (route-at-dispatch contract rule 6, written by plan-execute's outcomes.py
-# since s07). It reads "n/a" unless EVERY attempt in the pool carries a cost —
-# and every Agent-tool transcript measured in s07 had cache-creation tokens,
+# (route-at-dispatch contract rule 6, written by plan-execute's outcomes.py).
+# It reads "n/a" unless EVERY attempt in the pool carries a cost —
+# and every Agent-tool transcript measured had cache-creation tokens,
 # which model_prices cannot price, so most cells read "n/a". Said plainly in the
 # `cost_per_success_caveat` output field rather than left to look like no data.
 COST_PER_SUCCESS_CAVEAT = (

@@ -184,8 +184,8 @@ verify prompt now demands, and branch on it:
    `status: "completed"` means a usable verdict exists, `"failed"` means every attempt stalled or the
    deadline hit -- and `"failed"` is NOT a `REVISE`, it is a degraded round (see the honesty rule in step 3).
 
-   **Why supervised, and why you must not "fix" a stall by shrinking the request** (measured 2026-07-26,
-   plan-harden on profile-a-brain): two `xhigh` verify runs each did ~9-10 min of real work and then went
+   **Why supervised, and why you must not "fix" a stall by shrinking the request** (measured on a large
+   plan-harden run): two `xhigh` verify runs each did ~9-10 min of real work and then went
    silent; `codex-companion status` still said `running` while the job logs had not grown in 28 and 20
    minutes. Upstream openai/codex #31376 is the same signature (dead pooled connection in `CLOSE_WAIT`,
    `stream_idle_timeout_ms` never fires). The instinct to cut the prompt or drop to a lower effort tier

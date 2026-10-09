@@ -284,7 +284,7 @@ def _intervention_rows(ivs):
 
 
 def _compaction_section(comp, heading=True):
-    """The compaction did-it-help block (s07/PF-01). Renders 'no records' rather
+    """The compaction did-it-help block. Renders 'no records' rather
     than a blank or a crash on an empty ledger, and says the instrument was blind
     rather than showing a clean allow rate over records that were never taken."""
     if not comp:
@@ -424,7 +424,7 @@ function setVerdict(btn, v) {{
 
 
 def render_compaction_page(comp):
-    """The standalone did-it-help ONE-PAGER (s07 evidence contract).
+    """The standalone did-it-help ONE-PAGER (evidence contract).
 
     Delegates to compaction_onepager, which renders the page a person actually
     reads — banner, metric tiles, verdict table, decision cards, provenance

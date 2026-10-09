@@ -120,7 +120,7 @@ This is the v1 mechanism with the guardrails above. It has no automated test har
 orchestration, not code), so it is deliberately conservative — declared-only, conflict-halting,
 integration-gated. Start with `K=2` on an epic you KNOW is module-separable before trusting it wider.
 
-**v1.1 (2026-06-22) — warm-worktree provisioning (step 2b).** Adds a per-worktree provision step so
+**v1.1 — warm-worktree provisioning (step 2b).** Adds a per-worktree provision step so
 parallel story-runners start from warm deps/build cache instead of a cold checkout — the borrowable
 idea from the `treehouse` worktree-pool tool (a `post_create`-style provision hook + reliance on the
 shared global package cache), ported in-mechanism rather than by adopting the binary (treehouse's

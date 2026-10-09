@@ -130,7 +130,7 @@ def _assert_full_access_gated(sid, session, grant):
 # Codex silently cuts a project AGENTS.md at 32,768 bytes by default, and
 # --ignore-user-config also skips the trust entry that would load a repo's own
 # .codex/config.toml, so a dispatched session saw only its first 32 KiB
-# (profile-a-brain ADR 0012: 127,734 bytes, sections 5-9 lost). A -c override
+# (measured on a ~125 KB file: later sections lost). A -c override
 # survives --ignore-user-config, like the sandbox grants below.
 _CODEX_PROJECT_DOC_MAX_BYTES = 262144
 

@@ -49,7 +49,7 @@ _PATH = re.compile(r"(?:[A-Za-z]:\\|/)[^\s:,;)\'\"\]]+")
 # No \b anchors, and decimals collapse as ONE token: `\b\d+\b` left a digit glued
 # to a letter alone, so pytest's `in 12.34s` normalised to `in <n>.12s` and drifted
 # every run — two runs of the SAME failing test produced different signatures and
-# the protocol never armed. Found 2026-08-13 by this plan's acceptance review.
+# the protocol never armed. Found by this plan's acceptance review.
 _NUM = re.compile(r"\d+(?:\.\d+)*")
 _WS = re.compile(r"\s+")
 
@@ -157,7 +157,7 @@ def signature(excerpt):
     error-ish line; ``sig`` is a short stable digest of the pair, which is what
     the consecutive counter compares.
 
-    TWO THINGS THAT LOOK LIKE POLISH AND ARE NOT (both measured 2026-08-15):
+    TWO THINGS THAT LOOK LIKE POLISH AND ARE NOT (both measured):
 
     * A REVIEW GATE'S FAILURE IS ITS FINDINGS, NEVER ITS BANNER. ``llm-review-*``
       ends every failing run with the same sentence ("failed with <n> finding(s).
@@ -180,7 +180,7 @@ def signature(excerpt):
       the honest answer; widen it only with a real excerpt and a real signature,
       never by loosening the shape (see `llm_review_gate.findings_digest`).
 
-    A THIRD, measured 2026-08-20 over 182 outcome records: SIGNING ON IDENTITY
+    A THIRD, measured over 182 outcome records: SIGNING ON IDENTITY
     ALONE MEANT THE REVIEW BRANCH COULD NEVER ARM. A rework loop changes the
     finding set on every attempt by construction — the worker fixes findings and
     the reviewer raises others — so `consecutive` reset to 1 forever, `armed()`
@@ -256,7 +256,7 @@ def record_failure(plan_dir, session_id, excerpt):
     # SAME ROOT CAUSE = the signature repeated exactly, OR a finding CARRIED OVER.
     # The second clause is the whole point: on a rework loop the finding set
     # changes by construction, so identity alone reset the counter to 1 forever
-    # and the ladder below it was unreachable (measured 2026-08-20 — 40
+    # and the ladder below it was unreachable (measured — 40
     # multi-attempt cohorts, 1 rung change, 0 of 182 records with `escalated_from`).
     carried = sorted(set(prev.get("keys") or []) & set(sig["keys"]))
     same = prev.get("sig") == sig["sig"] or bool(carried)

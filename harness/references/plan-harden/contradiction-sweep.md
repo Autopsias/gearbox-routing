@@ -31,7 +31,7 @@ Record the sweep's result in the Phase 4 summary as `sweep ✓ N classes clean` 
 survivors. **A sweep that finds nothing must be probed with a known positive** before you trust
 it — a sweep pointed at the wrong string returns "clean" and "I did not look" identically.
 
-*Why:* measured across three hardening passes on one plan (2026-08-21), *a fix applied in one
+*Why:* measured across three hardening passes on one plan, *a fix applied in one
 place while the text it replaces survives elsewhere* caused the MAJORITY of findings in every
 single round — including two contradictions the hardening patches themselves introduced, and
 the round-3 fix that forced an entire second pass to exist. An ad-hoc version of this sweep

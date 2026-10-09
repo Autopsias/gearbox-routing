@@ -5,7 +5,7 @@
 / `degrade`) against two SSOTs:
 
 - **The real repo SSOT** (`claude/model-routing.yaml`) — baseline resolve for
-  each of the three example providers (anthropic/openai/gemini), a full
+  each example provider (anthropic/openai/gemini/zai, the last one effort-steep with two aliased tiers), a full
   escalation rung sequence for anthropic (workhorse effort ladder exhaustion
   -> tier advance -> frontier_reasoner's own ladder), and a degrade step
   (frontier_reasoner -> workhorse, floor-respecting, per-target compensation

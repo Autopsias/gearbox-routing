@@ -152,7 +152,7 @@ After waiting for agents to complete, validate each result before proceeding:
 
 **Key principle:** Never silently proceed with incomplete data — always tell the user what was skipped and why.
 
-**Stamp the full-scope run.** Only when scope is still "Historical + current conversation" here (no fallback to current-conversation scope for any reason, including a Prior-Improve agent failure) and the History Scan agent reported BOTH `TRANSCRIPT SCAN: complete` and `REVIEW-FINDINGS SCAN: complete` (an empty but successful scan counts; a failed or unreadable one does not), run `mkdir -p ~/.dyno/improve && touch ~/.dyno/improve/last-full-scope`. Do not touch it after a current-conversation run or after a fallback. `hooks/improve-nudge.py` reads this path.
+**Stamp the full-scope run.** Only when scope is still "Historical + current conversation" here (no fallback to current-conversation scope for any reason, including a Prior-Improve agent failure) and the History Scan agent reported BOTH `TRANSCRIPT SCAN: complete` and `REVIEW-FINDINGS SCAN: complete` (an empty but successful scan counts; a failed or unreadable one does not), run `mkdir -p ~/.gearbox-state/improve && touch ~/.gearbox-state/improve/last-full-scope`. Do not touch it after a current-conversation run or after a fallback. An optional nudge hook (not part of this export) reads this path.
 
 Then read each config file from the config map.
 
@@ -421,7 +421,7 @@ finding was presented** — the held-back sightings are the whole point, and a r
 only saves on success loses them. Schema and rules:
 `~/.claude/references/improve/evidence-ledger.md`.
 
-**Full-scope stamp:** already touched in Phase 4 after Agent Failure Handling (`~/.dyno/improve/last-full-scope`); nothing to do here, and never touch it after a fallback or current-conversation run.
+**Full-scope stamp:** already touched in Phase 4 after Agent Failure Handling (`~/.gearbox-state/improve/last-full-scope`); nothing to do here, and never touch it after a fallback or current-conversation run.
 
 **2. Learnings `~/.claude/improve-learnings.md`:**
 

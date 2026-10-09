@@ -16,8 +16,8 @@ full scoring machinery in its `rubric.md`). Encodes Anthropic's official skill-a
 best practices: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
 (retrieved 2026-07-05). Key official numbers: SKILL.md body under 500 lines; reference files
 over 100 lines need a TOC; descriptions state what + when, third person; one term per concept.
-G5 added 2026-08-12 from "Lessons from building Claude Code: How we use skills"
-(claude.com blog, 2026-06-03).
+G5 added from "Lessons from building Claude Code: How we use skills"
+(claude.com blog).
 
 ## How to apply
 

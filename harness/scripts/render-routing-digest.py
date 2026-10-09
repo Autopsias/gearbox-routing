@@ -2,7 +2,7 @@
 """render-routing-digest.py — deterministic renderer for the CLAUDE.md routing digest.
 
 Reads the SOURCE TEMPLATE (~/.claude/model-routing.digest.md), extracts the requested
-VARIANT block (v0 = minimal, installed by s02; full = advisory, published by s04), stamps
+VARIANT block (v0 = minimal, installed by a plan session; full = advisory, published by a plan session), stamps
 it with the live SSOT version (~/.claude/model-routing.yaml `version:`), and installs it
 into the TARGET file (~/.claude/CLAUDE.md) between generated
 '<!-- BEGIN ROUTING (model-routing.yaml vN) -->' / '<!-- END ROUTING -->' markers.
@@ -38,14 +38,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from resolve_route import RouteResolverError, resolve  # noqa: E402
 
 MAX_LINES = 40
-MAX_BYTES = 2000  # raised 1638->1800 (2026-07-03), then 1800->2000 (v24, 2026-09-06).
+MAX_BYTES = 2000  # raised 1638->1800, then 1800->2000 (v24).
                   # Each raise had the same cause: the cap saturated and forced real routing
                   # content out. v24 needed three facts the 1800 B cap could not hold at 5 B
                   # of headroom - the Codex-lane precedence pointer (the digest was hardcoding
                   # gpt-5.6-sol, the third driftable copy the SSOT forbids), the fable alias
                   # target, and the dated main-session canary. ~+50 tokens/session.
 
-# Target-file (CLAUDE.md) marker scan — ANCHORED to line-start/line-end (s02 re-harden
+# Target-file (CLAUDE.md) marker scan — ANCHORED to line-start/line-end (a plan session re-harden
 # fix #10). A bare substring scan previously counted a prose/backtick MENTION of the
 # marker text (e.g. documenting the marker syntax in a sentence) as a real marker,
 # causing a false "duplicate marker corruption" refusal on an otherwise-intact file. A
@@ -168,7 +168,7 @@ def atomic_write(path: str, content: str) -> None:
         # mkstemp always creates the temp file at mode 0600 regardless of umask. Since
         # os.replace() keeps the TEMP FILE's inode (and thus ITS mode bits), a naive
         # replace narrows an always-loaded CLAUDE.md from 0644 -> 0600 on every render
-        # (s02 re-harden fix #9). Preserve the pre-existing target's mode; for a
+        # (a plan session re-harden fix #9). Preserve the pre-existing target's mode; for a
         # brand-new target, honor the process umask the way a normal file create would
         # (undo mkstemp's forced 0600 narrowing) instead of silently keeping 0600.
         if os.path.exists(path):
@@ -217,7 +217,7 @@ def do_install_or_update(target_path: str, new_block: str, allow_install: bool) 
     atomic_write(target_path, new_text)
 
 
-# ---- s02 re-harden fix #1: tie the digest to SSOT `task_classes:` SEMANTICS, not just
+# ---- a plan session re-harden fix #1: tie the digest to SSOT `task_classes:` SEMANTICS, not just
 # the version stamp. The rendered digest table is authored prose (model-routing.digest.md
 # is a static template) — a `task_classes` model/effort change WITHOUT touching the
 # template or bumping `version` previously re-rendered byte-identical and shipped
@@ -225,7 +225,7 @@ def do_install_or_update(target_path: str, new_block: str, allow_install: bool) 
 # IS surfaced in the rendered table (some, e.g. `linchpin`, are deliberately not shown)
 # against the tier text actually present in that row.
 #
-# s03 UPDATE: `task_classes:` now stores {tier, effort-INTENT} (light/standard/
+# a plan session UPDATE: `task_classes:` now stores {tier, effort-INTENT} (light/standard/
 # thorough), not the concrete (model, effort) pair the rendered table shows
 # ("sonnet · medium") — comparing the raw tuple directly would false-fail on
 # every commit once the block was renamed/retired from its legacy shape. Each

@@ -297,7 +297,7 @@ def test_ledger_to_report_shows_cost_per_attempt_and_per_completed_session(tmp_p
 
 
 def test_cheap_cell_that_escalates_costs_more_per_completed_session(tmp_path):
-    """Operator decision 2026-09-29: a cheap cell that fails and escalates is not
+    """Operator decision: a cheap cell that fails and escalates is not
     cheap. Sonnet@medium fails at $0.50 and escalates to Opus@high at $3.00; a
     session that starts on Opus@high passes first time at $2.00. Per attempt
     Sonnet looks cheaper; per completed session it is the dearer cell."""

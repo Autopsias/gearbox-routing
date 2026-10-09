@@ -53,7 +53,7 @@ def test_review_scope_keeps_a_root_dotfile():
 def test_declared_writes_dedupes_paths_across_a_sessions_items():
     """Review surface is DISTINCT files touched, not paths summed per item.
 
-    Regression (2026-08-21): `_declared_writes` appended every item's paths
+    Regression: `_declared_writes` appended every item's paths
     without dedupe, so a session whose four items each listed the same file
     counted it four times. One real 5-file session was reported as "12 files"
     by `warn_wide_sessions`, and that wrong number was used as evidence for a
@@ -109,7 +109,7 @@ def _rungs_to_apex(model, effort):
 
 
 def test_the_ceiling_is_the_longest_ladder_the_ssot_actually_defines():
-    """Re-measured 2026-08-25 after routing SSOT v21 armed opus@xhigh: sonnet@
+    """Re-measured after routing SSOT v21 armed opus@xhigh: sonnet@
     medium needs 7 rungs, and the old cap of 6 made it unauthorable. KNOWN
     POSITIVE for the pin: a shorter starting rung must come out strictly under
     the ceiling, or the walk is not walking."""

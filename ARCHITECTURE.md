@@ -279,3 +279,57 @@ later session can reopen with a real driving case:
 - **Operational task-class definitions (inclusion/exclusion/tie-break table).** Lives
   in the consuming digest (the CLAUDE.md routing block a later session ports), not in
   this schema doc — noted here as a downstream requirement so it isn't lost.
+
+---
+
+## 7. The harness tree: wired hooks and platform limits
+
+`harness/` is a synced copy of a working Claude Code setup, not part of the
+routing schema above. Its `settings.json` wires these hooks. Most commands
+skip themselves when their file is missing; the two noted do not.
+
+| Event | Matcher | Hook | What it does |
+|---|---|---|---|
+| `Stop` | all | `turnend-guard.py` | Refuses to end a turn while a plan this session dispatched still has unfinished work |
+| `SessionStart` | all | `routing-cadence-check.py` | Nudges you when routing outcomes have piled up unanalysed (no skip guard: it errors if the file is missing) |
+| `SessionStart` | `compact` | `compact-policy.py session-start` | Restores context after a compaction |
+| `UserPromptSubmit` | all | `compact-policy.py prompt` | Applies the compaction policy to each prompt |
+| `PreToolUse` | `Bash` | `git-tree-guard.py` | Blocks risky git commands on a shared tree |
+| `PreToolUse` | `Bash`, `Write`, `Edit`, `MultiEdit`, `NotebookEdit` | `verify-state-guard.py` | Stops a dispatched agent from writing a plan's review-gate record |
+| `PreToolUse` | `Write` | `safe-refactor-advisory.sh` | Pauses a file split and offers `/safe-refactor` (no skip guard: it errors if the file is missing) |
+| `PreCompact` | `auto` | `compact-policy.py pre-compact` | Saves state before an automatic compaction |
+| `PostCompact` | all | `compact-policy.py post-compact` | Re-orients the agent after compaction |
+
+`harness/settings.json` also sets the status line (`scripts/statusline.sh`).
+
+### Opt-in: the agent janitor's session-end hook
+
+The janitor (`scripts/agent_janitor.py`) **runs only on macOS** and **kills
+orphaned agent processes and deletes old temp files and Codex session logs
+without asking.** Nothing runs until you run
+`python3 ~/.claude/scripts/agent_janitor.py install`. The session-end hook
+(`hooks/agent-janitor-sessionend.py`) is not wired by default. To opt in, add
+this under `"hooks"` in `~/.claude/settings.json`:
+
+```json
+"SessionEnd": [
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "~/.claude/hooks/agent-janitor-sessionend.py",
+        "timeout": 30,
+        "async": true
+      }
+    ]
+  }
+]
+```
+
+### The machine governor
+
+`scripts/govrun.py` queues heavy jobs (`govrun -- pytest -n auto`) behind a
+limited number of slots. Its POSIX record locks live under your home
+directory, in `~/.machine-governor` (override with `GOVRUN_STATE_DIR`). The
+PreToolUse hook that refuses an unwrapped heavy command is not part of this
+export, so `govrun --status` reports DISARMED.

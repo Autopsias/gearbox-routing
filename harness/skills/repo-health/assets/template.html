@@ -1,0 +1,176 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F4F6F5; --card: #FFFFFF; --ink: #16211E; --muted: #5D6D67;
+    --line: #E1E8E5; --accent: #0B6E62;
+    --ok: #1F7A4D; --ok-bg: #E3F1E9; --warn: #96660A; --warn-bg: #F7EED8;
+    --crit: #B33225; --crit-bg: #F9E7E4; --na: #93A19B; --na-bg: #EEF1F0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131817; --card: #1B2220; --ink: #E6ECEA; --muted: #8FA09A;
+      --line: #2A3431; --accent: #45B6A6;
+      --ok: #63BE8D; --ok-bg: #1D3227; --warn: #D8A64C; --warn-bg: #332B18;
+      --crit: #E2705F; --crit-bg: #38211E; --na: #6E7D78; --na-bg: #222A28;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817; --card: #1B2220; --ink: #E6ECEA; --muted: #8FA09A;
+    --line: #2A3431; --accent: #45B6A6;
+    --ok: #63BE8D; --ok-bg: #1D3227; --warn: #D8A64C; --warn-bg: #332B18;
+    --crit: #E2705F; --crit-bg: #38211E; --na: #6E7D78; --na-bg: #222A28;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); margin: 0;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 40px 24px 56px; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ------- masthead ------- */
+  .masthead { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 30px; font-weight: 700; margin: 2px 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta code { font-size: 12px; }
+  .stale { margin-top: 6px; font-size: 12.5px; font-weight: 650; color: var(--warn); max-width: 60ch; }
+  .verdict { text-align: right; }
+  .scorenum { line-height: 1; margin-bottom: 8px; }
+  .scorenum .n { font-size: 46px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .scorenum .of { font-size: 16px; color: var(--muted); font-weight: 600; }
+  .b-red .n { color: var(--crit); } .b-amber .n { color: var(--warn); } .b-green .n { color: var(--ok); }
+  .verdict .pill {
+    display: inline-block; font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 9px 18px; border-radius: 999px; color: #fff;
+  }
+  .v-good .pill { background: var(--ok); } .v-warn .pill { background: var(--warn); } .v-crit .pill { background: var(--crit); }
+  .verdict .sub { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 6px; }
+
+  /* ------- summary stats ------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px;
+           background: var(--line); border: 1px solid var(--line); border-radius: 8px;
+           overflow: hidden; margin: 26px 0 8px; }
+  .stat { background: var(--card); padding: 12px 16px; }
+  .stat .n { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat.crit .n { color: var(--crit); } .stat.warn .n { color: var(--warn); } .stat.ok .n { color: var(--ok); }
+  .stat .l { font-size: 11.5px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .checked { color: var(--muted); font-size: 12.5px; margin: 6px 2px 0; }
+
+  /* ------- section headings ------- */
+  h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--muted); margin: 38px 0 14px; display: flex; align-items: baseline; gap: 10px; }
+  h2::after { content: ""; flex: 1; border-top: 1px solid var(--line); align-self: center; }
+  h2 .hot { color: var(--crit); }
+
+  /* ------- the board ------- */
+  .board { display: flex; flex-direction: column; gap: 10px; }
+  .layer { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px 13px; }
+  .layer-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .layer-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+  .layer-state { font-size: 12px; font-weight: 600; }
+  .lscore { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .st-green { color: var(--ok); } .st-amber { color: var(--warn); } .st-red { color: var(--crit); }
+  .trend { margin-left: auto; display: flex; gap: 3px; align-items: center; }
+  .trend .sq { width: 9px; height: 9px; border-radius: 2px; background: var(--na-bg); }
+  .sq.q-green { background: var(--ok); } .sq.q-amber { background: var(--warn); } .sq.q-red { background: var(--crit); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font-size: 12.5px; font-weight: 550; padding: 3px 10px; border-radius: 999px;
+          white-space: nowrap; cursor: default; }
+  .chip .g { font-weight: 700; margin-right: 4px; }
+  .c-pass { background: var(--ok-bg); color: var(--ok); }
+  .c-warn { background: var(--warn-bg); color: var(--warn); }
+  .c-fail { background: var(--crit-bg); color: var(--crit); }
+  .c-na   { background: transparent; color: var(--na); border: 1px dashed var(--line); }
+  .c-pending { background: transparent; color: var(--warn); border: 1px solid var(--warn); }
+
+  /* ------- findings ------- */
+  ul.findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .finding { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; }
+  .finding.f-fail { background: var(--crit-bg); border-color: color-mix(in srgb, var(--crit) 35%, var(--line)); }
+  .finding.f-warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 25%, var(--line)); }
+  .fhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .fglyph { font-weight: 700; }
+  .f-fail .fglyph { color: var(--crit); } .f-warn .fglyph { color: var(--warn); }
+  .ftitle { font-weight: 650; font-size: 15px; }
+  .fid { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+  .fbody { margin: 6px 0 0 24px; color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+  .fbody .paths { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); overflow-x: auto; }
+  .ffix { margin: 8px 0 0 24px; font-size: 13px; color: var(--muted); }
+  .ffix code { color: var(--accent); font-size: 12.5px; }
+  .allclear { background: var(--card); border: 1px dashed var(--line); border-radius: 8px;
+              padding: 14px 18px; color: var(--muted); }
+
+  /* ------- decision ------- */
+  .decision { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+              border-radius: 8px; padding: 16px 20px; }
+  .decision p { margin: 0 0 4px; font-weight: 600; }
+  .decision ol { margin: 8px 0 0; padding-left: 22px; }
+  .decision li { margin: 7px 0; }
+  .decision .rec { font-weight: 700; color: var(--accent); }
+
+  /* ------- history ------- */
+  .history { display: flex; gap: 18px; align-items: flex-start; overflow-x: auto; padding: 4px 2px; }
+  .run { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 44px; }
+  .run .dot { width: 16px; height: 16px; border-radius: 50%; }
+  .dot.d-green { background: var(--ok); } .dot.d-amber { background: var(--warn); } .dot.d-red { background: var(--crit); }
+  .run .d { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+  .run.now .d { font-weight: 700; color: var(--ink); }
+  .run.unsure .dot { outline: 2px dashed var(--warn); outline-offset: 2px; }
+  .run.unsure .num { color: var(--warn); }
+
+  footer { margin-top: 40px; color: var(--muted); font-size: 12.5px;
+           border-top: 1px solid var(--line); padding-top: 14px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend span { white-space: nowrap; }
+</style>
+<main>
+  <div class="masthead">
+    <div>
+      <div class="eyebrow">Repo health</div>
+      <h1>{{REPO}}</h1>
+      <div class="meta">Run {{DATE}} · commit <code>{{COMMIT}}</code> · <span class="mono">{{REPO_PATH}}</span></div>
+      {{STALE}}
+    </div>
+    <div class="verdict {{VERDICT_CLASS}}">
+      <div class="scorenum b-{{SCORE_BAND}}"><span class="n">{{SCORE}}</span><span class="of">/100</span></div>
+      <span class="pill">{{VERDICT}}</span>
+      <div class="sub">{{SCORE_NOTE}}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+<!-- INSERT_STATS -->
+  </div>
+  <div class="checked">{{CHECKED_LINE}}</div>
+
+  <h2>Layers &amp; checks</h2>
+  <div class="board">
+<!-- INSERT_BOARD -->
+  </div>
+
+  <h2><span class="hot">Fix now</span> — blocking</h2>
+<!-- INSERT_BLOCKING_LIST -->
+
+  <h2>Advisory — improve when convenient</h2>
+<!-- INSERT_ADVISORY_LIST -->
+
+  <h2>Decision</h2>
+  <div class="decision">
+<!-- INSERT_DECISION_CARD -->
+  </div>
+
+  <h2>Run history</h2>
+  <div class="history">
+<!-- INSERT_HISTORY_STRIP -->
+  </div>
+
+  <footer>
+    <div class="legend"><span>✓ pass</span><span>! warning</span><span>✕ fail</span><span>– not applicable</span><span>○ not run yet</span></div>
+    Generated by the repo-health skill. Blocking = fix immediately (security, or a red test suite). Advisory = tracked, never gating. Hover any chip for the check's detail.
+  </footer>
+</main>

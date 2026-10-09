@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 <!-- ROUTING (skill-unification s08, CP-01): demoted typed front door; routes to the
      canonical reviewers /adversarial-review (deep) and /code-review (fast).
-     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. s09 (CP-03 prune, 2026-06-21)
+     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. s09 (CP-03 prune)
      completed WITHOUT removing this file — verified against
      _plans/<your-plan>-<date>/_closeouts/s09.json, whose 12 deleted files do
      not include review.md. This alias remains live by deliberate decision, not oversight. -->

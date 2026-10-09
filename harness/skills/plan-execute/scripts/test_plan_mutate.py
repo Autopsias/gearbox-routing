@@ -298,7 +298,7 @@ def test_unplaced_item_warns_instead_of_silently_skewing_the_counters(plan):
 
 def test_session_keyed_groups_get_the_new_session_not_an_items_list():
     """A phase-journey whose groups list sessions: adding `items` to one group made the
-    coverage check call every older item ungrouped and refuse the add (2026-09-29)."""
+    coverage check call every older item ungrouped and refuse the add."""
     spec = {"categories": [{"key": "run", "label": "Measure"}],
             "items": [{"id": "run-01", "category": "run"}, {"id": "run-04", "category": "run"}],
             "infographic": {"type": "phase-journey", "phases": [
@@ -423,7 +423,7 @@ def test_retire_refuses_in_flight_and_finished(plan):
 
 
 def test_in_flight_state_ignores_review_acceptance_sidecars(plan):
-    """REGRESSION 2026-09-21 — a settled session was reported mid-flight forever.
+    """REGRESSION — a settled session was reported mid-flight forever.
 
     `llm_review_ledger.accepted_path()` writes `<sid>.accepted.json` into
     `_verify_state/`. `_live_state_files` used to glob every `*.json` there and
@@ -635,7 +635,7 @@ def test_cli_add_session_end_to_end(plan, capsys):
     assert pm.consistency_report(plan)["ok"]
 
 
-# ---- the nav strip chip must follow the article (2026-08-21) ----
+# ---- the nav strip chip must follow the article ----
 #
 # Measured across every plan on this machine that day: 20 of 20 dashboards
 # showed EVERY session as TODO in the nav strip while the articles read DONE,

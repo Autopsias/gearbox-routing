@@ -4,7 +4,7 @@ Nothing measured the most expensive step in the loop. `run.ndjson` carried no
 duration on any gate event, so the only way to cost a verify pass was to
 subtract the timestamps of two unrelated events -- and the per-ATTEMPT split,
 which is where the interesting failure lives, was not recoverable at all.
-Measured 2026-08-23 on s09b: attempt 1 consumed its full 1800s wall limit and
+Measured on s09b: attempt 1 consumed its full 1800s wall limit and
 was killed, attempt 2 then ran from zero. The gate reported INDETERMINATE after
 ~36 minutes and no log said why.
 
@@ -77,7 +77,7 @@ def log_gate(plan_dir, session, gate, t0, outcome, attempts=(), attempt_usd=()):
 
 
 def log_run(plan_dir, phase, session, gate, seconds, outcome):
-    """Append one `gate_run` event for ANY argv gate, in any repo (2026-10-04).
+    """Append one `gate_run` event for ANY argv gate, in any repo.
 
     `gate_completed` above is the review gate's own per-attempt record; this one
     is written by the RUNNER (`verify` and land), so test gates are timed too and

@@ -1,0 +1,25 @@
+# Codex render manifest (dual-harness-contract.md § 6.2/6.3). Consumed by
+# `gearbox deploy`'s render step, NOT by codex itself.
+#
+# render:  paths under this directory, copied verbatim into ~/.codex/skills/memo-loop/.
+#          Two entries, deliberately — not one, and not "references" wholesale:
+#            - SKILL.md points at ~/.claude/skills/memo-loop/references/*.md for every
+#              SHARED contract (rubric compiler, findings contract, run-state layout,
+#              stop rules, lessons/reflect) so there is exactly one copy of each.
+#            - references/codex-transport.md is the ONE Codex-only file: the inverted
+#              critic ladder (Codex authors GPT, so the cross-vendor critic is Claude via
+#              `claude -p`) and the workspace-write sandbox caveat. Neither has a
+#              Claude-side original to point at, so it is authored here, not duplicated
+#              from anywhere. It overrides the shared critique.md FOR TRANSPORT ONLY —
+#              precedence is stated in both files.
+#          No `scripts/` entry: memo-loop ships no code, Claude- or Codex-side (plain
+#          sequential phases; the Agent-tool model override and ralph-loop plugin are
+#          explicitly not ported — see SKILL.md "Not ported").
+# shadows: same-named skill in the OTHER root, moved to ~/.agents/skills-disabled/<name>/
+#          so the model never sees two `memo-loop` entries. A move, never a delete.
+#          The 2026-08-04 note here said no such entry existed; one appeared afterwards
+#          (an importer populates ~/.agents/skills), so Codex was choosing between two
+#          memo-loop registrations. Same treatment as plan-execute/plan-builder/plan-harden.
+name = "memo-loop"
+render = ["SKILL.md", "references/codex-transport.md"]
+shadows = ["~/.agents/skills/memo-loop"]

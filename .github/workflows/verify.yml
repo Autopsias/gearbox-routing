@@ -52,6 +52,20 @@ jobs:
           set -euo pipefail
           bash claude/scripts/verify-routing.sh --full --strict
 
+      # Unit tests for the routing policy, its resolver and guard (claude/) and
+      # for the export script (scripts/). harness/ tests are NOT run here: that
+      # tree is a synced copy of a private deployment, many of its tests expect
+      # a live ~/.claude, macOS, or tools a CI runner does not have. Run them
+      # locally if you change harness/. An empty HOME proves no test reads the
+      # developer's own ~/.claude.
+      - name: Unit tests (claude/ and scripts/; harness/ is not run in CI)
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet "pytest>=8,<10"
+          export HOME="$RUNNER_TEMP/empty-home"
+          mkdir -p "$HOME"
+          python -m pytest -q -p no:cacheprovider claude scripts
+
       - name: Install throwaway target + run install.sh
         run: |
           set -euo pipefail

@@ -223,7 +223,7 @@ def test_a_moved_main_invalidates_the_ack_and_re_parks(fx):
 def test_a_rebuilt_merge_cannot_ride_an_ack_granted_for_the_previous_one(fx):
     """§5.1d binds the ack to the MERGE COMMIT, not only to the triple.
 
-    Found 2026-08-23 by a review of this branch. The approval was keyed on
+    Found by a review of this branch. The approval was keyed on
     plan_head + main_head + gate_digest; the merge sha was shown in the brief and
     recorded into the ack, and never compared. Removing the land worktree by hand
     — which ``land_push.already_landed`` documents as an ordinary operator move —
@@ -404,7 +404,7 @@ def test_the_repo_lease_excludes_a_land_ACROSS_PROCESSES(fx):
         # ASSERTED, not assumed: two spellings of one repo (`/var/...` vs its
         # resolved `/private/var/...`) slug to two DIFFERENT lock files and BOTH
         # sides "acquire" — s03b's `same file? False`, reproduced in this very
-        # fixture on 2026-08-22 before the holder derived its resource the way
+        # fixture before the holder derived its resource the way
         # production does. Without this line the test can pass on nothing.
         assert holder_lock == str(sl._ship_lock_path(iso["plan_dir"], out["resource"]))
     finally:

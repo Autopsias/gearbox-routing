@@ -34,7 +34,7 @@ def untracked_files(cwd, plan_dir=None, session=None, scope=(), exclude=()):
     """Paths git calls NEW — present, not ignored, absent from `git diff HEAD`.
     `None` when git could not answer at all (not a work tree, git missing).
 
-    THE BLIND SPOT THIS CLOSES, measured 2026-08-15 on S07 of the adaptive-routing
+    THE BLIND SPOT THIS CLOSES, measured on S07 of the adaptive-routing
     plan: `git diff HEAD` excludes untracked files, so `render_report.py` — 173
     new lines — was invisible to all three review rounds while the gate reported a
     clean PASS each time. Staging it and reading it found a real bug on the first
@@ -58,7 +58,7 @@ def untracked_files(cwd, plan_dir=None, session=None, scope=(), exclude=()):
 
 # Written by run.py, read by run.py, authored by nobody. Handing these to a
 # reviewer costs a paragraph of "this is generated output" per file and buys
-# nothing: measured 2026-08-20 on s03, 9 of 21 listed new files were the
+# nothing: measured on s03, 9 of 21 listed new files were the
 # harness's own state. (This comment stood here TWICE, verbatim; the orphaned
 # copy is dropped rather than carried.)
 _BOOKKEEPING = ("/_verify_state/", "/_worktrees/")
@@ -81,7 +81,7 @@ def _norm(path):
 def in_scope(path, scope):
     """True when `scope` is empty (review everything) or `path` sits under one.
 
-    WHY A SCOPE EXISTS AT ALL, measured 2026-08-20 across two concurrent plans in
+    WHY A SCOPE EXISTS AT ALL, measured across two concurrent plans in
     one checkout: the surface was the whole tree, so each session's review read
     the OTHER session's uncommitted source too. Three rework attempts were spent
     on findings in files the reviewed session never touched -- real defects,
@@ -104,7 +104,7 @@ def _out_of_surface(path, plan_dir=None, session=None, scope=(), exclude=()):
     Two exclusions, and both are about AUTHORSHIP, never about noise:
 
     * harness bookkeeping -- machine-written state nobody authored.
-    * another plan's or another session's `_evidence/` -- measured 2026-08-20 on
+    * another plan's or another session's `_evidence/` -- measured on
       s03, where 5 of 6 blocking findings were against already-EXECUTED evidence
       scripts belonging to a closed sibling plan and to a finished session of
       this one. A session cannot fix those: editing a script after it produced a
@@ -183,7 +183,7 @@ def diff_stat(cwd, base=None, scope=(), exclude=()):
 def write_diff_file(cwd, base, out_path, scope=(), exclude=()):
     """Write the ACTUAL diff to a file, or None if git failed.
 
-    THE REVIEWER MUST NOT BE HANDED A GIT COMMAND. Measured 2026-08-20: the gate
+    THE REVIEWER MUST NOT BE HANDED A GIT COMMAND. Measured: the gate
     named `git diff 4d56d6dc0` -- 33 files including six production modules --
     and the reviewer answered "the committed range is two documentation files",
     which is exactly `git diff origin/main`. It re-derives its own range and
@@ -331,7 +331,7 @@ def resolve_surface(level, cwd, base, plan_dir=None, session=None, scope=(), exc
     # The emptiness guard below does not catch it -- one unrelated dirty file
     # makes the surface non-empty, and a clean review of the wrong files is a
     # genuine PASS. The check is not "did it refuse on empty", it is "was the
-    # surface the session's WORK or merely non-empty" (2026-08-20).
+    # surface the session's WORK or merely non-empty".
     if plan_dir and not base:
         journal = os.path.join(plan_dir, "run.ndjson")
         if not os.path.exists(journal):
@@ -387,7 +387,7 @@ def resolve_surface(level, cwd, base, plan_dir=None, session=None, scope=(), exc
         # A check that returns clean because its input was empty is worse than
         # no check. This fires when a session COMMITTED its work and no --base
         # was passed: `git diff HEAD` is empty, the reviewer is handed nothing,
-        # and an empty findings array reads as a PASS. Measured 2026-08-20 on
+        # and an empty findings array reads as a PASS. Measured on
         # the model-portability plan, where every session hit it.
         print(_empty_surface_msg(level, surface, scope, exclude), file=sys.stderr)
         return None, INDETERMINATE
@@ -442,7 +442,7 @@ def prepare_surface(args, scope, exclude=()):
     # levels -- `land` always does, because it re-runs the UNION of every session's
     # gates -- and on a shared ledger the second gate to run reads the first one's
     # surface record, sees no file changed since it, and returns INDETERMINATE
-    # without ever reviewing. Measured 2026-08-23: four land runs, llm-review-medium
+    # without ever reviewing. Measured: four land runs, llm-review-medium
     # skipped in under 1.5s every time (fixed in 969feba).
     # THE REVIEWER IS THE THIRD COMPONENT, the same bug one axis over:
     # `cross-family-review-medium` and `llm-review-medium` share the LEVEL string,
@@ -472,7 +472,7 @@ def prepare_surface(args, scope, exclude=()):
     # not deep-read, so counting it here makes `surface_attested` compare the
     # reviewer's honest count against a bigger number, and every
     # evidence-bearing session goes INDETERMINATE (caught end-to-end, not by
-    # the unit tests, 2026-08-23).
+    # the unit tests).
     read_n = len(changed) + len(split_untracked(args.cwd, new_files)[0])
     return led, base, changed, new_files, diff_file, read_n
 

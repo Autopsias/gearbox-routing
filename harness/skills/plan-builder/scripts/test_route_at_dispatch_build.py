@@ -152,7 +152,7 @@ def test_peer_triggers_arm_the_floor_too():
 
 
 def test_the_floor_is_a_rank_not_a_walk(monkeypatch):
-    # Operator decision 2026-09-30: deep_reasoning's default is opus@medium, and the walk
+    # Operator decision: deep_reasoning's default is opus@medium, and the walk
     # from sonnet@high enters opus at high, skipping medium - escalate() never reaches the
     # default, yet sonnet@high ranks lower on the ladder, so it is below the floor.
     monkeypatch.setenv("PLAN_EXECUTE_ROUTING_PROVIDER", "anthropic")

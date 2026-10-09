@@ -22,9 +22,9 @@ type: reference
 - User explicitly requests "deep research" or "comprehensive analysis"
 - Complex technical decisions requiring multiple sources
 - Market research or detailed comparative analysis
-- Pass `query` and `effort` (default `low`); prefer `medium`. Measured 2026-09-03 on one question: `medium` $0.10 in 60 s, `high` $0.50 in 131 s with no extra sources
+- Pass `query` and `effort` (default `low`); prefer `medium`. Measured on one question: `medium` $0.10 in 60 s, `high` $0.50 in 131 s with no extra sources
 - A long run returns a run ID; call again with `runId` to wait for it, never start a duplicate
-- Replaces `deep_researcher_start` + `deep_researcher_check`: Exa retired its Research API (HTTP 410 `RESEARCH_RETIRED`, 2026-09-03)
+- Replaces `deep_researcher_start` + `deep_researcher_check`: Exa retired its Research API (HTTP 410 `RESEARCH_RETIRED`)
 - Missing from the tool list? `exa-mcp-server` 3.4.1 registers it only when `ENABLED_TOOLS` in the server's env names `agent_run`
 
 **Exa Web Search** (`web_search_exa`)
@@ -66,7 +66,7 @@ type: reference
 
 For tool domains hit many times per session, a dedicated CLI beats the equivalent MCP server on success rate, cost, and speed — benchmarked by the AXI project (kunchenguid/axi) at 915 runs total (490 browser + 425 GitHub): 100% task success at $0.050-0.074/task, vs. 82-87% success at $0.101-0.148/task for MCP, with up to 12x cost advantage on complex GitHub investigations.
 
-**Installed on this machine** (verified 2026-07-06, smoke-checked against a real repo and a real page — see provenance below):
+**Installed on this machine** (verified, smoke-checked against a real repo and a real page — see provenance below):
 
 - **GitHub operations** → prefer `gh` (already installed/authenticated), or `gh-axi` where its agent-ergonomic output pays for itself (TOON-style structured output, pre-computed CI status, contextual next-step hints).
 - **Browser automation** → prefer `chrome-devtools-axi` over the `chrome-devtools` MCP server.

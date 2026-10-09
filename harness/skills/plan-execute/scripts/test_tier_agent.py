@@ -1,4 +1,4 @@
-"""Tier-agent effort enforcement (2026-07-26).
+"""Tier-agent effort enforcement.
 
 The defect this guards: a plan's per-session `reasoning` tier used to be applied ONLY
 by prepending "Think hard…"-style prose to the subagent prompt. Measured against the
@@ -76,9 +76,10 @@ def _assert_frontmatter_parses(path, text, name, model, effort):
     assert fm.get("model") == model, f"{name}: frontmatter model is {fm.get('model')!r}"
     assert fm.get("description"), f"{name}: description is required and must be non-empty"
     if model == "haiku":
-        # HAIKU INVARIANT (model-routing.yaml `agents:`, guard check (b)): haiku rejects
-        # the reasoning dial, so a haiku tier agent must carry NO effort key.
-        assert "effort" not in fm, f"{name}: haiku must carry no effort: key (HAIKU INVARIANT)"
+        # Haiku 5.5 takes the dial; the one haiku tier agent pins `low` and every
+        # haiku cell in _TIER_AGENTS collapses onto it (the Haiku 5.5 routing change). An unpinned haiku
+        # agent would inherit the parent session's effort (probed).
+        assert fm.get("effort") == "low", f"{name}: haiku tier agent must pin effort: low, has {fm.get('effort')!r}"
     else:
         assert fm.get("effort") == effort, (
             f"{name}: frontmatter effort is {fm.get('effort')!r}, table says {effort!r}"
@@ -183,7 +184,7 @@ def test_fable_escalation_apex_pairs_resolve(tmp_path):
 
 
 def test_opus_low_experiment_tier_resolves(tmp_path):
-    """v25 (2026-09-11): opus@low is no class default, but the deep_reasoning downgrade
+    """v25: opus@low is no class default, but the deep_reasoning downgrade
     canary 4abfa765d726 dispatches it, and without a tier agent every tagged row ran at
     the orchestrator's session effort. PLANT: no definition file -> None (the gap is
     reported, never a silent reuse of tier-opus-medium). ALLOW: file present ->

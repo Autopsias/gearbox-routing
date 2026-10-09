@@ -304,7 +304,7 @@ def test_the_first_push_resolves_the_remote_instead_of_hardcoding_origin(iso):
     while `land_state.context` in the same land resolves the sole remote by name.
     The two halves of one land must agree about the push target.
 
-    Found 2026-08-23 by a review of this branch."""
+    Found by a review of this branch."""
     tree, root = iso["tree"], iso["root"]
     for cwd in (root, tree):
         git(["remote", "rename", "origin", "upstream"], cwd)
@@ -330,7 +330,7 @@ def test_a_failed_ignored_scan_refuses_instead_of_reading_as_no_ignored_files(is
     reported `dropped_ignored: []` as an all-clear, which is exactly the §12.4
     teardown park the function exists to prevent.
 
-    Found 2026-08-23 by a review of this branch."""
+    Found by a review of this branch."""
     plan_dir, tree = iso["plan_dir"], iso["tree"]
     (plan_dir / "PLAN.html").write_text("<html>live</html>\n")
 
@@ -360,7 +360,7 @@ def test_an_ignore_rule_matching_the_plan_dir_refuses_rather_than_deleting_the_r
     rmtree the entire copied record; `git add` then staged nothing and the caller
     returned `already-recorded` with `sha: None` — the record silently gone.
 
-    Found 2026-08-23 by a review of this branch."""
+    Found by a review of this branch."""
     plan_dir, tree = iso["plan_dir"], iso["tree"]
     (plan_dir / "PLAN.html").write_text("<html>live</html>\n")
     rel = plan_dir.resolve().relative_to(iso["root"].resolve()).as_posix()
@@ -443,7 +443,7 @@ def test_record_plan_is_a_no_op_when_a_neighbour_already_swept_it(iso):
 
 
 def test_record_plan_is_a_no_op_when_the_hook_rewrite_leaves_nothing_new(iso):
-    """Measured 2026-10-06 on a resumed land: the live record differed from the
+    """Measured on a resumed land: the live record differed from the
     committed one only by a final newline that `end-of-file-fixer` adds back.
     The hook rewrite emptied the staged diff, the retry commit had nothing to
     commit, and the land parked `final-record-failed` on every resume."""
@@ -536,7 +536,7 @@ def test_each_session_is_reviewed_against_its_own_work_not_the_whole_branch(iso,
     the branch's cut point makes session sNN's gate diff cut-point..HEAD and
     re-review every earlier session's commits — the surface grows with each
     session, which is the shape that cost this repo 16 failed gate rounds in 21
-    hours (2026-08-20). Three sessions commit in sequence here; the third must be
+    hours. Three sessions commit in sequence here; the third must be
     reviewed against the SECOND's commit and see only its own file.
 
     The pinned base is the KNOWN NEGATIVE: the same diff taken from it is the

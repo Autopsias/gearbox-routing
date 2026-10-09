@@ -74,7 +74,7 @@ def test_harness_codex_emits_a_command_for_every_session(tmp_path, capsys, ssot,
     assert by_id["s01"]["codex_model"] == "gpt-5.6-sol"
     assert by_id["s01"]["codex_effort"] == "xhigh"
     assert by_id["s01"]["translated_from"] is None
-    # opus-pinned: translated via the SSOT, carrying the receipt. s03 (2026-08-13):
+    # opus-pinned: translated via the SSOT, carrying the receipt. s03:
     # the session declares task_class agentic_build, so the route comes from
     # (task_class, openai) -> apex_reasoner -> sol@xhigh, NOT from matching the
     # Claude tier name `frontier_reasoner` against an OpenAI tier of the same name.
@@ -208,7 +208,7 @@ def test_retired_gpt55_pin_blocks_with_guidance(ssot):
     _rr = run._import_resolver()
     assert "gpt-5.5" not in _rr._Profile(retired, "openai").models.values()
 
-    # KNOWN-NEGATIVE CONTROL, now built the other way round (s03, 2026-08-13): the
+    # KNOWN-NEGATIVE CONTROL, now built the other way round (s03): the
     # fixture itself is the retired lineup, so the control RE-ADDS a synthetic
     # `workhorse: gpt-5.5` tier and proves the pin RESOLVES there. Without it this
     # test would pass even if `gpt-5.5` were unresolvable for some unrelated reason
@@ -239,7 +239,7 @@ def test_retired_gpt55_pin_blocks_with_guidance(ssot):
 def test_luna_has_a_fallback_rung(tmp_path, capsys, ssot):
     # Before CL-03 a haiku-pinned session translated to luna@max had a NULL
     # fallback: one refused mechanical session took the whole run to NO-CODEX.
-    # v1.15 (2026-08-13) RE-POINTED that rescue: gpt-5.5 is retired with the whole
+    # v1.15 RE-POINTED that rescue: gpt-5.5 is retired with the whole
     # `workhorse` tier, so luna now rescues UP to terra@max. The invariant this test
     # exists for is unchanged — the BOTTOM tier must never have a null fallback.
     assert run._fallback_for("gpt-5.6-luna", "openai") == ("gpt-5.6-terra", "max")

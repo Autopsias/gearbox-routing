@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""compaction_ledger.py — defensive readers for the ~/.dyno/compaction/ ledgers.
+"""compaction_ledger.py — defensive readers for the ~/.gearbox-state/compaction/ ledgers.
 
-The leaf half of the compaction retro (s07/PF-01): parsing, validation, and the
+The leaf half of the compaction retro: parsing, validation, and the
 per-intervention exposure model. `compaction_retro.py` builds the report on top
 of it and `arming_check.py` reads the same functions, so there is exactly one
 implementation of "is this row admissible" in the tree.
@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 # retro until 2026-08-27. test_compaction_retro.py asserts the two lists agree.
 INTERVENTIONS = ("hooks", "base_context", "routing", "repo_diet", "compact_window")
 
-# s02 guarantees these on every decisions line. TYPE checks, not key presence —
+# The policy hook guarantees these on every decisions line. TYPE checks, not key presence —
 # a `policy_version: "1"` is a different mechanism's row, not this one's.
 DECISION_SPINE = {
     "ts": str, "session": str, "event": str,
@@ -120,11 +120,11 @@ def measurement_unavailable(row):
     reason = row.get("reason") or ""
     return reason.startswith("unreadable_context") or "measurement_unavailable" in reason
 
-DYNO = os.path.expanduser("~/.dyno/compaction")
+GEARBOX_STATE = os.path.expanduser("~/.gearbox-state/compaction")
 
 
 def paths(root=None):
-    root = root or DYNO
+    root = root or GEARBOX_STATE
     return {
         "decisions": os.path.join(root, "decisions.ndjson"),
         "sessions": os.path.join(root, "sessions.ndjson"),
@@ -199,7 +199,7 @@ def load_decisions(path):
 
 
 def load_heartbeats(path):
-    """session id -> the FIRST heartbeat for that session (cp-02 writes one per
+    """session id -> the FIRST heartbeat for that session (the policy hook writes one per
     session at UserPromptSubmit). Its `type` is the first classification only —
     read the live type from the policy file, which an upgrade may have moved."""
     rows, rejected, exists = load_ndjson(path)
@@ -220,7 +220,7 @@ def load_heartbeats(path):
 
 
 def load_policy_types(policy_dir):
-    """session id -> live session type from ~/.dyno/compaction/policy/<sid>.json."""
+    """session id -> live session type from ~/.gearbox-state/compaction/policy/<sid>.json."""
     types = {}
     if not policy_dir or not os.path.isdir(policy_dir):
         return types
@@ -238,7 +238,7 @@ def load_policy_types(policy_dir):
 
 
 def autocompact_window(settings_path):
-    """The one auto-compact window surface (cp-05). None unless a settings record
+    """The one auto-compact window surface. None unless a settings record
     is actually found — NEVER a default standing in for a measurement.
 
     ONE definition, here in the leaf module: retro_scan.py and compaction_report.py

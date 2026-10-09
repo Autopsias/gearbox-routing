@@ -1,4 +1,4 @@
-"""LND-01 (finish-every-plan) — land stops leaving its own files modified.
+"""LND-01 (example-finish-plan) — land stops leaving its own files modified.
 
 Authority: ``../references/finish-contract.md`` "Decisions taken in s01 (a)" and
 revision R4 of ``plan-isolation-contract.md``. ``LAND_NOTICE.txt`` and

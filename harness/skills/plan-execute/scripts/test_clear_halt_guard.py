@@ -1,4 +1,4 @@
-"""The second clear of one session's halt needs a cost line (2026-09-05)."""
+"""The second clear of one session's halt needs a cost line."""
 import json
 import pytest
 import run_state_io as rsi

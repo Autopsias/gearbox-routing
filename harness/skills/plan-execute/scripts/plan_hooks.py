@@ -115,7 +115,7 @@ def _hook_canary(path, hook_body=None):
         # this repo's own shape (`.gitignore:6`) — ignores every new root-level
         # file, so a plain `git add` of the canary exits 1 with "paths are
         # ignored by one of your .gitignore files" and plan isolation fails
-        # outright at `begin`. Measured 2026-08-23 by the s10 canary against a
+        # outright at `begin`. Measured by the s10 canary against a
         # real clone of this repo; every in-repo fixture missed it because a
         # hand-built fixture's `.gitignore` has no such rule. Forcing is safe
         # here and nowhere else: the path is one this function just created
@@ -227,7 +227,7 @@ def hook_gate(root, path, *, hook_body=None):
     result = _hook_canary(path, hook_body)
     final = shared_hooks_dir(root)
     # §9.2 — this write is the control against an inherited foreign value:
-    # `git config --worktree` REPLACES the existing entry (probed 2026-08-21),
+    # `git config --worktree` REPLACES the existing entry (probed),
     # so after it no foreign hooksPath can survive in config.worktree. The
     # assert then proves the EFFECTIVE value end to end.
     git(["config", "--worktree", "core.hooksPath", str(final)], path, check=True)

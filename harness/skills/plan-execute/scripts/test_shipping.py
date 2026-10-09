@@ -634,7 +634,7 @@ def test_the_two_gate_registries_agree_on_every_llm_review_env_allowlist():
 
     A variable absent from the allowlist is not a smaller review; it is a control
     that silently does nothing, which is the failure this file already has three
-    entries for. Found 2026-08-23 by a review of the isolation branch."""
+    entries for. Found by a review of the isolation branch."""
     skill = Path(adapter.__file__).resolve().parent.parent
     bundled = json.loads((skill / "references" / "eval-gates.default.json").read_text())
     proj_p = skill.parent.parent / ".claude" / "eval-gates.json"

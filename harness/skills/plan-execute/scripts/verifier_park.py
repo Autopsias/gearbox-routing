@@ -49,7 +49,7 @@ from pathlib import Path
 #: with a CLI preamble possibly between the two.
 #:
 #: NO LINE WINDOW BOUNDS THE SCAN, and none can: the surface preamble prints ONE
-#: LINE PER UNTRACKED FILE, so it outruns any constant. Measured 2026-08-25, 8
+#: LINE PER UNTRACKED FILE, so it outruns any constant. Measured, 8
 #: untracked files put the marker on stdout line 13, a 10-line window missed it,
 #: and a real "no model may review this" went down the transport-retry path to
 #: halt the plan blaming a transport failure that never happened. FIRST-match is
@@ -163,7 +163,7 @@ def reviewer_for(harness, reviewer):
     `refusal()` answers only "may this run proceed?"; it never swapped the
     reviewer, so a `cross-family-review-*` gate on a CODEX-built session kept the
     registry's `--reviewer codex` and — with the opt-in ON — reviewed Codex-built
-    code with Codex, then reported a cross-family PASS. Measured 2026-08-25:
+    code with Codex, then reported a cross-family PASS. Measured:
     1 codex invocation, 0 claude, action=passed. That is worse than the gate not
     running, because it is a false assurance.
 
@@ -297,7 +297,7 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
     # THE SUBAGENT MAY HAVE ASKED FOR A HUMAN OF ITS OWN — a DIFFERENT AUTHOR'S
     # claim on this one field. The park overwrote it and `verify_finalize` then
     # cleared it to None, so the ask was gone from disk with no record and the
-    # session reached DONE with shipping proceeding (measured 2026-08-25 against a
+    # session reached DONE with shipping proceeding (measured against a
     # control pair). Neither claim may destroy the other: what the park displaces
     # is stashed here, shown in the brief, and put back by `unpark_closeout`.
     prior = closeout_checkpoint(plan_dir, session_id)
@@ -448,7 +448,7 @@ def resolve(plan_dir, session_id, decision, note=None):
     # (`shipping.checkpoint_pending`), so it may NOT happen here: a session whose
     # park was the FIRST of several gates still owes the rest, and clearing it
     # here left a plain `ack-checkpoint` free to mark the session DONE with a
-    # later gate never run (measured 2026-08-25 on a two-gate session). This
+    # later gate never run (measured on a two-gate session). This
     # marker is the standing instruction; `verify.verify_finalize` — the one
     # place that knows verification is COMPLETE — is where it is honoured.
     state["on_box_resolved"] = disposition

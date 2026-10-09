@@ -30,7 +30,7 @@ not, is the table in [Rule ledger](#rule-ledger).
 ## Why this runs at Phase 4, not earlier
 
 Grouping is a function of the FINAL DAG, and Phases 1–2 mutate it — a hardening pass
-can *add* dependencies (observed 2026-08-03: grilling made the pruner consume the
+can *add* dependencies (observed: grilling made the pruner consume the
 reaper's live-session registry, turning a file collision into a data dependency).
 A grouping computed before hardening settles is computed against a plan that no
 longer exists. Corollary: if the operator later elects an option that restructures

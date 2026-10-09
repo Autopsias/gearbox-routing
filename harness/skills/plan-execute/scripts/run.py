@@ -346,7 +346,7 @@ def _reasoning_directive(raw):
 # --------------------------------------------------------------------------
 # TIER AGENTS — the only mechanism that actually BINDS a subagent's effort.
 #
-# MEASURED against code.claude.com/docs/en (Claude Code 2.1.220, 2026-07-26),
+# MEASURED against code.claude.com/docs/en (Claude Code 2.1.220),
 # not assumed: `_REASONING_DIRECTIVE` above is INERT as an effort control.
 #   * "Other phrases such as `think`, `think hard`, and `think more` are passed
 #     through as ordinary prompt text and are not recognized as keywords."
@@ -370,17 +370,18 @@ def _reasoning_directive(raw):
 # So: resolve the manifest's (model, reasoning) pair to a tier-agent DEFINITION
 # carrying both `model:` and `effort:`, and pass it as `subagent_type`. The set
 # below is the cross product the SSOT actually resolves (providers.anthropic
-# models x effort.map: haiku takes no effort dial; sonnet/opus map
-# light|standard|thorough -> low|medium|high). Unmapped escalation rungs (sonnet
+# models x effort.map: haiku/sonnet/opus all map
+# light|standard|thorough -> low|medium|high; haiku since Haiku 5.5). Unmapped escalation rungs (sonnet
 # xhigh — a dead rung — and every `max`, operator-elected) deliberately have NO
 # tier agent: they fall back to the prepend path with `effort_enforced: false` so
 # the gap is VISIBLE in the member payload instead of silently inheriting.
 # opus@xhigh IS mapped since v1.20 — it became a live escalation rung.
 _TIER_AGENT_DIR = Path.home() / ".claude" / "agents"
 _TIER_AGENTS = {
-    # Haiku takes NO effort dial (providers.anthropic.effort.map.cheap_fast is all-None,
-    # and the SSOT's HAIKU INVARIANT fails any haiku agent carrying an `effort:` key), so
-    # one agent serves every haiku tier — there is no dial to bind.
+    # Haiku 5.5 takes the dial, but the only haiku tier agent is tier-haiku, pinned
+    # `effort: low` — the mechanical class's level. A haiku@medium or haiku@unset session
+    # also runs at low: no haiku tier agent exists above low (40 public tasks: medium
+    # passed no more than low and was slower).
     ("haiku", "low"): "tier-haiku",
     ("haiku", "medium"): "tier-haiku",
     ("haiku", ""): "tier-haiku",
@@ -392,7 +393,7 @@ _TIER_AGENTS = {
     # rung): neither is a class default; without a row each runs unbound, i.e. theatre.
     ("opus", "low"): "tier-opus-low",
     ("opus", "xhigh"): "tier-opus-xhigh",
-    # fable is the named escalation-apex exception (ESC-01, 2026-08-13): reached from
+    # fable is the named escalation-apex exception (ESC-01): reached from
     # opus-high on the SSOT's standing ladder when opus's own rungs aren't enough, so
     # unlike the sonnet/opus xhigh rungs above (dead/operator-elected, deliberately
     # unmapped), fable gets a real tier agent through xhigh. fable.max still has none —
@@ -424,7 +425,7 @@ def _tier_agent(model_token, reason_tier, agent_dir=None, provider="anthropic"):
 # When a dispatched model is refused for access/entitlement (e.g. Fable
 # suspended/paywalled, or `codex exec -m` rejects the model), the orchestrator
 # re-dispatches the SAME session on the next model down, at a PER-TARGET reasoning
-# tier (recalibrated on our own calibration run, 2026-07-25): fable→opus lands at
+# tier (recalibrated on our own calibration run): fable→opus lands at
 # `high` (Opus 5's sweet spot — high→xhigh is a DEAD RUNG on our own calibration
 # run: no measurable gain for materially higher cost), and opus→sonnet lands at
 # `high` — sonnet high→xhigh is a DEAD RUNG too (a small accuracy gain for
@@ -482,7 +483,7 @@ def _fallback_for(token, provider="anthropic", refused=()):
     when no lower judgement-safe tier exists for that provider (already at/below
     the judgement floor, or an unrecognized/None token).
 
-    THE REFUSED SET IS AUTHORITATIVE OVER THIS EDGE (ESC-03 rework, 2026-08-14).
+    THE REFUSED SET IS AUTHORITATIVE OVER THIS EDGE (ESC-03 rework).
     `refused` is the session's refused-rung set (`escalation.compute`'s descriptor
     carries it); a cell in it was refused at a real dispatch and is unavailable for
     the rest of the session. This ladder is a STATIC dict that knew nothing about
@@ -538,11 +539,11 @@ _CODEX_WRAPPER_MODEL = "sonnet"
 # translates intent → its native dial. Mirrors providers.anthropic.effort.map
 # reversed (low→light, medium→standard, high→thorough).
 #
-# UNCLAMPED at CL-03 (2026-07-28). This map used to send BOTH `xhigh` and `max`
+# UNCLAMPED at CL-03. This map used to send BOTH `xhigh` and `max`
 # to `thorough`, so a session that asked for maximum thinking silently landed on
 # whatever the tier's `thorough` cell held — `gpt-5.6-sol @ xhigh`, never `max`.
 # That was a clamp invented HERE, not provider policy: `codex debug models` on
-# codex-cli 0.145.0 (re-verified 2026-07-28) reports `max` as a real supported
+# codex-cli 0.145.0 (re-verified) reports `max` as a real supported
 # reasoning level on sol, terra AND luna (`ultra` exists on sol/terra and stays
 # forbidden by policy). The intent axis therefore grows two rungs above
 # `thorough` so the five manifest tiers map ONE-TO-ONE and every remaining loss
@@ -678,7 +679,7 @@ def _dispatch_lane(session, provider, ssot_text, harness="claude", plan_dir=None
 # `active_provider` dial. The two differ exactly when the dial is `openai` and a
 # session fails closed to Claude execution, and feeding the openai profile a
 # `sonnet` cell makes the resolver raise ("current model_id 'sonnet' is not in
-# provider 'openai' models", measured 2026-08-14). That raise was caught and
+# provider 'openai' models", measured). That raise was caught and
 # degraded to "no climb", so under an openai dial the rework loop re-dispatched the
 # SAME rung forever with nothing in the log to say why.
 #
@@ -903,7 +904,7 @@ def _translate_claude_token(raw, task_class, ssot_text, rr, openai):
     #   1. the session's OWN model → providers.anthropic tier → openai.models[tier]
     #   2. (task_class, openai) through resolve_route.resolve
     #
-    # WHY NOT EITHER ONE ALONE — both directions were measured (2026-08-14):
+    # WHY NOT EITHER ONE ALONE — both directions were measured:
     #   * class only: `model: Opus` + `task_class: standard_build` resolved to
     #     gpt-5.6-LUNA, while the SAME session with no task_class resolved to
     #     gpt-5.6-terra. The author's pin was silently downgraded by the
@@ -983,7 +984,7 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
     names — see the comment at the translation branch for the measured reason.
     An explicitly pinned Codex model never consults it.
 
-    ``require_calibrated`` (adversarial-review 2026-07-10, Codex HIGH): a route
+    ``require_calibrated`` (adversarial-review, Codex HIGH): a route
     driven by the RUN-LEVEL dial (`active_provider: openai`, translating Claude
     tier vocabulary) must not dispatch through a profile whose
     `calibration.status` isn't `researched` — the SSOT marks openai `lane_scoped`
@@ -1022,7 +1023,7 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
     class_cell = None          # the {model_id, native_effort} the task_class prescribes
     if model is None and raw.lower().startswith("gpt-5.5"):
         # RETIRED-MODEL PIN (v1.15) — an already-built manifest can still carry a
-        # `gpt-5.5` pin the operator retired on 2026-08-13. BLOCKED-WITH-GUIDANCE:
+        # `gpt-5.5` pin the operator retired. BLOCKED-WITH-GUIDANCE:
         # never silently rerouted onto a 5.6 model (the plan author did not choose
         # it) and never run on 5.5. Silence is the one forbidden outcome.
         #
@@ -1066,7 +1067,7 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
     # taking only its model_id dropped the effort half: `linchpin` (SSOT row
     # sol·MAX, one-shot irreversible work) dispatched at sol@xhigh, and the row the
     # SSOT actually prescribes was unreachable unless the session happened to pin
-    # `reasoning: max` (measured 2026-08-14). Only applies when the class actually
+    # `reasoning: max` (measured). Only applies when the class actually
     # named this model — a session routed by its own pin keeps its own effort.
     if class_cell and class_cell.get("model_id") == model:
         effort = _stronger_effort(openai, tier, effort, class_cell.get("native_effort"))
@@ -1115,7 +1116,7 @@ def _stronger_effort(profile, tier, a, b):
 
 
 # --------------------------------------------------------------------------
-# HARNESS MODE (CP-02, 2026-07-28). One plan directory, two orchestrators — the
+# HARNESS MODE (CP-02). One plan directory, two orchestrators — the
 # full contract is skills/plan-execute/references/dual-harness-contract.md.
 #
 #   --harness claude  (default)  the orchestrator is Claude in the main
@@ -1304,7 +1305,7 @@ def _codex_translation(sid, session, codex_model, codex_effort, ssot_text, dropp
 
     `codex_model`/`codex_effort` are the BASE rung — the cell the SSOT resolved,
     BEFORE any escalation climb — and `escalation` is that climb's descriptor.
-    That split is load-bearing (ESC-03 rework, 2026-08-14): built from the
+    That split is load-bearing (ESC-03 rework): built from the
     POST-climb pair, this receipt attributed the climb's own raise to whatever
     else was to hand, and persisted the false cause as `effort_fidelity` on the
     batch member and in the `codex_translation` event — an escalated session read
@@ -1760,7 +1761,7 @@ def cmd_status(plan_dir):
             "land": land.land_status(plan_dir),
             # RP-04 — page/manifest coherence. Reported, never blocking: `status`
             # answers "how is this plan", and a page surface that drifted is part
-            # of that answer. 25 ms on a 228 KB page (measured 2026-08-12).
+            # of that answer. 25 ms on a 228 KB page (measured).
             "containment": sg.check_containment(plan_dir),
             "shipping": shp.shipping_summary(plan_dir, manifest),
             "replan_pending": [p["brief"] for p in rp.pending(plan_dir)],
@@ -2492,7 +2493,7 @@ def _resolve_codex_session_spec(declared_codex, egress_state, manifest, plan_dir
         codex_model, codex_effort, esc_desc = _codex_climb(
             plan_dir, manifest, s, codex_model, codex_effort)
         escalated = bool(esc_desc and esc_desc["rung"] > 0)
-        # Unique per invocation AND per attempt (adversarial-review 2026-07-10,
+        # Unique per invocation AND per attempt (adversarial-review,
         # consensus HIGH): a path keyed only by session id let a stale/foreign
         # closeout from a prior run — or a concurrent plan reusing the same
         # session ids — be relayed as this run's result.
@@ -2768,7 +2769,7 @@ def _emit_dispatch_batch(by_id, codex_harness, egress_state, manifest, pc_warnin
     # — so every escalated rung was filed `prompt_directive_advisory` even
     # though the climb had resolved a real `tier-*` agent and bound it. That is
     # precisely the cohort the question "did Fable's effort actually bind?" is
-    # about (measured 2026-08-15, s08 acceptance review). Logged for every
+    # about (measured, s08 acceptance review). Logged for every
     # session that HAS one; the codex lane carries `effort_fidelity` instead
     # and is left to the manifest derivation.
     mechanisms = {m["id"]: m["effort_mechanism"] for m in batch if m.get("effort_mechanism")}
@@ -2799,7 +2800,7 @@ def _anchor_preflight(by_id, html, sessions):
 
 def cmd_begin(plan_dir, sessions, unsafe_lock=False, harness="claude", resume=False,
               concurrent=False, isolate=None, no_route=False):
-    # Inherited halt hole (closed 2026-08-12): `plan` refused on a halted plan but
+    # Inherited halt hole (closed): `plan` refused on a halted plan but
     # `begin` did not, so the loop's own next step could dispatch — and mutate
     # TODO→DOING — straight through a halt. `--resume` is the same deliberate
     # override `plan --resume` already is, and nothing else opens this door.
@@ -2935,7 +2936,7 @@ def cmd_begin(plan_dir, sessions, unsafe_lock=False, harness="claude", resume=Fa
 
 
 # --------------------------------------------------------------------------
-# DISPATCH RECEIPT (2026-07-28). Under `--harness codex` the orchestrator is an
+# DISPATCH RECEIPT. Under `--harness codex` the orchestrator is an
 # interactive Codex model told, IN PROSE, to run each session's `dispatch_cmd`.
 # Nothing structural made it. A model that instead did the work inline produced a
 # perfectly valid closeout, `apply` took it, the session went DONE — and the
@@ -3421,7 +3422,7 @@ def cmd_checkpoint(plan_dir, session_id):
 def _ack_approved(plan_dir, session_id, manifest, co, note):
     """The approval itself, once every refusal above has declined to fire.
 
-    Split out of `cmd_ack_checkpoint` UNCHANGED (2026-08-26): the refusal
+    Split out of `cmd_ack_checkpoint` UNCHANGED: the refusal
     ladder in front of it grew three guards, and the whole took the function
     past the 100-line bound the pre-commit ratchet enforces."""
     reason = co.get("human_checkpoint_reason")
@@ -3908,7 +3909,7 @@ def cmd_record_refusal(plan_dir, session_id, model, reasoning, reason, source):
     # THE RUNG MUST BE A REAL RUNG OF THIS SESSION'S LADDER. Without this check
     # `--model fable` with no `--reasoning` recorded `fable@unset`, printed
     # `"recorded": true`, and the very next dispatch sent `fable@medium` again —
-    # the exact rung just refused (measured 2026-08-14). A refusal that reads as
+    # the exact rung just refused (measured). A refusal that reads as
     # accepted and changes nothing is worse than one that is rejected, so a key
     # that names no rung is a hard error that lists the keys that do.
     _assert_real_rung(plan_dir, manifest, rad.effective_session(plan_dir, manifest, session),

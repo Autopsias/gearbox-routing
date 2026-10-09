@@ -1745,7 +1745,7 @@
       renderSessionArc();
       // Infographic failure must NEVER kill the rest of this handler (chip sync,
       // next-line, counters). A spec with phases lacking `items` bindings used to
-      // throw here and leave the whole top nav stale (2026-07-03).
+      // throw here and leave the whole top nav stale.
       try { renderPhaseJourney(items); } catch (e) { console.error('infographic renderer failed:', e); }
       // Same isolation rule as the infographic: an explainer failure must never
       // stall the rest of the repaint.

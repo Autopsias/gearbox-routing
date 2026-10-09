@@ -35,7 +35,7 @@ def _names(args, cwd, what):
     """Path list out of a `--name-only`-style git command, `-z` and NUL-split.
 
     `-z` is not decoration. Under the default `core.quotePath`, git renders a
-    non-ASCII path as an escaped, DOUBLE-QUOTED token — measured 2026-08-22:
+    non-ASCII path as an escaped, DOUBLE-QUOTED token — measured:
     `_plans/plâno-2026/a.txt` comes back as `"_plans/pl\\303\\242no-2026/a.txt"`.
     Every consumer below compares against a plain `_plans/` prefix, so the
     quoting silently flipped both of them the wrong way: §8.b's refusal could

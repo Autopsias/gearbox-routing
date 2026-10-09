@@ -3,6 +3,7 @@ name: import-error-fixer
 description: "Fixes Python import errors, module resolution and dependency issues; use PROACTIVELY when imports fail. Examples: \"ModuleNotFoundError: No module named 'requests'\", \"ImportError: cannot import name from partially initialized module\", \"Circular import between modules detected\", \"Module import path configuration issues\"."
 tools: Read, Edit, MultiEdit, Bash, Grep, Glob, LS
 model: haiku
+effort: low
 color: red
 ---
 

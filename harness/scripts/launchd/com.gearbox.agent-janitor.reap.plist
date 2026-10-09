@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gearbox.agent-janitor.reap — orphan-process reaper, every 30 minutes.
+
+  StartInterval, NOT StartCalendarInterval: man launchd.plist documents that a
+  firing missed while the machine is asleep is simply MISSED, no catch-up. A
+  30-minute interval self-heals on the next wake; it does not depend on the
+  machine being awake at any particular clock time.
+
+  __HOME__ is substituted by `agent_janitor.py install` at copy-time (this
+  file is versioned and machine-independent; the rendered copy in
+  ~/Library/LaunchAgents is not). Runs the DEPLOYED module
+  (~/.claude/scripts/agent_janitor.py), never this source-tree copy.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gearbox.agent-janitor.reap</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>__HOME__/.claude/scripts/agent_janitor.py</string>
+        <string>reap</string>
+        <string>--apply</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>__HOME__/.claude/logs/agent-janitor-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.claude/logs/agent-janitor-launchd.log</string>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

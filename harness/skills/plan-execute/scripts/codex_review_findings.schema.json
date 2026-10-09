@@ -3,7 +3,7 @@
   "title": "cross-family review findings",
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "reviewed", "findings"],
+  "required": ["verdict", "reviewed", "findings", "priors"],
   "properties": {
     "verdict": {
       "type": "string",
@@ -30,6 +30,20 @@
           },
           "title": {"type": "string", "description": "One short phrase naming the defect."},
           "why": {"type": "string", "description": "The defect and its evidence, one or two sentences."}
+        }
+      }
+    },
+    "priors": {
+      "type": "array",
+      "description": "One entry per finding the PRIOR REVIEW section lists, by its id. A prior you leave out is treated as still OPEN.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"type": "string", "enum": ["fixed", "open"]},
+          "evidence": {"type": "string", "description": "One line: what in the code shows the status."}
         }
       }
     }

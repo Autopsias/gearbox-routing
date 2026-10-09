@@ -49,7 +49,7 @@ differed each time — neither was "review it again":
 Feed both into §4.0d's reviewability lint. The empirical signal — findings failing to fall
 across two consecutive rounds on the same unit — outranks any static threshold.
 
-## Why this mode exists (measured 2026-08-21, a 107 KB spec)
+## Why this mode exists (measured, a 107 KB spec)
 
 Whole-document new findings per round ran 19 → 10 → 1 → 1 across one pass and 12 → 6 → 13 → 9
 across the next — no convergence, and the second pass's first round found a CRITICAL inside

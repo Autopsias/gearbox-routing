@@ -110,7 +110,7 @@ two-stage, explicit-tag experiment (grill 2026-08-13):
    never on raw success rate alone. A Claude-lane cohort counts only when its first
    attempt ran through a tier agent (`effort_mechanism: tier_agent`); any other cohort
    ran at the orchestrator's effort, not the rung under test, and is reported as
-   `excluded.effort_unbound` (v25, 2026-09-11). Before authoring a canary, confirm
+   `excluded.effort_unbound` (v25). Before authoring a canary, confirm
    `agents/tier-<model>-<effort>.md` exists.
 3. **Judge at the next retro.** Read `canaries[]` for the proposal's `proposal_id`:
    `smoke-failed` → report the abort and drop the proposal; `smoke-in-progress` /
@@ -203,7 +203,7 @@ report that honestly rather than picking a direction from too little data.
 
 The compaction changes (a PreCompact veto, a trimmed base context, a routing SSOT
 bump, a three-repo diet) went live at DIFFERENT MOMENTS, and two of them usually
-share one deploy. `~/.dyno/compaction/activations.ndjson` is the sole authority on
+share one deploy. `~/.gearbox-state/compaction/activations.ndjson` is the sole authority on
 when each went live — never `git log`, because a commit date is not a deploy date.
 
 ```bash

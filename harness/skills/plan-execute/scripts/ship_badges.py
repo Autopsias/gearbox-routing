@@ -25,8 +25,7 @@ def mark_done(state, step):
     """Record ``step`` done. A COMMIT that ran moves HEAD past whatever an earlier
     ``push`` sent, so a ``push`` already recorded done goes back to pending:
     replaying a failed commit (clear-halt, ship-begin, ship-run --step commit)
-    otherwise skipped the push and finalized with origin at the OLD sha
-    (2026-09-24). A push with nothing new is a no-op, so re-running it is cheap."""
+    otherwise skipped the push and finalized with origin at the OLD sha. A push with nothing new is a no-op, so re-running it is cheap."""
     state["steps"][step] = STEP_DONE
     if step == "commit" and state["steps"].get("push") == STEP_DONE:
         state["steps"]["push"] = STEP_PENDING

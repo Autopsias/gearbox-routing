@@ -50,7 +50,7 @@ mapped to an owner by reading the plan-side state files, and anything
 unmappable is reported UNKNOWN, never guessed at. Ownership itself is keyed by
 (plan, branch) or (plan, path), not name/path alone: two plans can
 legitimately declare the same `parallel_group` (verified in this repo —
-`pg-prep` in both `gearbox-dyno-v3-2026-07-27` and `gearbox-dyno-v4-2026-07-27`),
+`pg-prep` in both `example-plan-a-2026-07-27` and `example-plan-b-2026-07-27`),
 which collides on both the same `plan/<group>/<sid>` branch name AND the same
 `.plan-worktrees/<group>/<sid>` path. A branch or worktree claimed by more
 than one distinct plan is reported CONFLICT — never resolved to a single

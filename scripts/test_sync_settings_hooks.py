@@ -82,3 +82,18 @@ def test_scan_goes_red_on_a_planted_dangling_hook(tmp_path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=env)
     green, output, count = sync.run_blocked_pattern_scan(tmp_path, ["never-matches-anything-xyz"])
     assert not green and "planted.py" in output
+
+
+def test_public_policy_is_mirrored_into_the_harness_layout(tmp_path):
+    repo, harness = tmp_path / "repo", tmp_path / "repo" / "harness"
+    (repo / "claude").mkdir(parents=True)
+    (repo / "claude" / "model-routing.yaml").write_text("version: \"9.9.9\"\n")
+    assert sync.mirror_public_files(repo, harness) == ["model-routing.yaml"]
+    assert (harness / "model-routing.yaml").read_text() == "version: \"9.9.9\"\n"
+
+
+def test_mirror_fails_closed_when_the_public_policy_is_missing(tmp_path):
+    import pytest
+
+    with pytest.raises(sync.SyncError):
+        sync.mirror_public_files(tmp_path, tmp_path / "harness")

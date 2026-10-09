@@ -94,6 +94,26 @@ def test_a_prior_the_reviewer_OMITS_is_open_silence_is_not_a_fix():
     assert fail and counts["prior_open"] == 1 and "not addressed" in recs[0]["evidence"]
 
 
+def test_a_FIXED_high_re_reported_by_its_id_is_a_regression_and_blocks():
+    """Found in a security review. `judge` treated ANY known
+    id that is not an open prior as a floor-demoted one and recorded it `noted`,
+    so a fixed HIGH that came back -- or any finding tagged with a fixed id --
+    never blocked. Only a prior below the floor (or owner-accepted) is carried."""
+    fixed = {"kind": "finding", "fid": "abc", "attempt": 1, "file": "a.py",
+             "severity": "high", "summary": "old", "status": "fixed"}
+    ctx = _Ctx(3)
+    ctx.records = [fixed]
+    back = [{"prior_id": "abc", "file": "a.py", "severity": "high", "summary": "it is back"}]
+    fail, counts, recs = L.judge(ctx, back)
+    assert fail and recs[0]["status"] == "open", recs
+    # A demoted medium echoed at a HIGH it re-raised blocks too.
+    ctx.records = [dict(fixed, severity="medium", status="noted")]
+    assert L.judge(ctx, back)[0]
+    # KNOWN POSITIVE: a demoted medium re-reported as itself is still carried.
+    fail, counts, recs = L.judge(ctx, [dict(back[0], severity="medium")])
+    assert not fail and recs[0]["status"] == "noted" and counts["noted"] == 1
+
+
 def test_no_plan_context_keeps_the_old_rule():
     assert L.judge(None, [{"file": "a.py"}]) == (True, {}, [])
     assert L.judge(None, []) == (False, {}, [])
@@ -131,7 +151,7 @@ def _plan_and_tree(tmp_path):
     (plan / "_verify_state").mkdir(parents=True)
     # A real plan dir always has its journal. Without it the gate now REFUSES
     # rather than silently reviewing `git diff HEAD`, which for a session that
-    # committed is not its work at all (llm_review_surface, 2026-08-20).
+    # committed is not its work at all (llm_review_surface).
     (plan / "run.ndjson").write_text(
         '{"event": "dispatch_started", "session_ids": ["s01"], "ts": "2026-08-20T00:00:00+00:00"}\n')
     tree = tmp_path / "tree"
@@ -172,7 +192,7 @@ def test_three_attempts_converge_and_the_ledger_records_it(tmp_path, monkeypatch
     plan, tree = _plan_and_tree(tmp_path)
     f_a = {"file": "a.py", "line": 1, "severity": "high", "summary": "a is unguarded"}
     # HIGH, so it is a BLOCKING prior: this test is about a prior surviving to
-    # the next round, and after the severity floor (2026-08-22) only a finding at
+    # the next round, and after the severity floor only a finding at
     # the floor becomes one. The advisory path is covered by the medium below.
     f_b = {"file": "b.py", "line": 1, "severity": "high", "summary": "b is unguarded"}
     id_a, id_b = L.fingerprint(f_a), L.fingerprint(f_b)
@@ -232,7 +252,7 @@ def test_a_prior_OUTSIDE_this_attempts_surface_cannot_block_forever():
     before the narrowing may now sit in a file the reviewer is never shown. It
     cannot mark those fixed, so "omission is not a fix" made the gate unpassable
     for the rest of the session -- no amount of fixing could clear it. Carried and
-    counted, never silently dropped (found by the isolation session, 2026-08-20)."""
+    counted, never silently dropped (found by the isolation session)."""
     prior = {"kind": "finding", "fid": "abc", "file": "skills/repo-health/x.py",
              "summary": "old", "status": "open"}
     ctx = _Ctx(2, priors=[prior])
@@ -260,12 +280,12 @@ def test_a_finding_on_a_ROOT_DOTFILE_is_not_demoted_out_of_the_delta():
     """`lstrip("./")` strips a character SET, so `.complexity-exceptions` came back
     as `complexity-exceptions`, never matched the delta, and a real medium finding
     on it was classed `outside` and demoted to non-blocking `noted`. Fifth instance
-    of this exact call in this repo (2026-08-20)."""
+    of this exact call in this repo."""
     ctx = _Ctx(2, delta={".complexity-exceptions"})
     fail, counts, recs = L.judge(
         ctx, [{"file": ".complexity-exceptions", "severity": "medium", "summary": "s"}])
     # The bug was CLASSIFICATION, so that is what this asserts. Whether a medium
-    # blocks is the separate severity-floor decision (2026-08-22) and is not the
+    # blocks is the separate severity-floor decision and is not the
     # subject here -- a high one on the same path still fails the gate, below.
     assert recs[0]["new_in"] == "delta", recs
     assert L.judge(ctx, [{"file": ".complexity-exceptions", "severity": "high",
@@ -282,7 +302,7 @@ def test_a_reviewer_cannot_tag_its_own_finding_out_of_the_delta():
     demoted by the reviewer's own mislabel. Delta membership is local ground truth
     (content hashes, computed in fix_delta); the tag is only consulted for a path
     we have nothing to check it against. Sixth instance of the demoted-out-of-the-
-    delta family in this repo (2026-08-21).
+    delta family in this repo.
 
     Asserted on CLASSIFICATION, not on `fail`: after the severity floor
     (2026-08-22) severity decides blocking and location does not, so a mislabelled
@@ -300,7 +320,7 @@ def test_a_reviewer_cannot_tag_its_own_finding_out_of_the_delta():
     assert recs2[0]["new_in"] == "outside" and counts2["noted"] == 1
 
 
-# ---------- the severity floor (2026-08-22) ----------
+# ---------- the severity floor ----------
 # Measured across 28 plans: of the findings that BLOCKED a rework, 36 of 56 were
 # medium or low. Each one spent a full dispatch, and the fix for it introduced
 # new code that the next round then found new findings in. The floor is the
@@ -527,7 +547,7 @@ def test_the_OPT_IN_does_not_collapse_the_two_GATES_onto_one_ledger(tmp_path, mo
 # way to say "known, and not this session's job". The reviewer also REWORDS its
 # summary between attempts, which is why the key is a phrase and not the finding
 # id: the same uv runner-option gap arrived under two different ids on attempts 4
-# and 5 (2026-09-08).
+# and 5.
 
 UV = {"file": "scripts/govrun_pytest_budget.py", "line": 218, "severity": "high",
       "summary": "Runner options still bypass both enforcement layers: uv run "

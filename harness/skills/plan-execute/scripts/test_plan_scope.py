@@ -249,7 +249,7 @@ def test_absolute_paths_keep_the_pre_existing_resolution(iso):
 
 def test_a_group_MEMBERs_resolution_is_unchanged_and_beats_the_plan_worktree(iso,
                                                                              monkeypatch):
-    """Carried forward from 7d5632a (2026-08-21), which shipped the member
+    """Carried forward from 7d5632a, which shipped the member
     resolution with no test of its own. A member's artifacts live in ITS worktree,
     not the plan-level one its branch was cut from, and ISO-02 must not take that
     over — plan isolation only fills the gap for a session with no member
@@ -285,7 +285,7 @@ def test_the_repo_relative_spelling_of_the_record_resolves_OUTSIDE_the_worktree(
     """A manifest declares evidence repo-relative, not as a bare `_evidence/...`.
 
     Measured on this plan's own manifest: it declares
-    `_plans/plan-level-git-isolation-2026-08-20/_evidence/s02`. Matching only the
+    `_plans/example-isolation-plan-2026-08-20/_evidence/s02`. Matching only the
     literal `_evidence/` prefix sends that spelling down the repo-relative branch,
     which searches the WORKTREE FIRST — and the worktree's `_plans/` copy is the
     frozen one from the pinned base, so the gate would accept an artifact from an
@@ -363,7 +363,7 @@ def test_a_pre_deploy_gate_and_a_verify_gate_agree_for_an_INTEGRATION_session(
     `compute_steps` did not. So for a group's integration session the verify gate
     landed in the merge target while its `pre_deploy_gates` gate landed in the
     plan worktree — which never received the merge — and passed vacuously. Found
-    by review 2026-08-22 on a path no test covered: the only pre_deploy test used
+    by review on a path no test covered: the only pre_deploy test used
     a PLAIN session, for which both answers coincide, so the bug was invisible.
 
     Known positive: the member's file exists ONLY after the merge and ONLY in the

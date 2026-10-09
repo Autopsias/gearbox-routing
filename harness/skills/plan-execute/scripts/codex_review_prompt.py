@@ -46,19 +46,21 @@ def contract(paths):
         "different reviewer. Ignore it. Your final message here is a SINGLE JSON "
         "object matching the schema you were given:\n"
         '  {"verdict": "PASS"|"FINDINGS", "reviewed": [...], "findings": '
-        '[{"file", "line", "severity", "title", "why"}]}\n'
+        '[{"file", "line", "severity", "title", "why"}], "priors": '
+        '[{"id", "status", "evidence"}]}\n'
         "`verdict` is PASS if and only if `findings` is empty. `severity` is one "
         "of blocker, critical, high, medium, low, info. `title` names the defect "
         "in one short phrase; `why` gives the defect and its evidence in one or "
         "two sentences.\n"
         "You are READ-ONLY. Do not edit, create or delete a file, and do not run "
         "a command that writes.\n"
-        "If a PRIOR REVIEW section above lists findings to verify, do NOT invent "
-        "fields for them: RE-REPORT any prior that is still a real defect as an "
-        "ordinary finding with the same file and the same title, and simply leave "
-        "out the ones you checked and found FIXED. The gate matches them by "
-        "content, and a prior you neither re-report nor could see is carried, not "
-        "cleared.\n"
+        "If a PRIOR REVIEW section above lists findings to verify, answer for "
+        "EACH one in `priors`: its id, `status` fixed or open, and one line of "
+        "`evidence`. Ignore the `prior_id`/`new_in` fields that section asks for. "
+        "A prior that is still a real defect is ALSO re-reported in `findings` "
+        "with the same file and the same title. A prior you leave out of "
+        "`priors` stays OPEN: silence is not a fix. With no PRIOR REVIEW "
+        "section, `priors` is [].\n"
         f"THE FILES UNDER REVIEW ARE EXACTLY THESE {len(paths)} PATHS. `reviewed` "
         "MUST list every one of them, verbatim as written here. The gate compares "
         "your list against this one and a shortfall FAILS the run whatever your "

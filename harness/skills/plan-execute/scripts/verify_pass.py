@@ -2,7 +2,7 @@
 
 ONE closeout, ONE verdict. After a `rework` verdict the next pass needs a
 closeout that `apply` persisted AFTER that verdict; the one that failed is not
-re-verified. Measured 2026-08-21 (plan-level-git-isolation s02): the
+re-verified. Measured on an isolation plan: the
 orchestrator re-ran the gates on the closeout that had just failed, 20 times
 over 17 hours, never re-dispatching — so the stuck protocol armed five times
 and the escalation ladder, computed only in `begin`, never got a dispatch to
@@ -87,9 +87,9 @@ def is_review_gate(g):
 
 
 def reviews_first(gates):
-    """Fix rounds (2026-10-03): run review gates before the test gates. A review
+    """Fix rounds: run review gates before the test gates. A review
     finding sends the session back for another round, so a test run spent before
-    it is wasted (s04 of finish-plan-follow-ups-2026-10-03: 4,802 s of passing tests before a
+    it is wasted (on one session: over an hour of passing tests before a
     review failed). Stable inside each group; first-pass order is untouched."""
     return sorted(gates, key=lambda g: not is_review_gate(g))
 
@@ -97,7 +97,7 @@ def reviews_first(gates):
 def run_argv(plan_dir, session_id, g, dry_run):
     """Run argv gate `g` for `verify` and return its result dict. A dry run returns
     the gate's `fixture_fake` (or a plain pass) and runs nothing. A real run is
-    timed and logged as a `gate_run` event, as land logs its gates (2026-10-04)."""
+    timed and logged as a `gate_run` event, as land logs its gates."""
     fake = g.get("fixture_fake")
     if dry_run and fake:
         return {"returncode": fake.get("returncode", 0), "stdout": fake.get("stdout", ""),

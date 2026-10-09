@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gearbox.agent-janitor.prune — disk pruner, sleep-safe interval.
+
+  StartInterval 21600 (6h), NOT StartCalendarInterval 03:30: a laptop
+  often sleeps overnight, and man launchd.plist documents that an interval firing
+  missed while asleep is simply MISSED with no catch-up -- a calendar-scheduled
+  nightly prune would essentially never run. Firing every 6h instead means a
+  wake at any time of day still gets a tick within a few hours. The janitor's
+  OWN --apply path (agent_janitor.py, PRUNE_STAMP_NAME) enforces a real
+  once-per-24h cap internally, so the frequent wake-up never over-prunes --
+  see PRUNE_STAMP_INTERVAL_S in agent_janitor.py.
+
+  __HOME__ is substituted by `agent_janitor.py install` at copy-time. Runs the
+  DEPLOYED module (~/.claude/scripts/agent_janitor.py), never this source-tree
+  copy.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gearbox.agent-janitor.prune</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>__HOME__/.claude/scripts/agent_janitor.py</string>
+        <string>prune</string>
+        <string>--apply</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>21600</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>__HOME__/.claude/logs/agent-janitor-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.claude/logs/agent-janitor-launchd.log</string>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

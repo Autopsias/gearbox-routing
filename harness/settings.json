@@ -1,12 +1,100 @@
 {
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
+            "timeout": 10,
+            "statusMessage": "Turn-end guard: open plan work?"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/routing-cadence-check.py",
+            "timeout": 5,
+            "statusMessage": "Checking routing outcome cadence"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/verify-state-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
+            "timeout": 10
+          }
+        ]
+      },
       {
         "matcher": "Write",
         "hooks": [
           {
             "type": "command",
             "command": "~/.claude/hooks/safe-refactor-advisory.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" pre-compact",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" post-compact",
+            "timeout": 10
           }
         ]
       }

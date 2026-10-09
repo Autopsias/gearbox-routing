@@ -1,4 +1,4 @@
-# Route-at-dispatch contract — schema v8 (contract v1, 2026-09-29)
+# Route-at-dispatch contract — schema v8 (contract v1)
 
 **This file is the single statement of record for who picks a session's model and
 effort from plan schema v8 on.** The plan author says what the work is, what is
@@ -6,7 +6,7 @@ risky and how it is checked. The executor (`/plan-execute begin`) says which
 model and effort run it. The builder (`plan-builder`) and the executor both
 change against this text. Where another document disagrees, this file wins.
 
-Frozen by plan session S03 of `_plans/route-at-dispatch-2026-09-29/` (item
+Frozen by plan session S03 of `_plans/example-dispatch-plan-2026-09-29/` (item
 CON-01) before the builder and executor sessions implement it. It changes by a
 superseding plan session that bumps the contract version in this heading, never
 by drift. Cases decided in this session rather than in the plan-harden grill are
@@ -158,7 +158,7 @@ conflict). This contract claims neither answer.
   - before a v8 plan runs on any tree, confirm that tree's
     `plan_version_gate.py` has `SUPPORTED_MAX_SCHEMA` of 8 or more.
 - **The GLM tree.** `~/.claude-glm` keeps its own copy of plan-execute and of the
-  routing file (version 22 on 2026-09-29). `gearbox deploy` does not update it.
+  routing file (version 22). `gearbox deploy` does not update it.
   A v8 plan must not run there until that copy has v8.
 
 ## 4. Overrides
@@ -283,7 +283,7 @@ DECIDED-HERE (plan-harden grill).
     above it, up to and including the write root. Absent ones are recorded, so
     adding one fails as "added". Reason: pytest runs these before any test code
     in the locked file — at collection when the package chain is unbroken, and
-    at `Package` setup across a gap. Probe on 2026-09-29, pytest 9.1.1: a
+    at `Package` setup across a gap. Probe, pytest 9.1.1: a
     two-line `pkg/__init__.py` made a failing `pkg/sub/test_x.py` pass, with and
     without `pkg/sub/__init__.py`. An extension-module `__init__` is imported
     before `__init__.py` (the loader order in `importlib`), so every form counts.
@@ -294,7 +294,7 @@ DECIDED-HERE (plan-harden grill).
   runs every gate with `PYTHONPYCACHEPREFIX` set to a fresh empty folder per
   attempt. Python and pytest's assertion rewriter both honour it
   (`sys.pycache_prefix`), so no cache in the tree or from an earlier attempt is
-  read. Probe on 2026-09-29, Python 3.14.6: a stale cache with a matching
+  read. Probe, Python 3.14.6: a stale cache with a matching
   header loaded the old code; a fresh prefix loaded the edited source.
 - **Out of scope, stated rather than hidden:**
   - Environment variables (`PYTHONSTARTUP`, `PYTHONPATH`, `PYTEST_ADDOPTS`,
@@ -337,7 +337,7 @@ DECIDED-HERE (plan-harden grill). Each worker attempt records:
 | `input_tokens` | **Non-cached input, for every source.** Codex reports `cached_input_tokens` inside `input_tokens`; subtract it, or `model_prices` bills cached tokens twice. |
 | `output_tokens` | Includes reasoning output. |
 | Codex totals | The sum of its `turn.completed` events. |
-| Pricing key | The **served** model id from attestation, never the alias (the `sonnet` alias changed its served model on 2026-09-29). |
+| Pricing key | The **served** model id from attestation, never the alias (the `sonnet` alias changed its served model). |
 | Missing rate | When `model_prices` has no rate for a charged token category (it has none for cache creation today), `cost_usd` is `null` and `cost_source` is `none`. Never price a subset. |
 
 Cost comes only from a reported cost or from `model_prices`, never guessed.
@@ -386,7 +386,7 @@ which every worker attempt has a non-null `cost_usd`**. A session with any
 unpriced attempt is excluded and counted in the entry report, per dispatch path
 (Claude tier agent, zai, Codex).
 
-**Baseline (measured 2026-09-29, before v8).** One unit per
+**Baseline (measured, before v8).** One unit per
 `(project, plan, session, generation)`; the latest attempt row stands for the
 unit. First-pass = latest row `result: passed` at `attempt: 1`. Final-pass =
 latest row `result: passed`. Denominator = units with a terminal result

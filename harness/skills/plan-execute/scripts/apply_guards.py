@@ -77,7 +77,7 @@ def missing_dispatch_receipt(plan_dir, session_id):
     # it: run.ndjson is append-only so the codex event can never be cleared, and
     # keying off it alone pinned the receipt requirement onto every later
     # closeout for a session that has legitimately re-run on Claude (crash
-    # recovery) — measured 2026-08-18, a dead codex dispatch permanently wedged
+    # recovery) — measured, a dead codex dispatch permanently wedged
     # apply. The refusal text already scopes itself to `begin --harness codex`;
     # this makes the condition match that scope. A genuine codex-lane apply
     # (last dispatch_started harness == "codex") still demands its receipt.

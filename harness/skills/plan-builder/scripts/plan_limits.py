@@ -1,6 +1,6 @@
 """Measured limits a plan author should know about -- and why.
 
-Split out of build_plan.py (which sits at its file-size baseline) on 2026-08-20.
+Split out of build_plan.py (which sits at its file-size baseline).
 Both numbers here come from measurements, and both exist because an LLM review
 pass is a SAMPLE of a diff, not an audit: SWE-PRBench (2026) measures frontier
 reviewers at 15-31% recall per pass, falling as the diff grows. A session that is
@@ -12,14 +12,14 @@ verify-gates.md, "Sizing the surface".
 import re
 import sys
 
-#: `verify.max_rework` default. 1 -> 2 on 2026-08-20, measured: at 1 the loop is
+#: `verify.max_rework` default. 1 -> 2, measured: at 1 the loop is
 #: one review, one fix, one re-review -- nothing is left for the reviewer to
 #: verify the fix. Over 21h / two plans, 16 of 17 verify failures were one LLM
 #: review gate, and sessions halted at 1-2 on the reviewer's second SAMPLE.
 DEFAULT_MAX_REWORK = 2
 
 #: `verify.max_rework` CEILING -- the largest value `build_plan.validate_spec`
-#: accepts. 5 -> 6 on 2026-08-21, then 6 -> 7 on 2026-08-25 when routing SSOT
+#: accepts. 5 -> 6, then 6 -> 7 when routing SSOT
 #: v21 (96570b6) armed `opus@xhigh` as an escalation rung and lengthened every
 #: ladder that passes through opus by one. Re-measured against the live SSOT
 #: with `resolve_route.escalate`: the longest escalation ladder any legal
@@ -34,7 +34,7 @@ DEFAULT_MAX_REWORK = 2
 #: number that still cannot get there, which reads as compliance and is not.
 MAX_REWORK_CEILING = 7
 
-#: Declared WRITES per session -- files, not prompt chars -- measured 2026-08-20
+#: Declared WRITES per session -- files, not prompt chars -- measured
 #: over every plan on this machine: 74 sessions / 18 plans, median 3, p75 5,
 #: p90 6, max 13. Review burden is set by what a session TOUCHES (patch size +
 #: files predict it at AUC 0.957 on 33k agent-authored PRs). The 10-file session
@@ -73,7 +73,7 @@ def wide_sessions(declared_writes, limit=SESSION_TOUCHES_P90):
 #: replaces survives in another. Structural validation cannot see it, because
 #: prose is not a reference the schema resolves.
 #:
-#: Measured 2026-08-21 over every plan on this machine (29 plans), counted by HIT
+#: Measured over every plan on this machine (29 plans), counted by HIT
 #: and not by plan -- the first pass counted plans, called it 5 of 29, and hid a
 #: 33% precision rate inside a number that looked fine. Raw: 12 hits, of which
 #: only 4 were real. The 8 others were a path segment (3), a split annotation
@@ -85,7 +85,7 @@ _SESSION_REF = re.compile(r"\bs\d{2}[a-z]?\b")
 #: A negation immediately before the id ("no s04b exists", "s07 no longer runs").
 _NEGATED = re.compile(r"\b(no|not|never|nor|without|neither)\b[^.!?]{0,40}$", re.I)
 
-#: Lines inside a heredoc in a session prompt. Measured 2026-08-21: across every
+#: Lines inside a heredoc in a session prompt. Measured: across every
 #: plan on this machine NO session prompt carries a heredoc at all, and the one
 #: that ever did -- a 139-line arming program -- sat at 8, then 8, then 6 open
 #: review findings across three hardening rounds, and closed all six the moment
@@ -154,7 +154,7 @@ def stale_session_refs(spec):
     KNOWN GAP: `plan_mutate.retire_session` KEEPS the id in `sessions` (status
     RETIRED), so prose pointing at a retired session is stale in meaning and
     invisible here -- only a session that leaves the spec entirely is caught. No
-    plan on this machine carries a retired session today (measured 2026-08-21),
+    plan on this machine carries a retired session today (measured),
     so this is a gap on paper, not an observed miss."""
     live = {s.get("id") for s in spec.get("sessions") or []}
     out = []
@@ -176,7 +176,7 @@ def stale_item_refs(spec):
     that prefix and no item has that id. Deriving the prefixes from the plan
     itself is what keeps ordinary English out -- an untethered `[a-z]+-\d+` match
     reads "top-10" and "task-10" as ids (measured: 2 of 3 hits were exactly that).
-    Measured 2026-08-21: one plan references a dropped `cal-01` five times while
+    Measured: one plan references a dropped `cal-01` five times while
     carrying only `cal-02` and `cal-03`."""
     live = {i.get("id") for i in spec.get("items") or []}
     prefixes = {i.rsplit("-", 1)[0] for i in live if re.match(r"^[a-z0-9]+-\d+$", i or "")}
@@ -254,7 +254,7 @@ def plan_risk_warnings(spec, declared_writes=None):
             f"{EMBEDDED_PROGRAM_LINES}+ lines: "
             + ", ".join(f"{sid} (<<{tag}, {n} lines)" for sid, tag, n in progs)
             + ". A review pass reads prose and cannot run code, so an embedded program is the "
-            "one part of a prompt hardening cannot close -- measured 2026-08-21, one stayed at "
+            "one part of a prompt hardening cannot close -- measured, one stayed at "
             "6-8 open findings for three rounds and closed entirely once it moved into a script "
             "with tests. Have the session BUILD the script and run it, or point it at one that "
             "already exists. Advisory."

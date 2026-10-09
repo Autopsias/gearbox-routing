@@ -145,8 +145,8 @@ def write_ndjson(path, rows):
                             for r in rows))
 
 
-def dyno_root(tmp_path, activations=(), decisions=(), sessions=(), version=1, policies=None):
-    root = tmp_path / "dyno"
+def state_root(tmp_path, activations=(), decisions=(), sessions=(), version=1, policies=None):
+    root = tmp_path / "gearbox-state"
     (root / "policy").mkdir(parents=True)
     write_ndjson(root / "activations.ndjson", activations)
     write_ndjson(root / "decisions.ndjson", decisions)

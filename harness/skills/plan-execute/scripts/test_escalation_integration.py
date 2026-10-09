@@ -279,7 +279,7 @@ GATE_MUTE = {"redx": {"kind": "argv", "argv": [
 
 
 def test_plant_an_unattributable_failure_never_buys_a_rung(tmp_path, capsys):
-    """THE EXPENSIVE HALF of the stuck protocol's signature defect (D2, 2026-08-15).
+    """THE EXPENSIVE HALF of the stuck protocol's signature defect (D2).
 
     `climb_steps` buys a model rung off the same-signature counter, so a streak
     whose excerpt identifies NOTHING would climb on evidence that was never
@@ -311,7 +311,7 @@ def test_allow_an_attributable_failure_still_buys_its_rung(tmp_path, capsys):
 
 
 def test_the_ledger_records_the_mechanism_that_ACTUALLY_bound_the_effort(tmp_path, capsys):
-    """D3 (2026-08-15). `effort_mechanism` is the one field that answers "did the
+    """D3. `effort_mechanism` is the one field that answers "did the
     escalated tier's effort actually bind?" — and it was WRONG on exactly the
     escalated rungs that question is about.
 
@@ -624,7 +624,7 @@ def _loop_announce(root, capsys):
 
 # --------------------------------------------------------------------------
 # 5z. THE BYPASS — the ladder is computed in `begin`; nothing else may re-run a
-#     rework. Measured 2026-08-21 (gearbox-iso plan-level-git-isolation s02):
+#     rework. Measured on an isolation plan:
 #     one `begin`, eight rework verdicts, zero re-dispatches — the orchestrator
 #     fixed the findings inline and re-ran the gates on the closeout that had
 #     just failed, 20 times; 11 armed records across the ledger, 0 climbs.

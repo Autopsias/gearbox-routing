@@ -79,6 +79,12 @@ git config core.hooksPath .githooks   # required if you will ever push — see b
 > private. See [`GENERICIZATION.md`](GENERICIZATION.md) §"Why CI cannot scan for
 > identifiers".
 
+> **What CI tests.** The verify workflow runs pytest on `claude/` and
+> `scripts/` only, with an empty `HOME`. It does **not** run the tests under
+> `harness/`: that tree is a synced copy of a private deployment, and many of
+> its tests expect a live `~/.claude`, macOS, or tools a CI runner lacks. If
+> you change `harness/`, run its tests locally.
+
 > **The default install target is a fresh directory — never your real
 > `~/.claude`.** Run it against a throwaway dir first. Pointing it at your
 > live `~/.claude` requires *both* `--claude-home "$HOME/.claude"` **and**
@@ -86,7 +92,7 @@ git config core.hooksPath .githooks   # required if you will ever push — see b
 > — see `install.sh --help`.
 
 `--provider` picks which shipped example profile (`anthropic` / `openai` /
-`gemini`) becomes `active_provider:`. `--accept-example-profile` is required
+`gemini` / `zai`) becomes `active_provider:`. `--accept-example-profile` is required
 because the shipped profiles are verify-before-use examples, not your
 researched policy — pass `--profile <your-file>` instead once you have one.
 
@@ -120,6 +126,34 @@ guard — a non-zero exit means the install left drift, not a clean pass.
   working: over/under-modeled tasks, cost outliers, receipt mismatches
   against `MISROUTES.md`. It never edits the policy file itself — findings
   route back through `/routing-update`.
+
+## What is new in the harness
+
+The `harness/` tree is a synced copy of a working Claude Code setup. The latest
+refresh adds the parts below; each links to the file to read first.
+
+- **Plan runner upgrades** — per-plan branches and worktrees, a land stage,
+  output-judged gates. See `harness/skills/plan-execute/`.
+- **Skills** — review, cost, repo-health and harness-cleanup skills. Browse
+  `harness/skills/` (start with `adversarial-review`, `cost-audit`, `repo-health`).
+- **Guard and compaction hooks** — stop risky git and plan-state commands, and
+  manage context compaction. See `harness/hooks/` and the hook list in
+  [`ARCHITECTURE.md`](ARCHITECTURE.md) §7.
+- **Agent janitor** — `harness/scripts/agent_janitor.py`. **macOS only, and it
+  kills processes and deletes files without asking.** Nothing runs until you
+  install it, and its session-end hook is opt-in (snippet in
+  [`ARCHITECTURE.md`](ARCHITECTURE.md) §7).
+- **Machine governor (`govrun`)** — `harness/scripts/govrun.py` queues heavy
+  test runs. Its slot locks live under your home directory
+  (`~/.machine-governor`, or `GOVRUN_STATE_DIR`).
+- **Quality ratchet, efficiency rule, status line and route resolver** —
+  `harness/scripts/quality/`, `harness/rules/llm-review-and-agent-efficiency.md`,
+  `harness/scripts/statusline.sh`, `harness/scripts/resolve_route.py`.
+
+Installing: `install.sh` is unchanged and installs only the routing policy.
+To use the harness, copy the parts you want from `harness/` into your Claude
+home. Most hooks in `harness/settings.json` skip themselves when their file is
+missing; two do not (see [`ARCHITECTURE.md`](ARCHITECTURE.md) §7). Read the changelog entry before you copy the janitor or the governor.
 
 ## Further reading
 

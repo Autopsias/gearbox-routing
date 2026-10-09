@@ -1,7 +1,7 @@
 """A findings LEDGER per session, so a rework round VERIFIES fixes instead of
 RE-SAMPLING the whole surface.
 
-WHY, measured 2026-08-20 over 21h and two plans: 16 of 17 verify failures were
+WHY, measured over 21h and two plans: 16 of 17 verify failures were
 `llm-review-medium`, and the loop never converged. Each rework round handed the
 reviewer the session's ENTIRE accumulated diff with no memory of the last round,
 so round 2 raised findings on round-0 files that round 1 had simply not sampled.
@@ -22,7 +22,7 @@ OUTSIDE the delta. Then:
   attempt >= 2   the reviewer is handed ONLY the fix delta (`review_focus`), so
                  a finding outside it cannot be raised at all.
 
-MEASURED 2026-08-22, across 28 plans / 153 verified sessions / 125 findings.
+MEASURED, across 28 plans / 153 verified sessions / 125 findings.
 Classification alone did not terminate the loop, because the reviewer was still
 handed the WHOLE session diff every round and that diff only ever grows: s02 ran
 41 -> 47 files over nine rounds, s06 16 -> 32 over eight. 105 of 125 findings
@@ -99,7 +99,7 @@ def load_accepted(plan_dir, session):
 
     KEYED ON A PHRASE, NEVER ON THE FINDING ID. The id hashes the whole summary
     and the reviewer rewords its summary between attempts, so one deferred gap
-    arrived under two different ids on attempts 4 and 5 (2026-09-08). A phrase
+    arrived under two different ids on attempts 4 and 5. A phrase
     that survives the rewording is the only key that keeps matching.
 
     This CANNOT clear a real regression by itself: it names one file and one
@@ -350,7 +350,7 @@ def narrow_to_delta(ctx, changed, new_files):
         # this is a FAIL, not "nothing to review". Scored INDETERMINATE it went
         # down verify's transport-retry path and halted the plan as `blocked`,
         # which plan_mutate treats as in flight -- no retire, no amend, and a
-        # resume only repeated the indeterminate (g1-integration, 2026-10-02).
+        # resume only repeated the indeterminate (g1-integration).
         return set(), changed, new_files, (
             f"llm-review: FAILED — attempt {ctx.attempt} and no file in the reviewed "
             f"surface changed since attempt {ctx.attempt - 1}, which left "
@@ -359,7 +359,7 @@ def narrow_to_delta(ctx, changed, new_files):
                         f"[{p.get('severity')}]  {p.get('summary')}" for p in ctx.priors))
     if not focus and reviewed_unchanged(ctx):
         # THE PASS TWIN: a land re-gate after main moved hit INDETERMINATE here on
-        # every retry, and an argv gate cannot be waived (2026-10-06).
+        # every retry, and an argv gate cannot be waived.
         return set(), changed, new_files, (
             f"llm-review: PASSED — attempt {ctx.attempt} and the reviewed surface is "
             f"byte-identical to attempt {ctx.attempt - 1}, which was reviewed and left "
@@ -392,13 +392,13 @@ def judge(ctx, parsed, floor=None):
     recs, seen = [], set()
     for f in parsed:
         pid = f.get("prior_id")
-        if pid and pid not in prior_by_id and pid in known:
-            # A prior the FLOOR already demoted. The reviewer is right that it is
-            # still there; it is still not worth a dispatch. Carried at its own
-            # severity -- never re-blocked, and never duplicated as a new finding
-            # with no severity, which would fail closed and pin the session.
+        # A prior the FLOOR demoted (or the owner accepted): carried, never re-blocked.
+        # NOT a fixed HIGH echoed by id, nor one re-raised past the floor.
+        k = known.get(pid) if pid not in prior_by_id else None
+        if k and (k.get("status") == "accepted" or not (
+                blocks(k.get("severity"), floor) or blocks(f.get("severity") or k.get("severity"), floor))):
             counts["noted"] += 1
-            recs.append({**known[pid], "kind": "finding", "attempt": a,
+            recs.append({**k, "kind": "finding", "attempt": a,
                          "status": "noted", "evidence": f.get("summary")})
             continue
         if pid and pid in prior_by_id:
@@ -445,7 +445,7 @@ def judge(ctx, parsed, floor=None):
         # fixed, and its silence is not evidence either way. Counting it OPEN makes
         # the gate unpassable for the rest of the session -- which is exactly what
         # narrowing `review_scope` does to priors raised before the narrowing
-        # (found by the plan-level-git-isolation session, 2026-08-20). Recorded,
+        # (found by the example-isolation-plan session). Recorded,
         # counted and printed, never silently dropped.
         if surface and _norm(p.get("file") or "") not in surface:
             counts["prior_unverifiable"] += 1

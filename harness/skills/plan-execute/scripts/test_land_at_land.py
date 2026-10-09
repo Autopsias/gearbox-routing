@@ -91,7 +91,7 @@ def test_a_failing_at_land_gate_parks_and_pushes_nothing(fx):
 
 
 def test_land_ack_refuses_a_gate_inherited_park(fx):
-    # LND-14 stop rule (finish-contract.md, 2026-10-04): there is no way to accept
+    # LND-14 stop rule (finish-contract.md): there is no way to accept
     # an inherited red gate, so a `gate-inherited` park cannot be acked through.
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")

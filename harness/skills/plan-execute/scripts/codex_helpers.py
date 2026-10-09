@@ -79,7 +79,7 @@ providers:
   openai:
     calibration:
       status: {openai_status}
-    # RE-POINTED TO THE REAL THREE-TIER SHAPE (s03, 2026-08-13), as the v1.15 note
+    # RE-POINTED TO THE REAL THREE-TIER SHAPE (s03), as the v1.15 note
     # here said it would be. The `workhorse` tier is GONE with gpt-5.5, which is
     # precisely why dial-driven translation no longer matches Claude tier NAMES
     # against OpenAI tier names: `sonnet` is workhorse under providers.anthropic,

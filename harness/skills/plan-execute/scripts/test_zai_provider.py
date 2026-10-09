@@ -1,4 +1,4 @@
-"""providers.zai — the GLM substrate lane (v1.21, 2026-08-30).
+"""providers.zai — the GLM substrate lane (v1.21).
 
 Covers the three zai mechanisms (lane logic in provider_lane.py, wiring in run.py):
   * provider RESOLUTION — PLAN_EXECUTE_ROUTING_PROVIDER env, then CLAUDE_CONFIG_DIR

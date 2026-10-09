@@ -86,7 +86,7 @@ def check(plan_dir, timeout=20):
     url = html_path.resolve().as_uri()
     # Own process group, killed whole on EVERY exit: subprocess.run(timeout=)
     # kills only Chrome's main process, and its forked helpers were found
-    # reparented to PID 1 and still running 23 h after a test (2026-09-27).
+    # reparented to PID 1 and still running 23 h after a test.
     proc = None
     try:
         proc = subprocess.Popen(

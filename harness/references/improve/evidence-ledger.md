@@ -245,7 +245,7 @@ One wrinkle on the very first run: until the file is tracked it classifies as
 `live_untracked`, and deploy's routine harvest stages tracked modifications only. It
 blocks nothing, but an explicit `gearbox harvest` is what first commits it.
 
-`improve-learnings.md` moved into `[live-state]` in the same decision (2026-08-23).
+`improve-learnings.md` moved into `[live-state]` in the same decision.
 The Save Learnings step writes both files on every run, but only the ledger was new;
 the learnings file had been classified as harness source, so each `/improve` run left
 behind drift that aborted the next deploy.

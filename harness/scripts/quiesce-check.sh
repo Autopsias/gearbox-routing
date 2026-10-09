@@ -4,7 +4,7 @@
 #                                      Exit 2 = COULD NOT INSPECT (harder stop).
 #
 # PROVENANCE: this is the S03A cutover gate, adversarially reviewed to APPROVED@r3
-# (_evidence/s03a/CUTOVER-PROCEDURE.md §1.2 + CUTOVER-PROCEDURE-REVIEW-LOG.md), promoted
+# (a cutover procedure and its review log), promoted
 # from a one-shot cutover artifact into the permanent deploy path at S04. The gate logic
 # is UNCHANGED. Only the four values that were hardcoded to that one cutover were lifted
 # into environment inputs so `scripts/gearbox deploy` can supply them per run:
@@ -123,7 +123,7 @@ fi
 
 # --- Q2 HARD: tracked surface is not churning ------------------------------
 # Q2 honours the SAME narrow/strict scope as Q1 — otherwise narrow mode is defeated by
-# its own churn probe. Measured 2026-07-25T16:25Z: the newest mtime on the tracked
+# its own churn probe. Measured: the newest mtime on the tracked
 # surface WAS a foreign session's auto-memory file, so an unscoped Q2 reds on exactly
 # the writes narrow mode exists to tolerate.
 # A tracked file DELETED on disk is an OBSERVABLE FACT, not an inspection failure —
@@ -138,7 +138,7 @@ fi
 # stat failure on a file that EXISTS is still fatal — that is a real inspection error.
 # The filter is python3 (already a hard dependency above), NOT awk: this platform's awk
 # does not honour RS='\0', so a NUL-separated filter silently emits NOTHING and the gate
-# dies "probe returned nothing" on every run — measured here 2026-08-22 while writing
+# dies "probe returned nothing" on every run — measured while writing
 # this fix, and caught only because the known-positive probe ran the CLEAN-tree control
 # too. `lexists` is the exact condition `stat` cares about, and it covers any missing
 # path, not only a git-known deletion.

@@ -37,7 +37,7 @@ system fonts — CSP-safe, works offline):
 
 HTML artifacts from this pattern **never enter your-vault typed zones**
 (`10 People/` … `70 Decisions/`). Legal homes: plan session dirs
-(`_plans/<slug>/_evidence/...`), `99 Workspace/` scratch, or `~/.claude/`.
+(`_plans/<slug>/_evidence/...`), `<workspace-folder>/` scratch, or `~/.claude/`.
 The vault's typed zones are markdown-only knowledge; a decision-card HTML is
 a transient interaction surface, not vault content.
 

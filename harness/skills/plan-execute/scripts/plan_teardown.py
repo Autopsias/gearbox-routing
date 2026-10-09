@@ -29,7 +29,7 @@ resolves through — reads its slug FROM that claim, so clearing it mid-cleanup
 made every later read of this plan's own land history (``lst.load``) return
 ``None``, breaking idempotent resume, `land-status`, and ten pre-existing
 tests that inspect ``landed_sha``/``final_record_sha`` after a landed result.
-MEASURED 2026-08-22 in this session's own fixture. The worktree teardown is
+MEASURED in this session's own fixture. The worktree teardown is
 reused at the ``worktree.py`` layer instead — one level below where the claim
 gets touched.
 

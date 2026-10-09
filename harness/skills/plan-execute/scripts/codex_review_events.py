@@ -9,10 +9,9 @@ reason (an unreadable one, which retries).
 
 WHY THIS IS NOT A GREP OVER THE LOG. That stream is not a transcript of errors.
 It carries the per-turn token usage and the `aggregated_output` of every command
-the reviewer ran — i.e. the source under review. Measured against a recorded run
-(`_plans/memo-loop-skill-2026-08-04/_evidence/s02/adversarial-review-codex.md.jsonl`):
-44 `command_execution` items, one carrying 10 KB of a file's text, 4
-`agent_message`, 2 `error` items and neither about quota. A free-text search over
+the reviewer ran — i.e. the source under review. Measured against a recorded review run:
+dozens of `command_execution` items, one carrying a whole file's text, a few
+`agent_message` and `error` items, and no error about quota. A free-text search over
 that reads `"input_tokens": 4291` as a 429, and reads the pattern below — this
 file's own source, whenever the gate reviews these scripts — as a refusal. Both
 stamp `cross_family_unavailable` on a reviewer that never refused AND skip the

@@ -162,7 +162,7 @@ def test_plant_a_different_error_is_a_different_signature():
 # original normaliser broke on exactly that shape: `\b\d+\b` left the digit glued
 # to a letter in `in 12.34s`, and pytest's summary banner (which matches _ERRORISH
 # and comes last) won the locus. Two runs of the SAME failing test therefore
-# signed differently and the protocol never armed. Regression found 2026-08-13 by
+# signed differently and the protocol never armed. Regression found by
 # the acceptance review of plan-framework-upgrade.
 _PYTEST_FAIL = (
     "FAILED test_worktree.py::test_merge_producer_first - "
@@ -246,7 +246,7 @@ def test_plant_rework_feedback_stays_quiet_on_two_different_errors(plan):
 # --------------------------------------------------------------------------
 # RS-03 / D2 — a REVIEW gate's root cause is its FINDINGS, not its banner
 # --------------------------------------------------------------------------
-# Found 2026-08-15 by running the loop, not by reading it. `llm-review-*` ends
+# Found by running the loop, not by reading it. `llm-review-*` ends
 # every failing run with the same sentence, and the findings themselves contain no
 # error word — so that sentence was the only line `_ERRORISH` matched and EVERY
 # review-gate failure signed `6c61d90dec14`. Two unrelated findings read as one
@@ -358,7 +358,7 @@ def test_allow_two_identical_review_findings_still_arm(plan, tmp_path):
 # --------------------------------------------------------------------------
 # RS-03 / D3 — the same root cause SURVIVING a rework is a repeat
 # --------------------------------------------------------------------------
-# Measured 2026-08-20 over 182 outcome records: 40 cohorts needed >=2 attempts,
+# Measured over 182 outcome records: 40 cohorts needed >=2 attempts,
 # exactly ONE ever changed model or effort, and `escalated_from` was null on all
 # 182. The ladder was fine; the signature was not. Signing the SET of findings
 # makes `consecutive` reset to 1 on every attempt of a working rework loop —
@@ -613,8 +613,8 @@ def test_the_PRODUCTION_indeterminate_route_arms_and_still_charges_nothing(plan,
     to `rework._indeterminate`, which is the only path production takes, since
     every llm-review-* entry in both registries declares that exit. So the arming
     proved above was unreachable: a reviewer could time out forever and nothing
-    would suggest splitting the session. Measured 2026-08-20 on s04 -- two 900s
-    timeouts on a 5,543-line surface, nothing armed (review, 2026-08-20).
+    would suggest splitting the session. Measured on s04 -- two 900s
+    timeouts on a 5,543-line surface, nothing armed (review).
 
     Both halves matter: it must ARM (a repeat is a repeat) and it must NOT charge
     the agent's rework budget for the harness's own timeout."""

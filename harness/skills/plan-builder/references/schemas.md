@@ -133,7 +133,7 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
 - **`open_questions`** (array of strings, optional; 2026-08-01) — the fog register: decisions the interview surfaced but could not state sharply enough to resolve or assign to a decision session. Each entry should name the question plus what would sharpen it (e.g. "Which auth provider? — sharpens after the s02 spike"). Rendered as a static "Open decisions" dashboard section and carried into `manifest.json`, where plan-harden's `decision-debt` lint cross-checks it against session prompts. Prefer an explicit decision session over an entry here whenever the question can already be stated precisely — this list is for what genuinely can't be sharpened yet, not a parking lot for avoidable ambiguity.
 - **`serial_reason`** (string, optional; 2026-08-12, PL-03) — why this plan is a **chain** rather than a fan-out. Its only effect: it silences the pure-chain warning `validate_spec()` raises when every dependency layer is one session wide (see "Parallel groups" below). Non-empty or omitted — a blank string is refused, because it would silence the warning without answering it. Carried into `manifest.json`, so plan-harden's parallelization lint reads the author's stated reason instead of re-flagging a chain that was already justified. Good reasons: one hand on one interface, a migration that must land in order, a spike whose result reshapes the next session. Not a reason: "it was easier to write".
 - **`plan_schema_version`** (integer, optional; **a NEW spec should declare `plan_schema_version: 8`**, which also requires `task_class` on every session and `touches` on every item — see "Schema v8" below) — the spec's own opt-in. Build-time requirements key off it, each deliberately unenforced when it is absent so that specs written before the feature existed (and the live plans `plan_mutate` re-validates on every add/amend/retire) keep validating exactly as they did: the mandatory per-item **prior-art decision** at `>= 4` (`PRIOR_ART_MIN_SCHEMA`), the **parallel-group contract** at `>= 3` (`PARALLEL_CONTRACT_MIN_SCHEMA`), and the "Schema v8" rules at `8`. It also picks the stamp `gen_manifest` writes on the OUTPUT manifest: a fresh build stamps 8 only when the spec declares 8, and any other spec stamps 7. `--preserve-state` keeps the prior manifest's stamp and refuses a rebuild across the v8 boundary. A spec above 8 is refused.
-- **`research_env`** (object, **written by the builder — never authored by hand**; RS-06, 2026-08-13) — the build-time research-environment record. `build_plan.build()` stamps it onto `spec.json` (and `gen_manifest` copies it into `manifest.json`) whenever *any* item carries a `research_status`, so the machine's own account of the environment sits beside the author's prose instead of the skip record being purely hand-written. Shape: `{available, signals[], sources[], method, probed_at}` — `signals` names each capability found (`mcp:exa`, `builtin:WebSearch`), `sources` names each config file actually read, `method` restates the probe's limits verbatim. Absent from a spec that makes no skip claim, which is every plan built before 2026-08-13 — that is what keeps `plan_mutate`'s "manifest.json == `gen_manifest(spec.json)`" check passing on existing plans. `gen_manifest` READS it off the spec and never re-probes, so regenerating a manifest on another machine reproduces the same bytes.
+- **`research_env`** (object, **written by the builder — never authored by hand**; RS-06) — the build-time research-environment record. `build_plan.build()` stamps it onto `spec.json` (and `gen_manifest` copies it into `manifest.json`) whenever *any* item carries a `research_status`, so the machine's own account of the environment sits beside the author's prose instead of the skip record being purely hand-written. Shape: `{available, signals[], sources[], method, probed_at}` — `signals` names each capability found (`mcp:exa`, `builtin:WebSearch`), `sources` names each config file actually read, `method` restates the probe's limits verbatim. Absent from a spec that makes no skip claim, which is every plan built before 2026-08-13 — that is what keeps `plan_mutate`'s "manifest.json == `gen_manifest(spec.json)`" check passing on existing plans. `gen_manifest` READS it off the spec and never re-probes, so regenerating a manifest on another machine reproduces the same bytes.
 - **`notify_on_complete`** (object, optional) — Symmetric companion to `notify_on_halt` for unattended (`--auto`) runs. Shape: `{"command": "<string>"}`. Fires ONCE when `/plan-execute` reports the plan complete (idempotent via a `complete_notified` run-state flag), same safety envelope (`shell=False`, ~10s, swallowed failures), with env vars `PLAN_DIR`, `PLAN_TITLE`, `PLAN_STATUS=complete`. The "you can stop watching now" ping — point it at a Slack/desktop/webhook script.
 - **`explainer`** (object, optional; 2026-08-24, eli5-derived) — renders "The plan, explained": a picture-first section that tells a newcomer what the plan does and where it stands. Content rules come from the eli5 skill (`../eli5/SKILL.md` → "Rules for the page"); validation + render live in `scripts/explainer.py`. The section's live half — step status colors, the "You are here" badge, and the "Where we are" paragraph — is repainted in the browser on every load from the sessions' `data-status`, exactly like the donuts, so `/plan-execute` never writes it and it can never go stale. Shape:
   - **`chain`** (array, required, 2–5 steps) — the causal chain. Each step: `label` (short name), `caption` (one plain sentence: what this step changes), `sessions` (list of session ids this step covers — unknown ids are a build error; a session in no step only draws an advisory warning), optional `unlocks` (one plain sentence: what becomes possible when the step is done — this is the causal link the "Where we are" text quotes). More than 5 steps warns: merge until each step carries a cause the next one needs.
@@ -171,9 +171,9 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
 - **`tweak_likelihood`** (`"high"` | `"medium"` | `"low"`, optional) — Flags an item as a judgment call likely to be revisited (a schema choice, an ambiguous tradeoff). Any item carrying this field is pulled into a static "Decision hotspots" section rendered above the Session Plan, sorted high→low, so the reader sees the plan's riskiest calls before the execution order. Omit entirely for routine items — the section itself disappears from the build when no item uses the field.
 - **`alternatives`** (array of strings, optional) — The roads not taken for that decision. Rendered under the item's `why`/description in the hotspots section. Only meaningful alongside `tweak_likelihood`.
 
-#### Prior-art decision (item-level — MANDATORY, one of two shapes, 2026-08-12)
+#### Prior-art decision (item-level — MANDATORY, one of two shapes)
 
-<!-- RS-01/RS-02, plan-framework-upgrade-2026-08-12 s09 -->
+<!-- RS-01/RS-02, example-upgrade-plan-2026-08-12 s09 -->
 
 The interview's prior-art pass (see `SKILL.md` → "Prior-art pass") asks one bounded
 research question per item — does a proven solution already cover this scope? — and
@@ -216,7 +216,7 @@ research step silently while build and harden stay green.
     explicit "skipped-with-notice" path: it must never be indistinguishable from a
     silently omitted `prior_art`. Rendered inside the agent-spec as a
     "Prior art — research skipped" note.
-  - **`"unavailable"`** *(RS-06, 2026-08-13)* — **the research tooling was not there.**
+  - **`"unavailable"`** *(RS-06)* — **the research tooling was not there.**
     This is the ONE claim the builder adjudicates instead of accepting: at build time
     `validate_spec` runs `probe_research_tools()` and **refuses the spec** if that probe
     can see research capability configured in this environment, naming exactly what it
@@ -254,7 +254,7 @@ research step silently while build and harden stay green.
 - **`title`** (string, required)
 - **`model`** (`"Haiku"|"Sonnet"|"Opus"|"Fable"` — or a Codex token `"gpt-5.6-sol"|"gpt-5.6-terra"|"gpt-5.6-luna"`, required below `plan_schema_version` 8; at v8 an optional override — see "Schema v8" below) — Drives the model chip color (teal / blue / amber / violet — Codex tokens all share one slate "Codex" color). Free-form tolerant at render time: any value gets a chip, but only these seven tokens have a dedicated color (unknown names fall back to Sonnet's) — and `build_plan.py` warns at build time when a value won't normalize to a dispatchable token (fable/opus/sonnet/haiku/gpt-5.6-sol/gpt-5.6-terra/gpt-5.6-luna), since `/plan-execute` would then omit `model` and the subagent inherits the orchestrator's model. A session pinned to a Codex token dispatches under `/plan-execute --harness codex` (Codex CLI) instead of the Cowork picker — see "Codex rubric" below for the model-per-kind map.
 - **`effort`** (string, optional) — Free-form **size / wall-clock** estimate, e.g. `"S"`, `"~2h"`, `"half day"`. This is *time weight*, NOT cognitive depth — for depth use `reasoning`.
-- **`reasoning`** (`"low"|"medium"|"high"|"xhigh"|"max"`, optional) — **Cognitive-effort tier**, orthogonal to `effort`. Renders as a `◐`-prefixed chip (grey / blue / amber / orange / pink) and is carried into `manifest.json` so the runner can size the dispatched model's thinking budget. Signals how much thinking depth the session needs: mechanical → `low`; standard build → `medium`; coding / agentic / integration → `high` (**the coding/agentic default — on Sonnet, `xhigh` is a dead rung on our own calibration run (a small accuracy gain for materially higher cost); from `high`, escalate MODEL, not effort**); ambiguous design tradeoffs / deep reasoning → `Fable` at `low`; reserve `max` for open-ended or irreversible calls (never on Opus — see the rubric). `xhigh`/`extra` are synonyms; `Haiku` rejects the reasoning dial entirely (pair it with `low`).
+- **`reasoning`** (`"low"|"medium"|"high"|"xhigh"|"max"`, optional) — **Cognitive-effort tier**, orthogonal to `effort`. Renders as a `◐`-prefixed chip (grey / blue / amber / orange / pink) and is carried into `manifest.json` so the runner can size the dispatched model's thinking budget. Signals how much thinking depth the session needs: mechanical → `low`; standard build → `medium`; coding / agentic / integration → `high` (**the coding/agentic default — on Sonnet, `xhigh` is a dead rung on our own calibration run (a small accuracy gain for materially higher cost); from `high`, escalate MODEL, not effort**); ambiguous design tradeoffs / deep reasoning → `Fable` at `low`; reserve `max` for open-ended or irreversible calls (never on Opus — see the rubric). `xhigh`/`extra` are synonyms; `Haiku` (5.5) takes the dial, but pair it with `low` — medium measured no better on real tasks and is slower.
 - **`human_summary`** (string, optional, *strongly recommended*) — One or two sentences in plain English about what this session achieves. Rendered in serif at 18px — the most prominent text on the card. The human reader reads this first.
 - **`deliverable`** (string, optional, *recommended*) — Concrete outcome at session end. Rendered as a green callout.
 - **`why_model`** (string, optional; at v8 required with an override, refused without one) — One sentence rationale for the model choice. Rendered as italic line.
@@ -326,7 +326,7 @@ Don't default every session to Sonnet / medium. Match the tier to the work. The 
 
 | Session kind | `model` | `reasoning` | `effort` | Why |
 |---|---|---|---|---|
-| Mechanical (rename sweep, formatting, codemod, doc edits) | `Haiku` | `low` | S | Well-specified, no judgement — fast + cheap wins. Haiku rejects the reasoning dial; keep it at `low`. |
+| Mechanical (rename sweep, formatting, codemod, doc edits) | `Haiku` | `low` | S | Well-specified, no judgement — fast + cheap wins. Haiku 5.5 takes the dial; `low` is the measured pick. Not for build work: on real tasks it passes as many as Sonnet but takes ~3x the time. |
 | Standard build (CRUD, wiring, templated features, test scaffolds) | `Sonnet` | `medium` | M | **Sonnet is the broad workhorse** (Sonnet 5.5 since 2026-09-28; Sonnet 5 from 2026-06-30) — near-Opus on coding/agentic at half the Opus price. The Sonnet cells here are Sonnet 5 measurements; 5.5 recalibrated its effort levels (SSOT v29). Defined scope at `medium` is its sweet spot. |
 | Integration / multi-file refactor / non-obvious debugging | `Opus` | `high` | M–L | On our own calibration run, **`Opus 5`·`high` dominates `Sonnet`·`high`** on the hard-agentic distribution — cheaper AND materially more accurate. `Opus`·`medium` is the cost-saver rung; `Sonnet`·`high` remains reasonable for LIGHTER integration work (the easy distribution isn't covered by the same run). Sonnet's `high`→`xhigh` stays a dead rung. |
 | Architecture, ambiguous tradeoffs, security-sensitive design, hard root-cause | `Opus` | `medium` | L–XL | On our own calibration run, **`Opus 5`·`medium` dominates the old `Fable`·`low` pin on both axes** — Opus 5 (GA 2026-07-24, same $5/$25 as 4.8) inverts the earlier dominance direction. Escalate `medium`→`high` on the two named triggers. **Do not pair Opus with `xhigh`/`max`** — `high`→`xhigh` is a DEAD RUNG (no measurable gain for materially higher cost) and `max` weak (marginal at best); `max` is operator-elected only. |
@@ -361,7 +361,7 @@ as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair `gpt-5
 with any `reasoning` other than `max`; a "cheap" luna session run at a lower tier
 isn't cheaper, it's broken.
 
-#### GLM (zai) resolution — the `~/.claude-glm` tree (v1.21, 2026-08-30)
+#### GLM (zai) resolution — the `~/.claude-glm` tree (v1.21)
 
 **You do not author GLM plans differently.** A plan's `model`/`reasoning` vocabulary
 stays exactly as above — `Opus`/`Sonnet` + `low`…`max` — and the SAME plan directory
@@ -392,7 +392,7 @@ rides the dial, never the model id.
 - **`items`** (array of item IDs, required) — Items completed in this session.
 - **`prompt`** (string, required) — The task body. `build_plan.py` writes it to `sessions/<id>.prompt.md`, wrapped with the item scope, a pointer to `sessions/<id>.context.md`, and the closeout contract. **Write only the task body — don't include closeout instructions yourself.** The subagent reads the generated prompt file; it is never JSON-escaped into the HTML.
 
-  **Two traps that both look like success** *(added 2026-08-21, each cost a lost edit)*:
+  **Two traps that both look like success** *(added, each cost a lost edit)*:
 
   1. **`notes` on a session is the dashboard's RUNTIME notes area, not an authoring field.**
      `--preserve-state` rewrites it, so an authoring statement written into `notes` is silently
@@ -418,7 +418,7 @@ rides the dial, never the model id.
 - **`subagent_type`** (string \| null) — The agent type `/plan-execute` dispatches. `null` (or omitted) = a **fresh `general-purpose` agent**: clean isolated context, and the per-session `model` IS honored. `/plan-execute` resolves it at dispatch to the `tier-<model>-<effort>` agent that binds the session's effort, or — for a cell with no tier agent — to `session-effort-worker`, which inherits the orchestrator's effort. This is the right default for almost every session. A named type (`"Plan"`, `"Explore"`, `"code-reviewer"`, `"epic-implementer"`, …) is also a fresh agent with that type's tools/prompt. The literal `"fork"` is a true fork that inherits the orchestrator's context **and runs the orchestrator's model (the per-session `model` is ignored — build warns)**; reserve it for the rare session that needs the live conversation context. *(Earlier docs called `null` "a fork" — incorrect; omitting `subagent_type` yields a fresh agent, not a fork.)*
 - **`parallel_group`** (string \| null) — Sessions sharing a group whose deps are all satisfied dispatch concurrently in one batch. Members of a group MUST share the same `depends_on` set (validated). A member is bound by the frozen parallel-group contract — see "Parallel groups" below before using it.
 - **`isolation`** (`"worktree"` \| null; 2026-08-12, contract M3) — declares that this group's members run in **separate orchestrator-managed git worktrees** (`git worktree add`). Group-level: every member must carry the same value, and a half-isolated group is refused. `"worktree"` is the ONLY legal value — a typo is refused, never quietly read as "no isolation" — and it never means the Agent tool's own `isolation: "worktree"` parameter, which is barred by name (measured to destroy untracked agent output). Absent/`null` = a shared-tree group, which stays legal.
-- **`review_scope`** (array of repo-relative path prefixes, optional; 2026-08-20) — the directories this session's work lives in, e.g. `["skills/repo-health"]`. `/plan-execute` hands it to the `llm-review-*` gates as `PLAN_EXECUTE_REVIEW_SCOPE`, and the reviewed surface — the untracked list **and** the diff file the reviewer reads — is restricted to it. Declare it whenever another plan may be live in the same checkout: measured 2026-08-20, three rework attempts were charged to sessions for findings in files they never touched, because the surface was the whole tree. Whole-component prefix (`skills/x` does not match `skills/xy`). An empty scoped surface is refused (`INDETERMINATE`), never passed, and every dropped path is printed — so a scope that is *wrong* (the session edited outside it) is visible, not silent. Absent → the whole tree, the pre-2026-08-20 behaviour. **Keep it honest:** a scope narrower than the session's real footprint hides work from review; when in doubt, widen it or leave it out.
+- **`review_scope`** (array of repo-relative path prefixes, optional; 2026-08-20) — the directories this session's work lives in, e.g. `["skills/repo-health"]`. `/plan-execute` hands it to the `llm-review-*` gates as `PLAN_EXECUTE_REVIEW_SCOPE`, and the reviewed surface — the untracked list **and** the diff file the reviewer reads — is restricted to it. Declare it whenever another plan may be live in the same checkout: measured, three rework attempts were charged to sessions for findings in files they never touched, because the surface was the whole tree. Whole-component prefix (`skills/x` does not match `skills/xy`). An empty scoped surface is refused (`INDETERMINATE`), never passed, and every dropped path is printed — so a scope that is *wrong* (the session edited outside it) is visible, not silent. Absent → the whole tree, the pre-2026-08-20 behaviour. **Keep it honest:** a scope narrower than the session's real footprint hides work from review; when in doubt, widen it or leave it out.
 
 #### Build-time advisories on a plan's own text *(2026-08-21)*
 
@@ -429,7 +429,7 @@ Three warnings, printed by `build_plan.py` at build time and folded into every
 | Advisory | Fires when | Why it exists |
 |---|---|---|
 | wide session | a session declares writes across more than `SESSION_TOUCHES_P90` (6) files | one LLM review pass samples a surface that size at 15–31% recall, so rework keeps finding new things in untouched code and the session may not converge |
-| stale prose reference | a session's or item's PROSE names a session id (`sNN`) or an item id (`<prefix>-NN`, where the prefix is one the plan's own items use) that the plan does not have | measured 2026-08-21 over all 29 plans here, counted by HIT: **9 real** — one plan naming a session that was split into `sNNa`/`sNNb`, another naming it three times, and a third referencing a dropped `cal-01` five times while carrying only `cal-02`/`cal-03`. No schema check can see any of them, because prose is not a reference the schema resolves, and the next builder follows it. Four shapes are deliberately skipped — a path segment, a hyphenated compound, a quoted notice, and a sentence that negates the id (*"no s04b exists"*) — without which the sweep runs at 33% precision |
+| stale prose reference | a session's or item's PROSE names a session id (`sNN`) or an item id (`<prefix>-NN`, where the prefix is one the plan's own items use) that the plan does not have | measured over all 29 plans here, counted by HIT: **9 real** — one plan naming a session that was split into `sNNa`/`sNNb`, another naming it three times, and a third referencing a dropped `cal-01` five times while carrying only `cal-02`/`cal-03`. No schema check can see any of them, because prose is not a reference the schema resolves, and the next builder follows it. Four shapes are deliberately skipped — a path segment, a hyphenated compound, a quoted notice, and a sentence that negates the id (*"no s04b exists"*) — without which the sweep runs at 33% precision |
 | embedded program | a session prompt carries a heredoc of `EMBEDDED_PROGRAM_LINES` (10) or more lines | review reads prose and cannot run code; see SKILL.md's "Never leave a PROGRAM embedded in a build session's prompt" |
 
 **Splitting a session is the moment the second one fires.** Split `sNN` into `sNN`/`sNNb`
@@ -443,7 +443,7 @@ the warning rather than dismissing it — that is exactly the defect it was meas
 - **`max_retries`** (int 0–5) — Reserved for transient-error retry (v1.5). Semantic failures never retry.
 - **`depends_on_policy`** (`"all"｜"completed_or_terminal"`, optional, default `"all"`) — how the session treats an upstream dep that **terminally failed**. `"all"` (today's behaviour) is a hard AND: every dep must complete or the session never dispatches. `"completed_or_terminal"` lets the session dispatch over the **completed subset** even when a dep terminally failed — for a capstone/synthesis session that should degrade rather than be stranded by one upstream stumble. Carried into `manifest.json` for `/plan-execute` to honour; a session using it should say in its prompt how it degrades (which items become `no-data`). *(Encodes the hardening that a prompt clause alone cannot: without this key the DAG silently strands the capstone.)*
 - **`codex_shell`** (object, optional; 2026-07-29) — **the shell capabilities this session needs when a `codex exec` process runs it** (under `/plan-execute --harness codex`, or a Codex-pinned session on the Claude harness). Omit for work confined to the repo. The default dispatch is `--sandbox workspace-write`, MEASURED on codex-cli 0.145.0 to deny **writes outside the repo workspace**, **all network** (`CODEX_SANDBOX_NETWORK_DISABLED=1`), and **nested `codex exec` / vendor CLIs** (`failed to initialize in-process app-server client`). A session needing any of those must declare it, or a Codex run dispatches it and fails it after paying for it. Fields:
-  - **`writable_roots`** (array of paths) — extra roots the session may write, e.g. `["~/.dyno"]` when the plan's artifacts live outside the repo. `~` is expanded at build time (inside a quoted TOML string the shell cannot). Renders `-c sandbox_workspace_write.writable_roots=[…]`.
+  - **`writable_roots`** (array of paths) — extra roots the session may write, e.g. `["~/.gearbox-state"]` when the plan's artifacts live outside the repo. `~` is expanded at build time (inside a quoted TOML string the shell cannot). Renders `-c sandbox_workspace_write.writable_roots=[…]`.
   - **`network`** (bool) — live network for the dispatched session. Renders `-c sandbox_workspace_write.network_access=true`.
   - **`env_include`** (array of environment-variable names) — explicitly forward only these parent variables to commands spawned by Codex. Credential values never enter the plan, command, receipt, or log. The runner adds `PATH`, `HOME`, and `TMPDIR`, then renders `shell_environment_policy.inherit=all`, `ignore_default_excludes=true`, and the exact `include_only` allowlist. Wildcards are rejected.
   - **`sandbox`** (`"workspace-write"` default | `"danger-full-access"`) — `danger-full-access` is the ONLY thing that grants **nested agent dispatch** (a session shelling out to `codex exec` / `claude -p` / another vendor CLI), and it hands that session an **unsandboxed** shell. Two build-time rules: it **forbids** `writable_roots`/`network` beside it (already granted; the command must have one reading), and it is legal ONLY on a session a human already gates — `dispatch.guards_irreversible`, `requires_human_checkpoint`, `task_class: linchpin`, or `peer_triggers: [irreversible_change]`. `build_plan.py` refuses an ungated one and `run.py` refuses again at dispatch (`UngatedFullAccessSession` → `BLOCKED` + halt): the gate protecting an unsandboxed agent must not be enforced only by the tool that wrote the manifest.
@@ -502,7 +502,7 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   short. `references/plan-harden/model-lint.md`'s `max-rework-cannot-reach-apex`
   rule computes this live via `resolve_route`, never a hardcoded ladder — but size it right
   at authoring time using these worked examples (Claude lane, verified against the live
-  SSOT 2026-08-15, re-measured 2026-08-23 against SSOT v21 — the v1.20 opus@xhigh
+  SSOT 2026-08-15, re-measured against SSOT v21 — the v1.20 opus@xhigh
   escalation rung added one step to every walk through opus;
   `sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh`):
 
@@ -513,7 +513,7 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   | `sonnet@high` (the `standard_build` ceiling) | `sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **6** |
   | `sonnet@medium` (the `standard_build` **default**) — needs `sonnet@high` first | `sonnet@medium → sonnet@high → opus@high → opus@xhigh → fable@medium → fable@high → fable@xhigh` | **7** |
 
-  **The ceiling is 6 because the longest ladder is 6** *(raised from 5 on 2026-08-21)*.
+  **The ceiling is 6 because the longest ladder is 6** *(raised from 5)*.
   `sonnet@medium` — the cell most plans author most of their build sessions at — needs six
   rework rounds to reach the apex, and the old cap of 5 made that session UNAUTHORABLE: the
   right number was refused by the builder, and the model-lint could only recommend clamping to
@@ -645,7 +645,7 @@ Rules that keep this honest:
 
 #### Closing acceptance review (`acceptance_review`, optional — the plan-level gate)
 
-<!-- added 2026-07-26. Verify gates check the PARTS; this checks the WHOLE. -->
+<!-- added. Verify gates check the PARTS; this checks the WHOLE. -->
 
 - **`acceptance_review`** (bool, default `false`) — marks THE closing session that
   validates the **plan's** objectives, not one session's. At most one session per plan
@@ -703,7 +703,7 @@ body should tell it to:
 4. Ship it in the eval-deliverable shape `/plan-execute` § PS-02 requires — one
    rendered one-pager with the data inline, plus a decision card of **at most three**
    options. Never a narration wall, never a multi-page HTML maze.
-5. **Do not recommend `claude ultrareview`** (operator decision 2026-10-04: it bills
+5. **Do not recommend `claude ultrareview`** (operator decision: it bills
    $5–25 per run and nobody ran it). The whole-plan review now runs at land: the
    `llm-review-high` gate is flagged `at_land`, so `/plan-execute`'s land runs the
    code review over the plan's accumulated diff next to the adversarial review, and
@@ -768,7 +768,7 @@ A `phase_closer` is a `post_session` shape plus `require_human_checkpoint` (a ph
 
 ### Changelog — relation to ADR-027
 
-This `post_session` shape **extends** the per-session pattern ADR-027 introduced (example-project, 2026-05-20). Additions over ADR-027: the `deploy:` enum with a project-detection guard, the `deploy_argv` escape hatch with `command_failure_mode`, first-class `pre_deploy_gates`, `skip_if_partial`, and phase-level `phase_closer` inheritance. Schema evolution is **additive** — ADR-027-shaped manifests remain valid input. Do not author a competing ADR; cite ADR-027.
+This `post_session` shape **extends** the per-session pattern ADR-027 introduced (example-project). Additions over ADR-027: the `deploy:` enum with a project-detection guard, the `deploy_argv` escape hatch with `command_failure_mode`, first-class `pre_deploy_gates`, `skip_if_partial`, and phase-level `phase_closer` inheritance. Schema evolution is **additive** — ADR-027-shaped manifests remain valid input. Do not author a competing ADR; cite ADR-027.
 
 ### Parallel groups — the frozen contract, and what the builder does about it
 
@@ -798,7 +798,7 @@ On a spec that opts in (`"plan_schema_version": >= 3`) each of these is a **buil
 
 Below the opt-in version the same problems are **printed as warnings** naming the rule, never
 refused: `validate_spec()` is shared plumbing (`plan_mutate` re-validates the spec of every LIVE
-plan on each add/amend/retire), and measured on 2026-08-12, enforcing unconditionally would have
+plan on each add/amend/retire), and measured, enforcing unconditionally would have
 stranded 5 of this repo's 10 existing plans on rules their manifests are grandfathered out of.
 
 **Emitted into `manifest.json`** — `items[].touches` (the M2a/M2/M5 input; before this, 307

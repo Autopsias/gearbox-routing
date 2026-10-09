@@ -1,4 +1,4 @@
-# Transport-error auto-retry (OR-01, added 2026-07-03)
+# Transport-error auto-retry (OR-01, added)
 
 Full classifier + commit-boundary gate detail. Read this when a `Task` call or a
 Bash/MCP call in the dispatch loop actually errors with a transport-layer signature

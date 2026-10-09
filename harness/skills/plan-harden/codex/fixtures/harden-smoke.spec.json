@@ -1,0 +1,43 @@
+{
+  "title": "Plan-harden Codex-only smoke fixture",
+  "subtitle": "A two-session plan-builder plan used to prove the ported Codex plan-harden loop end to end",
+  "narrative": "A throwaway fixture plan. Its only purpose is to be reviewed, hardened, backported and rebuilt by the Codex-only plan-harden port.",
+  "infographic": {"type": "phase-journey", "phases": [{"label": "Build"}, {"label": "Harden"}]},
+  "categories": [
+    {"key": "smoke", "label": "Harden smoke", "description": "Minimal work items whose only purpose is to make the harden loop run."}
+  ],
+  "items": [
+    {"id": "sm-01", "category": "smoke", "title": "Sync a config file", "human_summary": "Copy one file from a template to its destination.", "deliverable": "The destination file matches the template.", "description": "A single-step mechanical sync."},
+    {"id": "sm-02", "category": "smoke", "title": "Design the sync's rollback strategy", "human_summary": "Decide how to undo the sync if the destination file was wrong.", "deliverable": "A written rollback strategy for the sync in sm-01.", "description": "An ambiguous, judgment-heavy design decision — deliberately pinned to a mechanical model/effort so the model-lint task-class-model-mismatch rule has something real to flag."}
+  ],
+  "sessions": [
+    {
+      "id": "s01",
+      "title": "Sync a config file",
+      "items": ["sm-01"],
+      "model": "gpt-5.6-luna",
+      "reasoning": "max",
+      "effort": "S",
+      "task_class": "mechanical",
+      "human_summary": "Copies one file from a template to its destination. No judgment calls.",
+      "deliverable": "The destination file exists and matches the template byte-for-byte.",
+      "why_model": "Pure mechanical copy; cheapest usable Codex rung.",
+      "prompt": "Do NO real project work. This is a plumbing fixture for the Codex plan-harden loop. Reply with one short sentence confirming you understand this is a fixture, then return the closeout block. Mark item sm-01 complete.",
+      "dispatch": {"subagent_type": null, "depends_on": [], "parallel_group": null, "requires_human_checkpoint": false}
+    },
+    {
+      "id": "s02",
+      "title": "Design the sync's rollback strategy",
+      "items": ["sm-02"],
+      "model": "gpt-5.6-luna",
+      "reasoning": "max",
+      "effort": "S",
+      "task_class": "agentic_build",
+      "human_summary": "Decides how the sync in s01 gets undone if it copied the wrong file.",
+      "deliverable": "A written rollback strategy for s01's sync.",
+      "why_model": "DELIBERATE fixture mismatch: task_class=agentic_build resolves to a heavier tier than the pinned gpt-5.6-luna/max — this session exists so model-lint's task-class-model-mismatch rule has a real, non-synthetic flag to raise.",
+      "prompt": "Do NO real project work. This is a plumbing fixture for the Codex plan-harden loop. Reply with one short sentence confirming you understand this is a fixture, then return the closeout block. Mark item sm-02 complete.",
+      "dispatch": {"subagent_type": null, "depends_on": ["s01"], "parallel_group": null, "requires_human_checkpoint": false}
+    }
+  ]
+}

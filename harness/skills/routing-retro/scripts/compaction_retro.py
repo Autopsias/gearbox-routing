@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """compaction_retro.py — the "did it help" half of /routing-retro for the
-compaction work (s07/PF-01).
+compaction work.
 
 Builds ONE JSON block from retro_scan.py's session stats plus the
-~/.dyno/compaction/ ledgers. render_report.py renders it; arming_check.py reads
+~/.gearbox-state/compaction/ ledgers. render_report.py renders it; arming_check.py reads
 the same functions. Nothing here computes a cohort from a single ledger
 timestamp: exposure is per intervention, from that intervention's own
 activation row (see compaction_ledger.cohort_label).
@@ -43,9 +43,9 @@ MECHANISM_INTERVENTIONS = ("hooks",)
 VERDICTS = ("helped", "no_improvement", "underpowered", "confounded",
             "no_baseline", "no_exposure", "activation_unknown")
 
-# cp-05's projection: a retrospective model over 189 historical sessions put a
+# The rollout's projection: a retrospective model over historical sessions put a
 # 250k window at ~29% saving and 300k at ~22%. PROJECTED, NOT MEASURED — it is
-# the number the s02 checkpoint chose from, so the report prints predicted vs
+# the number the rollout checkpoint chose from, so the report prints predicted vs
 # realized rather than treating it as an established result.
 PREDICTION = {250000: 29.0, 300000: 22.0}
 
@@ -69,15 +69,17 @@ def _load_is_unpinned_generic():
 
 is_unpinned_generic = _load_is_unpinned_generic()
 
-DISPATCH_LEDGER = os.path.expanduser("~/.dyno/routing/dispatch-audit.ndjson")
+DISPATCH_LEDGER = os.path.expanduser("~/.gearbox-state/routing/dispatch-audit.ndjson")
 
-# repo_diet covers exactly these three repositories (s05).
-REPO_DIET_REPOS = ("profile-a-brain", "Trader", "example-project")
+# repo_diet's repositories: set GEARBOX_REPO_DIET_REPOS to a comma-separated list of
+# repo directory names. Unset (the default), the repo-scoped cohort matches nothing.
+REPO_DIET_REPOS = tuple(r.strip() for r in os.environ.get("GEARBOX_REPO_DIET_REPOS", "").split(",")
+                        if r.strip())
 
 REPO_ATTRIBUTION_LIMIT = (
     "decisions.ndjson and sessions.ndjson record no working directory, so a "
     "compaction ledger line CANNOT be attributed to a repository. repo_diet "
-    "covers profile-a-brain, Trader and example-project only; its apparent after-cohort "
+    "covers three named repositories only; its apparent after-cohort "
     "counts sessions that may never have opened any of them. Reported, not "
     "fixed: adding a cwd field now would change shipped code inside the plan's "
     "own measurement session and would give nothing retroactively."
@@ -160,7 +162,7 @@ def index_sessions(scan, heartbeats, policy_types):
 
 def attach_decisions(rows, decisions, policy_version):
     """Fold spine-valid decisions into their sessions. `source: 'probe'` lines are
-    s02's hand tests, not a rollout, and are excluded from every cohort."""
+    hand tests, not a rollout, and are excluded from every cohort."""
     excluded_probe = 0
     stale_version = 0
     for d in decisions:

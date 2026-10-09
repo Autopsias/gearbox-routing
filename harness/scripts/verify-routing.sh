@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verify-routing.sh — generalized drift guard for ~/.claude/model-routing.yaml (the
 # model/effort/degradation SSOT). Modeled on verify-assignments.sh's style and extended
-# to cover every consumer surface: agent pins, the haiku-has-no-effort invariant,
+# to cover every consumer surface: agent pins, the haiku effort invariant,
 # prose-consumer version stamps, the run.py degradation/reasoning lockstep, the CLAUDE.md
 # digest render, and (as a sub-check) verify-assignments.sh itself.
 #
@@ -97,7 +97,7 @@ echo
 OVERALL_FAIL=0
 
 # ---- (a)(b)(d) + unknown-agent + epic composed-cross-check (python3, ast + regex) ----
-echo "== (a) agent frontmatter vs SSOT · (b) haiku-has-no-effort · (d) run.py lockstep · unknown-agent scan =="
+echo "== (a) agent frontmatter vs SSOT · (b) haiku effort matches the SSOT · (d) run.py lockstep · unknown-agent scan =="
 set +e
 CLAUDE_DIR="$CLAUDE_DIR" SSOT="$SSOT" AGENTS_DIR="$AGENTS_DIR" RUN_PY="$RUN_PY" MODE="$MODE" STRICT="$STRICT" \
 python3 - <<'PY'
@@ -341,7 +341,7 @@ for _model, effort in ssot_agents.values():
         tier_tokens.add(effort)
 
 # ============================================================================
-# (a) + (b): agent frontmatter vs SSOT, haiku-has-no-effort invariant
+# (a) + (b): agent frontmatter vs SSOT, haiku effort invariant
 # ============================================================================
 
 
@@ -357,7 +357,7 @@ def agent_frontmatter(name):
     return (mo.group(1) if mo else None, eo.group(1) if eo else None)
 
 
-# ---- frontmatter VALIDITY (added 2026-07-26) -------------------------------
+# ---- frontmatter VALIDITY (added) -------------------------------
 # agent_frontmatter() above greps `model:`/`effort:` line-wise. That is fine for drift
 # detection but BLIND to whether the block is loadable YAML at all: a description
 # containing an unquoted ": " (e.g. `description: dispatch tier: opus at high effort`)
@@ -581,14 +581,16 @@ for name, (model, effort) in sorted(ssot_agents.items()):
     disk_model, disk_effort = agent_frontmatter(name)
 
     # (b) haiku invariant applies to EVERY row, epic or not, and to the SSOT itself.
-    if model == "haiku" and effort != "unset":
-        check(f"SSOT invariant: haiku agent '{name}' has effort pinned", False,
-              f"SSOT says effort={effort!r} but haiku rejects the reasoning dial")
-    if model == "haiku" and disk_effort is not None:
-        check(f"haiku agent '{name}' carries no effort: key on disk", False,
-              f"found effort: {disk_effort!r} in {name}.md frontmatter")
-    elif model == "haiku":
-        check(f"haiku agent '{name}' carries no effort: key on disk", True, "")
+    # Haiku 5.5 takes the dial. A haiku row is `unset` or a level that
+    # providers.anthropic.effort.map.cheap_fast maps; the disk frontmatter must match it.
+    if model == "haiku":
+        _hk_levels = {v for v in (ssot_provider_effort_map.get("anthropic", {}).get("cheap_fast") or {}).values() if v}
+        if effort != "unset" and effort not in _hk_levels:
+            check(f"SSOT invariant: haiku agent '{name}' effort is unset or a mapped cheap_fast level", False,
+                  f"SSOT says effort={effort!r}; effort.map.cheap_fast maps {sorted(_hk_levels)}")
+        _hk_want = None if effort == "unset" else effort
+        check(f"haiku agent '{name}' effort on disk matches the SSOT row", disk_effort == _hk_want,
+              f"SSOT says effort={effort!r}, {name}.md frontmatter has {disk_effort!r}")
 
     if is_epic:
         # epic_* rows are OWNED by epic-dev-assignments.yaml; cross-checked warn-only
@@ -608,7 +610,7 @@ for name, (model, effort) in sorted(ssot_agents.items()):
         check(f"agent '{name}' effort", disk_effort == effort, f"SSOT={effort!r} disk={disk_effort!r}")
 
 # ---- frontmatter hygiene scan (EVERY agent file — see frontmatter_error) ----
-# WARN-ONLY, deliberately. MEASURED 2026-07-26: `epic-test-fixer` has failed
+# WARN-ONLY, deliberately. MEASURED: `epic-test-fixer` has failed
 # yaml.safe_load for a long time (its description carries an unquoted "(Death-A): must"),
 # and Claude Code registers it anyway — so its frontmatter parser is MORE PERMISSIVE than
 # PyYAML, and a strict-YAML failure here does NOT mean the runtime rejects the agent.

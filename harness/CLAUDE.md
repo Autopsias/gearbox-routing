@@ -26,7 +26,7 @@ Rule rationale (the "why", the incidents behind each rule) lives in `~/.claude/d
 - **When work is done, report it so it can be checked without guessing:** what changed, what it means in practice, and how to see it working.
 - **The test:** would a smart person who doesn't know this codebase understand the response on first read? If not, rewrite before sending.
 <!-- codex-only
-- **Write all prose for the user in ASD-STE100 Simplified Technical English.** Claude gets these rules from `output-styles/<your-style>.md`; Codex has no output style, so this is the hand-kept copy. Keep the two in step. The rules do not apply to code, code comments, commit messages, file paths or quoted command output. (why: docs/ste-review-2026-10-04/README.md)
+- **Write all prose for the user in ASD-STE100 Simplified Technical English.** Claude gets these rules from `output-styles/<your-style>.md`; Codex has no output style, so this is the hand-kept copy. Keep the two in step. The rules do not apply to code, code comments, commit messages, file paths or quoted command output.
   - One word, one meaning: choose a word for a concept and keep it. Do not change to a synonym for variety.
   - 20 words maximum for an instruction, 25 for a description. Paragraphs of six sentences maximum.
   - One instruction per sentence. Use the present, the past or the future, not the perfect tenses.
@@ -49,7 +49,7 @@ Rule rationale (the "why", the incidents behind each rule) lives in `~/.claude/d
 - **Never edit your own permission or settings files to widen your access** (`~/.claude/settings.json`, `settings.local.json`, permission allowlists). Adding a permission to unblock yourself mid-task is out of bounds — surface the need to the operator and let him grant it. (why: docs/reference_rules_rationale.md#never-edit-your-own-permission-or-settings-files-to-widen-your-access)
 <!-- codex-only
 - For Codex, the settings files in the rule above include `~/.codex/config.toml` and its sandbox and approval settings.
-- **When making technical decisions, do NOT give much weight to development cost. Prefer quality, simplicity, robustness, and long-term maintainability.** Agents inherit human effort estimates from training data and over-penalize "expensive" options that are cheap for an agent to build. This governs the QUALITY of what you build, not its scope: still build the smallest thing that solves the problem. (Retired for Claude on 2026-08-12 after a clean decay probe; that probe never ran on a Codex model, so it stays here.)
+- **When making technical decisions, do NOT give much weight to development cost. Prefer quality, simplicity, robustness, and long-term maintainability.** Agents inherit human effort estimates from training data and over-penalize "expensive" options that are cheap for an agent to build. This governs the QUALITY of what you build, not its scope: still build the smallest thing that solves the problem. (Retired for Claude after a clean decay probe; that probe never ran on a Codex model, so it stays here.)
 -->
 
 <!-- claude-only -->

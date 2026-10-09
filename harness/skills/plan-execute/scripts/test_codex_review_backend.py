@@ -140,10 +140,11 @@ def _plan(tmp_path, sid="s01", name="plan"):
     return plan
 
 
-def _answer(findings, reviewed=("a.py", "b.py"), verdict=None):
+def _answer(findings, reviewed=("a.py", "b.py"), verdict=None, priors=()):
     return json.dumps({
         "verdict": verdict or ("FINDINGS" if findings else "PASS"),
-        "reviewed": list(reviewed), "findings": findings})
+        "reviewed": list(reviewed), "findings": findings, "priors": list(priors)})
+
 
 
 _DEFECT = [{"file": "a.py", "line": 1, "severity": "high",
@@ -371,7 +372,7 @@ def test_the_SOURCE_UNDER_REVIEW_in_the_event_log_is_NOT_a_quota_refusal(tmp_pat
 
     So a review of THESE scripts writes the gate's own quota pattern into the log
     the gate then reads -- 10 KB of one file's text in a recorded run
-    (_plans/memo-loop-skill-2026-08-04/_evidence/s02, 44 command_execution items)
+    (dozens of command_execution items)
     -- and a benign `error` item sits beside it, verbatim from that same run.
     Neither is a refusal. The two known positives below are.
     """
@@ -602,29 +603,25 @@ def _record(out, recs, rc1, rc2):
                   f"status={r['status']} fid={r['fid'][:12]}")
 
 
-def test_a_prior_is_CLEARED_by_a_clean_attempt_2_and_the_session_PASSES(
-        tmp_path, monkeypatch, shim, capsys):
-    """WITHOUT THIS THE REWORK LOOP CANNOT TERMINATE for the Codex reviewer.
-
-    The findings schema has no field in which a reviewer can say a prior is
-    fixed — a Claude reviewer writes `"prior": "fixed"`, Codex cannot — so a
-    prior raised in attempt 1 would be carried OPEN by `judge()` for the rest of
-    the session no matter what the session did, and the gate could never return
-    0. `adapt` infers it instead, from the one fact the gate verifies for itself:
-    the path was PREPARED, the reviewer ATTESTED to reading it, and it did not
-    re-report the finding.
-    """
-    rc1, rc2, recs = _rework(tmp_path, monkeypatch, _answer([], reviewed=["a.py"]))
+@pytest.mark.parametrize("said,rc2,status", [("fixed", g.PASS, "fixed"), (None, g.FINDINGS, "open")])
+def test_a_prior_is_CLEARED_only_by_an_explicit_fixed(tmp_path, monkeypatch, shim, capsys,
+                                                      said, rc2, status):
+    """Codex answers a prior in `priors`, by the id the PRIOR REVIEW section listed.
+    Without `fixed` the loop cannot terminate. Silence used to be inferred `fixed`,
+    so one pass that MISSED the defect passed the gate (found in a security review)."""
+    fid = ledger.fingerprint({"file": "a.py", "summary": crb._summary(_DEFECT[0])})
+    priors = [{"id": fid, "status": said, "evidence": "x is set first"}] if said else []
+    rc1, got, recs = _rework(tmp_path, monkeypatch, _answer([], reviewed=["a.py"], priors=priors))
     out = capsys.readouterr().out
-    assert (rc1, rc2) == (g.FINDINGS, g.PASS), out
+    assert (rc1, got) == (g.FINDINGS, rc2), out
     assert "surface NARROWED to the fix delta" in out, "attempt 2 IS the fix delta"
-    assert "prior_fixed=1" in out and "prior_open=0" in out, out
+    assert f"prior_{status}=1" in out, out
     second = [r for r in recs if r["kind"] == "finding" and r["attempt"] == 2]
-    assert [r["status"] for r in second] == ["fixed"], second
+    assert [r["status"] for r in second] == [status], second
     # ONE id across both attempts. The fix moved the code two lines down, and
     # `fingerprint` excludes the line for exactly this reason.
     assert len({r["fid"] for r in recs if r["kind"] == "finding"}) == 1, recs
-    _record(out, recs, rc1, rc2)
+    _record(out, recs, rc1, got)
 
 
 def test_the_SAME_defect_re_reported_at_a_DRIFTED_line_is_the_SAME_open_prior(
@@ -665,10 +662,10 @@ def test_two_findings_in_ONE_file_get_two_fingerprints(tmp_path, monkeypatch, sh
     assert len(fids) == 2, fids
 
 
-def test_a_prior_is_matched_by_CONTENT_and_cleared_only_when_the_file_was_read():
-    """Codex cannot emit a `prior_id` under the schema, so the adapter matches on
-    the ledger's own fingerprint. Re-reported -> still open; read and not
-    re-reported -> fixed; never shown -> neither (judge carries it)."""
+def test_a_prior_is_matched_by_CONTENT_and_cleared_only_when_declared_fixed():
+    """Codex emits no `prior_id` per finding, so the adapter matches on the
+    ledger's own fingerprint. Re-reported -> still open; declared fixed over a
+    shown file -> fixed; silent, or never shown -> neither (judge carries it)."""
     class _Led:
         plan_dir = session = ""
         priors = [{"fid": None, "file": "a.py", "summary": "planted defect: The value "
@@ -681,15 +678,18 @@ def test_a_prior_is_matched_by_CONTENT_and_cleared_only_when_the_file_was_read()
              if f.get("prior_id")]
     assert entry and entry[0]["prior"] == "open", same
 
-    gone = crb.adapt({"findings": []}, ["a.py"], _Led, "medium")
-    entry = json.loads(gone.split("```json")[1].split("```")[0])
-    assert entry == [{"prior_id": _Led.priors[0]["fid"], "prior": "fixed",
-                      "summary": "not re-reported over the attested surface"}]
+    fid = _Led.priors[0]["fid"]
+    said = {"findings": [], "priors": [{"id": fid, "status": "fixed", "evidence": "guarded"}]}
+    entry = json.loads(crb.adapt(said, ["a.py"], _Led, "medium")
+                       .split("```json")[1].split("```")[0])
+    assert entry == [{"prior_id": fid, "prior": "fixed", "summary": "guarded"}]
 
-    # KNOWN NEGATIVE: a prior in a file this attempt never showed the reviewer is
-    # NOT cleared by silence about it.
+    # KNOWN NEGATIVE: silence over a shown file clears nothing.
+    assert json.loads(crb.adapt({"findings": []}, ["a.py"], _Led, "medium")
+                      .split("```json")[1].split("```")[0]) == []
+    # KNOWN NEGATIVE: `fixed` for a file this attempt never showed is not honoured.
     _Led.hashes = {"b.py": "h"}
-    assert json.loads(crb.adapt({"findings": []}, ["b.py"], _Led, "medium")
+    assert json.loads(crb.adapt(said, ["b.py"], _Led, "medium")
                       .split("```json")[1].split("```")[0]) == []
 
 

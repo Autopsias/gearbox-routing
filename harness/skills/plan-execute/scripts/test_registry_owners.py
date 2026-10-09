@@ -84,7 +84,7 @@ def test_group_member_branch_leftover_when_owner_plan_stale(tmp_path, monkeypatc
 def test_cross_plan_branch_collision_reports_conflict_never_leftover(tmp_path):
     """Defect 1 (HIGH), granted-attempt fix — VERIFIED live in this repo, not
     hypothetical: `pg-prep` is declared as a `parallel_group` in BOTH
-    `_plans/gearbox-dyno-v3-2026-07-27` and `_plans/gearbox-dyno-v4-2026-07-27`,
+    `_plans/example-plan-a-2026-07-27` and `_plans/example-plan-b-2026-07-27`,
     which both produce the SAME `plan/pg-prep/<sid>` branch name via
     `worktree.member_branch`. `branch_owners` used to key ownership by branch
     name alone and merge with `owners.update(partial)`, so the LAST plan
@@ -370,7 +370,7 @@ def test_cross_plan_worktree_path_collision_reports_conflict_never_stale(tmp_pat
     name: `root / WORKTREE_DIRNAME / group / sid` is derived purely from
     project_root + group + session id. VERIFIED live in this repo: `pg-prep`
     s01/s02 are declared as a `parallel_group` in BOTH
-    `_plans/gearbox-dyno-v3-2026-07-27` and `_plans/gearbox-dyno-v4-2026-07-27`
+    `_plans/example-plan-a-2026-07-27` and `_plans/example-plan-b-2026-07-27`
     — same project_root, same group, same session id — which resolves to the
     IDENTICAL worktree path under both.
 

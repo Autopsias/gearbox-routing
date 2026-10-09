@@ -22,7 +22,7 @@ from codex_helpers import (
 )
 
 # --------------------------------------------------------------------------
-# data_sensitivity_guard, CONTENT-AWARE (2026-07-28). The guard used to match
+# data_sensitivity_guard, CONTENT-AWARE. The guard used to match
 # FILENAME substrings (corpus/creds/credential/secret) and never read a byte:
 # it refused a repo over an analysis script called `migrate_corpus.py` while a
 # live key in `config.py` sailed past. It now runs `gitleaks` — the scanner
@@ -327,7 +327,7 @@ def test_repo_gitleaksignore_is_actually_honored(tmp_path, capsys, ssot, egress_
     # fingerprint is line-anchored, so before 2026-08-15 any edit above a
     # reviewed false positive silently unpinned it and stranded the whole tree as
     # DO-NOT-SEND — indistinguishable, in the refusal message, from a fresh
-    # secret. That is exactly how `profile-a-brain` broke: commit 4cfb55a moved a
+    # secret. That is exactly how one project broke: a commit moved a
     # flagged docstring from line 143 to 142.
     leak.write_text("# five new lines above the finding\n" * 5 + leak.read_text(),
                     encoding="utf-8")
@@ -420,7 +420,7 @@ def test_content_scan_can_fail(tmp_path, capsys, ssot, egress_root, monkeypatch)
 
 
 def test_commented_or_out_of_block_opt_in_never_authorizes(tmp_path, capsys, ssot, egress_root):
-    # adversarial-review 2026-07-10 (Codex HIGH): a commented-out entry, or one
+    # adversarial-review (Codex HIGH): a commented-out entry, or one
     # outside the egress_opt_ins block, previously matched the raw-text regex.
     (egress_root / ".env").write_text("K=1")
     commented = "      # " + _opt_in_line(str(egress_root)).strip()

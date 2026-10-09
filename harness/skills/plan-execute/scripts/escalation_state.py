@@ -108,7 +108,7 @@ def record_dispatch(plan_dir, session_id, rung, climb=None):
         authored cell. Deriving the rung from the current streak alone stalled the
         ladder — a session that climbed to rung 2 on cause A, then failed twice
         consecutively on cause B, sat at rung 2 while demonstrably stuck again
-        (measured 2026-08-14). And a different error must not hand the model BACK
+        (measured). And a different error must not hand the model BACK
         either, so this value only ever rises within a generation.
 
     Re-running `begin` on resume re-records the same values and derives the same

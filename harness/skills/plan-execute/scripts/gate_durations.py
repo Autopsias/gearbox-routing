@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""How long each repo's gates take, from the `gate_run` events (2026-10-04).
+"""How long each repo's gates take, from the `gate_run` events.
 
     python3 gate_durations.py ~/DeveloperFolder/example-project ~/your-private-harness --since 2026-10-05
 

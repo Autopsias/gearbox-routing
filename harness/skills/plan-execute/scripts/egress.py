@@ -35,7 +35,7 @@ from ssot_policy import _content_allowlist, _egress_opt_in
 # --------------------------------------------------------------------------
 _EGRESS_ROOT_ENV = "PLAN_EXECUTE_EGRESS_ROOT"  # test override; default = cwd. The scanned
 # root is BOUND into the codex command via `cd <root> &&` so the scanned tree and the
-# shipped tree are the same path by construction (adversarial-review 2026-07-10, consensus).
+# shipped tree are the same path by construction (adversarial-review, consensus).
 #
 # WHAT IS MATCHED (rewritten 2026-07-28 — was filename substrings):
 #   1. FILENAME — `.env*`, anywhere in the tree (full walk, symlinks followed).
@@ -241,11 +241,11 @@ def _gitleaks_pin_budget(real_root):
     contract stated the file was honoured. `-i` stays passed for the case where
     the path forms do line up; this is the belt that actually fits.
 
-    The LINE is deliberately dropped from the key (2026-08-15). A gitleaks
+    The LINE is deliberately dropped from the key. A gitleaks
     fingerprint is line-anchored, so ANY edit above a reviewed false positive
     silently unpins it and turns the whole tree DO-NOT-SEND — for a reason the
     refusal message cannot state, because it looks identical to a fresh secret.
-    That is what stranded `profile-a-brain`: commit 4cfb55a moved a flagged
+    That is what stranded one project: a commit moved a flagged
     docstring from line 143 to 142 and the pin stopped matching, though the line,
     its text and its entropy (3.81) were unchanged. Same defect the quality gate
     fixed in 77278cd by forgiving a function by NAME instead of by line number.
@@ -442,7 +442,7 @@ def _find_restricted(root, allow=frozenset()):
     the SSOT's per-file content allowlist; it never clears a `.env*`, which only a
     whole-repo egress_opt_ins entry can.
 
-    Measured 2026-07-28 on the 16 GB / 103,727-file plan repo, gitleaks 8.30.0:
+    Measured on the 16 GB / 103,727-file plan repo, gitleaks 8.30.0:
     2.2 s walk + 1.0 s scan ≈ 3.4 s, against 6 min 5 s before the scoping.
 
     ponytail: NOT cached across processes, deliberately. The walk is 2/3 of the

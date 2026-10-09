@@ -165,7 +165,7 @@ def union_gates(manifest):
     "the plan's union of verify gates") — keeping only the HIGHEST declared
     level per leveled reviewer family.
 
-    Measured 2026-08-26 on the cross-family-review-gate plan's land: the union
+    Measured on the cross-family-review-gate plan's land: the union
     held `llm-review-low` AND `llm-review-medium`, both ran over the identical
     25–30-file merged surface on all four regate rounds, and the low ledger
     never recorded a finding. A lower level of the same reviewer over the same
@@ -207,7 +207,7 @@ def gate_digest(results):
 # 2026-08-22 and are why this is a list rather than the two strings §4.5 quotes:
 # when a competing lander advances the ref *inside* our push window, the CAS is
 # refused by the RECEIVING end, which words it completely differently —
-#   remote: error: cannot lock ref 'refs/heads/main': is at 8ee5a34 but expected 0c48d20
+#   remote: error: cannot lock ref 'refs/heads/main': is at <sha> but expected <sha>
 #   ! [remote rejected] HEAD -> main (failed to update ref)
 # — and matching only `fetch first`/`stale info` classified that as a hard
 # failure. The land parked on a rejection whose entire meaning is "re-sync".

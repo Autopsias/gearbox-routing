@@ -65,7 +65,7 @@ def test_rebuild_without_register_in_reads_the_project_gates(tmp_path, monkeypat
     """A --rebuild without --register-in must still read the project's
     .claude/eval-gates.json. It used to skip the file and refuse every
     project-only verify gate as "not in the project's .claude/eval-gates.json"
-    (reproduced 2026-10-01 on _plans/finish-every-plan-2026-10-01)."""
+    (reproduced on _plans/example-finish-plan-2026-10-01)."""
     import json
 
     project = tmp_path / "proj"

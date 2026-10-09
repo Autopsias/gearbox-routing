@@ -1,0 +1,49 @@
+{
+ "skill_name": "jev-fit-scan",
+ "evals": [
+  {
+   "id": 3,
+   "name": "dev-loop-pr-gate",
+   "prompt": "I now have access to Jev, TypeSafe's System One model (docs: https://docs.typesafe.ai/introduction). Scan this repo thoroughly and tell me where Jev could be properly applied to raise quality or to cut cost while we keep quality and function. Repo: <skill-dir>/evals/fixtures/pr-gate",
+   "expected_output": "A report that finds the AI review step in CI as the one site, proposes a screen in front of the incumbent (the incumbent keeps the written findings), measures the step from logs/ci-review.jsonl, treats the weakened-test check as a gap on record, and shows the call and a shadow-test plan with its cost, and leaves the vendor decision to the CTO under AGENTS.md rule 1. No invented lint or comment-quality ideas.",
+   "files": [],
+   "assertions": [
+    "Finds the review step (.github/workflows/ai-review.yml: claude -p over the full diff) as a development-loop site",
+    "Does not propose to replace the review with Jev: the written findings are text generation and AGENTS.md rule 2 keeps them",
+    "Proposes a screen in front of the incumbent (Jev rules per hunk or per file, the incumbent reads what passes), with recall as the gate or a sample of dropped items as the safeguard",
+    "Measures from logs/ci-review.jsonl: 40 reviews, about 6.2 million input tokens, 30 of 40 (75%) with no finding, which hold about 70% of the input tokens",
+    "Names the weakened-test check as a gap on record and cites the 2026-08-14 incident note in AGENTS.md",
+    "Says the data that leaves is source code, cites AGENTS.md rule 1, and leaves the vendor decision to the CTO: it plans the shadow test and sends nothing",
+    "Classifies the ruff lint workflow as plain code, not a site",
+    "Invents no candidate without an incumbent or a failure on record (no comment-quality scan, no code-smell scan, no browser test agents)",
+    "Shows the call for the first site: the state, the question type, the options or levels, the threshold, what code does on each side",
+    "States Jev facts with a source and a read date, or labels them as a dated snapshot",
+    "Left the repo untouched (git status clean in the fixture copy)"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "cost-cut-broker-desk",
+   "prompt": "I now have access to Jev, TypeSafe's System One model (docs: https://docs.typesafe.ai/introduction). Scan this repo thoroughly and tell me where Jev could be properly applied to raise quality or to cut cost while we keep quality and function. Repo: <skill-dir>/evals/fixtures/broker-desk",
+   "expected_output": "A report that finds three sites with no verdict call in them today: the keyword router's catch-all bucket (41% of tickets, a 9-hour queue on record), the complaint study that cost cut to a sample of 200 of about 70,000, and the wording monitor as a screen in front of the incumbent. It measures each from the logs, keeps the letter linter and the reply drafting out, gives TEST FIRST to a gap on record, and leaves the vendor decision to the operations lead under AGENTS.md rule 1.",
+   "files": [],
+   "assertions": [
+    "Finds the catch-all bucket of the keyword router (app/tickets.py returns \"other\") as an unruled band, and counts it from logs/categories.jsonl: 512 of 1,250 tickets, 41%",
+    "Cites the 2026-08-30 note (median wait of 9 hours in the `other` queue) as the gap on record for that site",
+    "Finds scripts/complaint_study.py as work that cost cut short: a sample of 200 of about 70,000 tickets, with the 2026-09-02 note that the full run was never approved",
+    "Says the study's output fields are a closed set (two picks and two yes/no), so the full archive can be one request per ticket with four questions, and gives the cost of the full run at the live Jev price or the formula with its inputs",
+    "Finds the wording monitor (app/monitor.py) and proposes a screen in front of the incumbent: the incumbent still writes the alert, because code sends that text to the account managers",
+    "Measures the monitor from logs/llm-usage.jsonl: 470 of 500 events ended with no alert (94%), and the monitor holds about 83% of all input tokens",
+    "Sets the screen's gate on recall, or keeps a sample of dropped events in front of the incumbent, because a missed change in cover is silent",
+    "Classifies app/letter_lint.py as plain code with no failure on record: not a site, no proposal",
+    "Classifies the reply drafting (app/reply.py) as text generation and cites AGENTS.md rule 2",
+    "Gives TEST FIRST to one site only, and to a gap on record or a cost cut with a counted share, not to an unmeasured swap",
+    "The recommendation in the call card starts with the TEST FIRST site, or the card states the reason for another order",
+    "Says the data that leaves is customer ticket text, cites AGENTS.md rule 1, and leaves the vendor decision to the operations lead: it plans the shadow test and sends nothing",
+    "States Jev facts with a source and a read date, or labels them as a dated snapshot",
+    "Left the repo untouched (git status clean in the fixture copy)"
+   ]
+  }
+ ],
+ "note": "Eval 3 carries its own fixture in evals/fixtures/pr-gate: a repo whose only model is an AI review step in CI, with a 40-row usage log, one incident note and two rules. Copy it to a scratch directory and run `git init` there before the run, so that the untouched check works. Eval 4 carries its fixture in evals/fixtures/broker-desk: a broker's ticket desk with a keyword router whose catch-all bucket holds 41% of one week of tickets, a complaint study that ran once on a sample, a policy-wording monitor that answers NONE for 94% of events, and two traps (a regex letter linter, a reply drafter). It came from four publicly described Jev builds. Copy it and run `git init` as for eval 3."
+}

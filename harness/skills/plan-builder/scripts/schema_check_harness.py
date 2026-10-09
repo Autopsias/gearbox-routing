@@ -68,7 +68,7 @@ def expect_invalid(spec, name, needle=None):
 def sess(spec, sid):
     return next(s for s in spec["sessions"] if s["id"] == sid)
 
-# The fixture predates the checkpoint-brief policy (2026-07-11): its s06 human
+# The fixture predates the checkpoint-brief policy: its s06 human
 # gate has no `checkpoint` decision brief, which is now a deliberate build
 # error. Keep the raw fixture for the rejection test, then patch BASE once so
 # every other test runs against the policy-conformant baseline.

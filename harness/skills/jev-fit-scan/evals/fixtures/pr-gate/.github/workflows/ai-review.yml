@@ -1,0 +1,14 @@
+name: ai-review
+on: pull_request
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Review the whole diff
+        run: |
+          git diff origin/main...HEAD > diff.patch
+          claude -p "$(cat .github/review-prompt.md)" --model claude-opus-5 --output-format json < diff.patch > review.json
+      - name: Log usage
+        run: python ci/log_review.py review.json >> logs/ci-review.jsonl

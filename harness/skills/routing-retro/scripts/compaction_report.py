@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """compaction_report.py — assembles the compaction did-it-help block.
 
-One function, `build()`, turns retro_scan.py's JSON plus the ~/.dyno/compaction/
+One function, `build()`, turns retro_scan.py's JSON plus the ~/.gearbox-state/compaction/
 ledgers into the dict render_report.py renders. Everything it reports is either
 measured here or explicitly labelled as not measurable.
 
@@ -34,7 +34,7 @@ from compaction_ledger import (
 
 
 def _prediction(window, hooks_verdict, before, after):
-    """cp-05's projection vs what actually happened. A plan that never compares
+    """The rollout's projection vs what actually happened. A plan that never compares
     its own forecast to its result cannot be wrong, which is the same as not
     being a measurement. `prediction_met` is a FLAG BESIDE the verdict, never a
     member of the verdict vocabulary — and it is a verdict ON THE FORECAST, so
@@ -76,7 +76,7 @@ def _prediction(window, hooks_verdict, before, after):
                 f"after={after.get('n_sessions_observed')})")
     return {"window": window, "predicted_pct": predicted, "realized_pct": realized,
             "prediction_met": met, "line": line,
-            "basis_note": ("the ~29%/~22% figures are a PROJECTION over 189 historical "
+            "basis_note": ("the ~29%/~22% figures are a PROJECTION over historical "
                            "sessions made at plan time; no artifact in this repo "
                            "reproduces that model, so the predicted side is quoted, "
                            "not re-measured")}
@@ -125,8 +125,8 @@ def _decision_card(interventions, blindness, bundles):
     if any(e["verdict"] == "underpowered" for e in interventions.values()):
         pend = [iv for iv, e in interventions.items() if e["verdict"] == "underpowered"]
         cards.append({
-            "title": f"Let it soak, then run s09 ({', '.join(pend)})",
-            "body": ("The clock started but the sample cannot answer yet. s09 exists "
+            "title": f"Let it soak, then run the acceptance review ({', '.join(pend)})",
+            "body": ("The clock started but the sample cannot answer yet. The acceptance review exists "
                      "to convert these; run `arming_check.py` first — it says per "
                      "criterion what is armed and what is still below its floor."),
             "cost": "no work now; one session later.",
@@ -252,7 +252,7 @@ def build(scan, root=None, settings_path=None, plans_glob=None,
     cheaper_and_worse = _cheaper_and_worse(out_iv)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "generated_from": {"scan_sessions": len(scan.get("sessions", [])), "root": root or os.path.expanduser("~/.dyno/compaction")},
+        "generated_from": {"scan_sessions": len(scan.get("sessions", [])), "root": root or os.path.expanduser("~/.gearbox-state/compaction")},
         "policy_version": version,
         "ledgers": {
             "decisions": {"exists": dec_exists, "rejected_lines": dec_rejected,
@@ -381,7 +381,7 @@ def _verdict_line(interventions, prediction, blindness, caw, bundles=()):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scan", required=True, help="retro_scan.py JSON")
-    ap.add_argument("--root", default=None, help="dyno compaction root (default ~/.dyno/compaction)")
+    ap.add_argument("--root", default=None, help="compaction state root (default ~/.gearbox-state/compaction)")
     ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"))
     ap.add_argument("--plans-glob", default=None,
                     help="closeout glob for the adherence row; pass it SINGLE-QUOTED "

@@ -126,7 +126,7 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
         # Keyed on the gate DECLARING the EXCLUDE var itself, so it reaches the
         # review gates and nothing else: an env var handed to every argv gate is
         # how PLAN_EXECUTE_REVIEW_BASE once leaked into code-review-gate's pytest
-        # children (2026-08-20). Keyed on SCOPE it was a silent no-op waiting to
+        # children. Keyed on SCOPE it was a silent no-op waiting to
         # happen — `review_context.declared_env` derives a scope from the SESSION
         # spec and there is no session called "land", so the land never sets
         # SCOPE at all. A gate that declared EXCLUDE but dropped the unused SCOPE
@@ -306,7 +306,7 @@ def _resolve_all(plan_dir, ctx, st):
     # code, so the cover's registry entry must be IDENTICAL in the trusted outer
     # registry: a plan that changes any field of `ci-check` (argv, cwd, expect,
     # indeterminate_exit, ...) loses the cover and the covered gate runs.
-    # Operator decision 2026-10-04.
+    # Operator decision.
     outer, cand = shp.eval_gates(plan_dir), lal.registry(st["land_path"])
     st["covered"] = {gid: c for gid, g in gates.items()
                      if gid not in flagged and (c := g.get("land_covered_by")) in flagged

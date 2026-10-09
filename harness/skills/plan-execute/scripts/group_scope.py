@@ -14,7 +14,7 @@ Below the version gate NOTHING here changes anything: ``plan_isolation`` returns
 ``(None, None)`` for every plan on disk today, and each helper then returns the
 value ``worktree.py`` computed before this module existed.
 
-THE MEMBER BRANCH NAME — flat, not nested (operator decision 2026-08-22)
+THE MEMBER BRANCH NAME — flat, not nested (operator decision)
 --------------------------------------------------------------------------
 V3-1 first fixed an isolated plan's member branch at ``plan/<plan-slug>/<group>/
 <sid>`` while the plan's own branch is ``plan/<plan-slug>``. **Git cannot hold

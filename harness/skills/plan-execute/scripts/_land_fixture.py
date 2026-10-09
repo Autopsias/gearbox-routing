@@ -197,7 +197,7 @@ def _arm_prepush(fx, times=1):
     # friends) into every hook, and a `git clone` + `git push` run under them
     # operates on the PUSHING repository rather than the clone — so this hook
     # re-entered itself and fired 99 times in one land, pushing OUR OWN merge as
-    # the "competing" commit. Measured 2026-08-22. Without the unset the proof
+    # the "competing" commit. Measured. Without the unset the proof
     # tests something that never happens in production.
     hook.write_text(f"""#!/bin/sh
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_PREFIX

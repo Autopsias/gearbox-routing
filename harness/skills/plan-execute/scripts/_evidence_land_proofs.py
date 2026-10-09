@@ -239,7 +239,7 @@ def proof_pair_v6_during_v7(tmp):
                 "origin_main_before": before, "origin_main_after": origin_main(fx),
                 # `same_lock_file` is asserted, not assumed: two spellings of one
                 # repo slug to two files and BOTH sides "acquire" — s03b's
-                # `same file? False`, reproduced in this fixture on 2026-08-22.
+                # `same file? False`, reproduced in this fixture.
                 "ok": (out.get("action") == "land-locked" and holder_lock == land_lock
                        and land_lock in independent and origin_main(fx) == before)}
     holder.terminate()

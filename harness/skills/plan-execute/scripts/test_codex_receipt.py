@@ -273,7 +273,7 @@ def test_claude_harness_payload_is_byte_identical(tmp_path, capsys, ssot):
 
 
 # --------------------------------------------------------------------------
-# dispatch.codex_shell — declared shell capabilities (2026-07-29)
+# dispatch.codex_shell — declared shell capabilities
 #
 # MEASURED on codex-cli 0.145.0 before this feature was written: inside
 # `codex exec --sandbox workspace-write` a write outside the repo workspace is
@@ -302,18 +302,18 @@ def test_codex_shell_grants_writable_roots_and_network(tmp_path, capsys, ssot):
     ssot("anthropic")
     sessions = [
         {"id": "s01", "title": "S1", "items": ["i1"], "model": "Opus", "reasoning": "high",
-         "dispatch": {"codex_shell": {"writable_roots": ["~/.dyno"], "network": True}}},
+         "dispatch": {"codex_shell": {"writable_roots": ["~/.gearbox-state"], "network": True}}},
     ]
     plan_dir = make_plan(tmp_path, sessions)
     by_id, out, err = _begin_codex(plan_dir, ["s01"], capsys)
     cmd = by_id["s01"]["dispatch_cmd"]
 
-    home_dyno = str(Path("~/.dyno").expanduser().resolve())
+    home_state = str(Path("~/.gearbox-state").expanduser().resolve())
     assert "--sandbox workspace-write" in cmd              # mode NOT widened
-    assert f'sandbox_workspace_write.writable_roots=["{home_dyno}"]' in cmd
+    assert f'sandbox_workspace_write.writable_roots=["{home_state}"]' in cmd
     assert "sandbox_workspace_write.network_access=true" in cmd
     # ~ is expanded at build time: inside a quoted TOML string the shell can't.
-    assert "~/.dyno" not in cmd
+    assert "~/.gearbox-state" not in cmd
     # The grant is disclosed, never silent.
     assert "sandbox=workspace-write" in err and "network_access=true" in err
     assert by_id["s01"]["codex_shell_grant"]["network"] is True

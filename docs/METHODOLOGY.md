@@ -149,6 +149,23 @@ into under-modeling once the 2-failure bar is actually met — at that point
 the ladder exists precisely so you climb it, not stall on it. The rule is
 symmetric: escalate on evidence, never on task-feel in either direction.
 
+**One escalation-only rung, and an optional apex.** A provider's standing
+`effort.map` stops at the rung `thorough` maps to. At most one rung above it
+(Anthropic's `xhigh` in the example profile) sits in the escalation ladder and
+nowhere else, so a stuck task can reach it but no task class defaults onto it.
+The provider's very top rung stays out of every ladder. A provider may also
+name an `apex_model` above `frontier_reasoner`: it is not a tier, nothing
+resolves to it, and it is the step after the frontier tier's whole ladder has
+failed at the same root cause. See `effort_policy` in
+`claude/model-routing.yaml`.
+
+**Lowering a default is a different test.** Moving a task class to a cheaper
+effort asks "is it no worse?", not "is the dearer one better?". Ties count as
+evidence under that question, and the usual weaknesses of an LLM-judged eval
+all push toward "no worse". Read
+[`docs/adr/0001-low-effort-non-inferiority.md`](adr/0001-low-effort-non-inferiority.md)
+before you move a default down.
+
 `degrade:` is the separate, reactive-only counterpart: it fires on
 `entitlement`/`unavailable` signals (a tier got refused for access reasons),
 never on ordinary failure, and it never drops below the provider's `floor` —

@@ -131,7 +131,7 @@ def plans_paths(tree, base, head="HEAD", default=None):
     ALSO differs from the default-branch commit it last merged —
     ``merge-base(head, origin/<default>)``. A plan branch that merges main picks
     up main's own `_plans/` edits (harvest commits); the tree diff from the base
-    counted those as the plan's, and refused the ship (2026-10-02). A path the
+    counted those as the plan's, and refused the ship. A path the
     plan itself changed still differs from that merge-base, including one main
     ALSO changed, so it is still refused. The merge-base only moves when
     ``head`` merges again — never because main moved — so a retry gets the same
@@ -232,7 +232,7 @@ def _stage(tree):
         git add -A -- .                      exit 0   staged: real.py
         git add -A                           exit 0   staged: real.py
 
-    Judging that by the exit code halted four sessions of one Night Porter run
+    Judging that by the exit code halted four sessions of one overnight run
     on commits that had already succeeded. Neither `--ignore-errors` nor
     `advice.addIgnoredFile=false` changes the exit code, and simply DROPPING
     the exclusion is wrong: with a file under `_plans/` force-added,
@@ -285,7 +285,7 @@ def commit(tree, message, plan_dir):
     _stage(tree)
     if _nothing_staged(tree):
         # ASK THE INDEX, NEVER THE MESSAGE. `git commit` has three refusals here
-        # and only one of them says "nothing to commit" (measured 2026-08-22):
+        # and only one of them says "nothing to commit" (measured):
         # a tree dirty ONLY under `_plans/` — which the EXCLUDE_PLANS pathspec
         # stages nothing from, i.e. the §8.a case this ships for — gets "no
         # changes added to commit" (tracked) or "nothing added to commit but

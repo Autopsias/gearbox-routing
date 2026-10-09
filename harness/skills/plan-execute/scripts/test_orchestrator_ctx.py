@@ -67,7 +67,7 @@ def test_tree_root_anchor_locates_the_hooks_directory():
     which is a proxy for the anchor rather than the anchor: the same repo
     checked out as a git worktree (`gearbox-iso`, where plan-level isolation
     runs) has a different directory name and failed here while the anchor was
-    perfectly correct. A name is not a structure (2026-08-22)."""
+    perfectly correct. A name is not a structure."""
     assert (octx.TREE_ROOT / "skills" / "plan-execute" / "scripts").is_dir(), octx.TREE_ROOT
     assert octx.CONTEXT_TOKENS_PATH.is_file(), octx.CONTEXT_TOKENS_PATH
     # A KNOWN NEGATIVE: the anchor must be the tree root, not its parent.
@@ -179,14 +179,14 @@ def test_the_worker_markers_do_not_suppress_the_measurement(tmp_path, monkeypatc
     This module used to route the session id through
     ``compact_store.env_session()``, which refuses whenever
     ``CLAUDE_CODE_CHILD_SESSION`` or ``CLAUDE_CODE_FORK_SUBAGENT`` is set.
-    MEASURED 2026-08-23 on this host, both markers read ``'1'`` inside the
+    MEASURED on this host, both markers read ``'1'`` inside the
     ORCHESTRATOR's OWN tool subprocess, so that refusal fired on every single
     dispatch and the field landed ``null`` on 33 of 33 records while the reader
     underneath it worked perfectly.
 
     A previous version of this test asserted the opposite, on the reading that a
     dispatched agent returning 132,718 tokens had reported the WORKER's context.
-    A direct probe on 2026-08-23 settled it: a dispatched subagent's subprocess
+    A direct probe settled it: a dispatched subagent's subprocess
     reports the SAME ``CLAUDE_CODE_SESSION_ID`` as the orchestrator and resolves
     to the SAME transcript file. That 132,718 was the orchestrator's own context
     at that moment, not a worker's — the two were never distinguishable because

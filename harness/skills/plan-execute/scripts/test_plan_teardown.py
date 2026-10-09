@@ -162,7 +162,7 @@ def test_a_landed_plans_claim_no_longer_refuses_require_live(fx):
     the (now torn-down) worktree after `step_cleanup`'s teardown, and
     `require_live` read that stale path as "the checkout vanished" and refused
     every later `plan_ship`/`shipping` call on a plan that had already landed
-    successfully. Neuter-checked (2026-08-23): commenting out the
+    successfully. Neuter-checked: commenting out the
     `pwt._clear_claim_path` call `step_cleanup` makes on a non-preserved
     teardown reproduces `WorktreeError: ... and that directory is gone`.
     """
@@ -183,7 +183,7 @@ def test_an_abandoned_plans_claim_no_longer_refuses_require_live(fx):
     right after `remove_plan_worktree` cleared it, so `require_live` refused
     immediately after a clean `retire-plan` — telling the operator to "retire
     the plan's isolation state deliberately", which is exactly what they just
-    did. Neuter-checked (2026-08-23): restoring the unconditional
+    did. Neuter-checked: restoring the unconditional
     `"path": state["path"]` in `retire_plan`'s `_write_claim` call reproduces
     the same raise.
     """

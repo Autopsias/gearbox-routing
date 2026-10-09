@@ -604,7 +604,7 @@ def test_concurrent_writers_produce_only_whole_lines(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Round-2 review findings (orchestrator fix, 2026-08-15): the apply-side attempt
+# Round-2 review findings (orchestrator fix): the apply-side attempt
 # ordinal and rework_count must not invent numbers that disagree with verify.py.
 # ---------------------------------------------------------------------------
 def test_apply_attempt_resets_at_a_generation_bump(tmp_path, monkeypatch):
@@ -721,7 +721,7 @@ def test_begin_stamps_the_field_on_every_dispatch_started(tmp_path, monkeypatch)
 # --------------------------------------------------------------------------
 # routing_provenance — the VALUE, not just the key
 # --------------------------------------------------------------------------
-# REGRESSION 2026-09-04: SSOT v22 (commit 8303082) replaced this function's
+# REGRESSION: an SSOT change replaced this function's
 # `import run as _run` with `import provider_lane as pl` and left three `_run`
 # uses below it. Every call raised NameError, the bare `except` swallowed it,
 # and the fallback labelled 114/114 records `pinned_override` — so the
@@ -732,7 +732,7 @@ def test_begin_stamps_the_field_on_every_dispatch_started(tmp_path, monkeypatch)
     ("deep_reasoning", "claude", "opus", "medium", "default_resolved"),
     ("agentic_build", "claude", "opus", "high", "default_resolved"),
     ("standard_build", "claude", "sonnet", "medium", "default_resolved"),
-    ("mechanical", "claude", "haiku", None, "default_resolved"),
+    ("mechanical", "claude", "haiku", "low", "default_resolved"),       # cheap_fast.light -> low
     ("agentic_build", "codex", "gpt-5.6-sol", "xhigh", "default_resolved"),
     ("mechanical", "claude", "sonnet", "max", "pinned_override"),      # zai cell, claude lane
     ("deep_reasoning", "claude", "opus", "low", "pinned_override"),    # canary rung

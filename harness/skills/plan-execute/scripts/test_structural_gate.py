@@ -158,7 +158,7 @@ def test_check_js_parses_the_real_dashboard_script(tmp_path, monkeypatch):
         assert "outside of base path" not in result["reason"], (
             "eslint ignored the scratch file — the check linted NOTHING. Its base "
             "path is the CWD, so check_js_parses must run eslint with "
-            "cwd=_ESLINT_CONFIG.parent (measured 2026-08-25)"
+            "cwd=_ESLINT_CONFIG.parent (measured)"
         )
 
 
@@ -168,7 +168,7 @@ def test_an_eslint_run_that_LINTED_NOTHING_is_not_a_pass(rc, stdout):
     exits 1 with EMPTY stdout when eslint is not in the npx cache, and rc=1 is also
     eslint's "found problems" code — so an empty report read as a clean one. On
     GitHub's runner that made the PLANTED-identifier probe below report `passed`
-    (measured 2026-09-07). Only the report tells "clean" from "never ran"."""
+    (measured). Only the report tells "clean" from "never ran"."""
     proc = SimpleNamespace(returncode=rc, stdout=stdout, stderr="npm error code ENOTCACHED")
     assert sg._eslint_verdict(proc)["status"] == "skipped"
 
@@ -184,7 +184,7 @@ def test_a_PLANTED_undefined_identifier_is_CAUGHT(tmp_path, monkeypatch):
     # RUN FROM A DIRECTORY THAT IS NOT AN ANCESTOR OF THE CONFIG. Without this
     # the probe is broken: in the SOURCE tree the eslint config lives under the
     # repo root, so a subprocess inheriting the repo-root cwd lints the file
-    # happily and the base-path bug cannot reproduce — measured 2026-08-25, the
+    # happily and the base-path bug cannot reproduce — measured, the
     # neuter passed 10/10 until this line was added. In the DEPLOYED tree
     # (~/.claude) the config is outside the plan's repo, which is where the gate
     # actually ran dead for six days.
@@ -202,7 +202,7 @@ def test_a_PLANTED_undefined_identifier_is_CAUGHT(tmp_path, monkeypatch):
     if result["status"] == "skipped":
         # A skip is acceptable ONLY for genuinely absent tooling. "outside of base
         # path" is the DEAD-GATE symptom this probe exists to catch — skipping on
-        # it rebuilds the very loophole being fixed (measured 2026-08-25: the first
+        # it rebuilds the very loophole being fixed (measured: the first
         # version of this probe did exactly that and reported "2 skipped").
         assert "outside of base path" not in result.get("reason", ""), result
         pytest.skip(f"eslint unavailable on this host: {result.get('reason')}")
@@ -215,7 +215,7 @@ def test_a_SCRIPT_TAG_INSIDE_AN_HTML_COMMENT_is_not_extracted(tmp_path, monkeypa
     literal text `<script>`. The extraction regex matched that COMMENT as a real
     tag — no `data-layout-audit` before its `>`, so the exclusion never fired —
     and fed eslint English, failing 3 of the last 4 real plans with
-    `Parsing error: Unexpected token nav` (measured 2026-08-25)."""
+    `Parsing error: Unexpected token nav` (measured)."""
     monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
     plan_dir = make_plan(tmp_path, [SESS])
     monkeypatch.chdir(tmp_path)
@@ -233,7 +233,7 @@ def test_a_SCRIPT_TAG_INSIDE_AN_HTML_COMMENT_is_not_extracted(tmp_path, monkeypa
     if result["status"] == "skipped":
         # A skip is acceptable ONLY for genuinely absent tooling. "outside of base
         # path" is the DEAD-GATE symptom this probe exists to catch — skipping on
-        # it rebuilds the very loophole being fixed (measured 2026-08-25: the first
+        # it rebuilds the very loophole being fixed (measured: the first
         # version of this probe did exactly that and reported "2 skipped").
         assert "outside of base path" not in result.get("reason", ""), result
         pytest.skip(f"eslint unavailable on this host: {result.get('reason')}")
@@ -307,7 +307,7 @@ def test_apply_refuses_done_when_dashboard_write_silently_fails(tmp_path, monkey
     # This transcript is the evidence artifact required by S07's verify block.
     transcript_path = Path(
         "~/.claude/_plans/"
-        "claude-code-reliability-selfassessment-2026-07-03/_evidence/s07/"
+        "example-reliability-plan-2026-07-03/_evidence/s07/"
         "refused-done-transcript.txt"
     )
     transcript_path.parent.mkdir(parents=True, exist_ok=True)

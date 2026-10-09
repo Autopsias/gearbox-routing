@@ -460,7 +460,7 @@ def main(out_path, cli_transcript=None, suite_result=""):  # pragma: no cover - 
 
     # Not a fixture-only check: the same code, run against the live plan that
     # dispatched this session.
-    live = Path(__file__).resolve().parents[3] / "_plans" / "plan-framework-upgrade-2026-08-12"
+    live = Path(__file__).resolve().parents[3] / "_plans" / "example-upgrade-plan-2026-08-12"
     if live.is_dir():
         lines += [
             "## 6 — The same check against THIS plan (not a fixture)",

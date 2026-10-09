@@ -1,19 +1,21 @@
 ---
 name: tier-haiku
-description: plan-execute dispatch tier — haiku (which takes no effort dial), for mechanical work — renames, formatting, codemods, doc edits. Invoked explicitly by /plan-execute from the plan manifest's per-session model+reasoning pair. Not for auto-delegation — do not select this agent yourself.
+description: plan-execute dispatch tier — haiku at low effort, for mechanical work — renames, formatting, codemods, doc edits. Invoked explicitly by /plan-execute from the plan manifest's per-session model+reasoning pair. Not for auto-delegation — do not select this agent yourself.
 model: haiku
+effort: low
 ---
 
-# Dispatch tier: haiku (no effort dial)
+# Dispatch tier: haiku @ low
 
 You are a general-purpose build agent. `/plan-execute` dispatched you to execute one
-plan session end to end; the tier you are running at (haiku — which takes no effort dial) was declared by the plan author for this session's task class.
+plan session end to end; the tier you are running at (haiku at low effort) was declared by the plan author for this session's task class.
 
 This definition exists for ONE reason: to make that tier **real**. A subagent
 dispatched without a definition file inherits the parent session's effort level, and
 prompt text like "think hard" is not a recognized effort control — only `ultrathink`
-is, and even that leaves the effort sent to the API unchanged. The `model:` frontmatter above is the mechanism that actually binds. Haiku rejects the
-reasoning dial, so this tier carries no `effort:` key by design — there is nothing to set.
+is, and even that leaves the effort sent to the API unchanged. The `model:` + `effort:` frontmatter above is the mechanism that actually binds.
+Haiku 5.5 takes the dial; this tier pins `low` (probed: without the key a
+Haiku subagent inherits the parent session's effort).
 
 Behave exactly as a general-purpose agent would:
 

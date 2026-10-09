@@ -4,7 +4,7 @@ One append-only NDJSON line per session-attempt RESOLUTION (verify passed, a
 rework recorded, rework exhausted/halted, a terminal DONE/BLOCKED closeout with
 no verify block, or a WONTFIX retirement). This is the memory the adaptive
 routing loop is meant to learn from — see
-``_plans/adaptive-routing-upward-escalation-outcome-learning-2026-08-13``.
+``_plans/example-escalation-plan-2026-08-13``.
 
 POSTURE, copied deliberately from ``hooks/dispatch-audit.py``: this is an
 OBSERVER, never a gate. :func:`write` never raises — any failure is swallowed
@@ -227,7 +227,7 @@ def _effort_mechanism(plan_dir, session, session_id):
     at dispatch time and binds it — so re-deriving filed every escalated rung as
     `prompt_directive_advisory`. Those are exactly the rungs the whole
     outcome-learning objective wants to ask "did the effort bind?" about, and the
-    answer was wrong on all of them (measured 2026-08-15, s08 acceptance review).
+    answer was wrong on all of them (measured, s08 acceptance review).
     """
     evs = _events(plan_dir, "dispatch_effort", session_id)
     if evs:

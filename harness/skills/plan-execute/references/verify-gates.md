@@ -6,7 +6,7 @@ independent check `/plan-execute` runs so an optimistic closeout never advances 
 ships unverified work. It is **opt-in and additive** — a plan with no `verify`
 block runs exactly as before.
 
-**Contents:** [The block](#the-block-authored-in-the-plan-spec-resolved-into-the-manifest) · [Gate kinds](#gate-kinds-same-as-shipping-gates) · [`expect`](#expect--the-gate-passes-on-its-output-not-only-its-exit-code-2026-08-20) · [When it runs](#when-it-runs-and-what-happens) · [Review gates (vetted lever)](#review-gates-the-vetted-lever--p5) · [LLM review gates](#llm-review-gates--llm-review-lowmediumhigh-bound-2026-08-12) · [Cross-family review](#cross-family-review--cross-family-review-lowmediumhigh-added-2026-08-25) · [Under the Codex harness](#under-the-codex-harness--the-mirror-direction-added-2026-08-25-session-s05) · [Helper subcommands](#helper-subcommands) · [Durability / safety](#durability--safety-so-you-dont-have-to)
+**Contents:** [The block](#the-block-authored-in-the-plan-spec-resolved-into-the-manifest) · [Gate kinds](#gate-kinds-same-as-shipping-gates) · [`expect`](#expect--the-gate-passes-on-its-output-not-only-its-exit-code) · [When it runs](#when-it-runs-and-what-happens) · [Review gates (vetted lever)](#review-gates-the-vetted-lever--p5) · [LLM review gates](#llm-review-gates--llm-review-lowmediumhigh-bound-2026-08-12) · [Cross-family review](#cross-family-review--cross-family-review-lowmediumhigh-added) · [Under the Codex harness](#under-the-codex-harness--the-mirror-direction-added-session-s05) · [Helper subcommands](#helper-subcommands) · [Durability / safety](#durability--safety-so-you-dont-have-to)
 
 ## The block (authored in the plan spec, resolved into the manifest)
 
@@ -25,9 +25,9 @@ block runs exactly as before.
   neither is a **build-time error**. Gates run sequentially; all must pass.
   Non-empty when present — but a block may **omit `gates`** if it carries
   `require_evidence` (the evidence assertion is then the whole gate).
-  **Fix rounds run review gates first (2026-10-03):** on a rework pass `verify-begin` moves review gates (skill-kind, or argv gates that run `llm_review_gate.py`) ahead of the others, keeping relative order inside each group, because a review finding sends the session back anyway and a test run spent before it is wasted. The first pass keeps the declared order.
+  **Fix rounds run review gates first:** on a rework pass `verify-begin` moves review gates (skill-kind, or argv gates that run `llm_review_gate.py`) ahead of the others, keeping relative order inside each group, because a review finding sends the session back anyway and a test run spent before it is wasted. The first pass keeps the declared order.
 - **`on_fail`** — `rework` (default) or `halt`.
-- **`max_rework`** — int 0–6 (ceiling raised from 5 on 2026-08-21 so the longest escalation ladder, `sonnet@medium`, is authorable; default 2 since 2026-08-20, was 1). The bound on the rework loop.
+- **`max_rework`** — int 0–6 (ceiling raised from 5 so the longest escalation ladder, `sonnet@medium`, is authorable; default 2 since 2026-08-20, was 1). The bound on the rework loop.
 - **`require_evidence`** (Vista ③, default `false`) — when `true`, the session's
   closeout MUST carry an `evidence` array (see closeout-contract.md); at
   `verify-finalize` every listed path must exist and be non-empty or `DONE` is
@@ -36,7 +36,7 @@ block runs exactly as before.
   the project's "verify mechanism engagement" rule structural: no proof artifact
   on disk ⇒ no `DONE`. `verify-simulate` (CI smoke) skips the evidence check.
 
-  **Freshness (LND-03, 2026-08-23).** Existence alone was never proof: the
+  **Freshness (LND-03).** Existence alone was never proof: the
   artifact an earlier run wrote is already at the declared path — in a worktree
   because the checkout was made at a base that contains it, in the shared tree
   because the file is simply still there. Each declared path must therefore also
@@ -133,10 +133,10 @@ Resolution happens at **build time** — `/plan-execute` reads the merged block.
 > target. Resolved WITHOUT it the two disagreed — the verify gate landing in the
 > merge target, the pre_deploy gate in the plan worktree — so an integration
 > session's pre_deploy gate tested a tree holding none of the merged work and
-> passed vacuously (found by review 2026-08-22, fixed the same day).
+> passed vacuously (found by review, fixed the same day).
 > A skill-kind gate for an isolated member carries the
 
-### `expect` — the gate passes on its OUTPUT, not only its exit code (2026-08-20)
+### `expect` — the gate passes on its OUTPUT, not only its exit code
 
 **Exit 0 is a claim, not proof that the check ran.** `pytest -q` over a path that
 collects nothing, a grep whose input was empty, a runner that skipped every case:
@@ -174,7 +174,7 @@ nor a failure, because nothing was reviewed**. `verify` routes it to a third act
 - The gate stays `pending`, so `verify-begin … --resume` re-runs exactly it.
 - **`rework_count` is UNCHANGED.** Charging the agent's budget for the harness's own
   timeout is what exhausted `max_rework` on a session with not one finding ever
-  raised (measured 2026-08-20, s13: two 900 s timeouts on a 21-file surface).
+  raised (measured, s13: two 900 s timeouts on a 21-file surface).
 - It still calls `record_failure`, so a REPEAT at the same gate and level arms the
   stuck protocol — a reviewer that never answers escalates instead of looping.
 - The orchestrator branch is the `indeterminate` action in `SKILL.md` step 3.
@@ -238,7 +238,7 @@ either way (`done`).
 >
 > **Whatever you bind it to must detect changes from the WORKING TREE.** Verify gates run
 > *before* `post_session` commits, so a check deriving its file set from a committed delta
-> (`git diff origin/<branch>...HEAD`) sees nothing and exits 0. Measured 2026-07-28 on a
+> (`git diff origin/<branch>...HEAD`) sees nothing and exits 0. Measured on a
 > tree with 28 dirty files: `pnpm prepush` printed `PREPUSH VALIDATION SKIPPED` and passed.
 
 ## When it runs and what happens
@@ -261,7 +261,7 @@ orchestrator then drives the verify sub-loop (`verify-begin` → `verify-record`
   ladder and the announcement form. `max_rework` still bounds the loop either way;
   climbing a rung costs a rework attempt the same as a same-rung retry does.
   The re-run pass puts review gates first (2026-10-03; see `gates` above).
-- **A gate CANNOT DECIDE (declared `indeterminate_exit`, added 2026-08-20)** → the
+- **A gate CANNOT DECIDE (declared `indeterminate_exit`, added)** → the
   loop returns `{"action": "indeterminate", gate, hint, feedback_file}`. This is
   neither a pass nor a finding: NOTHING WAS REVIEWED. The gate stays **pending**,
   the session stays `PARTIAL`, and **no rework attempt is charged** —
@@ -291,7 +291,7 @@ The orchestrator reports the gate `done` only if the verdict has **no blocking
 finding**; otherwise `failed` (which reworks or halts like any gate).
 
 > **NEVER bind a review gate to `/code-review` or `/adversarial-review`
-> (2026-08-23).** Both are **fan-out orchestrations**: they dispatch finder
+>.** Both are **fan-out orchestrations**: they dispatch finder
 > agents against the **repo root** and build their own surface. A gate's scope is
 > a property of its prompt, so the moment the gate delegates to one of them the
 > scope is gone and nothing reports the loss. Measured on a 391-line, 5-file
@@ -303,12 +303,12 @@ finding**; otherwise `failed` (which reworks or halts like any gate).
 > Those two commands stay fine as **operator-typed** commands, where the cost is
 > visible and nobody is claiming a scope.
 >
-> **The one allowed shape (2026-09-05): the ORCHESTRATOR pins the scope in the
+> **The one allowed shape: the ORCHESTRATOR pins the scope in the
 > invoke args.** A registry entry is static and cannot name a session's files;
 > the orchestrator can. Prepend to `<args>`: the worktree path, the exact file
 > list (`git diff HEAD --stat` plus untracked new files), the base commit, and
-> "list captured evidence, do not read it". profile-a-brain's `adversarial-review`
-> gate ran that way twice on s05 of The Porter Finishes, returned a verdict each
+> "list captured evidence, do not read it". One project's `adversarial-review`
+> gate ran that way twice on one session, returned a verdict each
 > time, and each pass found one real defect the argv reviewer had missed. Bare,
 > the ban above stands exactly as measured.
 
@@ -386,7 +386,7 @@ the diff in that one session**. It is deliberately NOT `claude -p "/code-review
 `.claude/eval-gates.json`) — a gate id is a closed vocabulary, so a plan naming
 one that resolves in neither fails at **build** time.
 
-### The reviewed surface is the diff **plus every new file** (2026-08-15)
+### The reviewed surface is the diff **plus every new file**
 
 `git diff HEAD` contains no line of an untracked file. A session that adds a new
 module therefore had it reviewed by **nobody** while the gate reported a clean
@@ -399,7 +399,7 @@ guess, both `INDETERMINATE` (never a pass): a `cwd` that is not a git work tree,
 and more than `UNTRACKED_MAX` (60) untracked files — at that point the tree is
 too dirty for the gate to claim it reviewed the change.
 
-**The surface is BOUNDED to the session (2026-08-20).** Two measured failures in
+**The surface is BOUNDED to the session.** Two measured failures in
 one day made the unbounded surface untenable: (a) verify runs *before* a session
 commits, so `git diff HEAD` is the session's *entire* accumulated output on every
 rework round, and (b) the surface is the *tree*, so a concurrent session's
@@ -443,7 +443,7 @@ to high is ~6×, on a ten-line diff. That is the argument for steering the level
 off `task_class` rather than defaulting everything to high, and for putting the
 deterministic gates first so a broken build never pays for a review.
 
-### Sizing the surface, and what a rework actually reviews (2026-08-20)
+### Sizing the surface, and what a rework actually reviews
 
 **One LLM review pass is a sample, not an audit.** SWE-PRBench (350 PRs,
 human ground truth, March 2026) measures eight frontier models at **15–31%
@@ -453,7 +453,7 @@ changed lines, ~65% at 300–600, ~28% past 1,000. And patch size + files touche
 predicts review burden at AUC 0.957 on 33k agent-authored PRs — what a session
 *touches* decides how well it will be reviewed, not what its brief says.
 
-Measured here, 2026-08-20, over 21 h and two plans: 16 of 17 verify failures
+Measured, over 21 h and two plans: 16 of 17 verify failures
 were `llm-review-medium`, and rework never converged — round 2 raised findings
 on round-0 files that round 1 had never flagged. Not regressions; the sample.
 `max_rework` was a cutoff on a sampling process.
@@ -564,7 +564,7 @@ the registry to decide which levels to exercise — install a level without
 proving it and the harness will catch it. Levels left on the loud stub are
 reported as skipped.
 
-### How long each gate takes (2026-10-04)
+### How long each gate takes
 
 Every argv gate run by `verify` or by land appends a `gate_run` event to the plan's
 `run.ndjson`: gate id, phase (`verify`, `land`, `land-base`, `land-rerun`), outcome
@@ -576,7 +576,7 @@ It prints runs, median, longest and total minutes per repo and gate. It exists t
 decide, on measured times, whether test gates in all repos should queue behind
 `govrun` (the machine limiter) instead of running at the same time.
 
-### At plan close: the whole-plan code review runs at land (2026-10-04)
+### At plan close: the whole-plan code review runs at land
 
 Per-session review sees one session's diff. The whole change gets one code review
 at land: `llm-review-high` is flagged `at_land` in the shared default list
@@ -593,9 +593,9 @@ never repairs: the land parks, the park lists every gate's result, and the one f
 round you add with `add-session` takes the findings of both reviews.
 
 This replaces the old recommendation to run `claude ultrareview` at plan close
-(operator decision 2026-10-04): it billed $5–25 per run, and nobody ran it.
+(operator decision): it billed $5–25 per run, and nobody ran it.
 
-## Cross-family review — `cross-family-review-low|medium|high` (added 2026-08-25)
+## Cross-family review — `cross-family-review-low|medium|high` (added)
 
 Same three levels, same argv wrapper (`scripts/llm_review_gate.py`), same
 findings-block contract as `llm-review-*` above — the one difference is
@@ -633,7 +633,7 @@ harness-side park, session s05):**
   `DEGRADED_FROM: cross_family_unavailable` (codex unusable), writes
   `_verify_state/<sid>.degraded.json`, and exits 2 (the gate's declared
   `indeterminate_exit`).
-- **What that exit 2 does, landed 2026-08-25 (session s05):** `verify.py`'s
+- **What that exit 2 does, landed (session s05):** `verify.py`'s
   `_run_gate` routes it to `rework._indeterminate`'s split in
   `verifier_park.indeterminate()`. The marker IS read — the FIRST
   `VERIFIER:` line in stdout, found by prefix scan, no line-count window
@@ -654,7 +654,7 @@ harness-side park, session s05):**
   --decision verified-on-box|blocked` answers it, or the gate is removed
   from that session's plan by hand.
 
-### Under the Codex harness — the mirror direction (added 2026-08-25, session s05)
+### Under the Codex harness — the mirror direction (added, session s05)
 
 `llm-review-*` and `cross-family-review-*` both run under `--harness codex`
 too (a Codex-built session). There the family that did **not** write the
@@ -683,7 +683,7 @@ operator's code to Anthropic, which they may specifically not want.
   whole stdout, not an exact match on line 1 (line 1 is the reviewer
   *identity* line, prose, not the marker) and **not bounded to a fixed
   line window**. An earlier design scanned only the first 10 lines; that
-  window was removed on 2026-08-25 (session s05, rework 3) because the
+  window was removed (session s05, rework 3) because the
   gate's own surface preamble prints one line per untracked file and so
   has no upper bound — measured on this box, 8 untracked files pushed the
   marker to stdout line index 12, past a 10-line window, and the false
@@ -772,7 +772,7 @@ operator's code to Anthropic, which they may specifically not want.
 on itself — it would be handing the reviewer its own untrusted output to
 judge.
 
-**Registry home — the bundled default ONLY** (measured 2026-08-25). Unlike
+**Registry home — the bundled default ONLY** (measured). Unlike
 `llm-review-*`, which both registries carry, these three ids are registered in
 `skills/plan-execute/references/eval-gates.default.json` and **nowhere else**:
 gearbox's own `.claude/eval-gates.json` holds `code-review-gate` and the three
@@ -788,7 +788,7 @@ ids, land the same numbers in both.
 registry entries — each cross-family level carries the same inner/outer pair as
 its `llm-review-*` twin — not re-derived from the live measurement below; see
 each gate's `_note` in `eval-gates.default.json`. **`low` was 300/720 for one
-commit** (2026-08-25): it was copied from `llm-review-low` just before that
+commit**: it was copied from `llm-review-low` just before that
 entry was raised to 1200/2400 on a REAL INDETERMINATE — the same 300s inner
 budget that timed out twice on a 3-file/176-line surface under box contention.
 The twins are equal again; keep them equal unless a measurement says otherwise.
@@ -817,7 +817,7 @@ even if the rest of the feature is reverted.
 
 **The authoritative file list is MECHANICAL, and is deliberately not restated
 here** — a hand-copied list claims a completeness it loses on the next commit,
-and this one did. Measured 2026-08-26 at commit `6b45087`: the list called itself
+and this one did. Measured: the list called itself
 "the complete list" and held 7 bullets naming 8 files, while the branch touched
 **35**. Every script the feature added was missing from it —
 `codex_review_backend.py`, `codex_review_prompt.py`, `codex_review_events.py`,

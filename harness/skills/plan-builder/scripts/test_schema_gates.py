@@ -256,7 +256,7 @@ def _check_contract_first_shaping():
         bad("touches: unparseable prose", f"opaque={_rep['opaque']} groupable={_rep['groupable']}")
 
     # ---------------------------------------------------------------------------
-    # Research-tool availability probe (RS-06, 2026-08-13)
+    # Research-tool availability probe (RS-06)
     # ---------------------------------------------------------------------------
     # The gap this closes: `research_status` was a field the authoring agent
     # hand-wrote. "The research tools were absent, so the pass was skipped" was an
@@ -468,7 +468,7 @@ def _check_research_status_claims():
 
 def _check_infographic_coverage():
     # ---------------------------------------------------------------------------
-    # INFOGRAPHIC_COVERAGE_MIN_SCHEMA (2026-08-13) — the progress bar counts through
+    # INFOGRAPHIC_COVERAGE_MIN_SCHEMA — the progress bar counts through
     # the infographic's group list, so an item in no group is missing from the
     # DENOMINATOR: the bar reports progress over a subset while looking like it
     # covers the plan. Refused at build time, where it is still cheap to fix.
@@ -499,7 +499,7 @@ def _check_infographic_coverage():
 
     # CONTROL — the identical defect one version below is untouched. Four real
     # plans on disk carry unplaced items; none carries a stamp, so none is newly
-    # refused (measured 2026-08-13 across all 25 spec.json under _plans/).
+    # refused (measured across all 25 spec.json under _plans/).
     expect_valid(_spec_coverage(build_plan.INFOGRAPHIC_COVERAGE_MIN_SCHEMA - 1, drop_item="ft-02"),
                  "coverage: CONTROL — the same defect below the gate still validates")
     expect_valid(_spec_coverage(None, drop_item="ft-02"),

@@ -724,7 +724,7 @@ def _two_gate_parked_plan(tmp_path):
 
 def test_resolving_a_park_leaves_a_later_gate_required_and_refuses_a_plain_ack(
         tmp_path, claude_shim, deployed_home):
-    """RESOLVING THE PARK IS NOT FINISHING THE SESSION. Measured 2026-08-25 before
+    """RESOLVING THE PARK IS NOT FINISHING THE SESSION. Measured before
     the fix: resolve returned run-argv for gate:smoke2, the dashboard stayed at
     AWAITS_REVIEW, and a plain `ack-checkpoint` then marked the session DONE with
     smoke2 never run -- the very bypass the park exists to prevent, one door over."""

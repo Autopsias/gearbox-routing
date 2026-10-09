@@ -1,6 +1,6 @@
 """union_gates — the land re-gate's gate set (§4.4 "the plan's union of verify
 gates"). Pure-dict tests, no git fixture; extracted from test_land.py at its
-size bound (2026-08-27).
+size bound.
 
     pytest plan-execute/scripts/test_land_union.py -q
 """

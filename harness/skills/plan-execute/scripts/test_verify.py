@@ -127,7 +127,7 @@ def test_build_carries_review_scope_into_the_manifest(tmp_path):
     # Emitting "only when non-empty" DROPS `"review_scope": []` from every plan
     # built while the emit was unconditional -- measured on the concurrent
     # repo-health plan, whose s01/s02/s03 carry `[]` and whose four _verify_state
-    # files all bind to the digest that would move (2026-08-21). Both mistakes are
+    # files all bind to the digest that would move. Both mistakes are
     # the same mistake: the manifest must describe what the plan published.
     man_p = plan_dir / "manifest.json"
     man = json.loads(man_p.read_text())
@@ -168,7 +168,7 @@ GATE_RC2 = {"ind": {"kind": "argv", "argv": ["sh", "-c", "exit 2"]}}          # 
 def test_a_declared_indeterminate_exit_is_not_charged_and_stays_rerunnable(tmp_path):
     """A gate that COULD NOT DECIDE (reviewer timeout, no parseable block) leaves
     the gate pending and the rework budget untouched. s13 halted 2/2 "exhausted"
-    on two 600s timeouts with no finding ever raised (2026-08-20)."""
+    on two 600s timeouts with no finding ever raised."""
     plan_dir = make_plan(tmp_path, [_verify_sess(["ind"], max_rework=1)], gates=GATE_IND)
     write_closeout(plan_dir, "s01")
     _begin_doing(plan_dir, "s01")
@@ -636,7 +636,7 @@ def test_a_rebuild_after_midnight_does_not_change_the_manifest(tmp_path):
     """gen_manifest read the CLOCK for `created`, so regenerating a plan the next
     day produced a different manifest_digest -- and manifest_digest is what
     _verify_state compares to decide state-drift. The plan then halts, mid-verify,
-    for a change nobody made. Measured on 2026-08-21, when this plan's own digest
+    for a change nobody made. Measured, when this plan's own digest
     moved at midnight. A spec that pins `created` must round-trip; one that does
     not still stamps today, so plans built before this are untouched."""
     plan_dir = make_plan(tmp_path, [{**SESS, "id": "s01"}], gates=GATE_PASS)
@@ -667,7 +667,7 @@ def test_a_rebuild_after_midnight_does_not_change_the_manifest(tmp_path):
 def test_a_rebuild_does_not_re_probe_the_research_environment(tmp_path):
     """`created` was fixed and its SIBLING was left: research_env.probed_at is
     clock-derived too, so a rebuild re-probed it and moved manifest_digest just
-    the same (measured 1e021aeb -> a5283e62, 2026-08-21). research_env_record's
+    the same (measured). research_env_record's
     own docstring already promised this ("never re-probed... reproduces the same
     bytes") -- true on the gen_manifest path, false on the build() path. Both
     clock-derived keys now follow ONE rule: the spec, else what the plan already
@@ -690,9 +690,9 @@ def test_a_rebuild_does_not_re_probe_the_research_environment(tmp_path):
 
 def test_a_rebuild_leaves_an_UNCHANGED_manifest_byte_for_byte(tmp_path):
     """Pinning the clock keys is not enough, because `manifest_digest` hashes RAW
-    BYTES and the bytes on disk are not canonical. Measured 2026-08-21: 4 of the
+    BYTES and the bytes on disk are not canonical. Measured: 4 of the
     28 plans in this repo carry a trailing newline nothing in build_plan writes,
-    and rebuilding _plans/plan-level-git-isolation-2026-08-20 moved its digest
+    and rebuilding _plans/example-isolation-plan-2026-08-20 moved its digest
     75bd9a7c60aa -> 35271aafb96d over that ONE byte with zero content difference
     -- which halts every bound _verify_state on state-drift for a change nobody
     made. So a rebuild compares VALUES and only writes when the dispatch graph
@@ -713,7 +713,7 @@ def test_a_rebuild_leaves_an_UNCHANGED_manifest_byte_for_byte(tmp_path):
 
 
 def test_a_bare_gate_name_is_refused_by_name_and_exits_nonzero(tmp_path, capsys):
-    """The false-green measured 2026-08-22. Gate names carry a `gate:` prefix, so
+    """The false-green measured. Gate names carry a `gate:` prefix, so
     `--gate ind` names nothing -- but `cmd_verify_run` printed `action: "error"`
     and exited 0, so an orchestrator reading the exit code advanced past a gate
     that had never run. The old message ("not an argv-kind gate") also sent the

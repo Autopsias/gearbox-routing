@@ -3,6 +3,7 @@ name: linting-fixer
 description: "Fixes Python lint/format issues with ruff, mypy, black and isort; use PROACTIVELY after code changes. Use when you say 'ruff errors', 'lint failing', 'format issues', 'fix linting'."
 tools: Read, Edit, MultiEdit, Bash, Grep, Glob, SlashCommand, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: haiku
+effort: low
 color: yellow
 ---
 

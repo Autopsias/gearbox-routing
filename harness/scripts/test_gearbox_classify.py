@@ -176,7 +176,7 @@ def main():
     assert set(gc.changed_key_paths(a, a)) == set()
     # A block on ONE side only is reported by its leaves. The first /effort on a NEW
     # model id adds the whole `modelSettings.<id>` block; reported as the block, it
-    # missed `modelSettings.*.effortLevel` and aborted a deploy (Opus 5.5, 2026-09-22).
+    # missed `modelSettings.*.effortLevel` and aborted a deploy (Opus 5.5).
     ms = {"modelSettings": {"claude-opus-5": {"effortLevel": "high"}}}
     added = {"modelSettings": {**ms["modelSettings"], "claude-opus-5-5": {"effortLevel": "xhigh"}}}
     assert set(gc.changed_key_paths(ms, added)) == {"modelSettings.claude-opus-5-5.effortLevel"}

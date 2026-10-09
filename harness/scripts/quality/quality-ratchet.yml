@@ -1,0 +1,80 @@
+name: quality-ratchet
+
+# CI backstop for the three vendored quality-ratchet checkers (tools/).
+#
+# The pre-commit hooks judge only STAGED files, so a local `SKIP=` (or a
+# --no-verify that should never happen) is survivable exactly because this job
+# re-runs all three checkers WHOLE-PROJECT on every push and PR. Without it a
+# local bypass is permanent and invisible; with it the bypass turns into a red
+# check the next push.
+#
+# Template source of truth: gearbox scripts/quality/quality-ratchet.yml,
+# vendored by vendor_quality.py. Never edit the vendored copy; re-sync instead.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-ratchet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ratchet:
+    # A repo that pays for no hosted minutes sets the repository variable
+    # QUALITY_RATCHET_RUNS_ON to a JSON runner label list, e.g.
+    # ["self-hosted","macOS","ARM64"]. Unset keeps GitHub's hosted runner.
+    runs-on: ${{ fromJSON(vars.QUALITY_RATCHET_RUNS_ON || '"ubuntu-latest"') }}
+    # Without this a job inherits GitHub's 360-minute default: a hung
+    # step burns six hours of runner time and reports nothing. The
+    # ratchet takes well under a minute.
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python (uv)
+        # uv, not actions/setup-python: setup-python writes to the hosted
+        # runner's tool cache and fails on a self-hosted runner. This works on
+        # both. activate-environment puts .venv first on PATH for `python`.
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+
+      - name: Install ruff (complexity checker backend)
+        # Pinned so CI and the commit hook can never disagree about a score;
+        # bump deliberately, alongside a local ruff bump.
+        run: uv pip install ruff==0.14.10
+
+      - name: Prove the checkers can still fail
+        # A gate that returns "clean" because its input was empty is worse
+        # than no gate. Plant a known-bad file in a scratch project and assert
+        # every checker flags it BEFORE trusting their all-clear on the repo.
+        run: |
+          set -euo pipefail
+          plant=$(mktemp -d)
+          python - "$plant" <<'EOF'
+          import sys, pathlib
+          plant = pathlib.Path(sys.argv[1])
+          body = "\n".join(f"    x{i} = {i}" for i in range(600))
+          cond = "\n".join(f"    if n == {i}: return {i}" for i in range(20))
+          (plant / "bad.py").write_text(f"def huge():\n{body}\n\ndef twisty(n):\n{cond}\n    return 0\n")
+          EOF
+          ! python tools/check_file_sizes.py --project "$plant"
+          ! python tools/check_function_lengths.py --project "$plant"
+          ! python tools/check_complexity.py --project "$plant"
+
+      - name: File size ratchet (whole project)
+        run: python tools/check_file_sizes.py --project .
+
+      - name: Function length ratchet (whole project)
+        run: python tools/check_function_lengths.py --project .
+
+      - name: Complexity ratchet (whole project)
+        run: python tools/check_complexity.py --project .

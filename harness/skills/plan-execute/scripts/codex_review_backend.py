@@ -309,7 +309,8 @@ def parse(out):
             data = None
     if not isinstance(data, dict):
         return None, f"codex last message is not a JSON object: {text[:200]!r}"
-    if not isinstance(data.get("findings"), list) or not isinstance(data.get("reviewed"), list):
+    if not isinstance(data.get("findings"), list) or not isinstance(data.get("reviewed"), list) \
+            or not isinstance(data.get("priors", []), list):
         return None, f"codex answer does not match the findings schema: {text[:200]!r}"
     if str(data.get("verdict", "")).upper() == "FINDINGS" and not data["findings"]:
         # Incoherent, and the direction matters: a reviewer that says it found
@@ -367,8 +368,8 @@ def adapt(payload, prepared, led, level):
     # counts captured run output that `prepared_paths` deliberately drops (listed
     # for the reviewer, never deep-read), so a prior on `_evidence/run.log` sits
     # in `hashes` over a file nobody was asked to open. `prepared` is exactly the
-    # list `attest` held the reviewer to, which is the whole reason the inference
-    # below is evidence rather than an assumption.
+    # list `attest` held the reviewer to, so a `fixed` for any other file is
+    # a claim about a file nobody was asked to read, and is not honoured.
     shown = set(prepared)
     out, matched = [], set()
     for f in payload["findings"]:
@@ -376,25 +377,24 @@ def adapt(payload, prepared, led, level):
                "severity": str(f.get("severity", "")).lower(), "summary": _summary(f)}
         fid = ledger.fingerprint(rec)
         if fid in priors:
-            # Codex cannot emit a prior_id under the schema, so the MATCH is made
+            # Codex emits no prior_id per finding, so the MATCH is made
             # here, on the ledger's own fingerprint (file + summary, line
             # excluded). Re-reported means still open.
             rec["prior_id"], rec["prior"] = fid, "open"
             matched.add(fid)
         out.append(rec)
+    # SILENCE IS NOT A FIX. Inferring `fixed` for a shown prior Codex did not
+    # re-report let one pass that MISSED the defect clear an open HIGH (found in a
+    # security review). Only an explicit `priors[].status == "fixed"` clears.
+    said_fixed = {str(p.get("id")): p for p in payload.get("priors") or []
+                  if isinstance(p, dict) and p.get("status") == "fixed"}
     for fid, p in priors.items():
-        if fid in matched or _norm(p.get("file") or "") not in shown:
-            # Not seen this round: judge() carries it as OPEN (inside the ledger's
-            # surface) or UNVERIFIABLE (outside it). Silence about a file nobody
-            # was shown is never evidence, and this backend does not manufacture
-            # any — least of all for a file the gate itself chose not to hand over.
+        if fid in matched or fid not in said_fixed or _norm(p.get("file") or "") not in shown:
+            # Re-reported, not declared fixed, or in a file nobody was shown:
+            # judge() decides (OPEN or UNVERIFIABLE), never this adapter.
             continue
-        # Shown, read (the attestation above proves it), and not re-reported.
-        # THAT is the evidence a Claude reviewer supplies by writing
-        # `"prior": "fixed"`; the schema has no field for it, so it is inferred
-        # here from the one fact the gate can verify for itself.
         out.append({"prior_id": fid, "prior": "fixed",
-                    "summary": "not re-reported over the attested surface"})
+                    "summary": _clean(said_fixed[fid].get("evidence")) or "declared fixed"})
     body = "\n".join(
         f"- {f['file']}:{f.get('line')} [{f.get('severity')}] {f['summary']}"
         for f in out if f.get("prior") != "fixed") or "(no finding)"
@@ -407,7 +407,8 @@ def run(prompt, cwd, timeout, args, led, prepared, workdir=None):
     """-> (data|None, note, quota). The `run_once` pair, plus the one fact the
     caller cannot recover for itself: whether codex REFUSED on usage limits (an
     unavailable reviewer) rather than answering unusably (an unreadable one)."""
-    work = Path(workdir or tempfile.gettempdir())
+    # A private dir: a pid-named file in a shared /tmp is a guessable symlink target.
+    work = Path(workdir or tempfile.mkdtemp(prefix="codex-review-"))
     out = work / f"codex-review-{os.getpid()}.txt"
     log = Path(str(out) + ".jsonl")
     for p in (out, log):

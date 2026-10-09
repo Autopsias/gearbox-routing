@@ -76,7 +76,7 @@ def already_landed(ctx, st):
     Once it has, re-walking the steps before the push is not merely wasteful, it
     is WRONG: `origin/<default>` now contains this plan's work, so §10.1's
     surface `<expected>..HEAD` is EMPTY and the re-gate parks a land that
-    SUCCEEDED. Measured 2026-08-22 by resuming after a refused teardown — the
+    SUCCEEDED. Measured by resuming after a refused teardown — the
     second invocation reported `gate-empty-surface` on a plan already on main.
 
     Asked of git IN THE ROOT REPO, never of the record and never of the land

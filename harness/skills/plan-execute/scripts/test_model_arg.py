@@ -142,7 +142,7 @@ def test_shadow_marker_is_emitted_only_as_task_description(tmp_path, capsys, mon
     sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "Sonnet"}]
     plan_dir = make_plan(tmp_path, sessions)
     original_prompt = (plan_dir / "sessions" / "s01.prompt.md").read_text()
-    marker = "plan-execute:s01 dyno-shadow-v1:abcdefghijklmnopqrstuvwxyz012345"
+    marker = "plan-execute:s01 shadow-v1:abcdefghijklmnopqrstuvwxyz012345"
     monkeypatch.setattr(run, "_shadow_dispatch_description", lambda *_: marker)
 
     run.cmd_begin(plan_dir, ["s01"])

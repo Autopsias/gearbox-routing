@@ -1,8 +1,8 @@
-# Plan-isolation contract — FROZEN 2026-08-21 (~~contract v1~~ contract v2, amended 2026-10-01 by R1–R5, see §16)
+# Plan-isolation contract — FROZEN 2026-08-21 (~~contract v1~~ contract v2, amended by R1–R5, see §16)
 
 **This file is the single statement of record for how `/plan-execute` isolates a
 plan into its own git branch and worktree, and how that work lands.** Sessions
-s05–s10 of `_plans/plan-level-git-isolation-2026-08-20/` implement it; where an
+s05–s10 of `_plans/example-isolation-plan-2026-08-20/` implement it; where an
 implementation and this file disagree, this file wins until it is amended by the
 procedure in §14.
 
@@ -60,7 +60,7 @@ The three load-bearing consequences, each measured rather than assumed:
   frozen copy while the orchestrator keeps writing the outer one, and a second
   plan's merge can silently delete the first plan's record with exit 0 (§8).
 
-**Isolation is version-gated and inert today.** Measured 2026-08-21 across
+**Isolation is version-gated and inert today.** Measured across
 **every** manifest under `_plans/`: **28 manifests scanned, 24 at
 `plan_schema_version` 2, 2 at 5, 2 at 6, and 0 at ≥ 7 — zero crossings.** No
 existing plan changes behaviour when this contract ships.
@@ -92,10 +92,10 @@ promoted from "documented" to "measured" without re-measuring.
 | Two plans appending to one `run.ndjson` → `CONFLICT (add/add)`, exit 1 | **measured** | s03b probe 3 scenario 5 |
 | `WORKTREE_DIRNAME = ".plan-worktrees"` and `BRANCH_PREFIX = "plan"` are already in use today for group worktrees | **measured** | `skills/plan-execute/scripts/worktree.py:51-52`, `member_branch()` at :292 |
 | Branch ownership must be keyed `(plan, branch)`; a branch claimed by two plans is a CONFLICT, never resolved | **measured, already shipped** | s01 / `registry_owners.py`; ADR-0002 |
-| `plan_schema_version` on disk: 28 manifests, 0 at ≥ 7 | **measured 2026-08-21** | §6 |
+| `plan_schema_version` on disk: 28 manifests, 0 at ≥ 7 | **measured** | §6 |
 | Claude Code writes an absolute `core.hooksPath` into `$GIT_COMMON_DIR/worktrees/<wt>/config.worktree`, and worktree-scoped config beats the shared value | **documented, NOT re-measured here** | anthropics/claude-code#60620 |
 | Shared `.git/hooks` shims bake absolute paths | **documented, NOT re-measured here** | lefthook#1398 |
-| Git Town (MIT, **3.4k stars**, re-read 2026-08-21) implements sync → ship → undo; its `fast-forward` ship strategy exists to "prevent false merge conflicts when using stacked changes" and to "Ship several branches in a stack without unnecessary CI runs", and requires the feature branch to be up to date | **documented** | git-town.com/preferences/ship-strategy; github.com/git-town/git-town |
+| Git Town (MIT, **3.4k stars**, re-read) implements sync → ship → undo; its `fast-forward` ship strategy exists to "prevent false merge conflicts when using stacked changes" and to "Ship several branches in a stack without unnecessary CI runs", and requires the feature branch to be up to date | **documented** | git-town.com/preferences/ship-strategy; github.com/git-town/git-town |
 | Multiple superproject checkouts of a submodule-bearing repo are not recommended | **documented** | `git-worktree(1)`, BUGS |
 
 Two rows are deliberately **documented, not measured**: the two hooks issues.
@@ -112,7 +112,7 @@ the upstream bug status.
 | Thing | Name |
 |---|---|
 | Plan branch | `plan/<plan-slug>` |
-| Group member branch under a plan | `plan/<plan-slug>__<group>__<sid>` (amended 2026-08-22 — the nested form `plan/<plan-slug>/<group>/<sid>` is a ref git refuses beside `plan/<plan-slug>`; see `parallel-group-contract.md` V3-1) |
+| Group member branch under a plan | `plan/<plan-slug>__<group>__<sid>` (amended — the nested form `plan/<plan-slug>/<group>/<sid>` is a ref git refuses beside `plan/<plan-slug>`; see `parallel-group-contract.md` V3-1) |
 | Plan worktree | `<repo>/.plan-worktrees/<plan-slug>/` |
 | Group member worktree under a plan | `<repo>/.plan-worktrees/<plan-slug>__<group>__<sid>/` |
 | Land worktree | `<repo>/.plan-worktrees/<plan-slug>__land-<short-token>/` |
@@ -189,7 +189,7 @@ not a name's shape, is what authorises action. The same discipline binds here:
 - A ref claimed by **two** plans is **CONFLICT**, never silently resolved to one
   owner. The peer-session finding this rule comes from was verified in this repo:
   `pg-prep` is declared as a `parallel_group` in *both*
-  `gearbox-dyno-v3-2026-07-27` and `gearbox-dyno-v4-2026-07-27`.
+  `example-plan-a-2026-07-27` and `example-plan-b-2026-07-27`.
 
 *Why this and not a name convention:* a name is a claim anybody can make. An
 operator's own `plan/experiment` branch, a legacy group branch, and a v7 plan
@@ -217,7 +217,7 @@ result names the expected new sha, *then* `git push origin --delete
 plan/<plan-slug>`. A delete that runs before the main push is how a rejected
 land loses its work.
 
-*Amended 2026-10-03 (§14; finish-plan-follow-ups s05, cross-reference
+*Amended 2026-10-03 (§14; example-follow-up-plan s05, cross-reference
 `finish-contract.md`, entries of 2026-10-03).* The delete is NOT an unleased
 `git push origin --delete`. It runs only after `git merge-base --is-ancestor
 <remote tip> <landed sha>` succeeds, and it is pushed as
@@ -422,7 +422,7 @@ Three things this sequence is chosen for, each measured:
   works**: exit 0, `7cec36b..612a5c0 HEAD -> main`, the bare origin advances and
   local `main` does not move.
 - `--force-with-lease=main:$EXPECTED` makes the push a **compare-and-swap**.
-  **Measured 2026-08-21 in a scratch fixture, both directions** — because a lease
+  **Measured in a scratch fixture, both directions** — because a lease
   that cannot refuse is not a lease:
   - *known positive* — `origin/main` still at `$EXPECTED`:
     `git push --force-with-lease=main:$EXPECTED origin HEAD:refs/heads/main`
@@ -499,12 +499,12 @@ cut its base from a stale ref. An operator whose `main` is quietly two commits
 behind will start the next plan from it, and §1.3's pinned base will faithfully
 record the stale sha.
 
-#### R1 (2026-10-01) — `finish` fast-forwards the owner, only when provably safe
+#### R1 — `finish` fast-forwards the owner, only when provably safe
 
 **Revised through §14.** The measurement: after the model-rating-and-gateways
 land, `git status` in the primary checkout showed `LAND_NOTICE.txt`,
 `_worktrees/g1.json` and `_plans_index.md` modified, so the printed command
-alone left the checkout dirty and behind. The operator decided on 2026-10-01.
+alone left the checkout dirty and behind. The operator decided.
 
 So "clean and behind" above is struck. `land` still never moves
 local `<default>`, and the land brief still prints this section's command.
@@ -562,9 +562,9 @@ two things this contract needs:
   without complaint at the plan level too. The re-gate is the only thing that
   catches it, so it is not skippable on the grounds that `main` did not move.
 
-#### R2 (2026-10-01) — the re-gate adds every `at_land` gate, and a red one can be repaired
+#### R2 — the re-gate adds every `at_land` gate, and a red one can be repaired
 
-**Operator decision, 2026-10-01.** The re-gate's gate set is the plan's union
+**Operator decision.** The re-gate's gate set is the plan's union
 of verify gates **plus every gate the candidate merged tree's registry
 (`<land_path>/.claude/eval-gates.json`) flags `at_land: true`**
 (`finish-contract.md`). Those gates enter the gate digest (§5.1) like any
@@ -979,7 +979,7 @@ In a **no-remote** repo, step 2 is instead
 commit (§4.8), and step 3 is skipped; the durable ref is what keeps the final
 record reachable, exactly as §4.8a measured.
 
-**R3 (2026-10-01) — a third, explicitly-permitted `<default>` mutation: the
+**R3 — a third, explicitly-permitted `<default>` mutation: the
 `finish` record push.** The measurement is R1's: records written after the
 final-record push, and this plan's `_plans_index.md` row, were left modified in
 the primary checkout. Before any write, `finish` resolves the remote as
@@ -1049,7 +1049,7 @@ RECORD — append-mostly history a human reads and git should version.
 `$GIT_COMMON_DIR/plan-state/` holds the plan's RUNTIME — mutable coordination
 state that must never be committed by anybody.**
 
-**R4 (2026-10-01) — `LAND_NOTICE.txt` and `_worktrees/` are RUNTIME, kept
+**R4 — `LAND_NOTICE.txt` and `_worktrees/` are RUNTIME, kept
 local by name.** R1's measurement: both were modified in the primary
 checkout after a land, because `step_finish` rewrites `LAND_NOTICE.txt` and the
 group cleanup rewrites `_worktrees/*.json` after the final-record push. §8.c2's
@@ -1311,7 +1311,7 @@ refusal is a park, not a reason to reach for `--force`.
 
 Recorded, not assumed. Both alternatives were read before the decision.
 
-- **Git Town** — MIT, **3.4k stars** (re-read 2026-08-21) — already implements
+- **Git Town** — MIT, **3.4k stars** (re-read) — already implements
   `sync` → `ship` → `undo`, with four documented ship strategies (`api`,
   `always-merge`, `fast-forward`, `squash-merge`). §4.4 cites its fast-forward
   rationale directly rather than re-deriving one.
@@ -1412,7 +1412,7 @@ inference ADR-0002 rejected, and a false positive here deletes a branch.
 conflicted land worktree's path. It accumulates visibly rather than being cleaned
 up quietly; §15.2 is the only way one leaves.
 
-**R5 (2026-10-01) — two new rows: `land-repair` and `finish`.**
+**R5 — two new rows: `land-repair` and `finish`.**
 
 | State | Local plan branch | Remote plan branch | Worktrees + lock | Lease | `$GIT_COMMON_DIR/plan-state/<slug>/` | `_plans/<slug>/` record |
 |---|---|---|---|---|---|---|
@@ -1433,7 +1433,7 @@ shared tree" as the plan worktree. The two are consistent by construction; where
 they overlap, the parallel-group contract governs group *membership* rules and
 this file governs the *plan* branch, worktree and land.
 
-**v2 revisions (2026-10-01):** R1 (§4.3, `finish` may fast-forward the owner),
+**v2 revisions:** R1 (§4.3, `finish` may fast-forward the owner),
 R2 (§4.4, `at_land` gates and `land-repair`), R3 (§8.c2, the `finish` record
 push), R4 (§8.e, `LAND_NOTICE.txt` and `_worktrees/` are local runtime), R5
 (§15, the `land-repair` and `finish` rows). The `finish` step itself is

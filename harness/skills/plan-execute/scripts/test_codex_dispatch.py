@@ -143,7 +143,7 @@ def test_openai_active_provider_translates_claude_tokens(tmp_path, capsys, ssot)
     by_id, out = _begin(plan_dir, ["s01", "s02"], capsys)
 
     assert out["active_provider"] == "openai"
-    # THE REGRESSION THIS TEST NOW PINS (s03, 2026-08-13): a dial-driven SONNET
+    # THE REGRESSION THIS TEST NOW PINS (s03): a dial-driven SONNET
     # session must route. Under the retired tier-NAME translation it resolved
     # `sonnet` → providers.anthropic `workhorse` → providers.openai `workhorse` →
     # None, and halted as unroutable the moment gpt-5.5 was retired — probed
@@ -348,7 +348,7 @@ def test_legacy_gpt55_pin_blocks_with_guidance_even_with_a_task_class(tmp_path, 
 
 
 def test_lane_scoped_profile_blocks_dial_but_not_explicit_pin(tmp_path, capsys, ssot):
-    # adversarial-review 2026-07-10 (Codex HIGH): the run-level dial must not
+    # adversarial-review (Codex HIGH): the run-level dial must not
     # dispatch through an uncalibrated (lane_scoped) profile; an explicit
     # per-session Codex pin remains a deliberate opt-in.
     ssot("openai", openai_status="lane_scoped")

@@ -94,7 +94,7 @@ def branch_owners(plans_root, errors=None):
 
     Keyed by (plan, branch), NOT branch name alone (HIGH defect, verified
     against this repo: `pg-prep` is declared as a `parallel_group` in BOTH
-    `_plans/gearbox-dyno-v3-2026-07-27` and `_plans/gearbox-dyno-v4-2026-07-27`,
+    `_plans/example-plan-a-2026-07-27` and `_plans/example-plan-b-2026-07-27`,
     which both produce the branch `plan/pg-prep/<sid>` via `member_branch`).
     Two plans sharing a branch name used to merge via `owners.update(partial)`,
     so the last plan scanned silently won ownership — if the loser was LIVE
@@ -179,8 +179,8 @@ def _owners_by_path(owners):
     Rework fix: `worktree.py`'s `.plan-worktrees/<group>/<sid>` path shape
     carries no plan identity, exactly like the `plan/<group>/<sid>` branch
     name — verified live in this repo: `pg-prep`/s01/s02 are declared as a
-    `parallel_group` in BOTH `_plans/gearbox-dyno-v3-2026-07-27` and
-    `_plans/gearbox-dyno-v4-2026-07-27`, sharing project_root, group, AND
+    `parallel_group` in BOTH `_plans/example-plan-a-2026-07-27` and
+    `_plans/example-plan-b-2026-07-27`, sharing project_root, group, AND
     session id, which resolves to the identical worktree path under both. A
     dict comprehension used to collapse that straight to one owner
     (last-plan-scanned wins), so a DONE plan could mark a LIVE plan's

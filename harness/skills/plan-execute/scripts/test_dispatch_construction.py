@@ -11,7 +11,7 @@ function does it, so this test checks the two spots in SKILL.md that govern it
 
 PLANT: before this session's fix, both spots said "omit `model` when
 `model_arg` is null" with no exception for a generic agentType — the exact
-46-of-196 unpinned fan-out measured 2026-08-21 (s06.context.md).
+46-of-196 unpinned fan-out measured (s06.context.md).
 
 Run: pytest skills/plan-execute/scripts/test_dispatch_construction.py -q
 """

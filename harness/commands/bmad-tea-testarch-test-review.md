@@ -8,7 +8,7 @@ disable-model-invocation: true
      Canonical testing entry = /test-orchestrate. This BMAD wrapper is PRESERVED as a
      preset behind the canonical testing front door — its body below still loads the _bmad workflow.
      Prefer /test-orchestrate as the obvious entry; this is a preset behind it.
-     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. s09 (2026-06-21) did not remove it. -->
+     Routing table: ~/.claude/SKILL-UNIFICATION-ROUTING.md. s09 did not remove it. -->
 
 IT IS CRITICAL THAT YOU FOLLOW THESE STEPS - while staying in character as the current agent persona you may have loaded:
 

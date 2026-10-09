@@ -58,7 +58,7 @@ cost-vs-performance reading from this board.** Not "consulted it" — the change
 the table for every model in our lineup and names which cells are Pareto-dominated. A diff
 that moves a pin without that table is not ready to propose.
 
-### How to fetch it (verified 2026-07-31 — do not assume, this was probed)
+### How to fetch it (verified — do not assume, this was probed)
 
 - **No machine-readable endpoint exists.** `/api/leaderboard` → 404, `/leaderboard.json` →
   404, `/data/leaderboard.json` → 307. Do not go looking again; if one appears, update
@@ -79,7 +79,7 @@ that moves a pin without that table is not ready to propose.
   (e.g. luna 67% at `max` collapsing to 44%/11% below it), and the default view cannot
   show that. If the diff touches an `effort.map` cell, a `native_effort_ceiling`, or an
   `escalation.effort_ladder` rung, you need the per-effort matrix. **Getting it is
-  currently unsolved — budget for that, do not assume a click.** Probed 2026-07-31: the
+  currently unsolved — budget for that, do not assume a click.** Probed: the
   toggle is client-side with no URL parameter, and it did NOT respond to three automated
   clicks (one by element ref, two by coordinate) — the view stayed on `Best`. The blog
   index does not carry the matrix statically either. Untried avenues: the site's `Data`
@@ -147,7 +147,7 @@ would flip it into one. Remove an entry once it's been evaluated (converted to a
 or explicitly declined with a dated note in a changeset's Confidence section).
 
 - *(RESOLVED 2026-08-23, v20 changeset — kept one cycle as precedent, then delete.)*
-  **Opus effort-dial attenuation on the trivial canary** (added 2026-08-18, v17):
+  **Opus effort-dial attenuation on the trivial canary** (added, v17):
   the 2.1.241 bump re-measured it, exactly as the flip condition asked. Trivial
   canary read opus INERT (0.956); a harder-prompt probe the same day (all four
   opus tiers, sonnet positive control, n=6/cell) read the dial LIVE at 2.44 with
@@ -157,7 +157,7 @@ or explicitly declined with a dated note in a changeset's Confidence section).
   prompt pair before a verdict is written; the status file records the deciding
   stage). Evidence: `harness/hard-probe-20260823/REPORT.json`, SSOT DECISION
   HISTORY v1.19.
-- **Claude Code Fast mode pricing** (added 2026-08-18, v17) — `/fast` runs Claude
+- **Claude Code Fast mode pricing** (added, v17) — `/fast` runs Claude
   Opus 5 at $10/$50 per MTok (2× standard opus) for up to 2.5× output speed;
   research preview, Opus 5/4.8 only, first-party API only. Not a `prices:` row —
   it is an interactive operator toggle, not a dispatchable routing rung. Flip to
@@ -173,12 +173,12 @@ or explicitly declined with a dated note in a changeset's Confidence section).
   Messages API this way). Watch for: GA / non-beta header, Bedrock/GCP parity, or a
   first API-side project in this harness's scope that could use it — any of those is
   reason to open a changeset diff.
-- **GPT-5.6 ultra measured cost** (added 2026-07-10, v1.5) — only MODELED
+- **GPT-5.6 ultra measured cost** (added, v1.5) — only MODELED
   estimates of ultra's cost multiplier exist (~2–4×, techsy.io; 4 parallel
   subagents by default per openai.com). The SSOT bans ultra-by-default on the
   Codex lane partly on this uncertainty. Flip to a diff if a measured figure,
   a real-world blowup report, or an OpenAI-published multiplier lands.
-- **ChatGPT-plan quota shape** (added 2026-07-10, codex-lane spot-check) — is
+- **ChatGPT-plan quota shape** (added, codex-lane spot-check) — is
   the rolling 5-hour window a SHARED pool across gpt-5.6 tiers, or a per-model
   allowance? Secondary sources report distinct msgs/5h per tier (implying
   per-model), but no OpenAI-owned page confirming it was loadable. The SSOT's
@@ -186,7 +186,7 @@ or explicitly declined with a dated note in a changeset's Confidence section).
   (degrade to NO-CODEX, not to another tier). Flip to a diff if OpenAI
   publishes the quota shape, or if an in-session `/status` observation shows
   per-model counters draining independently.
-- **gpt-5.3-codex / gpt-5.5-codex manifest discrepancy** (added 2026-07-10,
+- **gpt-5.3-codex / gpt-5.5-codex manifest discrepancy** (added,
   v1.5) — absent from the live codex-rs models.json despite blog claims of
   Feb-2027 support. Legacy *-codex shutdown is 2026-07-23. Re-check on the
   next manifest pull. **MOOT since 2026-08-13 (SSOT v16):** the lane is 5.6-ONLY,

@@ -1,6 +1,6 @@
-"""Self-checks for arming_check.py (s07/PF-01, MOVE 5).
+"""Self-checks for arming_check.py.
 
-s09 runs this script to decide whether a criterion can be judged at all, so the
+The acceptance review runs this script to decide whether a criterion can be judged at all, so the
 suite carries a KNOWN POSITIVE that arms all nine criteria plus one negative per
 branch, each failing for ITS OWN reason. A passing suite you have not seen fail
 proves nothing — every assertion here was checked against a deliberately broken
@@ -31,7 +31,7 @@ def _write(path, rows):
 
 
 def _root(tmp_path, activations, decisions=(), sessions=(), version=1):
-    root = tmp_path / "dyno"
+    root = tmp_path / "gearbox-state"
     (root / "policy").mkdir(parents=True)
     _write(root / "activations.ndjson", activations)
     _write(root / "decisions.ndjson", decisions)

@@ -35,7 +35,7 @@ probe passes; a stronger model does not obsolete a value judgment.
 For each candidate, reconstruct the recorded mistake as a minimal headless task
 and run it on the new model WITHOUT the rule loaded:
 
-- Unload the rule with the exclusion mechanism, verified 2026-08-12 on binary
+- Unload the rule with the exclusion mechanism, verified on binary
   2.1.228: `claude -p --settings '{"claudeMdExcludes": ["<glob of the file
   carrying the rule>"]}'`. For a single rule inside a file the operator keeps,
   probe from a scratchpad cwd with a copy of the context minus that rule.

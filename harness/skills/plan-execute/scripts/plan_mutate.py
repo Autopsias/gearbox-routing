@@ -630,7 +630,7 @@ def parse_new_item(raw):
     """`id|category|title[|summary]` -> item dict. A JSON OBJECT is also accepted,
     and on a modern plan it is the only form that can produce a valid item.
 
-    WHY THE SECOND FORM EXISTS (measured 2026-08-15): since plan_schema_version 4
+    WHY THE SECOND FORM EXISTS (measured): since plan_schema_version 4
     the builder REQUIRES every item to carry `prior_art` (decision+source) or a
     `research_status` with a reason. Three positional fields have nowhere to put
     either, so `--new-item` failed validation on every plan the builder now

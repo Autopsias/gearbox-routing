@@ -1,6 +1,6 @@
 """Run a child in its OWN process group, and kill the whole group.
 
-WHY THIS EXISTS (measured 2026-08-21, profile-a-brain self-healing-vault s10).
+WHY THIS EXISTS (measured on a long plan run).
 
 `subprocess.run(..., timeout=N)` kills its DIRECT child only. `claude -p` — the
 reviewer `llm_review_gate.run_once` launches — spawns helpers of its own, so a
@@ -18,7 +18,7 @@ Two halves, and BOTH are needed:
   * signal handlers that kill that group before this process dies. Without them
     the first half makes things worse, not better: a new session is deliberately
     OUTSIDE the group our own parent kills, so a caller that reaps us by group
-    (profile-a-brain's `tools/llm_review_scoped.py` does exactly that) would no
+    (a project's own scoped review tool can do exactly that) would no
     longer reach the reviewer at all.
 
 `scripts/codex_supervised.py` solves the same problem for `codex exec`, but is

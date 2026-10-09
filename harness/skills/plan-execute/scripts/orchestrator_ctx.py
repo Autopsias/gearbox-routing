@@ -87,7 +87,7 @@ def env_session_id():
 def encode_cwd(path) -> str:
     """Claude Code's own ``~/.claude/projects/`` directory encoding.
 
-    MEASURED 2026-08-22 against all 114 real directories on this host: every
+    MEASURED against all 114 real directories on this host: every
     character outside ``[A-Za-z0-9]`` becomes ``-``, with no collapsing of runs
     (that is why a dotted or hidden segment yields a double dash).
 

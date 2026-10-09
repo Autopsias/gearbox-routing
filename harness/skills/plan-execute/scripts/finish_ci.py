@@ -94,7 +94,7 @@ def ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None):
     run; with no descendant either, that is ``unknown`` with reason
     ``no-run-for-sha``, never ``green``.
 
-    R6 (2026-10-01): a workflow whose exact runs are all cancelled falls back
+    R6: a workflow whose exact runs are all cancelled falls back
     per workflow; see ``references/finish-contract.md`` § Revision notes.
     ``match`` is ``"descendant"`` when any deciding run is one, even when the reported
     run (``run_id``/``run_sha``) is an exact red one. Only ``push`` runs count, so

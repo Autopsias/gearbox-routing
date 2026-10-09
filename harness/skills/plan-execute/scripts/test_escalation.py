@@ -324,7 +324,7 @@ def test_no_existing_spec_is_NEWLY_refused_by_the_new_builder(tmp_path):
     """Measurement (b), as a DIFFERENTIAL — the only form that can be true.
 
     A plain "every spec validates" assertion is FALSE ON ARRIVAL: six plans on
-    disk are already refused today by the (ungated, 2026-07-11) checkpoint-brief
+    disk are already refused today by the (ungated) checkpoint-brief
     rule, none of which this change touches. A gate that is already red cannot
     tell you whether YOUR change broke something. So this compares the refusal SET
     before and after: the version bump must add no new member.

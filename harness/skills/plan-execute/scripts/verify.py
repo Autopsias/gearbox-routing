@@ -122,7 +122,7 @@ def _new_state(plan_dir, manifest, session_id, gates, vb):
 
 
 # `gate_cwd` lives in plan_scope beside `plan_cwd`, whose answer it refines
-# (size-ratchet extraction, 2026-08-22). Re-exported: callers import it here.
+# (size-ratchet extraction). Re-exported: callers import it here.
 gate_cwd = pscope.gate_cwd
 
 

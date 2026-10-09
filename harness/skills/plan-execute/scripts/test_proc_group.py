@@ -51,7 +51,7 @@ def _wait_gone(pid, seconds=5.0):
 #: The timeout under test KILLS the shell when it fires, so a shell that has not
 #: written the pid by then never will — polling afterwards cannot recover it.
 #: 1.0s was too tight: the gate runs 62 pytest shards at once and this file failed
-#: there while passing alone (measured 2026-09-20, both tests, on an untouched
+#: there while passing alone (measured, both tests, on an untouched
 #: checkout of the default branch). Each test therefore costs this many seconds.
 _SPAWN_WINDOW = 5.0
 

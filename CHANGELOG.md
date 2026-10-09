@@ -6,6 +6,61 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Second harness refresh: new skills, hooks and scripts (2026-10-09).**
+  - **Skills:** `adversarial-review`, `codex-skill-sync`, `cost-audit`, `eli5`, `janitor-status`, `janitor-stop`, `jev-fit-scan`,
+    `memo-loop`, `mods`, `plan-harden`, `repo-health` and `worth-adopting`.
+  - **Hooks:** guards that stop risky git and plan-state commands
+    (`git-tree-guard.py`, `verify-state-guard.py`, `turnend-guard.py`), a nag
+    for long-running agents, a routing-cadence check, and a context-compaction
+    policy (`compact-policy.py` and its helpers). The agent janitor's session-end
+    hook ships unwired: you opt in to it.
+  - **Scripts:** the agent janitor, a machine governor (`govrun`) that queues
+    heavy test runs, a code-quality ratchet (`scripts/quality/`), a supervised
+    Codex runner, a memory-budget check, `model_prices.py` (prices by served
+    model id), the status line script, and the harness's own route resolver.
+  - **A rule** on keeping LLM reviews, gates and dispatched agents efficient.
+  - **`harness/model-routing.yaml`** is now a copy of the public
+    `claude/model-routing.yaml`, made by the sync script, so plan-execute and
+    routing-retro find the policy and resolver where they look for them.
+  - **Platform limits.** The agent janitor runs only on macOS (launchd,
+    macOS `ps` and `lsof`), kills orphaned agent processes and deletes old temp
+    files and Codex session logs without asking. `govrun` keeps its slot locks
+    under your home directory (`~/.machine-governor`, or `GOVRUN_STATE_DIR`).
+  - **Docs.** `ARCHITECTURE.md` §7 lists every hook `harness/settings.json`
+    wires and gives the opt-in snippet for the janitor's session-end hook. The
+    README has a short "What is new in the harness" section. `install.sh` is
+    unchanged: it installs the routing policy only.
+
+### Fixed
+- **Two security fixes in the refreshed harness.** `jev-fit-scan` deep mode
+  no longer gives its judge web access, and it wraps all fetched web text in
+  marked untrusted-data blocks that the agents are told never to obey. The
+  agent janitor now refuses to delete anything under a scratch folder that
+  another user owns or can write, which closes a symlink-swap attack on its
+  cleanup.
+- **`test_openai_deep_reasoning` passes.** It expected `medium` while the policy
+  has always said `high` (`deep_reasoning` is `thorough`). The policy is the
+  authority, so the test changed. CI now runs pytest on `claude/` and
+  `scripts/`, so a failing test can no longer sit unseen.
+
+### Changed
+- **`claude/model-routing.yaml` → v2.4.0 (MINOR: a new provider profile and
+  additive blocks; no `task_classes` row moved).** Five lessons from a private
+  deployment's history, written without its calibration data:
+  - **`effort_policy`:** effort is a default plus escalation. At most one
+    escalation-only rung sits above the standing map, and an optional apex model
+    (`escalation.apex_model`) is reached only after the frontier tier's whole
+    ladder has failed.
+  - **`orchestrator_lane`:** a second vendor's model for independent review,
+    named once; the peer lane points at it.
+  - **`providers.zai`:** an effort-steep example profile next to the other three.
+  - **`model_prices` and `cost_accounting`:** cache writes are billed above the
+    input rate, so cost estimates must count them.
+  - **ADR 0001** (`docs/adr/0001-low-effort-non-inferiority.md`): how to test
+    whether a cheaper default effort is "no worse", and why a small, tie-heavy
+    task set cannot answer it.
+
 ### Changed
 - **`harness/` refreshed from the private deployment (2026-10-08).** Seven
   weeks of work on the plan runner (`/plan-execute`), the plan builder, the

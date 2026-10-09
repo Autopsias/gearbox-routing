@@ -559,12 +559,12 @@ def test_begin_ignores_a_stale_lock_or_done_sibling_plan(tmp_path):
 def generate_s01_evidence(out_path=None):
     """Deliberate, explicit step (never a test side effect — see Defect 2
     above) that produces the committed REG-01 cross-process proof:
-    `_plans/plan-level-git-isolation-2026-08-20/_evidence/s01/cross-process-active.txt`.
+    `_plans/example-isolation-plan-2026-08-20/_evidence/s01/cross-process-active.txt`.
 
     Run directly: `python3 skills/plan-execute/scripts/test_registry.py --generate-evidence`
     """
     out_path = Path(out_path) if out_path else (
-        SCRIPTS.parent.parent.parent / "_plans" / "plan-level-git-isolation-2026-08-20"
+        SCRIPTS.parent.parent.parent / "_plans" / "example-isolation-plan-2026-08-20"
         / "_evidence" / "s01" / "cross-process-active.txt"
     )
     import tempfile

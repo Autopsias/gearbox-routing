@@ -1,7 +1,7 @@
 """ISO-03 — a parallel group NESTED under an isolated plan, and the gate scoping
 that follows from it.
 
-Contracts: ``../references/parallel-group-contract.md`` §9 (v3, 2026-08-21) —
+Contracts: ``../references/parallel-group-contract.md`` §9 (v3) —
 V3-1 nests the member's base, checkout and merge target under the plan; V3-2
 redefines every "the shared tree" rule to mean the PLAN WORKTREE — and
 ``../references/plan-isolation-contract.md`` §1.1a, §10, §12.1.
@@ -128,7 +128,7 @@ def test_the_member_checkout_is_a_SIBLING_of_the_plan_worktree_never_a_child(iso
 
 
 def test_the_member_BRANCH_is_flat_because_git_refuses_the_nested_name(iso):
-    """THE AMENDED CONTRACT ROW (operator decision 2026-08-22), kept as a running
+    """THE AMENDED CONTRACT ROW (operator decision), kept as a running
     measurement of BOTH halves.
 
     V3-1 first asked for `plan/<plan-slug>/<group>/<sid>` while the plan's own

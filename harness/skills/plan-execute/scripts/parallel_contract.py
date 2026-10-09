@@ -1,7 +1,7 @@
 """Parallel-group manifest contract — the single shared checker.
 
 The contract itself: ``../references/parallel-group-contract.md`` (contract v2,
-amended 2026-08-15). Read it before changing
+amended). Read it before changing
 anything here; this module is its implementation, not its source of truth. Rule
 IDs in the messages below (R1, M1, M2, M2a, M3, M5, §1, §3) are that document's.
 

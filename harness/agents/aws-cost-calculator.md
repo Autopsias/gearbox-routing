@@ -30,7 +30,7 @@ Execute this degradation pattern for EACH service requiring pricing:
 TIER 1: Exa Agent (PREFERRED)
 ├── Use: mcp__exa__agent_run with effort="medium"
 ├── Cost: ~$0.10 and ~60s per call at effort=medium; effort=high measured
-│   5x the cost ($0.50, 131s) for no extra sources (2026-09-03)
+│   5x the cost ($0.50, 131s) for no extra sources
 ├── Query: Include today's date, specific services, regions
 ├── The tool waits for the run itself; if it returns status "running",
 │   call it again with the returned runId — never start a second run

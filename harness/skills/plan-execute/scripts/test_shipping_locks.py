@@ -302,7 +302,7 @@ def test_foreign_host_run_lock_is_never_stale(tmp_path):
 # 7d — THE MID-WRITE WINDOW. `O_EXCL` publishes the lock path EMPTY and the
 # JSON lands after it. A contender reading that window classed the lease
 # `unreadable`, stole it, and BOTH plans held the same repo resource. Found by
-# review 2026-08-21 and reproduced; the four-contender barrier test above misses
+# review and reproduced; the four-contender barrier test above misses
 # it because three trials rarely land inside a sub-millisecond window — a
 # known-positive that could not fail for the case that mattered.
 # --------------------------------------------------------------------------
@@ -345,7 +345,7 @@ def test_the_lock_path_is_never_published_empty(tmp_path):
 
 
 # --------------------------------------------------------------------------
-# 7e — the two defects the FIX introduced, found by review 2026-08-21.
+# 7e — the two defects the FIX introduced, found by review.
 # A fix is a change, and a change gets reviewed like any other.
 # --------------------------------------------------------------------------
 def test_a_future_mtime_does_not_lock_the_resource_forever(tmp_path):
@@ -406,7 +406,7 @@ def test_an_OSError_anywhere_in_the_publish_raises_LockError(tmp_path, monkeypat
     there escaped `ship_begin`'s `except rsi.LockError` exactly as the link
     failure had, and stranded the repo-wide lease just the same. One guard at
     the BOUNDARY, not one per call site; a per-call-site guard is how the first
-    sibling was missed. Reproduced by review 2026-08-21."""
+    sibling was missed. Reproduced by review."""
     import ship_locks as sl
     root = git_init(tmp_path / "proj")
     plan_dir = root / "_plans" / "p-a"

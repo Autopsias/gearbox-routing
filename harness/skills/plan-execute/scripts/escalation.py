@@ -144,7 +144,7 @@ def dispatchable_cell(model, reasoning):
     tier's FIRST rung. So `sonnet` with no `reasoning` would "climb" to
     sonnet@low and then sonnet@medium: two rungs spent walking DOWN and back to
     where it started, while the failure that triggered them goes unaddressed.
-    Measured against the real SSOT on 2026-08-14.
+    Measured against the real SSOT.
 
     Fail closed rather than guess: nothing here knows what effort an unpinned
     session actually runs at, so no rung above it can be named honestly."""
@@ -233,7 +233,7 @@ def _ladder(resolver, task_class, provider, authored, ssot_path=None):
     had already resolved — and every `escalate()` call re-reads and re-parses the
     ~1400-line SSOT, so a duplicated hop is a duplicated parse.
 
-    NOT CACHED, deliberately, and the numbers are why (measured 2026-08-14 on the
+    NOT CACHED, deliberately, and the numbers are why (measured on the
     real SSOT): one `escalate()` is 1.3 ms, a whole `compute()` is 6.6 ms, and
     `compute()` runs at most twice per gate failure — against a subagent dispatch
     that costs minutes. Memoising `resolve_route._load` would buy ~5 ms on a
@@ -280,7 +280,7 @@ def ladder_keys(resolver, task_class, provider, authored_model, authored_reasoni
     `record-refusal --model fable` with no `--reasoning` recorded `fable@unset`,
     reported success, and the very next dispatch sent `fable@medium` again — a
     refusal that reads as accepted and changes nothing is worse than one that is
-    rejected (measured 2026-08-14)."""
+    rejected (measured)."""
     rungs, _ = _ladder(resolver, task_class, provider,
                        {"model_id": authored_model,
                         "native_effort": authored_reasoning or None},

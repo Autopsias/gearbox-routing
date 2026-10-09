@@ -85,7 +85,7 @@ def dedup_records(records):
 
 # [S06 finding 5] a bare (offset-less) ts must parse as UTC, never crash a
 # tz-aware comparison. compaction_ledger.parse_ts IS that rule — one
-# definition, aliased here rather than re-typed (s07 rework 4: this body was a
+# definition, aliased here rather than re-typed (a review rework: this body was a
 # third copy of the same parse rule).
 _parse_ts = parse_ts
 
@@ -234,7 +234,7 @@ def cost_cells(records):
     Per attempt: the median `usage.cost_usd` over the cell's attempts that carry
     one, beside how many attempts there are and how many carry usage at all.
 
-    Per completed session (operator decision 2026-09-29): a session whose final
+    Per completed session (operator decision): a session whose final
     attempt ended DONE sums the cost of EVERY attempt, rework and escalation
     included, and the sum goes to the cell of its FIRST attempt — so a cheap
     cell that fails and escalates is not reported as cheap. A session with a

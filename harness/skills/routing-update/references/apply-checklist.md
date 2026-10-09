@@ -12,7 +12,7 @@ and THIS file gets the fix.
 | 3 | `~/.claude/epic-dev-assignments.yaml` | If any `epic-*` pin changed: edit here (authoritative), then mirror the SSOT `agents:` rows | `verify-assignments.sh` (guard sub-check f) |
 | 4 | `~/.claude/agents/*.md` frontmatter | Re-pin `model:` / `effort:` for every agent row that changed. Invariant: a `model: haiku` agent carries **no** `effort:` key at all | guard checks (a)+(b) |
 | 5 | CLAUDE.md digest + `~/.claude/model-routing.digest.md` | Re-render BOTH variants: `python3 ~/.claude/scripts/render-routing-digest.py --variant v0 --install` and `--variant full --install` (use `--check` first to preview). Watch the byte budget — an over-budget digest locks all commits | guard check (e) |
-| 6 | Prose stamp consumers | Bump every `<!-- routing-ssot: vN -->` to the new N in each `consumers:` entry with a stamp-checked type (`lint-reads` / `prose-rationale`) — enumerate from the SSOT, not from this sentence. **Plus the known UNREGISTERED stamped file `skills/plan-builder/codex/SKILL.md`** (stamped but absent from `consumers:`, so check (c) has never seen it — it sat at v12 against SSOT v14, found 2026-07-31). **A stamp bump asserts the prose agrees** — step 7 is what makes that assertion true | guard check (c) |
+| 6 | Prose stamp consumers | Bump every `<!-- routing-ssot: vN -->` to the new N in each `consumers:` entry with a stamp-checked type (`lint-reads` / `prose-rationale`) — enumerate from the SSOT, not from this sentence. **Plus the known UNREGISTERED stamped file `skills/plan-builder/codex/SKILL.md`** (stamped but absent from `consumers:`, so check (c) has never seen it — it sat at v12 against SSOT v14, found). **A stamp bump asserts the prose agrees** — step 7 is what makes that assertion true | guard check (c) |
 | 7 | **Prose-CONTENT propagation — the three consumer skills** | **The gap this step exists to close:** guard check (c) compares only the stamp *version*; it never diffs the prose's recommended models, efforts, prices or costs against the SSOT. So a changeset can bump every stamp, go green, and leave every skill recommending superseded values. See §"Step 7 in full" below | `scripts/check_stale_values.py` + the per-skill read |
 | 8 | `~/.claude/settings.json` | Align `model` with `main_session.advisory_default` family and `effortLevel` with `main_session.default_effort` — **re-confirm with the operator** (user-owned file; changes every future session's default) | guard settings warn-check (full mode) |
 | 9 | Hook regexes | ONLY if the `consumers:` set changed: extend `ROUTING_PREFIXES` (`githooks/pre-commit`) and `ROUTING_AFFECTING` (`githooks/commit-msg`) in lockstep | guard surface-list convergence check |
@@ -72,7 +72,7 @@ stale until the next `gearbox deploy` — a source-only fix isn't live for Codex
   SKILL.md prose against **both** the SSOT and *itself*: this file has held a degrade rung
   stated two different ways in three adjacent paragraphs.
 
-**Two failure shapes to look for specifically**, both found live on 2026-07-31:
+**Two failure shapes to look for specifically**, both found live:
 
 1. **A stale availability/deprecation claim quoted as fact.** `plan-execute/SKILL.md` still
    read *"Fable is paywalled/suspended as of 2026-07"* — a claim `model-routing.yaml`'s own

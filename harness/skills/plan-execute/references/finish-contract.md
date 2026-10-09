@@ -4,12 +4,12 @@
 is on the default branch, reports anything left behind, brings the operator's
 checkout up to date when that is provably safe, and reports CI's verdict.** It
 never repairs code. Repair happens before the push, in `land` (see "The
-`land-repair` directive"). Sessions s02–s07 of `_plans/finish-every-plan-2026-10-01/`
+`land-repair` directive"). Sessions s02–s07 of `_plans/example-finish-plan-2026-10-01/`
 build it; where code and this page disagree, this page wins until it is amended
 by `plan-isolation-contract.md` §14. The contract changes it forces are
 revisions R1–R5 in that file (v2).
 
-## Operator decisions (2026-10-01) — recorded, not open
+## Operator decisions — recorded, not open
 
 1. **Repair before the push.** `land` runs every gate the registry flags
    `at_land: true` on the merged tree. A red repairable gate yields a repair
@@ -293,7 +293,7 @@ and the covered gate runs. Land records the covered gates in
 when (b) holds for every non-passing gate. Before returning it, `land` runs
 each failing gate once more on a detached worktree at the candidate's base
 (`expected`). A review gate (an argv gate running `llm_review_gate.py`) skips that
-base run (2026-10-04): land hands it the base as its review base, so its findings
+base run: land hands it the base as its review base, so its findings
 are about the plan's diff, and on the base that diff is empty. The result is cached in `land.json["base_gate_cache"]` under the
 key `<base sha>:<gate id>:<definition digest>`. The digest is sha256 over that
 one gate's resolved definition, with the fields `land_gate._gate_set_digest`
@@ -416,7 +416,7 @@ that session is already in the plan, the directive adds
   `repair-session-invalid` (add-session's dry run refused the repair session for
   a reason other than its gates). Re-running `land` on the same candidate before
   any repair returns the same round's directive; it does not count a new round.
-- **2026-10-03 (finish-plan-follow-ups s02, LND-11; additive shape change).**
+- **2026-10-03 (example-follow-up-plan s02, LND-11; additive shape change).**
   The remote plan branch is deleted only when its tip is on the landed commit.
   `plan_teardown._delete_remote_branch` reads the tip with `ls-remote`, fetches
   it, checks `merge-base --is-ancestor <tip> <landed_sha>`, and pushes the
@@ -432,7 +432,7 @@ that session is already in the plan, the directive adds
   Finish step 2 reports it as `leftovers.plan_branch_remote` and retries the
   remote delete alone (target `remote-branch`), once and under finish's lease,
   even when the worktree and the local branch are already gone.
-- **2026-10-03 (finish-plan-follow-ups s03, LND-12 and LND-13; additive shape change).**
+- **2026-10-03 (example-follow-up-plan s03, LND-12 and LND-13; additive shape change).**
   New park `gate-flaky` (table under "The `land-repair` directive"). Every
   red-then-green test id is kept in `land.json["red_then_green"]` across
   candidates, and any later review brief of the plan prints them on one line.
@@ -512,7 +512,7 @@ that session is already in the plan, the directive adds
   Fix round (rework 2 after the second redispatch): "the plan's own patch
   changed a file" is judged by that file's patch content, not by subtracting
   the files the base changed, so a plan repair of a file main also edited clears its hold.
-- **2026-10-04 (finish-plan-follow-ups s04, LND-14; no shape change).**
+- **2026-10-04 (example-follow-up-plan s04, LND-14; no shape change).**
   `--accept-inherited` was left out under the session's stop rule (operator,
   2026-10-04, after the cross-family review found a new HIGH in six fix
   rounds): no CLI flag, no park-brief command, no doc or port-coverage rows.
@@ -523,7 +523,7 @@ that session is already in the plan, the directive adds
   `_evidence/s04/accept-inherited-fix-round-5.patch`. Review findings still
   open at the stop: direct-run JUnit ids were checked by count only, and a
   failing id whose file path contains a space escaped the log checks. The repair round for a failure only the plan caused was part of the same deferred work: today, when a red gate also fails on the base, land parks it as `gate-inherited` at gate level, even if the plan added a new failing test inside that gate. That park brief says "The plan did not break them", which can be false in that case; the later plan that ships `--accept-inherited` fixes the wording.
-- **2026-10-03 (finish-plan-follow-ups s05, FIN-12 and FIN-13; additive shape change).**
+- **2026-10-03 (example-follow-up-plan s05, FIN-12 and FIN-13; additive shape change).**
   `finish.json` gains `steps_done_at`, `steps` (the record, leftovers and
   checkout results) and `generation`. Each finish cycle writes a fresh
   `generation` id and clears the last cycle's results under the lease, then
@@ -546,7 +546,7 @@ that session is already in the plan, the directive adds
   and the finish brief give the exact
   `git push --force-with-lease=refs/heads/<branch>:<tip> <remote> :refs/heads/<branch>`.
   A kept dict whose retry finds `not-pushed` is recorded as `already-gone`.
-- **2026-10-04 (finish-plan-follow-ups s10, FIN-16; additive shape change).**
+- **2026-10-04 (example-follow-up-plan s10, FIN-16; additive shape change).**
   (1) Every read-compare-write of `finish.json` (the CI save, the new-cycle
   reset, the steps checkpoint and `arm`) holds an exclusive OS lock
   (`flock`) on the sidecar `finish.json.lock`: the `git:<root>` lease still
@@ -566,7 +566,7 @@ that session is already in the plan, the directive adds
   a name-only record from an older `land.json` is re-keyed under its recorded
   `gate`. Park `tests` and `plan_touched` print `<gate>: <test id>` only when
   two gates share that id.
-- **2026-10-04 (finish-plan-follow-ups s11, FIN-17; no shape change).**
+- **2026-10-04 (example-follow-up-plan s11, FIN-17; no shape change).**
   (1) The new-cycle reset re-reads `finish.json` under the `flock` and resets
   only if `finished_at`, `steps_done_at` and `generation` are still what finish
   read before taking the lease (a second run of the same plan re-enters it).
@@ -581,7 +581,7 @@ that session is already in the plan, the directive adds
   safe). (4) A land flaky hold from a relative test id anchors to the path
   resolved against the gate's working directory when that path is in the
   plan's diff, and to the raw id only when it is not.
-- **2026-10-04 (finish-plan-follow-ups s12, FIN-18; additive value).**
+- **2026-10-04 (example-follow-up-plan s12, FIN-18; additive value).**
   (1) A finish run takes a per-plan run lock (`flock` with `LOCK_NB` on the
   sidecar `finish.run.lock`) before it reads `finish.json`, and holds it until
   its steps checkpoint is written; it drops it before any CI poll. A second

@@ -1,6 +1,6 @@
-"""REGRESSION 2026-10-02 — an unchanged surface after a FAILED review deadlocked the plan.
+"""REGRESSION — an unchanged surface after a FAILED review deadlocked the plan.
 
-finish-every-plan-2026-10-01 / g1-integration, max_rework 2:
+example-finish-plan-2026-10-01 / g1-integration, max_rework 2:
   1. cross-family-review-medium failed twice with findings (rework 2/2 spent);
   2. the last round changed no file, and the gate answered INDETERMINATE
      ("nothing new to review") instead of a verdict;
@@ -113,7 +113,7 @@ def test_a_human_BLOCKED_disposition_settles_the_verify_cycle(tmp_path):
     assert pm.in_flight_state(plan_dir)["verify"] == []
 
 
-# REGRESSION 2026-10-06 — the PASS twin. improve-right-moments-2026-10-06: both
+# REGRESSION — the PASS twin. example-improve-plan-2026-10-06: both
 # land review gates PASSED on attempt 1, the owner acked, main moved, and the
 # re-gate saw the same 7 byte-identical files and answered INDETERMINATE. Every
 # retry gave the same answer, and an argv gate cannot be waived, so the plan

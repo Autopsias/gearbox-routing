@@ -1,0 +1,16 @@
+# Codex render manifest (dual-harness-contract.md § 6.2/6.3). Consumed by
+# `gearbox deploy`'s render step, NOT by codex itself.
+#
+# render:  paths under this directory, copied verbatim into ~/.codex/skills/<name>/.
+#          `fixtures/` is deliberately NOT listed — it's a dev-time smoke test, not
+#          something the model needs to see. Shared scripts/references
+#          (build_plan.py, model-lint.md, fork-prompts.md, the adversarial-review
+#          port) are NOT copied either — SKILL.md points at
+#          ~/.claude/{references,skills/plan-builder,skills/adversarial-review} so
+#          there is one copy of each.
+# shadows: same-named skill in the OTHER root, moved to ~/.agents/skills-disabled/<name>/
+#          so the model never sees two `plan-harden` entries. A move, never a delete.
+#          (Verified present at fold-in time: `~/.agents/skills/plan-harden`.)
+name = "plan-harden"
+render = ["SKILL.md"]
+shadows = ["~/.agents/skills/plan-harden"]

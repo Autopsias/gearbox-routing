@@ -294,7 +294,7 @@ def net_of_default_merges(base, cwd, branch):
 
     A session that merges ``origin/<branch>`` into the plan branch after it was
     dispatched (the build rule "merge main before any build") otherwise hands its
-    review gate all of main's changes since dispatch: on 2026-10-04 s01 of
+    review gate all of main's changes since dispatch: s01 of
     example-project-agentic-edge put 290 files of already-reviewed main code in front of
     ``llm-review-low`` for 3 files of its own, and both reviewer attempts timed out.
     The returned value is the TREE of ``merge(base, merge-base(HEAD, origin/<branch>))``,
@@ -360,7 +360,7 @@ def gate_env(plan_dir, session_id, cwd=None):
     # RESOLVED here, in the orchestrator's cwd: the gate runs with cwd = a member or
     # plan worktree, where a relative plan dir names the FROZEN `_plans/` copy. The
     # ledger then landed in the worktree, `apply` committed it, and §8.b refused
-    # every later ship of the plan (2026-09-24). Same rule as `plan_ship.git_step`.
+    # every later ship of the plan. Same rule as `plan_ship.git_step`.
     env = {PLAN_DIR_ENV: str(pathlib.Path(plan_dir).resolve()), SESSION_ENV: str(session_id),
            HARNESS_ENV: (land_harness(plan_dir) if session_id == LAND
                          else harness(plan_dir, session_id))}
@@ -382,7 +382,7 @@ def declared_env(gate, plan_dir, session_id, cwd=None):
     `code-review-gate`, whose pytest children call the review gate's main() in
     temp repos -- argparse read the ambient PLAN_EXECUTE_REVIEW_BASE and diffed a
     commit those repos do not have. Green four times run by hand, INDETERMINATE
-    on its first run THROUGH verify (2026-08-20).
+    on its first run THROUGH verify.
     """
     allow = set((gate or {}).get("env_allowlist") or [])
     return {k: v for k, v in gate_env(plan_dir, session_id, cwd).items() if k in allow}

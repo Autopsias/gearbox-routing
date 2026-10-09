@@ -46,7 +46,7 @@ Prompt the agent to:
    - **Open memory candidates:** also list memory notes in the target project (`~/.claude/projects/<project>/memory/`) that carry an open `Remove-the-cause candidate (open)` line (written by plan-execute's learning capture). Present each as a 'Remove the cause' finding. Its gate 1 quote is the memory note's candidate line, cited as `path:line` (file-derived).
    - Write the extraction as one script and run it against a small fixture tree first (a cause in 2 plans and one in 3, a duplicate `fid`, a tie, a null `fid`, a string `attempt`, a truncated line, a plan older than 30 days) before the real run.
 
-5. **Completion lines.** End your report with one line per scan, exactly: `TRANSCRIPT SCAN: complete` or `TRANSCRIPT SCAN: failed (<why>)`, and `REVIEW-FINDINGS SCAN: complete` or `REVIEW-FINDINGS SCAN: failed (<why>)`. An empty but successful scan is `complete`. A scan that failed or could not read its files is `failed`. The caller touches `~/.dyno/improve/last-full-scope` only when BOTH say `complete` (see `commands/improve.md`, Phase 4).
+5. **Completion lines.** End your report with one line per scan, exactly: `TRANSCRIPT SCAN: complete` or `TRANSCRIPT SCAN: failed (<why>)`, and `REVIEW-FINDINGS SCAN: complete` or `REVIEW-FINDINGS SCAN: failed (<why>)`. An empty but successful scan is `complete`. A scan that failed or could not read its files is `failed`. The caller touches `~/.gearbox-state/improve/last-full-scope` only when BOTH say `complete` (see `commands/improve.md`, Phase 4).
 
 Return categorized findings with source citations. Concise summaries, not raw data.
 

@@ -107,8 +107,8 @@ def _empty_session(path):
         "cost_usd": 0.0,
         "context_peak_tokens": 0,   # largest single-message context (fresh + cache read + cache write)
         "base_context_tokens": None, # context on the FIRST assistant call — what every session pays before it does anything
-        "compactions": 0,            # compact boundaries in the transcript (s07: the compaction retro's own denominator input)
-        "session_type": None,        # live type from ~/.dyno/compaction/policy/<sid>.json, else None ('untyped')
+        "compactions": 0,            # compact boundaries in the transcript (the compaction retro's own denominator input)
+        "session_type": None,        # live type from ~/.gearbox-state/compaction/policy/<sid>.json, else None ('untyped')
         "autocompact_window_inferred": None,  # null unless a settings/launch record is found
         "reread_cost_usd": 0.0,     # spend on cache READS only — the price of carrying context forward
         "tool_errors": 0,
@@ -170,7 +170,7 @@ def _scan_assistant_turn(d, msg, prices, s, model_rates=None):
     """An assistant turn: model attribution, token accounting, cost, and the receipts it carries."""
     # Claude Code writes ONE line per content block of an API response, and every
     # line repeats the same message.id and the same usage. Count usage once per id
-    # (measured 2026-10-03: 9207 lines, 4434 ids, cost reported 2.4x too high).
+    # (measured: 9207 lines, 4434 ids, cost reported 2.4x too high).
     mid = msg.get("id")
     if mid and mid in s["_seen_ids"]:
         _scan_assistant_content(msg, s)
@@ -342,8 +342,8 @@ def main():
                          "for the routing retro; the COMPACTION retro turns it ON, because the "
                          "compaction hooks fire in dispatched subagent sessions too and "
                          "excluding them would hide most of the instrument's own denominator")
-    ap.add_argument("--policy-dir", default=os.path.expanduser("~/.dyno/compaction/policy"),
-                    help="cp-02 policy files, for each session's live type")
+    ap.add_argument("--policy-dir", default=os.path.expanduser("~/.gearbox-state/compaction/policy"),
+                    help="compaction-policy files, for each session's live type")
     ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"),
                     help="settings record the auto-compact window is read from")
     args = ap.parse_args()

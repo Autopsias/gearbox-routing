@@ -45,8 +45,13 @@ class TestBaselineResolveRealProviders(unittest.TestCase):
         self.assertIsNone(result["native_effort"])
 
     def test_openai_deep_reasoning(self):
+        # The policy is the authority (model-routing.yaml header: "If a consumer
+        # disagrees with this file, fix the consumer"). deep_reasoning is
+        # { frontier_reasoner, thorough } and openai maps frontier_reasoner.thorough
+        # to `high`. This test expected `medium` from the day it was written, while
+        # the policy said `thorough`; CI never ran pytest, so nobody saw it.
         result = rr.resolve("deep_reasoning", "openai", ssot_path=REAL_SSOT)
-        self.assertEqual(result, {"model_id": "gpt-5.5", "native_effort": "medium"})
+        self.assertEqual(result, {"model_id": "gpt-5.5", "native_effort": "high"})
 
     def test_gemini_linchpin(self):
         result = rr.resolve("linchpin", "gemini", ssot_path=REAL_SSOT)
@@ -116,6 +121,31 @@ class TestDegradeLadder(unittest.TestCase):
         base = rr.resolve("linchpin", "anthropic", ssot_path=REAL_SSOT)
         with self.assertRaises(rr.RouteResolverError):
             rr.degrade("linchpin", "anthropic", current=base, signal="refusal", ssot_path=REAL_SSOT)
+
+
+class TestEffortSteepProvider(unittest.TestCase):
+    """The zai example profile: two models carry three tiers (cheap_fast and
+    workhorse alias one id) and every serious intent maps to `max`. The walk must
+    skip the aliased rung and stop at the frontier model, never loop."""
+
+    def test_zai_standard_build_is_flash_at_max(self):
+        result = rr.resolve("standard_build", "zai", ssot_path=REAL_SSOT)
+        self.assertEqual(result, {"model_id": "glm-5.3-flash", "native_effort": "max"})
+
+    def test_zai_mechanical_climbs_effort_then_model_then_stops(self):
+        cur = rr.resolve("mechanical", "zai", ssot_path=REAL_SSOT)
+        self.assertEqual(cur, {"model_id": "glm-5.3-flash", "native_effort": "low"})
+        cur = rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT)
+        self.assertEqual(cur, {"model_id": "glm-5.3-flash", "native_effort": "max"})
+        cur = rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT)
+        self.assertEqual(cur, {"model_id": "glm-5.3", "native_effort": "max"})
+        self.assertEqual(rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT), "exhausted")
+
+    def test_zai_degrade_keeps_max(self):
+        base = rr.resolve("linchpin", "zai", ssot_path=REAL_SSOT)
+        self.assertEqual(base, {"model_id": "glm-5.3", "native_effort": "max"})
+        degraded = rr.degrade("linchpin", "zai", current=base, signal="unavailable", ssot_path=REAL_SSOT)
+        self.assertEqual(degraded, {"model_id": "glm-5.3-flash", "native_effort": "max"})
 
 
 class TestNoLadderProviderPath(unittest.TestCase):

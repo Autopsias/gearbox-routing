@@ -1,7 +1,7 @@
 # Providers — choosing and switching
 
-Gearbox ships three worked provider profiles — `anthropic`, `openai`,
-`gemini` — inside `claude/model-routing.yaml`'s `providers:` block. Exactly
+Gearbox ships four worked provider profiles — `anthropic`, `openai`,
+`gemini`, `zai` — inside `claude/model-routing.yaml`'s `providers:` block. Exactly
 one is active at a time (`active_provider:`). This doc covers picking one at
 install time, switching later, and what "effort" means on each.
 
@@ -16,6 +16,7 @@ and fill in* a provider (including a brand-new one), see
 ./install.sh --provider anthropic     # default
 ./install.sh --provider openai
 ./install.sh --provider gemini
+./install.sh --provider zai           # an effort-steep example (see below)
 ```
 
 `--provider` sets `active_provider:` in the installed copy of
@@ -57,6 +58,7 @@ neutral `light` / `standard` / `thorough` intent into its native dial:
 | `anthropic` | `effort` | ALL token spend (text + tool calls + thinking) **and** visibly shapes agentic behavior — how many tool calls, how much preamble, how tightly the model scopes to what was asked. Turning it down changes how the agent behaves, not just how long it thinks. |
 | `openai` | `reasoning_effort` (Responses API: `reasoning.effort`; Chat Completions: `reasoning_effort`) | Internal reasoning-token depth before the visible response. Not documented to carry Anthropic's agentic-behavior-shaping property. |
 | `gemini` | `thinking_level` | A maximum-depth ceiling on internal reasoning before responding. A bound, not a spend-shaping dial. Mutually exclusive with the legacy `thinking_budget` param (setting both is a 400 error). |
+| `zai` | `reasoning_effort` (`low` / `high` / `max`) | Thinking is always on. The vendor recommends `max` for coding, so every serious intent maps to `max` and only `light` keeps a low rung. Two models carry three tiers: `cheap_fast` and `workhorse` share one id, and the escalation walk skips the aliased rung. |
 
 Each provider's `effort.map` in `claude/model-routing.yaml` is the actual
 intent → native-level table, per tier, with a `source:` doc link and an
@@ -66,7 +68,7 @@ that block directly rather than trusting a summary here to stay current.
 
 ## Staleness cadence for the shipped example profiles
 
-The three shipped profiles (`anthropic` / `openai` / `gemini`) are dated
+The four shipped profiles (`anthropic` / `openai` / `gemini` / `zai`) are dated
 examples, correct as of their `calibration.date`. **Re-verify each example
 provider's model ids, prices, and effort-dial semantics against that
 provider's current docs on the earlier of: that provider's next model

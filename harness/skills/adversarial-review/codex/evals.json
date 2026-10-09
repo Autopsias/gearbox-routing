@@ -1,0 +1,76 @@
+{
+  "skill": "adversarial-review",
+  "runs_per_eval": 3,
+  "assertions": [
+    {
+      "id": "E1",
+      "statement": "The review contains the required sections: Findings, Open Questions, Review Basis and Assumptions, Research Performed and Limitations, Residual Risks or Unreviewed Areas, the run-integrity E-check block, and a final Claude Handoff section with a fenced text block that is self-contained enough for Claude to act: artifact identity, review as-of date, supported decision/scope, verdict, actionable finding evidence and required action, owner-gated open questions, preserve constraints, residual risks, and a bounded task for Claude.",
+      "type": "read",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E2",
+      "statement": "Every reported finding uses only blocking, material, or minor for impact and verified or probable for evidence strength.",
+      "type": "read",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E3",
+      "statement": "Every reported finding includes Location, Criterion, Assumption-dependent, Evidence, Consequence, Remediation, and Provenance fields.",
+      "type": "read",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E4",
+      "statement": "No finding exists only to satisfy a quota, and zero material findings remains allowed when no candidate survives falsification.",
+      "type": "judge",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E5",
+      "statement": "Current, legal, regulatory, standards, policy, market, vendor, and citation-dependent material findings have verified source status and do not treat provisional agreement, proposal, guidance, commentary, or forecast as operative fact.",
+      "type": "judge",
+      "target": "review output and cited sources",
+      "expect": true
+    },
+    {
+      "id": "E6",
+      "statement": "Temporal-staleness findings state the artifact date, review as-of date, source-of-truth date, and whether the later source is decided, proposed, superseded, or working material.",
+      "type": "read",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E7",
+      "statement": "Acknowledged owner inputs, placeholders, and missing approvals are in Open Questions unless the review explains why they block or materially distort the supported decision.",
+      "type": "judge",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E8",
+      "statement": "Every finding states the concrete decision impact or failure mode and survives an explicit counter-interpretation or falsification attempt.",
+      "type": "judge",
+      "target": "review output",
+      "expect": true
+    },
+    {
+      "id": "E9",
+      "statement": "The review-only boundary is preserved: the artifact is not edited unless the user explicitly requested revision.",
+      "type": "read",
+      "target": "workspace diff or declared actions",
+      "expect": true
+    },
+    {
+      "id": "E10",
+      "statement": "If a durable lesson, correction, or process surprise occurred, an event-driven memory entry was appended; routine successful runs append nothing.",
+      "type": "read",
+      "target": "<workspace-folder>/_skill_memory/adversarial-review.md when available",
+      "expect": true
+    }
+  ]
+}

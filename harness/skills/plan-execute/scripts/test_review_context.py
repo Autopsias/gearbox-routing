@@ -1,6 +1,6 @@
 """The review gate's surface is BOUNDED — by the session's base and its scope.
 
-Why these exist, measured 2026-08-20 over 21h and two plans in one checkout:
+Why these exist, measured over 21h and two plans in one checkout:
 16 of 17 verify failures were `llm-review-medium`, and the rework loop never
 converged because the surface was the whole working tree and verify runs BEFORE
 a session commits. Every round re-reviewed the session's entire accumulated

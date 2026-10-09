@@ -100,7 +100,9 @@ overview / Claude Code model-config).
 > **Fable (5.1) is the escalation apex, not a standing pick** — raise MODEL from
 > Opus·high only when the two named triggers persist: a problem unsolved in prior
 > rounds, or whole-codebase/large-context synthesis (1M ctx). De-escalate to
-> **`Haiku 4.5 · low`** for mechanical batch work.
+> **`Haiku 5.5 · low`** for mechanical batch work. Haiku is not a Sonnet
+> substitute for build work: on 40 public tasks it passed as many as Sonnet 5.5
+> at medium but took ~3x the wall time and ~3x the steps.
 
 > **Refinement — effort is a per-model default + justified escalation, not a
 > ceiling.** Effort tokens bill at the OUTPUT rate, so a hot *standing* default is
@@ -112,16 +114,16 @@ overview / Claude Code model-config).
 > **live** (watched) sessions pay it every turn. See **"Live vs async"** below.
 
 
-## Claude Fable 5 — the tier above Opus (added 2026-06-10)
+## Claude Fable 5 — the tier above Opus (added)
 
 **What it is.** First model of the Claude 5 family, Mythos-class — sits **above
-Opus 4.8** in capability. GA on 2026-06-09. 1M-token context, adaptive thinking
+Opus 4.8** in capability. GA. 1M-token context, adaptive thinking
 only (the same Low–Max effort dials apply in the Cowork picker), priced at
 **2× Opus 4.8** ($10/$50 vs $5/$25 per Mtok). Built for long-horizon agentic
 work; benchmark deltas vs Opus 4.8 are largest exactly there (e.g. agentic-coding
 evals where performance scales strongly with the effort dial).
 
-> **⚠ Availability (re-confirmed 2026-07-26).** Fable 5 is a **normal, available
+> **⚠ Availability (re-confirmed).** Fable 5 is a **normal, available
 > model** — the earlier "suspended 2026-06-12 / paywalled" note was STALE and had been
 > quoted back at the operator as fact; `model-routing.yaml`'s `prices.fable` row now
 > carries a standing warning never to assume it. Fable does draw **usage credits** on
@@ -268,18 +270,18 @@ lacks, a cost cap the user set). An override:
 
 ## Sources (reviewed 2026-05-29; official docs re-verified via MCP 2026-07-01)
 
-Official (re-verified 2026-07-01 via Ref + Exa MCP):
+Official (re-verified via Ref + Exa MCP):
 
 - Anthropic — *Effort* (Claude API docs): per-level use-cases (**low** = subagents / simple / high-volume / latency-sensitive / chat · **medium** = balanced agentic · **high** = default: complex reasoning / difficult coding / agentic · **xhigh** = the coding/agentic start, offered on Fable 5 / Opus 4.8 / Opus 4.7 / Sonnet 5 only · **max** = genuinely frontier problems, *"significant cost for small gains,"* can *overthink* structured output); effort applies to **all** tokens (text + tool calls + thinking) billed at the output rate; **Haiku excluded** from `effort`; Fable's lower effort *"often exceeds `xhigh` performance on prior models."* <https://platform.claude.com/docs/en/build-with-claude/effort>
 - Anthropic — *Models overview / Choosing a model* (Claude API docs): the 4-question routing test (Opus 4.8 for extended multi-step reasoning / deep code analysis / nuanced judgment on ambiguous inputs; Sonnet 5 for instruction-following / structured output / tool use / RAG); *"tuning effort is often a better lever than switching models"*; positioning + pricing. <https://platform.claude.com/docs/en/about-claude/models/overview>
 - Anthropic — *Claude Code model configuration*: the **`opusplan`** alias (*"uses `opus` during plan mode, then switches to `sonnet` for execution"*) and the **`best`** alias (*"Fable 5 where available, otherwise the latest Opus"*) — the native plan/execute-by-model and Fable→Opus fallback patterns. <https://docs.claude.com/en/docs/claude-code/model-config>
 - Practitioner guides — ClaudeKit · claude-platform-playbook · MarkTechPost: effort-vs-model economics; *Sonnet 5 narrows the Opus gap and can match Opus 4.8 on some tasks at higher effort, at ~1.7× lower cost.*
 
-Prior review (2026-05-29):
+Prior review:
 - Anthropic — *Adaptive thinking* (Claude API docs): adaptive-only on Opus 4.7/4.8, effort as soft guidance, `max_tokens` interaction. <https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking>
 - Anthropic — *Claude Opus 4.8* (product page): positioning, High default, 1M context, pricing, recommended use cases. <https://www.anthropic.com/claude/opus>
 - Anthropic — *Introducing Claude Opus 4.7*: origin of the `xhigh` level and "start at high/xhigh for coding/agentic". <https://www.anthropic.com/news/claude-opus-4-7>
-- 9to5Mac, *Anthropic upgrades Claude with Opus 4.8* (2026-05-28): Cowork/claude.ai Effort Control launch; "Extra" = `xhigh`; High default; raised rate limits. <https://9to5mac.com/2026/05/28/anthropic-upgrades-claude-with-opus-4-8-heres-whats-new/>
+- 9to5Mac, *Anthropic upgrades Claude with Opus 4.8*: Cowork/claude.ai Effort Control launch; "Extra" = `xhigh`; High default; raised rate limits. <https://9to5mac.com/2026/05/28/anthropic-upgrades-claude-with-opus-4-8-heres-whats-new/>
 - Business Standard / BeInCrypto / 9to5Mac (2026-05-28/29): Opus 4.8 benchmark deltas (SWE-Bench Pro 64.3→69.2, HLE 54.7→57.9, GDPval-AA 1753→1890), Fast Mode ~2.5× faster, "4× less likely to leave code flaws unflagged".
 - Advanced-user practice — MindStudio, *Claude Code Effort Levels Explained* (2026-03): Low/Medium/High/Max task mapping; Medium as the high-volume coding default. <https://www.mindstudio.ai/blog/claude-code-effort-levels-explained/>
 - Advanced-user practice — *ultrathink / thinking modes* handbook: effort↔keyword mapping and the "5+ files / security / architecture → max" decision rule. <https://github.com/ThamJiaHe/claude-code-handbook/blob/main/docs/ultrathink-thinking-modes.md>

@@ -3,7 +3,7 @@
 Every test here has been neuter-probed by hand -- the code was broken one
 way per test and the matching test was confirmed to fail on a real assertion.
 There is NO neuters module; do not cite one (this line used to name a file
-that was never in the tree -- caught by review, 2026-08-23).
+that was never in the tree -- caught by review).
 """
 
 import json
@@ -175,7 +175,7 @@ def test_instrumentation_never_decides_a_gate(tmp_path):
 
 
 # --- the review must happen in ONE session, at the level it was asked for ----
-# Measured 2026-08-23. The prompt used to say `Invoke the code-review skill
+# Measured. The prompt used to say `Invoke the code-review skill
 # (Skill tool, skill="code-review", args="<level>")`. That skill dispatches
 # finders against the REPO ROOT, so on a 5-file scoped review it opened the
 # diff file zero times, read `run.py` 47 times (outside the scope), spent 426

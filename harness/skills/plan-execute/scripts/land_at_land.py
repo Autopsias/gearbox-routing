@@ -114,7 +114,7 @@ def _cwd(gid, g):
 def ci_warning(land_path, flagged):
     """One plain line when the repo has CI workflows and no ``at_land`` gate that
     runs a check. A review gate does not count: the shared default flags
-    ``llm-review-high`` at_land for every repo (2026-10-04), and it runs no tests."""
+    ``llm-review-high`` at_land for every repo, and it runs no tests."""
     wf = Path(land_path) / ".github" / "workflows"
     reg = registry(land_path)
     checks = [g for g in flagged if not vp.is_review_gate({"kind": "argv", **reg.get(g, {})})]

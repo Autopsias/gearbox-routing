@@ -13,7 +13,7 @@ z.ai's Anthropic-compatible endpoint, with ANTHROPIC_DEFAULT_*_MODEL remapping
 the Task-plane tokens (opus→glm-5.3, sonnet→glm-5.3-flash). The profile's
 `models:` in model-routing.yaml are therefore the TOKENS, not glm-* wire ids —
 the Task tool only accepts tokens (a literal "glm-5.3-max" id is rejected
-client-side — unrecognized_model — probed 2026-08-30), and the wire mapping
+client-side — unrecognized_model — probed), and the wire mapping
 stays in the GLM tree's env where it already lived.
 
 EVIDENCE (SSOT providers.zai.calibration + the v1.21 decision history): DeepSWE
@@ -107,8 +107,7 @@ def clamp_cell(model_arg, reason_tier):
     preserved (true mechanical); every other tier on a pinned model — including
     UNSET — clamps to max; fable collapses to opus (no zai apex above glm-5.3);
     haiku collapses to sonnet at its own tier (the zai workhorse token IS flash
-    under the env remap, and tier-haiku's no-dial invariant must never meet a
-    dial-capable model)."""
+    under the env remap; tier-haiku has no zai counterpart)."""
     if model_arg == "fable":
         model_arg = "opus"
     elif model_arg == "haiku":

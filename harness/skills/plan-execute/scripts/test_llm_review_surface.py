@@ -1,6 +1,6 @@
 """The review SURFACE is bounded by a session's review_scope, on BOTH halves.
 
-Why, measured 2026-08-20 across two plans in one checkout: the surface was the
+Why, measured across two plans in one checkout: the surface was the
 whole tree, so each session's review read the other's uncommitted source, and
 three rework attempts went on findings in files the reviewed session never
 touched. `_out_of_surface` already kept other plans' `_plans/**` out; this keeps
@@ -183,7 +183,7 @@ def test_a_plan_dir_with_no_journal_refuses_instead_of_reviewing_the_wrong_files
     surface -- it is a different one, holding whatever happens to be dirty. The
     emptiness guard does not catch it: one unrelated dirty file makes it
     non-empty and a clean review of the wrong files is a genuine PASS
-    (found by the plan-level-git-isolation session, 2026-08-20)."""
+    (found by the example-isolation-plan session)."""
     plan = tmp_path / "_plans" / "p"
     plan.mkdir(parents=True)      # no run.ndjson in it
     out = srf.resolve_surface("medium", str(tmp_path), None, str(plan), "s01")

@@ -621,6 +621,27 @@ def check_settings_hooks(repo_dir: Path) -> list[str]:
     return hits
 
 
+# Files the exported harness reads from its own root that this repo keeps under
+# claude/. Plan-execute and routing-retro look for <config root>/model-routing.yaml
+# beside the skill tree. The private SSOT is real calibration data and never ships
+# (see _scrub_claude_md), so the harness gets the PUBLIC, hand-maintained policy.
+HARNESS_LAYOUT_COPIES = (("claude/model-routing.yaml", "model-routing.yaml"),)
+
+
+def mirror_public_files(repo_dir: Path, harness_dir: Path) -> list[str]:
+    """Copy each HARNESS_LAYOUT_COPIES source from the export repo into harness/."""
+    out = []
+    for src_rel, dst_rel in HARNESS_LAYOUT_COPIES:
+        src = repo_dir / src_rel
+        if not src.is_file():
+            raise fatal(f"harness layout copy: {src_rel} is missing from the export repo")
+        dst = harness_dir / dst_rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        out.append(dst_rel)
+    return out
+
+
 def scrub_tree(dest: Path, rules: list) -> None:
     """Apply the manifest's scrub_rules to every text file just copied.
 
@@ -1355,6 +1376,12 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         for entry in pruned:
             print(f"DROPPED settings.json hook: {entry}", file=sys.stderr)
+        try:
+            for rel in mirror_public_files(repo_dir, harness_dir):
+                print(f"MIRRORED public file into harness/: {rel}", file=sys.stderr)
+        except SyncError as e:
+            print(f"FATAL: {e}", file=sys.stderr)
+            return 2
         scrub_tree(harness_dir, scrub_rules)
         try:
             private_sha, authoritative, ledger_path = write_provenance(

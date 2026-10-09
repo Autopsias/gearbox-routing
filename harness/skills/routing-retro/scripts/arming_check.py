@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""arming_check.py — is each acceptance criterion ARMED yet? (s07/PF-01, MOVE 5)
+"""arming_check.py — is each acceptance criterion ARMED yet?
 
-s09 must not re-judge a criterion whose evidence cannot exist yet. This script
+The acceptance review must not re-judge a criterion whose evidence cannot exist yet. This script
 answers that PER CRITERION, against that criterion's OWN evidence and its OWN
 intervention's after-sessions. It lives here, in code beside its test suite,
-rather than as a snippet inside s09's prompt — a program inside a markdown
+rather than as a snippet inside a review prompt — a program inside a markdown
 prompt sits outside every test discipline this plan has.
 
 There is NO single aggregate floor: 15 hooks-only sessions can satisfy an
@@ -23,7 +23,7 @@ Contract:
     ANY-ARMED / PARTIAL / BLOCKED decision.
 
 Usage:
-  python3 arming_check.py [--scan /tmp/retro-scan.json] [--root ~/.dyno/compaction]
+  python3 arming_check.py [--scan /tmp/retro-scan.json] [--root ~/.gearbox-state/compaction]
                           [--outcomes evals/routing/outcomes.ndjson] [--json]
 """
 
@@ -46,7 +46,7 @@ from compaction_ledger import (
     paths,
 )
 
-# The compaction-ledger floor, from s09's prompt: 40 live records at the CURRENT
+# The compaction-ledger floor, from the acceptance review's prompt: 40 live records at the CURRENT
 # policy_version over at least 15 distinct sessions, restricted to the
 # intervention's after-sessions.
 LEDGER_FLOOR_RECORDS = 40
@@ -57,7 +57,7 @@ LEDGER_FLOOR_SESSIONS = 15
 DEFAULT_AFTER_FLOOR = 5
 
 # The nine criteria, identified by the EVIDENCE each is bound to. The prose text
-# of criteria 1-7 belongs to the plan's acceptance review (s08/s09); what this
+# of criteria 1-7 belongs to the plan's acceptance review; what this
 # script owns is which ledger answers each one and what floor it must clear.
 CRITERIA = {
     1: {"label": "the veto is honoured by Claude Code", "evidence": "compaction_ledger",
@@ -304,7 +304,7 @@ def format_report(rep):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scan", default=None, help="retro_scan.py JSON (for session start/end times)")
-    ap.add_argument("--root", default=None, help="dyno compaction root (default ~/.dyno/compaction)")
+    ap.add_argument("--root", default=None, help="compaction state root (default ~/.gearbox-state/compaction)")
     ap.add_argument("--outcomes", default=None, help="evals/routing/outcomes.ndjson")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)

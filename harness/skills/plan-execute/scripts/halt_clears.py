@@ -1,6 +1,6 @@
-"""The SECOND clear of one session's halt needs a cost line (2026-09-05).
+"""The SECOND clear of one session's halt needs a cost line.
 
-Measured on The Porter Finishes: 9 halts, 10 clears, ONE session, and two
+Measured on one plan run: 9 halts, 10 clears, ONE session, and two
 memory rules written the same morning saying "clear at most once" did not
 hold that afternoon — a memory fires at recall, and nothing recalls it
 mid-loop. So the count lives here, in the tool, and the act the rule asks

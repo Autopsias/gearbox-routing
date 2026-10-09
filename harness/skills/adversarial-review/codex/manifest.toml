@@ -1,0 +1,18 @@
+# Codex render manifest (dual-harness-contract.md § 6.2/6.3/6.4). Consumed by
+# `gearbox deploy`'s render step, NOT by codex itself.
+#
+# Provenance (§ 6.4): this was a hand-maintained,
+# UNTRACKED skill at ~/.codex/skills/adversarial-review — a precedent for the ported
+# SHAPE (SKILL.md + references/ + agents/openai.yaml), not for sourcing. Folded in here
+# byte-identical (verified `diff -r` clean against the live copy at fold-in time) so it
+# stops drifting silently. Content is UNCHANGED — this is a source-of-truth move, not an
+# edit. plan-harden/codex reuses this skill as its Phase 2 review engine and adapts to
+# its `## Findings` output contract at ITS OWN seam; this skill's content is never edited
+# to serve that caller (this port's abort condition).
+#
+# render:  every file under this directory, copied verbatim into
+#          ~/.codex/skills/adversarial-review/ (replacing the untracked original).
+# shadows: none — this skill has no same-named Claude-side original.
+name = "adversarial-review"
+render = ["SKILL.md", "references", "agents", "evals.json"]
+shadows = []
