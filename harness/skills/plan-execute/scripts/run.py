@@ -385,6 +385,9 @@ _TIER_AGENTS = {
     ("haiku", "low"): "tier-haiku",
     ("haiku", "medium"): "tier-haiku",
     ("haiku", ""): "tier-haiku",
+    # sonnet@low (v37): the Sonnet-climb canary's starting rung; without a row it runs unbound
+    # and the retro drops every canary cohort as effort_unbound. The zai lane maps it too.
+    ("sonnet", "low"): "tier-sonnet-low",
     ("sonnet", "medium"): "tier-sonnet-medium",
     ("sonnet", "high"): "tier-sonnet-high",
     ("opus", "medium"): "tier-opus-medium",

@@ -20,6 +20,7 @@ except for the visual refresh.
 See ../references/schemas.md for the spec schema.
 """
 
+import build_canary
 import explainer as expl
 import plan_limits as pl
 import route_at_dispatch_build as rad
@@ -3559,6 +3560,8 @@ def main():
 
     spec_path = Path(args.spec)
     spec = json.loads(spec_path.read_text())
+    if not (args.rebuild or args.dry_run_shipping):  # a running plan never changes under it
+        spec = build_canary.apply(spec)
     # Apply the integration-session synthesis once, here, so the index entry and
     # the printed counts below describe the plan that was actually built (build()
     # applies it again — it is idempotent).

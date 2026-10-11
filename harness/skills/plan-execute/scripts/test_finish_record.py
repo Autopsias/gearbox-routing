@@ -449,3 +449,16 @@ def test_nested_ordinary_directories_record_normally(fx, ci):
     rec = _record(fx)
     assert rec["status"] == "pushed", rec
     assert "_plans/plan-a/_evidence/deep/er/x.txt" in rec["paths"]
+
+
+def test_a_record_file_without_a_final_newline_does_not_park_on_the_eof_hook(fx, ci):
+    _hook(fx, "for f in $(git diff --cached --name-only); do "
+              "[ -z \"$(tail -c1 \"$f\")\" ] || { echo \"Fixing $f\"; exit 1; }; done\n")
+    _dirty_record(fx)
+    ev = fx["plan"] / "evidence.json"
+    ev.write_bytes(b'{"a": 1}')                     # what a session's json.dump leaves
+    assert _record(fx, apply=False)["status"] == "would-push"
+    assert ev.read_bytes() == b'{"a": 1}'           # report-only writes nothing
+    rec = _record(fx)
+    assert rec["status"] == "pushed", rec
+    assert ev.read_bytes() == b'{"a": 1}\n'

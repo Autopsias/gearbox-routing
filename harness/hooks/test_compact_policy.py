@@ -77,6 +77,19 @@ def mod(tmp_path, monkeypatch):
         # a build verb anywhere keeps an ambiguous prompt provisional
         ("investigate why test_foo is flaky", "default", 0.5, False),
         ("analyse the failure and fix it", "default", 0.5, False),
+        # v4 — only the user's own words classify. A finished
+        # background job's report reads as analysis prose; it armed the veto
+        # in 44 sessions, one of which deferred 1,124 auto-compactions.
+        ("<task-notification>\n<task-id>b1</task-id>\n<summary>Background command "
+         "\"review the report\" completed</summary>\n</task-notification>",
+         "default", 0.5, False),
+        ('<wake reason="mention">analyse the transcript</wake>', "default", 0.5, False),
+        ("<system-reminder>a note</system-reminder> please analyse this paper",
+         "planning", 0.75, True),
+        # a planning command named anywhere, not only as the first word
+        ("ok, now take this through /plan-builder and run it", "planning", 0.75, True),
+        ("I want /plan-harden on the spec", "planning", 0.75, True),
+        ("open ~/.claude/skills/plan-builder/SKILL.md", "default", 0.5, False),
         # the review gate's headless dispatches are not ours to widen
         ("Review the diff in the file /tmp/plan-execute-review-1.diff (3 files)",
          "default", 0.5, False),
@@ -112,6 +125,17 @@ def test_a_provisional_default_is_upgraded_and_sticky_flips(home):
     assert after["type"] == "planning", "a provisional default must upgrade"
     assert after["sticky"] is True, "sticky must be REWRITTEN true on upgrade"
     assert after["ceiling_fraction"] == 0.75
+
+
+def test_a_machine_message_never_upgrades_a_session(home):
+    """The live incident: session 5f9fce27 went default -> planning on a task notification."""
+    kit.prompt(home, "s6", "just fix this typo")
+    kit.prompt(home, "s6", "<task-notification>\n<summary>analysis report "
+               "of the transcript</summary>\n</task-notification>")
+    got = kit.policy(home, "s6")
+    assert got["type"] == "default" and got["sticky"] is False, (
+        "a machine-sent block must not classify the session"
+    )
 
 
 def test_a_sticky_classification_is_never_downgraded(home):

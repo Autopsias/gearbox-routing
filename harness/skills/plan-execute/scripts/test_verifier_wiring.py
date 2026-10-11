@@ -141,9 +141,8 @@ def _fixture_tree(tmp_path, *, restricted, gate=GATE_ID, gate2=None, **sess_extr
     attest, and the expected count would drift with the harness rather than with
     the code under review.
 
-    `restricted=True` plants a git-ignored `.env`: rule 1 of the egress guard is
-    a FULL-TREE filename walk precisely because `.env` is normally git-ignored,
-    so this is the real restricted disposition and not a stand-in for it."""
+    `restricted=True` plants a git-ignored `.env` (executor dispatch refuses on it) AND a
+    tracked token: the review gate reviews a clean copy without `.env*`."""
     gates = [gate] + ([gate2] if gate2 else [])
     plan_dir = make_plan(tmp_path, [_verify_sess(gates, **sess_extra)],
                          gates={gate2: {"kind": "argv", "argv": ["true"]}} if gate2 else None)
@@ -159,6 +158,7 @@ def _fixture_tree(tmp_path, *, restricted, gate=GATE_ID, gate2=None, **sess_extr
     (root / "a.py").write_text("def bump(n):\n    return n + 2\n")
     if restricted:
         (root / ".env").write_text("KEY=1\n")
+        (root / "b.py").write_text('T = "ghp' + '_' + __import__("secrets").token_hex(18) + '"\n')
     _begin_doing(plan_dir, SID)
     write_closeout(plan_dir, SID)
     return plan_dir

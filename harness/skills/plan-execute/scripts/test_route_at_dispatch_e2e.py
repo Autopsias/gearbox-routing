@@ -85,7 +85,8 @@ def _git(root, *args):
 class Fixture:
     """A throwaway repository holding one built v8 plan, and the env to drive it."""
 
-    def __init__(self, tmp_path):
+    def __init__(self, tmp_path, spec=None):
+        self.spec = spec
         self.tmp = tmp_path
         self.root = tmp_path / "proj"
         self.plan_dir = self.root / "_plans" / SLUG
@@ -95,7 +96,8 @@ class Fixture:
         shutil.copy(TREE / "model-routing.yaml", self.routing)
         egress = tmp_path / "egress"
         egress.mkdir()
-        keep = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "USER", "SHELL")
+        # PLAN_BUILDER_BUILD_CANARY: conftest.py sets it off, so the fixture plan stays unpinned
+        keep = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "USER", "SHELL", "PLAN_BUILDER_BUILD_CANARY")
         self.env = {k: os.environ[k] for k in keep if k in os.environ}
         self.env.update(PLAN_EXECUTE_ROUTING_SSOT=str(self.routing),
                         PLAN_EXECUTE_OUTCOME_LEDGER=str(self.ledger),
@@ -119,7 +121,7 @@ class Fixture:
         _git(root, "add", "-A")
         _git(root, "commit", "-qm", "fixture: the locked test")   # the EARLIER commit
         spec = self.tmp / "spec.json"
-        spec.write_text(json.dumps(_spec()))
+        spec.write_text(json.dumps(self.spec or _spec()))
         self.cli(BUILD_PY, str(spec), str(self.plan_dir), "--register-in", str(root))
         _git(root, "add", "-A")
         _git(root, "commit", "-qm", "fixture: the plan")
@@ -337,3 +339,49 @@ def test_zai_provider_env_under_the_codex_harness_resolves_for_openai(fx):
     assert want != _cell(fx, "agentic_build", "zai")      # the cases really differ
     assert _ran(out["batch"][0]) == want
     assert fx.state()["resolved_cell"]["s02"]["provider"] == "openai"
+
+
+# --------------------------------------------------------------------------
+# Build canary: plan-builder marks, `begin` picks. The tag is on
+# the manifest either way; only `begin` decides whether the canary cell runs.
+# --------------------------------------------------------------------------
+CANARY = {"kind": "canary", "proposal_id": "sonnet-low-std-20261010"}
+
+
+def _canary_fx(tmp_path):
+    spec = _spec()
+    for s in spec["sessions"]:
+        if s["id"] in ("s01", "s03"):          # both standard_build, as plan-builder marks them
+            s["routing_experiment"] = dict(CANARY)
+    fx = Fixture(tmp_path, spec)
+    man = json.loads((fx.plan_dir / "manifest.json").read_text())
+    assert [s["model"] for s in man["sessions"]] == [""] * 3   # the builder pinned nothing
+    return fx, man
+
+
+def test_begin_picks_the_canary_cell_for_a_marked_session(tmp_path):
+    fx, man = _canary_fx(tmp_path)
+    out, err = fx.begin("s01", "s02", "s03", env={"PLAN_BUILDER_BUILD_CANARY": ""})
+    by_id = {m["id"]: m for m in out["batch"]}
+    frozen = fx.state()["resolved_cell"]
+    for sid in ("s01", "s03"):
+        assert _ran(by_id[sid]) == ("sonnet", "low"), sid
+        assert by_id[sid]["effort_mechanism"] == "tier_agent", sid   # else the retro drops it
+        assert frozen[sid]["canary"] == CANARY["proposal_id"]
+        assert f"route: {sid} standard_build -> sonnet@low" in err
+        assert rad.experiment(fx.plan_dir, man, man["sessions"][int(sid[-1]) - 1]) == CANARY
+    assert f"(routing canary {CANARY['proposal_id']}, routing v" in err
+    # control: the unmarked session in the same batch keeps its class default
+    assert _ran(by_id["s02"]) == _cell(fx, "agentic_build", "anthropic")
+    assert "canary" not in frozen["s02"]
+
+
+def test_a_canary_that_is_off_at_begin_runs_the_class_default_untagged(tmp_path):
+    fx, man = _canary_fx(tmp_path)
+    out, err = fx.begin("s01")                 # conftest's PLAN_BUILDER_BUILD_CANARY=off
+    assert _ran(out["batch"][0]) == _cell(fx, "standard_build", "anthropic")
+    assert "canary" not in fx.state()["resolved_cell"]["s01"]
+    assert "(class default, routing v" in err
+    # the manifest still carries the tag, but the ledger must not count this cohort
+    assert man["sessions"][0]["routing_experiment"] == CANARY
+    assert rad.experiment(fx.plan_dir, man, man["sessions"][0]) is None

@@ -74,6 +74,25 @@ def read_inside(base, path):
         return fh.read()
 
 
+def end_with_newline(plan_dir, inner):
+    """Give a text record file the final newline a repo end-of-file hook adds.
+
+    ``_commit`` never retries a hook, so a session's JSON written without one parked
+    the finish of every plan that carried it. It is fixed in the plan dir, not only
+    in the copy, so the checkout step's byte match against the commit still holds.
+    ponytail: only the missing newline; extra trailing blank lines still park."""
+    data = read_inside(plan_dir, inner)
+    if not data or data.endswith(b"\n") or b"\0" in data:
+        return
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return
+    fd = os.open(Path(plan_dir) / inner, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+    with os.fdopen(fd, "ab") as fh:
+        fh.write(b"\n")
+
+
 def _exe(base, path):
     """The one mode bit git records, from ``lstat`` of an accepted regular file."""
     return bool(lstat_inside(base, path).st_mode & 0o100)

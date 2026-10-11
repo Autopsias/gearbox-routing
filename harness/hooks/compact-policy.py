@@ -48,7 +48,7 @@ import sys
 try:
     import compact_activation as activation
     import compact_reorient as reorient
-    from compact_classify import content_kind
+    from compact_classify import content_kind, names_command, own_words
     import compact_safepoint as safepoint
     import compact_turn as turn
     from compact_store import (
@@ -126,16 +126,16 @@ def first_word(text):
 
 
 def classify(text):
-    """orchestrator / planning / default, from the command that starts the work."""
+    """orchestrator / planning / default, from the user's OWN words (v4: machine blocks dropped)."""
+    text = own_words(text)
     word = first_word(text)
     if not word:
         return PROVISIONAL_TYPE
     if word in ORCHESTRATOR_COMMANDS:
         return "orchestrator"
-    if word in PLANNING_COMMANDS or word in PLANNING_WORDS:
+    if word in PLANNING_COMMANDS or word in PLANNING_WORDS or names_command(text, PLANNING_COMMANDS):
         return "planning"
-    # v3: the first word marked only a small share of sessions. The whole
-    # prompt decides next — rules and measurement in compact_classify.py.
+    # v3: the whole prompt decides next — rules in compact_classify.py.
     return content_kind(text) or PROVISIONAL_TYPE
 
 

@@ -46,7 +46,6 @@ never clear a finding or force a pass.
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -60,6 +59,8 @@ PASS, FINDINGS, INDETERMINATE = 0, 1, 2
 # Re-exported so `llm_review_gate.<name>` keeps working for every caller and
 # test: the split moved WHERE these live, not what this module exposes.
 import llm_review_ledger as ledger  # noqa: E402
+import llm_review_args as review_args  # noqa: E402
+import llm_review_policy as policy  # noqa: E402
 import codex_review_backend as crb  # noqa: E402
 import gate_timing as gt  # noqa: E402
 import proc_group as pg  # noqa: E402
@@ -277,9 +278,13 @@ def build_prompt(level, intent_text, new_files=(), base=None, diff_file=None,
     return prompt
 
 
-def run_once(prompt, cwd, timeout):
-    """-> (outcome_dict|None, note). Pinned to opus: never inherit the session's /model."""
-    argv = ["claude", "-p", prompt, "--model", "opus", "--output-format", "json"]
+def run_once(prompt, cwd, timeout, model="sonnet"):
+    """-> (outcome_dict|None, note). Pinned (sonnet unless --reviewer-model): never inherit the session's /model."""
+    # --strict-mcp-config with no --mcp-config: the reviewer reads files, it needs no
+    # MCP server. Measured: 19 servers (local + claude.ai connectors) vs 0,
+    # 1-5 s faster per call, and no reviewer reach into Gmail/Drive.
+    argv = ["claude", "-p", prompt, "--model", model, "--output-format", "json",
+            "--strict-mcp-config"]
     try:
         # proc_group, not subprocess.run: the reviewer spawns helpers, and a
         # plain timeout kills the launcher and orphans them (one observed at 34
@@ -316,64 +321,8 @@ def read_intent(path):
 
 
 def _parse_args(argv):
-    """The gate's CLI. Split out of main() at the 100-line function bound --
-    argument definitions are not control flow, and main() is the loop that
-    matters.
-    """
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--level", required=True, choices=LEVELS)
-    ap.add_argument("--reviewer", default="claude", choices=("claude", "codex"),
-                    help="which FAMILY reviews. `claude` is the on-box reviewer -- "
-                         "the default, and every line of this file's history. "
-                         "`codex` hands the SAME prepared surface to a read-only "
-                         "`codex exec`, so the code is read by a model that did "
-                         "not write it (see codex_review_backend.py).")
-    ap.add_argument("--cwd", default=".")
-    ap.add_argument("--harness", choices=("claude", "codex"),
-                    default=os.environ.get("PLAN_EXECUTE_HARNESS", "claude"),
-                    help="which family BUILT the code under review (verify.py "
-                         "derives it from the session's own dispatch record). Under "
-                         "`codex` the cross-family reviewer is CLAUDE, which is "
-                         "opt-in: see verifier_park.refusal.")
-    ap.add_argument("--timeout", type=int, default=180,
-                    help="per-attempt wall limit in seconds (the gate makes at "
-                         "most 2 attempts, so budget the registry timeout at "
-                         "2x this plus slack)")
-    ap.add_argument("--intent-file", default=os.environ.get("PLAN_EXECUTE_INTENT_FILE", ""))
-    ap.add_argument("--base", default=os.environ.get("PLAN_EXECUTE_REVIEW_BASE", ""),
-                    help="git ref the session started from. The reviewed surface "
-                         "becomes `git diff <base>` (commits AND working tree). "
-                         "Without it the surface is `git diff HEAD`, which is EMPTY "
-                         "for any session that committed its work.")
-    ap.add_argument("--plan-dir", default=os.environ.get("PLAN_EXECUTE_PLAN_DIR", ""),
-                    help="the plan directory this session belongs to. With it, "
-                         "untracked files under ANOTHER plan are not this "
-                         "session's surface. Unset means the scoping rule cannot "
-                         "be evaluated and does not fire.")
-    ap.add_argument("--session", default=os.environ.get("PLAN_EXECUTE_SESSION", ""),
-                    help="the session id. With it, another session's `_evidence/` "
-                         "is not this session's surface either.")
-    ap.add_argument("--exclude", default=os.environ.get("PLAN_EXECUTE_REVIEW_EXCLUDE", ""),
-                    help="Paths to REMOVE from the surface (comma/colon separated). The "
-                         "mirror of --scope: the land re-gate reviews the tree it is about "
-                         "to push, which carries the plan's own generated record, and an "
-                         "include-list cannot say 'everything but that'.")
-    ap.add_argument("--scope", default=os.environ.get("PLAN_EXECUTE_REVIEW_SCOPE", ""),
-                    help="comma/colon-separated path prefixes this session owns "
-                         "(the session spec's `review_scope`). The surface -- the "
-                         "diff AND the untracked list -- is restricted to them, so a "
-                         "CONCURRENT session's source cannot raise findings against "
-                         "this one. Empty means the whole tree, the old behaviour.")
-    ap.add_argument("--blocking-severity",
-                    default=os.environ.get("PLAN_EXECUTE_BLOCKING_SEVERITY", ""),
-                    help="comma/colon-separated severities that BLOCK. Anything below "
-                         "is recorded as advisory `noted` -- kept in the ledger, "
-                         "printed, carried forward, and never a reason to re-dispatch "
-                         "the session. Empty uses the ledger's floor "
-                         "(high,critical,blocker). Pass a longer list (e.g. "
-                         "'high,medium') for a session that wants a stricter gate.")
-    args = ap.parse_args(argv)
-    return args
+    """The gate's CLI lives in llm_review_args.py (moved 2026-10-10 at the 500-line bound)."""
+    return review_args.parse_args(argv, __doc__.splitlines()[0], LEVELS)
 
 
 def main(argv=None):
@@ -409,7 +358,9 @@ def _pick_reviewer(args, prepared, expected):
     if args.family == crb.FAMILY:
         return crb.backend(args, prepared)
     print(f"VERIFIER: on_box_claude\nREVIEWED_FILES: {expected}")
-    return run_once
+    if args.reviewer_model == "sonnet":
+        return run_once
+    return lambda prompt, cwd, timeout: run_once(prompt, cwd, timeout, model=args.reviewer_model)
 
 
 def _review(args, attempt_ms, attempt_usd):
@@ -422,7 +373,7 @@ def _review(args, attempt_ms, attempt_usd):
         return prepared
     led, base, changed, new_files, diff_file, expected = prepared
     prompt = build_prompt(args.level, intent, new_files, base, diff_file, len(changed),
-                          prior_section=led.section if led else "", cwd=args.cwd)
+                          prior_section=led.section if led else "", cwd=args.cwd) + policy.prompt_extra(args)
 
     notes = []
     try:
@@ -457,8 +408,10 @@ def _review(args, attempt_ms, attempt_usd):
                   f"reviewed_files={claimed}/{expected}")
             print(f"[intent-into-review] intent_block={'present' if intent else 'absent'} "
                   f"source=lane-b-verify findings_classified={count}")
-            fail, counts, recs = ledger.judge(led, ledger.findings_array(data.get("result")),
-                                              ledger.parse_floor(args.blocking_severity))
+            parsed = ledger.findings_array(data.get("result"))
+            fail, counts, recs = ledger.judge(led, parsed, ledger.parse_floor(args.blocking_severity))
+            fail, recs, moved = policy.apply(args, led, parsed, recs, fail)
+            print(policy.report(moved), end="")
             if led:
                 ledger.record(led, recs)
                 print(ledger.convergence_line(counts) + ledger.accepted_block(recs))

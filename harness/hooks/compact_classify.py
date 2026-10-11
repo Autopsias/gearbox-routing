@@ -75,3 +75,38 @@ def content_kind(text):
     if not PLANNING_SIGNALS.search(prose) or BUILD_SIGNALS.search(prose):
         return None
     return "planning"
+
+
+# v4: messages Claude Code and the harness send INTO a session
+# arrive on UserPromptSubmit like typed prompts. MEASURED over the policy files
+# that day: 44 sessions became sticky `planning` from a <task-notification>
+# (a finished background job's report reads as analysis prose), 18 more from
+# <agent-message>, <wake>, <relay>, <cross-session-message> and
+# <system-reminder>. One of them (5f9fce27) then had 1,124 auto-compactions
+# deferred to a ceiling of 818,063 tokens. Only the user's own words classify.
+# <pasted_content> and <bash-input> are the user's own input and stay.
+MACHINE_TAGS = (
+    "task-notification", "system-reminder", "agent-message", "wake",
+    "relay", "cross-session-message",
+)
+MACHINE_BLOCK = re.compile(
+    r"<(%s)\b[^>]*>.*?(?:</\1>|\Z)" % "|".join(map(re.escape, MACHINE_TAGS)), re.S
+)
+
+
+def own_words(text):
+    """The prompt with every machine-sent block removed (an unclosed one runs to the end)."""
+    return MACHINE_BLOCK.sub(" ", text or "").strip()
+
+
+def names_command(text, commands):
+    """A command named ANYWHERE in the user's words: "use /plan-harden on this" is planning.
+
+    The operator's rule: a session with /plan-builder or
+    /plan-harden is a planning session, not only one that OPENS with it
+    (measured: 6 sessions named one mid-sentence and stayed default). A path
+    (`skills/plan-builder/`) is not a command: the slash must start a token.
+    """
+    if any(marker in text for marker in DISPATCH_MARKERS):
+        return False
+    return any(re.search(r"(?<![\w/.~-])%s(?![\w-])" % re.escape(c), text) for c in commands)

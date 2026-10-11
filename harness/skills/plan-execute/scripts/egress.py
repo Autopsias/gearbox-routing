@@ -39,6 +39,8 @@ _EGRESS_ROOT_ENV = "PLAN_EXECUTE_EGRESS_ROOT"  # test override; default = cwd. T
 #
 # WHAT IS MATCHED (rewritten 2026-07-28 — was filename substrings):
 #   1. FILENAME — `.env*`, anywhere in the tree (full walk, symlinks followed).
+#      The Codex REVIEW gate reviews a clean copy with no `.env*` files in it
+#      (codex_review_egress.clean_copy), so this rule binds dispatch.
 #      Cheap, near-zero false positives, and a content scanner will NOT catch it:
 #      a `.env` full of plain KEY=value trips no secret rule (measured). A `.env`
 #      file is a decision, not a guess. Deliberately NOT git-scoped — `.env` is
@@ -74,6 +76,7 @@ _GIT_TIMEOUT_S = 60
 # that silently widens to the whole filesystem is the same defect class as a gate
 # that reports green: it looks like it ran, and it did — over the wrong thing.
 _SCANNED_BYTES_RE = re.compile(r"scanned ~(\d+) bytes")
+_COMMIT_PREFIX_RE = re.compile(r"^[0-9a-f]{40}:")  # gitleaks git-mode pin prefix
 # Compiled bytecode is not the reviewed surface. Two of the three findings on the
 # real repo above were `__pycache__/*.pyc` copies of ONE Python docstring. Nothing
 # a human would read as source is skipped — only build products of source we do
@@ -262,15 +265,20 @@ def _gitleaks_pin_budget(real_root):
         text = (Path(real_root) / ".gitleaksignore").read_text(encoding="utf-8")
     except OSError:
         return {}
-    budget = {}
+    budget, seen = {}, set()
     for ln in text.splitlines():
         ln = ln.strip()
         if not ln or ln.startswith("#"):
             continue
-        # `<path>:<rule>:<line>` — rsplit, because a path may contain a colon.
-        path, _, rule = ln.rpartition(":")[0].rpartition(":")
-        if not path or not rule:
-            continue          # malformed pin: forgives nothing, fails closed.
+        # `<path>:<rule>:<line>` — rsplit, because a path may contain a colon. A
+        # `gitleaks git` pin leads with `<commit sha>:`; it counts like any pin (the
+        # line is not a key, see above), and the SAME path:rule:line counts ONCE in
+        # either form, in any order (review: repeats multiplied the budget).
+        rest, _, line = _COMMIT_PREFIX_RE.sub("", ln).rpartition(":")
+        path, _, rule = rest.rpartition(":")
+        if not path or not rule or (path, rule, line) in seen:
+            continue          # malformed pin forgives nothing; a repeated one adds nothing.
+        seen.add((path, rule, line))
         budget[(path, rule)] = budget.get((path, rule), 0) + 1
     return budget
 
@@ -284,6 +292,7 @@ def _gitleaks_pass(exe, target, ignore_root, expected_bytes, link_root, allow,
         exe, "dir", target,               # ONE path argument. See _SCANNED_BYTES_RE.
         "--follow-symlinks",              # file symlinks; dir symlinks come in as extra roots
         "--no-banner", "--redact",
+        "--ignore-gitleaks-allow",        # an inline `gitleaks:allow` is the session's own say-so
         "--report-format", "json", "--report-path", "-",
         # Honor the SCANNED tree's own .gitleaksignore (not the orchestrator's
         # cwd, which gitleaks defaults to) — same false-positive workflow the
@@ -392,6 +401,28 @@ def _text_hit(text, name):
     return hit.replace(d + os.sep, "") if hit else None
 
 
+def _config_extends(real_root):
+    """gitleaks loads `<scanned root>/.gitleaks.toml`, whose `[extend] path` pulls in a
+    second file by ANY name — one a change could edit past the `.gitleaks*` name check
+    (security review, scanner-config parser differential). Refuse such a config,
+    or one that does not parse; no repo here uses `extend.path` (checked)."""
+    import tomllib
+
+    cfg = Path(real_root) / ".gitleaks.toml"
+    try:
+        data = tomllib.loads(cfg.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as e:
+        return f"{cfg} (the secret scan's config cannot be read: {type(e).__name__})"
+    # gitleaks reads keys case-INsensitively (`[Extend]`/`PATH` work; probed 8.30.0)
+    ext = {k.lower(): v for k, v in data.items()}.get("extend") or {}
+    ext = {k.lower(): v for k, v in ext.items()} if isinstance(ext, dict) else {"path": ext}
+    if ext.get("path") or ext.get("url"):
+        return f"{cfg} (the secret scan's config extends another file, which a change could edit)"
+    return None
+
+
 def _content_scan(real_root, extra_roots, allow):
     """First non-allowlisted gitleaks finding on the REVIEWED SURFACE of
     `real_root` (and under any out-of-tree symlinked directory), as a display
@@ -411,6 +442,9 @@ def _content_scan(real_root, extra_roots, allow):
     Findings are `--redact`ed: the refusal names the file, rule and line, never
     the secret itself (the message lands in run.ndjson and the orchestrator's
     transcript)."""
+    extends = _config_extends(real_root)
+    if extends:
+        return extends
     exe = shutil.which("gitleaks")
     if exe is None:
         return _NO_GITLEAKS
@@ -440,7 +474,8 @@ def _find_restricted(root, allow=frozenset()):
     (it rides the full-tree walk that also finds out-of-tree symlinked
     directories), then the content scan over the git-scoped surface. `allow` is
     the SSOT's per-file content allowlist; it never clears a `.env*`, which only a
-    whole-repo egress_opt_ins entry can.
+    whole-repo egress_opt_ins entry can. (The Codex REVIEW gate never meets one: it
+    reviews a clean copy without `.env*` files, codex_review_egress.clean_copy.)
 
     Measured on the 16 GB / 103,727-file plan repo, gitleaks 8.30.0:
     2.2 s walk + 1.0 s scan ≈ 3.4 s, against 6 min 5 s before the scoping.

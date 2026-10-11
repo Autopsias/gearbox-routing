@@ -535,7 +535,8 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   transcript). `/plan-execute` refuses `DONE` at `verify-finalize` until every
   listed path exists and is non-empty — a miss reworks/halts like a failed gate. May
   stand alone (no `gates`). Steer it onto sessions where a metric could move without
-  the mechanism truly engaging.
+  the mechanism truly engaging. A bug-fix session always sets it, with the failing
+  reproduction from before the edit and the passing run after it as the two paths.
 - **`checks`** (array of objects, optional) — **named evidence-artifact contracts** that
   turn a load-bearing hardening from prompt prose into a machine-readable requirement.
   Each item is `{"name": <str>, "evidence_path": <str>, "assert": <str, optional>}`:
@@ -594,6 +595,13 @@ This applies at every level, not just `agentic_build`. For a session whose
 `model` is a Codex token (`gpt-5.6-*`), keep `llm-review-<level>` unchanged —
 there, Claude reading the diff already IS the other family, so no substitution
 applies.
+The Claude reviewer is Sonnet from 2026-10-11 (`llm_review_gate.py
+--reviewer-model`, default `sonnet`; `opus` before that). In the 2026-10-10
+reviewer test (20 broken + 20 correct eval diffs,
+`~/.gearbox-state/eval/rev-calibration-20261010/`) Sonnet separated broken from correct
+diffs at least as well as Opus, at under half the list price. The Codex reviewer
+for Claude-built sessions is unchanged: the rule is two different model makers on
+every review.
 
 [HARDENED:codex-r0 V-1] **Never declare both gates on the same session.** A
 single session must not carry both `llm-review-<level>` and

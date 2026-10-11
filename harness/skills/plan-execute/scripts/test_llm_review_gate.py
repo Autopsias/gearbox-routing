@@ -401,3 +401,22 @@ def test_two_review_LEVELS_in_one_session_do_not_share_a_ledger(tmp_path, monkey
     import llm_review_ledger as ledger
     ctx = ledger.context(str(plan), "land.low.claude", str(repo), ["brand_new.py"])
     assert ctx.attempt == 2 and ledger.narrow_to_delta(ctx, [], [])[0] == set()
+
+
+def test_the_reviewer_model_flag_reaches_the_claude_argv(monkeypatch):
+    """2026-10-11 reviewer switch. PLANT: with no flag the argv is sonnet, the production pin
+    (a default that parses but never reaches `claude -p` would keep every gate on opus). ALLOW:
+    --reviewer-model opus still reaches the argv, for a gate that pins the old reviewer."""
+    seen = []
+
+    class _P:
+        returncode, stdout, stderr = 0, '{"result": "x"}', ""
+
+    monkeypatch.setattr(g.pg, "run", lambda argv, cwd, timeout: (seen.append(argv), _P())[1])
+    for flag, want in (([], "sonnet"), (["--reviewer-model", "opus"], "opus")):
+        args = g._parse_args(["--level", "medium", *flag])
+        args.family = "claude"
+        review = g._pick_reviewer(args, None, 0)
+        review("prompt", ".", 5)
+        assert seen[-1][seen[-1].index("--model") + 1] == want, seen[-1]
+        assert "--strict-mcp-config" in seen[-1], "the reviewer must start no MCP server"

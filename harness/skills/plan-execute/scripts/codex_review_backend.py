@@ -45,7 +45,8 @@ from pathlib import Path
 
 import llm_review_ledger as ledger
 from codex_review_events import quota_hit
-from codex_review_egress import _read, egress_reason, text_egress_reason  # noqa: F401
+from codex_review_egress import (_read, clean_copy, egress_reason, env_change_reason,  # noqa: F401
+                                 text_egress_reason)
 from codex_review_prompt import _norm, contract, prepared_paths  # noqa: F401
 
 #: Mirrors ``llm_review_gate.INDETERMINATE``; duplicated rather than imported
@@ -433,7 +434,7 @@ def run(prompt, cwd, timeout, args, led, prepared, workdir=None):
     return {"result": adapt(payload, prepared, led, args.level)}, "", False
 
 
-def _reviewer(args, led, paths, diff_file=None):
+def _reviewer(args, led, paths, diff_file=None, root=None):
     """The gate's review callable — and the ONE marker block for the whole run.
 
     THE DISPOSITION IS NOT KNOWN UNTIL CODEX HAS ANSWERED. A usage/quota refusal
@@ -463,7 +464,7 @@ def _reviewer(args, led, paths, diff_file=None):
                 said.append("degraded")
                 degrade(args, led, "cross_family", reason)
                 return None, reason
-        data, note, quota = run(prompt, cwd, timeout, args, led, paths)
+        data, note, quota = run(prompt, root or cwd, timeout, args, led, paths)  # the copy
         if not said:
             if quota:
                 said.append("degraded")
@@ -489,10 +490,11 @@ def backend(args, prepared_surface):
     """
     led, _base, changed, new_files, diff_file, _expected = prepared_surface
     paths = prepared_paths(args.cwd, changed, new_files)
-    reason = egress_reason(args.cwd)
+    root = clean_copy(args.cwd) or args.cwd       # what Codex sees: no `.env*`, no links
+    reason = env_change_reason(list(changed) + list(new_files), diff_file) or egress_reason(root)
     if reason:
         return degrade(args, led, "cross_family", reason)
     ok, why = availability()
     if not ok:
         return degrade(args, led, "cross_family_unavailable", why)
-    return _reviewer(args, led, paths, diff_file)
+    return _reviewer(args, led, paths, diff_file, root)

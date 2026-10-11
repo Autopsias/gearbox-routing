@@ -91,6 +91,18 @@ the **class default** cell `{model, reasoning}`.
 
 No new lane detection is written; `provider_lane.effective_provider` is reused.
 
+**Build canary (2026-10-11, operator decision).** One exception to the class
+default, still decided here and not by the author: a session that plan-builder
+marked with `routing_experiment: {kind: "canary", proposal_id}` from
+`plan-builder/references/build-canaries.json` gets that canary's cell while the
+canary still wants cohorts on this provider (`build_canary.dispatch_cell`, which
+reads the outcome ledger). Once the canary stops (smoke failed, N≥10, or set
+inactive) the session gets its class default, and the ledger records it untagged
+(`route_at_dispatch.experiment`). The canary cell is frozen exactly like a class
+default, with `canary: <proposal_id>` on the freeze. plan-builder never writes a
+model for a canary, because a written model is an override and §3.1 would never
+run for it.
+
 ### 3.2 After resolution nothing changes
 
 Tier-agent selection (`_translate_claude_token`), the zai clamp

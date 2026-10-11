@@ -165,6 +165,10 @@ def _resolve(plan_dir, session, provider, resolver, ssot_path, version):
     if cur:
         print(f"route-at-dispatch: {sid} was frozen for provider {cur.get('provider')!r} but now "
               f"runs on {provider!r} — resolving its class default there.", file=sys.stderr)
+    canary = _canary(session, provider)
+    if canary:  # frozen like a class default: one decision per generation, on this lane
+        return {"model": canary[0], "reasoning": canary[1], "routing_version": version,
+                "provider": provider, "task_class": tc, "canary": canary[2]}
     try:
         got = resolver().resolve(tc, provider, ssot_path=ssot_path)
     except Exception as e:  # noqa: BLE001 — any gap is a refusal, never an inherit
@@ -175,6 +179,35 @@ def _resolve(plan_dir, session, provider, resolver, ssot_path, version):
                        f"(got {got!r})")
     return {"model": got["model_id"], "reasoning": got.get("native_effort") or "",
             "routing_version": version, "provider": provider, "task_class": tc}
+
+
+def _canary(session, provider):
+    """plan-builder's build canary (build_canary.py), asked AT DISPATCH so the model is still
+    chosen here: ``(model, reasoning, proposal_id)`` while the session's canary runs, else
+    None. Any failure to ask is None — the session gets its class default."""
+    if not (session.get("routing_experiment") or {}).get("proposal_id"):
+        return None
+    try:
+        if str(_BUILDER) not in sys.path:
+            sys.path.insert(0, str(_BUILDER))
+        import build_canary  # noqa: PLC0415 — only a tagged session needs it
+
+        return build_canary.dispatch_cell(session, provider)
+    except Exception as e:  # noqa: BLE001 — a canary is optional; begin is not
+        print(f"route-at-dispatch: {session['id']} canary check failed ({e}); class default",
+              file=sys.stderr)
+        return None
+
+
+def experiment(plan_dir, manifest, session):
+    """The ``routing_experiment`` the ledger records. An unpinned v8 session's tag counts only
+    when `begin` froze ITS canary cell: a canary that stopped before dispatch leaves the tag on
+    the manifest, but the session ran its class default and is an ordinary cohort."""
+    rx = session.get("routing_experiment")
+    if not rx or not (is_v8(manifest) and not pinned(session) and switch_on(plan_dir)):
+        return rx
+    rec = frozen_cell(plan_dir, session["id"]) or {}
+    return rx if rec.get("canary") == rx.get("proposal_id") else None
 
 
 def _override_refusal(session, provider, normalize, codex_route, reasoning_tier):
@@ -344,7 +377,9 @@ def receipt(plan_dir, manifest, by_id, batch):
         if pinned(s):
             why = f"override: {s.get('why_model') or '(no why_model)'}"
         else:
-            why = f"class default, routing v{(frozen_cell(plan_dir, m['id']) or {}).get('routing_version')}"
+            rec = frozen_cell(plan_dir, m["id"]) or {}
+            why = (f"routing canary {rec['canary']}" if rec.get("canary") else "class default") \
+                + f", routing v{rec.get('routing_version')}"
         esc = m.get("escalated_from")
         if esc:
             base = esc["authored"]

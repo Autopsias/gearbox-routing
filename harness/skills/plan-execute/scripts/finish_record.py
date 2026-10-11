@@ -24,7 +24,8 @@ from pathlib import Path
 
 import land_brief as lb
 import worktree as wt
-from finish_paths import Linked, Park, _exe, lstat_inside, read_inside, refuse_special  # noqa: F401
+from finish_paths import (Linked, Park, _exe, end_with_newline,  # noqa: F401
+                          lstat_inside, read_inside, refuse_special)
 from land_state import MAX_RESYNC, is_stale, rev
 from plan_record import RUNTIME_LOCAL
 from worktree import git
@@ -137,13 +138,15 @@ def _staged(tmp, rel, *against):
     return staged
 
 
-def _copy_record(tmp, plan_dir, files, ignored):
+def _copy_record(tmp, plan_dir, files, ignored, apply):
     """Copy each non-ignored record file into ``tmp``; return the paths written."""
     touched = []
     for path, inner in files.items():
         if path in ignored:
             continue
         try:
+            if apply:
+                end_with_newline(plan_dir, inner)
             live, exe = read_inside(plan_dir, inner), _exe(plan_dir, inner)
         except Linked as e:
             raise e.under(path[:-len(inner) - 1]) from None   # repo-relative
@@ -156,7 +159,7 @@ def _copy_record(tmp, plan_dir, files, ignored):
     return touched
 
 
-def stage_record(tmp, plan_dir, root, rel):
+def stage_record(tmp, plan_dir, root, rel, apply=False):
     """Stage the record in ``tmp``; return ``{path: bytes}`` of what is staged."""
     slug = Path(rel).name
     touched = [GITIGNORE] if _gitignore(tmp) else []
@@ -169,7 +172,7 @@ def stage_record(tmp, plan_dir, root, rel):
     for path in files:
         lstat_inside(tmp, path)       # a link in origin's tree parks before git reads it
     ignored = _ignored(tmp, list(files), "--no-index")   # tracked runtime too
-    touched += _copy_record(tmp, plan_dir, files, ignored)
+    touched += _copy_record(tmp, plan_dir, files, ignored, apply)
     # A tracked record file gone from the plan dir is removed; runtime-local and
     # ignored files are never part of the record, so their absence changes nothing.
     tracked = git(["ls-files", "-z", "--", rel + "/"], tmp, strip=False)[1].split("\0")
@@ -280,7 +283,7 @@ def record(plan_dir, ctx, origin_sha, *, apply, lease_ok):
         tmp = None
         try:
             tmp = _temp_tree(root, slug, expected)
-            staged = stage_record(tmp, plan_dir, root, rel)
+            staged = stage_record(tmp, plan_dir, root, rel, apply)
             res["paths"] = sorted(staged)
             if not staged:
                 return {**res, "status": "already-recorded"}, expected, {}

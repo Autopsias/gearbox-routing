@@ -160,7 +160,7 @@ def test_the_claude_reviewer_is_pinned_and_never_inherits_the_session_model(monk
     monkeypatch.setattr(g.pg, "run", fake_run)
     g.run_once("p", ".", 1)
     i = seen["argv"].index("--model")
-    assert seen["argv"][i + 1] == "opus"
+    assert seen["argv"][i + 1] == "sonnet"   # the pin since 2026-10-11 (opus before)
 
 
 def test_no_plan_dir_logs_nothing_rather_than_raising():

@@ -164,11 +164,12 @@ def test_unbound_cell_names_the_agent_with_no_effort_key(tmp_path, monkeypatch):
 
 
 def test_low_effort_dispatch_carries_the_fable51_guidance(tmp_path):
-    """`reasoning: low` has no tier agent for sonnet (falls to the advisory
+    """`reasoning: low` has no tier agent for fable (falls to the advisory
     branch) AND `_REASONING_DIRECTIVE['low']` is the empty string — the exact
     combination that skipped the wrapper line before this session's fix, so the
-    guidance must not be riding on that prepend."""
-    sess = {"id": "s01", "title": "S1", "items": ["it-1"], "model": "Sonnet",
+    guidance must not be riding on that prepend. (Sonnet was the model here until
+    routing v37 gave sonnet@low its own tier agent, tier-sonnet-low.)"""
+    sess = {"id": "s01", "title": "S1", "items": ["it-1"], "model": "Fable",
             "reasoning": "low", "task_class": "mechanical", "prompt": "do the small thing"}
     member = _dispatch_one(tmp_path, sess)
     assert member["effort_mechanism"] == "prompt_directive_advisory"  # sanity: the fallback

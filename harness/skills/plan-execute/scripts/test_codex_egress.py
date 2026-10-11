@@ -495,3 +495,41 @@ def test_restricted_tree_claude_executor_gets_on_box_verification(
     run.cmd_release(plan_dir)
 
 
+# --------------------------------------------------------------------------
+# GIT-MODE PINS. `gitleaks git` writes `<commit sha>:<path>:<rule>:<line>`.
+# example-project writes nearly all its pins that way, and the reader took the sha as
+# part of the path, so none matched. A sha pin now counts like any pin (the line
+# is not a key, so a fixture that moves stays pinned), but the SAME line pinned
+# in many commits, or in both forms, counts ONCE.
+# --------------------------------------------------------------------------
+def test_a_commit_prefixed_pin_is_honoured_and_repeats_count_once(tmp_path, capsys, ssot,
+                                                                  egress_root):
+    leak = _plant_secret(egress_root / "tests" / "fixture_key.py")
+    ssot("anthropic")
+
+    def plan(name):
+        (tmp_path / name).mkdir()
+        return make_plan(tmp_path / name, _codex_session())
+
+    reason = _refuses(plan("p1"), capsys)
+    rule, line = re.search(r"gitleaks rule (\S+), line (\d+)\)", reason).groups()
+    rel = leak.relative_to(egress_root)
+    sha_a, sha_b = "cb9b08bf" * 5, "8dfc15cd" * 5
+    ignore = egress_root / ".gitleaksignore"
+    # PLANT: a prefix that is not a 40-hex sha stays part of the path and forgives nothing
+    ignore.write_text(f"notasha:{rel}:{rule}:{line}\n")
+    assert "fixture_key.py" in _refuses(plan("p2"), capsys)
+    # ALLOW: a sha pin forgives it, even after the finding MOVED (pinned at another line)
+    ignore.write_text(f"{sha_a}:{rel}:{rule}:{int(line) + 7}\n")
+    by_id, _ = _begin(plan("p3"), ["s01"], capsys)
+    assert by_id["s01"]["backend"] == "codex"
+    # the same line in two commits counts ONCE; two distinct lines count twice; the
+    # plain form still counts per line (Codex's probe: three historical pins of one
+    # fixture had forgiven three findings)
+    ignore.write_text(f"{sha_a}:{rel}:{rule}:{line}\n{sha_b}:{rel}:{rule}:{line}\n"
+                      f"{sha_b}:{rel}:{rule}:99\n{rel}:{rule}:{int(line) + 1}\n{rel}:{rule}:{int(line) + 1}\n")
+    assert egress._gitleaks_pin_budget(egress_root) == {(str(rel), rule): 3}
+    # the same line in BOTH forms counts once, whichever comes first (security review)
+    for text in (f"{rel}:{rule}:5\n{sha_a}:{rel}:{rule}:5\n", f"{sha_a}:{rel}:{rule}:5\n{rel}:{rule}:5\n"):
+        ignore.write_text(text)
+        assert egress._gitleaks_pin_budget(egress_root) == {(str(rel), rule): 1}, text

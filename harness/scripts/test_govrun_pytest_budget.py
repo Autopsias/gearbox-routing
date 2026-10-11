@@ -776,3 +776,20 @@ def test_an_inline_assignment_replaces_the_exported_one(monkeypatch):
     monkeypatch.setenv("PYTEST_ADDOPTS", "-n 8")
     assert refused("pytest"), "control: the exported value alone is over budget"
     assert not refused("PYTEST_ADDOPTS=-n2 pytest")
+
+
+@pytest.mark.parametrize("argv,refused", [
+    ("uv run --all-extras pytest tests/unit -n 8 -q", True),     # example-project's gate
+    ("uv run --with pytest-xdist pytest -n 8", True),           # a value-taking runner flag
+    ("uv run --all-extras -m pytest -n 8", True),
+    ("uv run --frozen python -m pytest -n 8", True),
+    ("uv run --all-extras pytest -n 4", False),                 # CONTROL: within the budget
+    ("uv run --all-extras ruff check", False),                  # CONTROL: not pytest
+])
+def test_runner_options_before_the_payload_do_not_hide_pytest(argv, refused):
+    from govrun_pytest_budget import check_budget
+    if refused:
+        with pytest.raises(Refused):
+            check_budget(argv.split(), BUDGET)
+    else:
+        check_budget(argv.split(), BUDGET)

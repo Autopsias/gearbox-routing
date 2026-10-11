@@ -1,0 +1,9 @@
+{
+  "_note": "Operator decision: plan-builder writes these canaries into a NEW plan's matching build sessions in any repo (build_canary.py). A canary stops by itself when the outcome ledger shows smoke-failed, or once it reaches N>=10 cohorts (time to judge it at /routing-retro). Set active:false to stop one by hand. Evidence and judging rules: projects/-Users-USER-your-private-harness/memory/sonnet-climb-canary-armed.md.",
+  "canaries": [
+    {"proposal_id": "sonnet-low-std-20261010", "task_class": "standard_build", "provider": "anthropic",
+     "model": "sonnet", "reasoning": "low", "max_rework": 4, "active": true},
+    {"proposal_id": "sonnet-low-agentic-20261010", "task_class": "agentic_build", "provider": "anthropic",
+     "model": "sonnet", "reasoning": "low", "max_rework": 4, "active": true}
+  ]
+}

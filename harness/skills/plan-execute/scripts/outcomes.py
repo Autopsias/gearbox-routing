@@ -188,7 +188,7 @@ def _routing_provenance(plan_dir, session, task_class, backend, model_authored, 
     to `pinned_override` rather than guessing "default" — a false "pinned" is a
     missed data point; a false "default" corrupts the class-default calibration
     the aggregator computes from this field."""
-    if session.get("routing_experiment"):
+    if rad.experiment(plan_dir, manifest, session):
         return "experimental"
     v8 = rad.provenance(manifest, session)
     if v8:
@@ -344,7 +344,7 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
         "usage": attestation.ledger_usage(_fresh_receipt(plan_dir, session_id, generation)),
         "degraded_from": degraded_from,
         "escalated_from": escalated_from,
-        "routing_experiment": session.get("routing_experiment"),
+        "routing_experiment": rad.experiment(plan_dir, manifest, session),
         "routing_provenance": _routing_provenance(
             plan_dir, session, task_class, backend, model_authored, reasoning_authored,
             manifest=manifest,

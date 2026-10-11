@@ -501,8 +501,9 @@ def test_a_restricted_tree_starts_NO_reviewer_of_EITHER_family(
         tmp_path, monkeypatch, shim, real_egress, capsys):
     """GATE-02 end to end, through the REAL guard, with BOTH families on PATH.
 
-    A `.env` file is the filename rule, which fires before the content scan, so
-    the refusal half holds on a box without gitleaks too.
+    A live-shaped token in a REVIEWED file: since 2026-10-11 a `.env` never reaches the
+    clean copy Codex reviews, so content is the restriction. A box without gitleaks
+    refuses too (the missing scanner fails closed), so the refusal half holds anyway.
 
     And the disposition is `on_box_human`, NOT a quiet re-run of the Claude
     reviewer: the SSOT's restricted_repos clause wants an explicit
@@ -517,7 +518,7 @@ def test_a_restricted_tree_starts_NO_reviewer_of_EITHER_family(
     otherwise can skip, or be deleted, taking the meaning of this one with it.
     """
     tree = _tree(tmp_path)
-    (tree / ".env").write_text("SOMETHING=1\n")
+    (tree / "a.py").write_text('T = "ghp' + '_' + __import__("secrets").token_hex(18) + '"\n')
     monkeypatch.setenv("PLAN_EXECUTE_EGRESS_ROOT", str(tree))
     monkeypatch.setenv("CODEX_SHIM_OUT", _answer([]))
     claude = _claude_shim(tmp_path, monkeypatch)
@@ -527,7 +528,7 @@ def test_a_restricted_tree_starts_NO_reviewer_of_EITHER_family(
     out = capsys.readouterr().out
     assert rc == g.INDETERMINATE, out
     assert "DEGRADED_FROM: cross_family" in out and "VERIFIER: on_box_human" in out
-    assert ".env" in out, "the stamp must name the guard's own reason"
+    assert "a.py" in out or "gitleaks" in out, "the stamp must name the guard's own reason"
     # NOTHING WAS SENT. The identity line probes `codex --version` before the
     # guard is consulted — a probe that ships no tree anywhere — so what is
     # asserted is that the REVIEW, the invocation that WOULD, never started.
@@ -543,7 +544,7 @@ def test_a_restricted_tree_starts_NO_reviewer_of_EITHER_family(
 
     # PAIRED POSITIVE 1 — the SAME shim, the SAME PATH, the tree no longer
     # restricted: it records a review and the gate returns a verdict.
-    (tree / ".env").unlink()
+    (tree / "a.py").write_text("x = 2\n")
     if shutil.which("gitleaks") is None:
         # The filename half needs no scanner; clearing a CLEAN tree does, and a
         # skipped positive is a lost pairing. Pinned open for this half only —

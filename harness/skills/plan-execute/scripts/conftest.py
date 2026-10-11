@@ -130,3 +130,11 @@ def _no_ambient_provider_env(monkeypatch):
     """
     monkeypatch.delenv(provider_lane.PROVIDER_ENV, raising=False)
     monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_build_canary(monkeypatch):
+    """plan-builder's build_canary tags a NEW plan's build sessions from the LIVE outcome
+    ledger, so a fixture plan built here would change shape whenever a canary is armed.
+    test_route_at_dispatch_e2e.py passes this key into its own whitelisted env."""
+    monkeypatch.setenv("PLAN_BUILDER_BUILD_CANARY", "off")

@@ -200,6 +200,22 @@ def test_opus_low_experiment_tier_resolves(tmp_path):
     )
 
 
+def test_sonnet_low_canary_tier_resolves_on_the_anthropic_lane(tmp_path):
+    """v37: sonnet@low is the starting rung of the Sonnet-climb build
+    canary. Before v37 only the zai lane mapped it, so an anthropic-lane canary session
+    ran unbound and the retro dropped it as effort_unbound. PLANT: no definition file ->
+    None. ALLOW: file present -> tier-sonnet-low on the default (anthropic) lane."""
+    empty = Path(tmp_path) / "empty"
+    empty.mkdir()
+    assert run._tier_agent("sonnet", "low", agent_dir=empty) is None, (
+        "PLANT FAILED: sonnet low resolved with no definition file on disk"
+    )
+    present = _agent_dir(tmp_path, ["tier-sonnet-low"])
+    assert run._tier_agent("sonnet", "low", agent_dir=present) == "tier-sonnet-low", (
+        "ALLOW CONTROL FAILED: sonnet low did not resolve to tier-sonnet-low"
+    )
+
+
 def test_every_mapped_tier_has_a_real_definition_shipped():
     """The table is only useful if the files it names are actually deployed. This is
     the check that fails when someone adds a table row and forgets the agent file
@@ -244,6 +260,7 @@ def main():
         test_unmapped_tiers_do_not_resolve,
         test_fable_escalation_apex_pairs_resolve,
         test_opus_low_experiment_tier_resolves,
+        test_sonnet_low_canary_tier_resolves_on_the_anthropic_lane,
         test_frontmatter_parse_check_catches_the_unquoted_colon,
         test_every_mapped_tier_has_a_real_definition_shipped,
         test_reasoning_directive_still_covers_every_tier,

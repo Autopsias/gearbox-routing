@@ -595,6 +595,24 @@ round you add with `add-session` takes the findings of both reviews.
 This replaces the old recommendation to run `claude ultrareview` at plan close
 (operator decision): it billed $5–25 per run, and nobody ran it.
 
+### Canary review policy — `*-canary` gates
+
+`llm-review-low-canary`, `llm-review-medium-canary`, `cross-family-review-low-canary` and
+`cross-family-review-medium-canary` are the production gates plus
+`--stop-after-round 2 --require-repro` (`scripts/llm_review_policy.py`). From attempt 3, a NEW
+blocking finding in the fix delta is recorded `noted` with `policy: followup` (not blocking: record
+it as a follow-up). A NEW blocking finding with no `repro` (a failing test, or a command and its
+observed output) is LABELLED `policy: unproven` and STILL BLOCKS: clearing it would let the reviewed
+diff or the intent text tell the reviewer to omit `repro` and so clear every block (security review,
+2026-10-10). Open priors and findings in the session's original work still block. The gate prints
+every relabelled finding under `[review-policy]`.
+
+Why: a review audit of 1,131 verified sessions found that 66% of failed attempts
+failed only on a review gate, 385 of 811 high findings sat in code written to fix an earlier
+finding, and 162 sessions ended at their rework cap instead of on a verdict. A plan opts in by
+naming the `-canary` gate instead of the production one. Judge it on first-attempt pass rate,
+rounds per session, and how many moved findings were real defects, before widening it.
+
 ## Cross-family review — `cross-family-review-low|medium|high` (added)
 
 Same three levels, same argv wrapper (`scripts/llm_review_gate.py`), same
@@ -633,6 +651,34 @@ harness-side park, session s05):**
   `DEGRADED_FROM: cross_family_unavailable` (codex unusable), writes
   `_verify_state/<sid>.degraded.json`, and exits 2 (the gate's declared
   `indeterminate_exit`).
+- **The review gate reviews a clean copy (2026-10-11, operator decision):**
+  `codex_review_egress.clean_copy` hard-links the reviewed surface
+  (git-tracked plus untracked-not-ignored files) into a private temp dir,
+  leaving out every `.env*` path and every symlink, and Codex runs there. The
+  tree scan runs on that copy, so a committed `.env.example` no longer blocks a
+  review in any repo; a real secret in a reviewed file still does. Because
+  Codex's read-only sandbox can read any file on the machine (measured
+  2026-10-11), an UNTRACKED `.env*` in the original tree (a real secrets file)
+  still refuses the review: plan worktrees never hold one, main checkouts
+  usually do. A per-repo `egress_opt_ins` entry still applies. A change that
+  edits a `.env*` path or `.gitleaksignore` (the scan's pin file) is refused
+  before any review: a person reviews it, never Codex. Edits to any `.gitleaks*`
+  file (pins or the repo's scan config) are refused the same way, and the scan
+  ignores inline `gitleaks:allow` comments.
+  **Known limit, accepted by the operator 2026-10-11:** a plan worktree lives
+  inside the main checkout (`<repo>/.plan-worktrees/<plan>`), so the main
+  checkout's real `.env` sits a few folders above it and passes no check here.
+  Codex can read any file on the machine when it knows the path; the review
+  prompt never names the main folder. Refusing these trees would end Codex
+  reviews for every repo that keeps a real `.env`, for little gain over the
+  machine-wide limit (`~/.aws` and other repos are equally reachable). The real
+  fix is keeping secrets out of the repos. A non-git tree is reviewed
+  in place under the strict rule. Codex executor dispatch is unchanged.
+  **Triage rule for further security findings on this guard (operator,
+  2026-10-11, after five background reviews each found a narrower gap):** fix a
+  finding only when it is HIGH or affects a real repo today; log any other one
+  here, one line each, and tell the operator in one line. Logged, not fixed:
+  - (none yet)
 - **What that exit 2 does, landed (session s05):** `verify.py`'s
   `_run_gate` routes it to `rework._indeterminate`'s split in
   `verifier_park.indeterminate()`. The marker IS read — the FIRST

@@ -206,5 +206,113 @@
     },
     "_note": "ADDED (cross-family-review-gate WIRE-01). Reuses llm-review-*'s own registry timeouts LEVEL FOR LEVEL -- each cross-family level carries the same inner/outer pair as its llm-review-* twin (low 1200/2400, medium 1800/4000, high 1500/3120) -- rather than sizing from the live smoke measurement: s01b's CODEX_LIVE=1 run (real `codex exec`, planted eval() defect, _evidence/s01b/live-smoke.txt) measured 30-131s per level on a 1-file/8-line diff -- comfortably inside every one of these budgets -- but that diff is a fixture, not a real session surface. Real sessions in this plan's own ledger run 16->32 and 41->47 files; llm-review-*'s numbers were raised from MEASURED multi-file surfaces (46 files exceeding 900s twice, see llm-review-medium's _note) and the review shape (one headless CLI call against a scoped diff file) is identical between the two reviewer families, so borrowing those numbers sizes for the largest surface this plan can justify rather than the smallest it measured. Distinct from code-review-gate and llm-review-* ON PURPOSE: code-review-gate is the deterministic pytest/lint gate; llm-review-* is the on-box (Claude) reviewer; cross-family-review-* is the SAME review contract routed to codex via --reviewer. If a real run ever times out, raise from a MEASURED multi-file run per level, exactly as llm-review-*'s history did, and keep the pair equal to its llm-review-* twin unless a measurement says otherwise. REGISTRY HOME, measured: these three ids live in THIS bundled default ONLY -- the gearbox project copy `.claude/eval-gates.json` carries `code-review-gate` and the three `llm-review-*` ids and none of the cross-family ones. That is deliberate, not an omission: `shipping._load_registry` merges bundled-then-project, so a bundled-only id resolves everywhere while a project entry still wins where one exists. If a project copy ever DOES add these ids, land the same number in both (see verify-gates.md's two-registries note).",
     "indeterminate_exit": 2
+  },
+  "llm-review-low-canary": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --stop-after-round 2 --require-repro --timeout 1200"
+    ],
+    "cwd": ".",
+    "timeout": 2400,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_REVIEW_BASE",
+      "PLAN_EXECUTE_PLAN_DIR",
+      "PLAN_EXECUTE_SESSION",
+      "PLAN_EXECUTE_REVIEW_SCOPE",
+      "PLAN_EXECUTE_REVIEW_EXCLUDE",
+      "PLAN_EXECUTE_HARNESS",
+      "PLAN_EXECUTE_ROUTING_SSOT"
+    ],
+    "success_criteria": "Same contract as `llm-review-low`, plus the canary review policy in _note.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=low verdict=empty findings=0 (fixture)"
+    },
+    "_note": "CANARY 2026-10-10 (review audit, owner-approved direction): the production gate of the same level plus `--stop-after-round 2 --require-repro` (llm_review_policy.py). From attempt 3 a NEW blocking finding in the fix delta is recorded `noted` (policy=followup); a NEW blocking finding with no `repro` is LABELLED policy=unproven and still blocks (label only: reviewer output must never clear a finding). Open priors and original-work findings still block. A plan opts in by naming this gate instead of the production one. Measure before widening: first-attempt pass rate, rounds per session, and how many followup/unproven findings were real.",
+    "indeterminate_exit": 2
+  },
+  "llm-review-medium-canary": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --stop-after-round 2 --require-repro --timeout 1800"
+    ],
+    "cwd": ".",
+    "timeout": 4000,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_REVIEW_BASE",
+      "PLAN_EXECUTE_PLAN_DIR",
+      "PLAN_EXECUTE_SESSION",
+      "PLAN_EXECUTE_REVIEW_SCOPE",
+      "PLAN_EXECUTE_REVIEW_EXCLUDE",
+      "PLAN_EXECUTE_HARNESS",
+      "PLAN_EXECUTE_ROUTING_SSOT"
+    ],
+    "success_criteria": "Same contract as `llm-review-medium`, plus the canary review policy in _note.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=medium verdict=empty findings=0 (fixture)"
+    },
+    "_note": "CANARY 2026-10-10 (review audit, owner-approved direction): the production gate of the same level plus `--stop-after-round 2 --require-repro` (llm_review_policy.py). From attempt 3 a NEW blocking finding in the fix delta is recorded `noted` (policy=followup); a NEW blocking finding with no `repro` is LABELLED policy=unproven and still blocks (label only: reviewer output must never clear a finding). Open priors and original-work findings still block. A plan opts in by naming this gate instead of the production one. Measure before widening: first-attempt pass rate, rounds per session, and how many followup/unproven findings were real.",
+    "indeterminate_exit": 2
+  },
+  "cross-family-review-low-canary": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --reviewer codex --stop-after-round 2 --require-repro --timeout 1200"
+    ],
+    "cwd": ".",
+    "timeout": 2400,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_REVIEW_BASE",
+      "PLAN_EXECUTE_PLAN_DIR",
+      "PLAN_EXECUTE_SESSION",
+      "PLAN_EXECUTE_REVIEW_SCOPE",
+      "PLAN_EXECUTE_REVIEW_EXCLUDE",
+      "PLAN_EXECUTE_HARNESS",
+      "PLAN_EXECUTE_ROUTING_SSOT"
+    ],
+    "success_criteria": "Same contract as `cross-family-review-low`, plus the canary review policy in _note.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=low verdict=empty findings=0 reviewer=codex (fixture)"
+    },
+    "_note": "CANARY 2026-10-10 (review audit, owner-approved direction): the production gate of the same level plus `--stop-after-round 2 --require-repro` (llm_review_policy.py). From attempt 3 a NEW blocking finding in the fix delta is recorded `noted` (policy=followup); a NEW blocking finding with no `repro` is LABELLED policy=unproven and still blocks (label only: reviewer output must never clear a finding). Open priors and original-work findings still block. A plan opts in by naming this gate instead of the production one. Measure before widening: first-attempt pass rate, rounds per session, and how many followup/unproven findings were real.",
+    "indeterminate_exit": 2
+  },
+  "cross-family-review-medium-canary": {
+    "kind": "argv",
+    "argv": [
+      "/bin/sh",
+      "-c",
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --reviewer codex --stop-after-round 2 --require-repro --timeout 1800"
+    ],
+    "cwd": ".",
+    "timeout": 4000,
+    "env_allowlist": [
+      "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_REVIEW_BASE",
+      "PLAN_EXECUTE_PLAN_DIR",
+      "PLAN_EXECUTE_SESSION",
+      "PLAN_EXECUTE_REVIEW_SCOPE",
+      "PLAN_EXECUTE_REVIEW_EXCLUDE",
+      "PLAN_EXECUTE_HARNESS",
+      "PLAN_EXECUTE_ROUTING_SSOT"
+    ],
+    "success_criteria": "Same contract as `cross-family-review-medium`, plus the canary review policy in _note.",
+    "fixture_fake": {
+      "returncode": 0,
+      "stdout": "[llm-review-gate] level=medium verdict=empty findings=0 reviewer=codex (fixture)"
+    },
+    "_note": "CANARY 2026-10-10 (review audit, owner-approved direction): the production gate of the same level plus `--stop-after-round 2 --require-repro` (llm_review_policy.py). From attempt 3 a NEW blocking finding in the fix delta is recorded `noted` (policy=followup); a NEW blocking finding with no `repro` is LABELLED policy=unproven and still blocks (label only: reviewer output must never clear a finding). Open priors and original-work findings still block. A plan opts in by naming this gate instead of the production one. Measure before widening: first-attempt pass rate, rounds per session, and how many followup/unproven findings were real.",
+    "indeterminate_exit": 2
   }
 }

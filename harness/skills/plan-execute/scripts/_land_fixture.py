@@ -51,7 +51,7 @@ def _built_plan(root, slug):
                         "anchor_goal": {"name": "c", "tagline": "d"}}},
         d, project_root=str(root))
     m = json.loads((d / "manifest.json").read_text())
-    (d / "manifest.json").write_text(json.dumps({**m, "plan_schema_version": 7}, indent=2))
+    (d / "manifest.json").write_text(json.dumps({**m, "plan_schema_version": 7}, indent=2) + "\n")
     return d
 
 
@@ -86,7 +86,7 @@ def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False):
         (d / "PLAN.html").write_text("<html>base</html>\n")
         (d / "manifest.json").write_text(json.dumps(
             {"plan_schema_version": 7,
-             "sessions": [{"id": "s01", "verify": {"gates": ["marker-gate"]}}]}))
+             "sessions": [{"id": "s01", "verify": {"gates": ["marker-gate"]}}]}) + "\n")
         plans[slug] = d
     git(["init", "-q", "-b", "main", "."], root, check=True)
     git(["config", "user.email", "t@example.com"], root, check=True)
