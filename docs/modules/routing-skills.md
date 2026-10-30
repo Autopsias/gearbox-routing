@@ -35,8 +35,19 @@ session.
 **If you use the plan pipeline**, take the harness copies instead:
 
 ```bash
-mkdir -p ~/.claude/skills
+mkdir -p ~/.claude/skills ~/.claude/hooks
 cp -R harness/skills/routing-retro harness/skills/routing-update ~/.claude/skills/
+cp harness/hooks/dispatch-audit.py ~/.claude/hooks/ && chmod +x ~/.claude/hooks/dispatch-audit.py
+```
+
+The harness `routing-retro` needs the `dispatch-audit.py` hook. The hook records
+the model and effort that each subagent dispatch asks for, in
+`~/.dyno/routing/dispatch-audit.ndjson`, and `/routing-retro` reads that log. The
+hook never blocks a dispatch. `./install-module routing-skills` adds this to
+`~/.claude/settings.json` for you. By hand: merge this into the `hooks` block.
+
+```json
+{"hooks": {"PreToolUse": [{"matcher": "Agent", "hooks": [{"type": "command", "command": "~/.claude/hooks/dispatch-audit.py"}]}]}}
 ```
 
 ## Check it works
@@ -49,7 +60,10 @@ the misroute ledger, and only if you confirm an entry.
 
 ```bash
 rm -r ~/.claude/skills/routing-retro ~/.claude/skills/routing-update
+rm ~/.claude/hooks/dispatch-audit.py
 ```
+
+Run `./install-module --remove routing-skills` first to take the hook out of `settings.json`.
 
 ## Cautions
 

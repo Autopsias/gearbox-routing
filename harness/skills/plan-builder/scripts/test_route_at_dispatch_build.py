@@ -35,6 +35,14 @@ REPO = Path(__file__).resolve().parents[3]
 # comparison would pass on nothing and the v8 positive control would fail.
 PRE_V8_BUILDER = "e14bd6dd25b2a42000047108684496177b791a34"
 
+# The public export has neither this history nor the source repo's routing policy
+# (it ships an example policy), so the tests that pin either one skip there.
+_IN_SOURCE_REPO = subprocess.run(
+    ["git", "-C", str(REPO), "cat-file", "-e", f"{PRE_V8_BUILDER}^{{commit}}"],
+    capture_output=True).returncode == 0
+needs_source_repo = pytest.mark.skipif(
+    not _IN_SOURCE_REPO, reason="needs the source repo's routing policy and plan history")
+
 _V8: dict = {
     "title": "Route at dispatch fixture",
     "plan_schema_version": 8,
@@ -151,6 +159,7 @@ def test_peer_triggers_arm_the_floor_too():
     bp.validate_spec(_spec(s02=low))                                # control: no risk flag
 
 
+@needs_source_repo
 def test_the_floor_is_a_rank_not_a_walk(monkeypatch):
     # Operator decision: deep_reasoning's default is opus@medium, and the walk
     # from sonnet@high enters opus at high, skipping medium - escalate() never reaches the
@@ -164,6 +173,7 @@ def test_the_floor_is_a_rank_not_a_walk(monkeypatch):
                                     "peer_triggers": ["security_sensitive"]}))
 
 
+@needs_source_repo
 def test_the_floor_skips_a_cross_provider_override(monkeypatch):
     # Contract section 4: an override whose provider differs from the tree's skips the floor.
     # Codex linchpin default is sol@max; sol@high would climb to it, but on the Claude tree
@@ -175,6 +185,7 @@ def test_the_floor_skips_a_cross_provider_override(monkeypatch):
     bp.validate_spec(_spec(s02={"model": "gpt-5.6-sol", "reasoning": "max"}))
 
 
+@needs_source_repo
 def test_the_floor_refuses_the_default_model_at_a_lower_effort(monkeypatch):
     # escalate() may jump models instead of raising effort, so the walk alone let
     # sol@low and sol@medium through under a sol@max linchpin default.
@@ -401,6 +412,7 @@ def _manifest_now(path):
     return bp.gen_manifest(bp.with_integration_sessions(json.loads(Path(path).read_text())))
 
 
+@needs_source_repo
 def test_every_pre_v8_spec_builds_the_manifest_the_pre_v8_builder_built(tmp_path):
     specs = [p for p in sorted(REPO.glob("_plans/*/spec.json"))
              if rad.spec_version(json.loads(p.read_text())) < 8]

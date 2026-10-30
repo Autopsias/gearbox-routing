@@ -87,6 +87,15 @@
         ]
       },
       {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/dispatch-audit.py"
+          }
+        ]
+      },
+      {
         "matcher": "*",
         "hooks": [
           {

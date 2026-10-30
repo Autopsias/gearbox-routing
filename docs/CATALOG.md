@@ -15,7 +15,7 @@ lists every file the part needs, and how to check and remove it.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 29 skills · 69 commands · 41 subagents · 8 hooks.
+Counts: 29 skills · 69 commands · 41 subagents · 9 hooks.
 
 ## Skills
 
@@ -177,6 +177,7 @@ Counts: 29 skills · 69 commands · 41 subagents · 8 hooks.
 |---|---|---|---|
 | `agent-elapsed-nag.py` | PreToolUse, SubagentStop | Remind the orchestrator to report elapsed cost while a dispatch runs long. | [Small hooks](modules/small-hooks.md) |
 | `compact-policy.py` | SessionStart (compact), UserPromptSubmit, PreCompact (auto), PostCompact | Compaction policy for Claude Code: classify the session, then decide whether an automatic compaction may proceed. | [Context compaction policy](modules/compaction.md) |
+| `dispatch-audit.py` | PreToolUse (Agent) | Record what model + effort every subagent dispatch actually asked for, so tier drift is VISIBLE instead of silent. | [Routing skills](modules/routing-skills.md) |
 | `git-tree-guard.py` | PreToolUse (Bash) | Refuse a tree-wide destructive git command while the working tree carries tracked modifications. | [Git safety guard](modules/git-safety.md) |
 | `governor-hook.py` | PreToolUse (Bash) | Refuse a heavy command that skipped govrun. | [Machine governor](modules/govrun.md) |
 | `routing-cadence-check.py` | SessionStart | Nudge when routing outcomes have piled up unanalyzed. | [Small hooks](modules/small-hooks.md) |

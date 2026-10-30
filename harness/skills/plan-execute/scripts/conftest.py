@@ -138,3 +138,54 @@ def _no_live_build_canary(monkeypatch):
     ledger, so a fixture plan built here would change shape whenever a canary is armed.
     test_route_at_dispatch_e2e.py passes this key into its own whitelisted env."""
     monkeypatch.setenv("PLAN_BUILDER_BUILD_CANARY", "off")
+
+
+# The public export ships an example routing policy (its file starts "# HARNESS COPY")
+# in place of the source repo's. These tests pin the source policy's models, ladders
+# and rows, or replay plans pinned to it, so they skip against the example copy.
+_PINS_SOURCE_POLICY = {
+    ("test_codex_effort_climb.py", "test_no_derivable_codex_dispatch_ever_names_a_retired_model"),
+    ("test_dispatch_construction.py", "test_ssot_actually_defines_fanout_policy_default_model"),
+    ("test_escalation.py", "test_a_declared_non_tier_agent_declines_the_climb_out_loud"),
+    ("test_escalation.py", "test_a_refused_rung_does_not_cap_the_rest_of_the_ladder"),
+    ("test_escalation.py", "test_a_rung_key_that_names_no_rung_is_REFUSED_not_silently_recorded"),
+    ("test_escalation.py", "test_an_escalated_member_is_told_to_refuse_not_to_degrade"),
+    ("test_escalation.py", "test_every_anthropic_start_cell_climbs_to_the_apex_then_exhausts"),
+    ("test_escalation.py", "test_frozen_v5_claude_lane_dispatch_is_byte_identical"),
+    ("test_escalation.py", "test_frozen_v5_gpt55_pin_still_blocks_with_guidance"),
+    ("test_escalation.py", "test_no_existing_spec_is_NEWLY_refused_by_the_new_builder"),
+    ("test_escalation.py", "test_openai_climb_ends_at_sol_max_and_never_crosses_providers"),
+    ("test_escalation.py", "test_refused_rung_falls_back_to_the_previous_rung_and_is_never_re_proposed"),
+    ("test_escalation.py", "test_same_inputs_yield_the_same_rung_however_often_begin_runs"),
+    ("test_escalation.py", "test_the_documented_refusal_recovery_actually_walks"),
+    ("test_escalation.py", "test_the_floor_holds_on_the_composite_escalate_then_refuse_path"),
+    ("test_escalation.py", "test_v5_manifest_never_escalates_but_v6_does"),
+    ("test_escalation_integration.py", "test_a_SECOND_root_cause_climbs_from_the_rung_reached_not_from_the_floor"),
+    ("test_escalation_integration.py", "test_a_codex_harness_session_is_announced_its_OWN_rung_not_a_claude_one"),
+    ("test_escalation_integration.py", "test_a_different_error_holds_the_rung_instead_of_handing_the_model_back"),
+    ("test_escalation_integration.py", "test_allow_an_attributable_failure_still_buys_its_rung"),
+    ("test_escalation_integration.py", "test_an_all_refused_halt_says_so_instead_of_falling_silent"),
+    ("test_escalation_integration.py", "test_exhausting_the_budget_mid_ladder_names_the_untried_rungs"),
+    ("test_escalation_integration.py", "test_rework_loop_climbs_after_the_stuck_protocol_arms"),
+    ("test_escalation_integration.py", "test_the_apex_halt_does_not_blame_a_refusal_that_never_happened"),
+    ("test_escalation_integration.py", "test_the_climb_walks_the_lanes_provider_not_the_run_level_dial"),
+    ("test_escalation_integration.py", "test_the_halt_names_the_rung_that_ran_even_when_the_last_error_differs"),
+    ("test_escalation_integration.py", "test_the_ledger_records_the_mechanism_that_ACTUALLY_bound_the_effort"),
+    ("test_outcomes.py", "test_routing_provenance_resolves_the_class_default"),
+    ("test_plan_limits.py", "test_the_ceiling_is_the_longest_ladder_the_ssot_actually_defines"),
+    ("test_route_at_dispatch.py", "test_a_plan_or_routing_change_between_prepare_and_the_lock_refuses_the_begin"),
+    ("test_route_at_dispatch.py", "test_a_routing_file_change_between_attempts_does_not_move_the_frozen_cell"),
+    ("test_route_at_dispatch.py", "test_a_v7_manifest_dispatches_byte_identically"),
+    ("test_route_at_dispatch.py", "test_the_codex_paths_dispatch_the_frozen_cell_not_the_live_file"),
+    ("test_route_at_dispatch_e2e.py", "test_a_routing_file_edit_between_two_begins_leaves_the_frozen_cell_unchanged"),
+}
+_ROUTING = Path(__file__).resolve().parents[3] / "model-routing.yaml"
+
+
+def pytest_collection_modifyitems(config, items):
+    if not _ROUTING.read_text(encoding="utf-8").startswith("# HARNESS COPY"):
+        return
+    skip = pytest.mark.skip(reason="pins the source repo's routing policy; this copy ships an example one")
+    for item in items:
+        if (item.path.name, item.originalname) in _PINS_SOURCE_POLICY:
+            item.add_marker(skip)
