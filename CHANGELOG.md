@@ -6,6 +6,25 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Added (harness export 2026-10-29 and docs for new readers)
+- **`docs/CATALOG.md`**: every skill, command, subagent and hook in `harness/`,
+  one line each, with how you start it and its module card.
+  `scripts/build_catalog.py` builds it from the files, and `scripts/test_docs.py`
+  fails when it is out of date.
+- **README**: who Gearbox is for and not for, what it costs to use, what is in
+  the box, and what using each main module looks like.
+- **New module: executive summaries (`/tldr`)**. It turns long sources into a
+  one-page brief that puts the decision first, with a check that every number
+  comes from its claim list.
+- **Harness refresh** from the private source: the job governor's shared queue
+  and core budget (`govrun_queue.py`, `govrun_cores.py`, `govrun_python_m.py`),
+  `safe_json` and sensitive-path review in plan-execute, the exposed-repo route
+  in repo-health, and fixes in the review gate, land, routing-retro and hooks.
+
+### Fixed (docs)
+- The repo-health card now says which third-party skills `--deep` needs that
+  this repo does not ship, and how to add them.
+
 ### Fixed (trust review follow-up: should-fix items)
 - **32 doc statements corrected against the code** across README, ARCHITECTURE,
   GENERICIZATION, INTEGRATION, METHODOLOGY, PROVIDERS, the routing guard README,

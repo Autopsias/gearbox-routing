@@ -8,6 +8,9 @@ subagent files are Claude Code features. You do not install it as a whole. You p
 modules you want, and each module has a card that says what it does, what it
 needs, and how to install, check and remove it.
 
+To see every skill, command, subagent and hook on one page, with how you
+start each one, read [the catalogue](CATALOG.md).
+
 Read [`INSTALL.md`](INSTALL.md) Part 2 first. It has the five rules that apply
 to every module: install only what you use, install into `~/.claude`, never
 copy `harness/settings.json` or `harness/CLAUDE.md` over your own, copy every
@@ -36,6 +39,7 @@ path on the card, and read the cautions.
 | [Decision memos](modules/memo-loop.md) | Critiques or drafts a decision memo with a second model | Any — Codex optional |
 | [Outside-idea triage](modules/outside-ideas.md) | Judges what an article or repo proposes against your repo | Any |
 | [Explainers](modules/eli5.md) | Turns a subject into a story-style HTML page for a named audience | Needs the Artifact tool |
+| [Executive summaries](modules/tldr.md) | Turns long sources into a decision-first one-page brief, plus a page, deck or video from the same claims | Any — Chrome for PDF |
 | [Pre-push gate](modules/no-mistakes.md) | Runs a branch through review, tests, push, pull request and CI, with a stop at each gate | Needs the `no-mistakes` tool |
 
 ## Code quality and testing

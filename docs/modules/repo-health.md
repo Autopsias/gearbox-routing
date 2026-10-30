@@ -50,3 +50,19 @@ In each repo you scanned, delete `.claude/health/` if you do not want its histor
 - It fixes nothing until you say so. `--fix-blocking` sends fixer subagents to
   the blocking findings.
 - Only you can start it (`disable-model-invocation`).
+- `--deep` reads two reviewed third-party skills that this repo does not ship,
+  because of their licence terms or the owner's choice. Without them, the deep
+  pass cannot run. To use `--deep`, put each one in
+  `~/.claude/skills/repo-health/vendor/<name>/` yourself:
+  - `security-review` from
+    [getsentry/skills](https://github.com/getsentry/skills/tree/24fdb833b9e67670a027e3b482189100a69ff7f9/skills/security-review)
+    (its references derive from OWASP text under CC BY-SA 4.0).
+  - `cloudflare-security-audit` from
+    [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill/tree/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit)
+    (MIT), for a repo that you mark as exposed. It also needs Node. Without
+    it, the exposed-repo audit stops at its first check, with a message about
+    the "run contract".
+
+  When you add a copy, also add its row to `vendor.json` (repo, path, pin).
+  If you do not, the `sec.vendor-pins` check refuses with exit 2, because the
+  manifest no longer covers every folder in `vendor/`.

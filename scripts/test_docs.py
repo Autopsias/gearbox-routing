@@ -8,10 +8,12 @@ that does not exist.
 1. Every relative Markdown link in a hand-maintained doc resolves to a file.
 2. Every `harness/...` path a module card names exists (braces and globs expanded).
 3. Every skill folder, command and agent under harness/ is named by some card.
+4. docs/CATALOG.md matches what scripts/build_catalog.py generates from harness/.
 """
 import glob
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,3 +85,9 @@ def test_every_skill_command_and_agent_has_a_card():
                      if u.name != "__pycache__" and str(u) not in named
                      and u.stem not in text)
     assert not orphans, "harness parts with no module card:\n" + "\n".join(orphans)
+
+
+def test_catalog_is_current():
+    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_catalog.py"), "--check"],
+                         capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr

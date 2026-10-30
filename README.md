@@ -11,6 +11,49 @@ It is not tied to one vendor: the routing policy ships profiles for Anthropic,
 OpenAI, Gemini and Z.ai, and the toolkit runs on Claude Code and on OpenAI's
 Codex CLI. You take only the parts you want.
 
+## Is Gearbox for you?
+
+**A good fit if you:**
+
+- use Claude Code every day and want a setup that someone has already tested
+  on daily work: reviews, plans, guards and cost checks;
+- spend real money on models and want each task to get the cheapest model
+  that does it well, with a record of why;
+- run jobs too large for one session and want them split into sessions that
+  each must pass their checks before the next one starts;
+- want a second model (OpenAI's Codex) to review your code and plans.
+
+**Not a fit if you:**
+
+- want one package that installs everything. Apart from the routing
+  framework, you copy each part by hand, and each part has its own steps;
+- need support or a stable API. `harness/` is a copy of one person's working
+  setup, and it changes when that setup changes;
+- do not use Claude Code. Only the routing policy and a few skills work
+  without it (see [Works with](#works-with)).
+
+**What it costs you to use it:**
+
+- **Context.** Every skill, command and subagent that Claude can start on its
+  own adds its name and description to every turn. Install only what you use.
+- **Setup work.** The routing framework is one command. Each module is a few
+  copy commands and a check, all on its card.
+- **Trust.** Hooks run on your machine on every tool call they watch. Read a
+  hook before you wire it in.
+
+## What is in the box
+
+| Part | What it is | How you install it |
+|---|---|---|
+| **Routing framework** (`claude/`) | One policy file that maps each kind of task to a model and an effort level, plus the scripts that check it and apply it | `install.sh`: one command, with backups and an uninstall |
+| **Harness** (`harness/`) | Skills, slash commands, subagents, hooks and scripts, grouped into modules | By hand, one module at a time. Each module has a card with every file it needs and how to install, check and remove it |
+
+- **[The catalogue](docs/CATALOG.md)** lists every skill, command, subagent
+  and hook, with one line on what it does, how you start it, and its module
+  card. A script builds it from the files, so it always matches this repo.
+- **[The module index](docs/MODULES.md)** groups the parts into modules by
+  what you want to do.
+
 ## What Gearbox gives you
 
 ### Model and effort routing
@@ -134,11 +177,27 @@ Good places to start:
 | Large jobs run as checked sessions | [Plan pipeline](docs/modules/plan-pipeline.md), plus adversarial review and grilling for `/plan-harden` |
 | Small, safe wins | [Git safety guard](docs/modules/git-safety.md), [status line](docs/modules/statusline.md) |
 | To see what your sessions cost | [Cost and usage](docs/modules/cost-and-usage.md) |
+| Long sources turned into a one-page brief for a decision | [Executive summaries](docs/modules/tldr.md), with [explainers](docs/modules/eli5.md) for the visual page |
+
+## What using it looks like
+
+After you install a module, you use it inside a normal Claude Code session.
+Each example below comes from the "Check it works" part of its card.
+
+| You do this | You get this |
+|---|---|
+| Ask Claude to run `git reset --hard` while you have uncommitted work | The [git safety guard](docs/modules/git-safety.md) refuses it with a `BLOCKED … would discard N tracked modification(s)` message |
+| Type `/repo-health` in a git repo | [Repo health](docs/modules/repo-health.md) scores the repo from 0 to 100 on a dashboard, with BLOCKING and ADVISORY findings |
+| Type `/adversarial-review` with a small uncommitted change | [Adversarial review](docs/modules/adversarial-review.md) writes one review from Claude and one from Codex, then shows one merged list of findings |
+| Ask Claude to "build a plan for <a task>", then run `/plan-execute _plans/<folder>` | The [plan pipeline](docs/modules/plan-pipeline.md) builds a plan with a dashboard, runs each session in a fresh subagent, and stops at your checkpoints |
+| Start a new session with the status line installed | The [status line](docs/modules/statusline.md) shows rate limits, context use, cache state, the model and its effort |
+| Type `/tldr <path to a long PDF>` | [Executive summaries](docs/modules/tldr.md) writes a one-page brief that puts the decision first, and checks that every number in it comes from its list of claims taken from the sources |
 
 ## Documentation
 
 | I want to… | Read |
 |---|---|
+| See every skill, command, subagent and hook, one line each | [`docs/CATALOG.md`](docs/CATALOG.md) |
 | Understand the plan framework | [`docs/PLAN-FRAMEWORK.md`](docs/PLAN-FRAMEWORK.md) |
 | See every module | [`docs/MODULES.md`](docs/MODULES.md) |
 | Install, update or remove | [`docs/INSTALL.md`](docs/INSTALL.md) |
