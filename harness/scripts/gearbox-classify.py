@@ -199,7 +199,7 @@ def main(argv=None):
         res = json.load(open(args.from_json, encoding="utf-8"))
         return emit(res, args)
 
-    res = {
+    res: dict = {
         "claude_dir": args.claude_dir,
         "harness": [], "live_state": [], "churn": [],
         "live_untracked": [], "triage_untracked": [],

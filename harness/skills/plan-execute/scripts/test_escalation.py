@@ -36,8 +36,12 @@ from escalation_helpers import (
 # 1. The ladder — through the SHARED funnel, never a second table
 # --------------------------------------------------------------------------
 def test_every_anthropic_start_cell_climbs_to_the_apex_then_exhausts():
+    """v39: the automatic apex is opus@xhigh — the fable rung was
+    withdrawn by the pre-registered revisit. A session AUTHORED on fable still
+    climbs inside fable and stops at fable@xhigh; nothing climbs INTO fable."""
     rr = _resolver()
-    apex = {"model_id": "fable", "native_effort": "xhigh"}
+    apex = {"model_id": "opus", "native_effort": "xhigh"}
+    fable_top = {"model_id": "fable", "native_effort": "xhigh"}
     starts = [
         {"model_id": "haiku", "native_effort": None},
         {"model_id": "sonnet", "native_effort": "medium"},
@@ -55,7 +59,10 @@ def test_every_anthropic_start_cell_climbs_to_the_apex_then_exhausts():
             walk.append(cur)
         else:
             pytest.fail(f"ladder from {start} did not terminate in 12 rungs: {walk}")
-        assert walk[-1] == apex, f"{start} ended at {walk[-1]}, not the apex"
+        want = fable_top if start["model_id"] == "fable" else apex
+        assert walk[-1] == want, f"{start} ended at {walk[-1]}, not {want}"
+        if start["model_id"] != "fable":
+            assert not any(r["model_id"] == "fable" for r in walk), f"climbed into fable: {walk}"
         # THE INVARIANT THE SSOT STATES IN WORDS, asserted mechanically.
         assert not any(r == {"model_id": "opus", "native_effort": "max"} for r in walk)
         assert not any(r["native_effort"] == "max" for r in walk if r["model_id"] == "fable")
@@ -350,6 +357,7 @@ def test_no_existing_spec_is_NEWLY_refused_by_the_new_builder(tmp_path):
     import importlib.util
     spec_o = importlib.util.spec_from_file_location("build_plan_head",
                                                     old_dir / "build_plan.py")
+    assert spec_o is not None and spec_o.loader is not None
     old = importlib.util.module_from_spec(spec_o)
     sys.path.insert(0, str(old_dir))
     try:
@@ -429,20 +437,21 @@ def test_a_refused_rung_does_not_cap_the_rest_of_the_ladder(tmp_path, capsys):
     brief still advises raising max_rework, which cannot help."""
     plan_dir = make_plan(tmp_path, [SESS])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
-    _arm(plan_dir, "s01", consecutive=3, reworks=3)          # wants rung 2
+    # v39: the ladder from sonnet@high is opus@high (rung 1) -> opus@xhigh (rung 2).
+    _arm(plan_dir, "s01", consecutive=2, reworks=2)          # wants rung 1
+    by_id, _ = _begin(plan_dir, ["s01"], capsys)
+    assert (by_id["s01"]["model_arg"], by_id["s01"]["reasoning"]) == ("opus", "high")
+    run.cmd_release(plan_dir)
+    _record_refusal(plan_dir, "s01", "opus", "high", capsys)
+
+    # A further same-signature failure must reach the rung ABOVE the refused one.
+    _arm(plan_dir, "s01", consecutive=3, reworks=3)
+    ab.apply_mutation(plan_dir / "PLAN.html", "s01", status="TODO", note=None)
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
     assert (by_id["s01"]["model_arg"], by_id["s01"]["reasoning"]) == ("opus", "xhigh")
     run.cmd_release(plan_dir)
-    _record_refusal(plan_dir, "s01", "opus", "xhigh", capsys)
-
-    # A further same-signature failure must reach the rung ABOVE the refused one.
-    _arm(plan_dir, "s01", consecutive=4, reworks=4)
-    ab.apply_mutation(plan_dir / "PLAN.html", "s01", status="TODO", note=None)
-    by_id, _ = _begin(plan_dir, ["s01"], capsys)
-    assert (by_id["s01"]["model_arg"], by_id["s01"]["reasoning"]) == ("fable", "medium")
-    run.cmd_release(plan_dir)
     # ...and the refused cell is still never re-proposed on the way past it.
-    assert esca.session_state(plan_dir, "s01")["refused"] == ["opus@xhigh"]
+    assert esca.session_state(plan_dir, "s01")["refused"] == ["opus@high"]
 
 
 def test_an_escalated_member_is_told_to_refuse_not_to_degrade(tmp_path, capsys):
@@ -510,7 +519,7 @@ def test_the_floor_holds_on_the_composite_escalate_then_refuse_path(tmp_path, ca
     plan_dir = make_plan(tmp_path, [SESS])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
     _arm(plan_dir, "s01", consecutive=3, reworks=3)
-    for model, effort in (("fable", "medium"), ("opus", "xhigh"), ("opus", "high")):
+    for model, effort in (("opus", "xhigh"), ("opus", "high")):   # v39: no fable rung
         _record_refusal(plan_dir, "s01", model, effort, capsys)
     ab.apply_mutation(plan_dir / "PLAN.html", "s01", status="TODO", note=None)
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
@@ -548,9 +557,9 @@ def test_a_rung_key_that_names_no_rung_is_REFUSED_not_silently_recorded(tmp_path
     run.cmd_release(plan_dir)
 
     with pytest.raises(SystemExit) as e:                 # PLANT: effort omitted
-        run.cmd_record_refusal(plan_dir, "s01", "fable", "", reason="observed",
+        run.cmd_record_refusal(plan_dir, "s01", "opus", "", reason="observed",
                                source="dispatch_error")
-    assert "fable@medium" in str(e.value), "the error must name the rungs that ARE valid"
+    assert "opus@xhigh" in str(e.value), "the error must name the rungs that ARE valid"
     with pytest.raises(SystemExit):                      # PLANT: a rung below the floor
         run.cmd_record_refusal(plan_dir, "s01", "haiku", "", reason="observed",
                                source="dispatch_error")

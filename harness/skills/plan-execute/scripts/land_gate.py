@@ -46,6 +46,7 @@ import gate_timing as gt
 import land_at_land as lal
 import land_flaky as lfk
 import land_repair as lrp
+import land_short as lsh
 import land_start as lsg
 import land_state as lst
 import manifest_io as mio
@@ -55,6 +56,7 @@ import ship_state_io as ssio
 import shipping as shp
 import verifier_park as vpk
 from land_state import park, save
+from worktree import git
 
 #: A gate that REFUSED on policy: under the Codex harness with no Claude-verifier
 #: opt-in, no model may read this tree at all (`verifier_park.refusal`). It is an
@@ -107,6 +109,16 @@ def gate_cwd(declared, plan_tree, land_path):
     return str(mapped)
 
 
+def _base_excludes(cwd, base):
+    """`.review-exclude` path prefixes (one a line, `#` comments) AS THE BASE HOLDS
+    THEM -- never the plan's copy, so a plan cannot drop its own code from its
+    land review by editing the list. For data such as stored defect samples."""
+    rc, out, _ = git(["show", f"{base}:.review-exclude"], cwd)
+    if rc != 0:
+        return []
+    return [x.strip() for x in out.splitlines() if x.strip() and not x.lstrip().startswith("#")]
+
+
 def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
     env = rvs.declared_env(g, plan_dir, "land", cwd)
     if rvs.BASE_ENV in (g.get("env_allowlist") or []):
@@ -131,7 +143,7 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
         # spec and there is no session called "land", so the land never sets
         # SCOPE at all. A gate that declared EXCLUDE but dropped the unused SCOPE
         # would have lost §5.1b entirely and handed the reviewer the whole record.
-        env[rvs.EXCLUDE_ENV] = f"{lst.ps.PLANS_DIR}/{ctx['slug']}"
+        env[rvs.EXCLUDE_ENV] = ",".join([f"{lst.ps.PLANS_DIR}/{ctx['slug']}", *_base_excludes(cwd, st["expected"])])
     t0 = time.monotonic()
     res = ssio.run_deploy_argv(g["argv"], cwd=cwd, timeout=g.get("timeout", 1200),
                                env_allowlist=g.get("env_allowlist", []), env_extra=env)
@@ -159,12 +171,13 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
     # `VERIFIER:` line (None when there is no marker), so this cannot be faked by
     # a reviewer echoing the marker back in its findings.
     cause = vpk.cause_in(res.get("stdout") or "") if outcome == "skipped" else None
+    out = (res.get("stderr") or "") + (res.get("stdout") or "")
     rec = {"gate_id": gid, "outcome": ON_BOX if cause else outcome, "cwd": cwd,
             "returncode": rc, "cause": cause, "wall_s": wall_s,
+            "short_review": lsh.short_review(out) if outcome == "skipped" and not cause else None,
             "log": lrp.write_log(ctx, gid + log, res),       # LND-03: the full output
             "findings_count": 1 if outcome == "fail" else 0,
-            "excerpt": gx.expect_excerpt(
-                gid, miss, ((res.get("stderr") or "") + (res.get("stdout") or ""))[-4000:])}
+            "excerpt": gx.expect_excerpt(gid, miss, out[-4000:])}
     gt.log_run(plan_dir, "land" + log.replace(".", "-"), None, gid, wall_s, rec["outcome"])
     if log != ".base":        # LND-12: every land-tree failure is recorded, and saved, now
         lfk.record(plan_dir, ctx, st, rec)
@@ -186,7 +199,8 @@ def _verdict(plan_dir, ctx, st, results):
                        precisely because re-running cannot clear it.
       skipped       -> `gate-indeterminate`: the gate could not DECIDE (a timeout,
                        a reviewer that never answered). Re-running can clear it,
-                       which is why its brief says so.
+                       which is why its brief says so -- EXCEPT a short read
+                       (`land_short`): the same surface reads short again.
 
     Ordered by severity of the answer, not by how it left: a real finding outranks
     a refusal, and a human's BLOCKED outranks a park still waiting on one.
@@ -217,6 +231,11 @@ def _verdict(plan_dir, ctx, st, results):
                     blocked=by[BLOCKED])
     if by[ON_BOX]:
         return _park_on_box(plan_dir, ctx, st, by[ON_BOX], results, excerpt)
+    short = {r["gate_id"]: r["short_review"] for r in results if r.get("short_review")}
+    if short:
+        return park(plan_dir, ctx, st, "gate-indeterminate",
+                    lsh.brief(short, st["expected"], plan_dir) + excerpt,
+                    undecided=by["skipped"], short_review=short)
     return park(plan_dir, ctx, st, "gate-indeterminate",
                 f"LAND PARKED — the re-gate COULD NOT DECIDE: {by['skipped']} exited with its "
                 "declared indeterminate code (a timeout, or a reviewer that never "

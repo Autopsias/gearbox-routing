@@ -6,6 +6,8 @@ interview discipline and the same mandatory post-interview adversarial-review st
 (its own file covers those). Read this when you need the exact wording either skill
 uses; each skill's own SKILL.md states only its delta on top of this shell.
 
+**Ponytail does not apply to this task.** This is plan-grilling work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)
+
 ## Interview opening (shared)
 
 Interview me relentlessly about every aspect of this plan until we reach a shared

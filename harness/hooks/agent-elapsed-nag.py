@@ -70,6 +70,15 @@ def reminder(minutes, count):
     )
 
 
+def arm_timer():
+    return (
+        "[cost] Background dispatch started. While you wait for it you run no tools, so "
+        "this hook cannot remind you later. Arm a wake-up now: CronCreate a one-shot check "
+        "30 minutes from now that reports elapsed time, what the agent is doing, and the cut "
+        "if it has not closed out. Delete it (CronDelete) when the agent reports first."
+    )
+
+
 def run(mode, ev):
     """Return the text to inject, or None. Pure enough to test directly."""
     path = state_path(ev.get("session_id"))
@@ -85,6 +94,9 @@ def run(mode, ev):
     if ev.get("tool_name") in DISPATCH_TOOLS:
         starts.append(now)
         save(path, starts, bucket)
+        # Agents run in the background unless the call says otherwise.
+        if (ev.get("tool_input") or {}).get("run_in_background", True) is not False:
+            return arm_timer()
         return None
 
     if not starts:

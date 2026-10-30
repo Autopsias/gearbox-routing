@@ -44,3 +44,14 @@ over-authorize.
 `git rm -r <dir> && rm -rf <dir>` on a pre-existing directory the agent never created;
 the harness correctly blocked it as scope escalation. Explicit, target-naming
 confirmation is the bar for any destructive delete.
+
+## A local `main` is not the remote
+
+- **ALWAYS `git fetch` and read `origin/main` before you answer a question about the
+  code, compare against main, or start a branch.** A local `main` can be days behind
+  (or diverged) and answers confidently from old code; nothing errors. Branch from
+  `origin/main`, never from the bare local ref.
+
+*Why:* example-project 2026-09-17 reported a deploy gap of 7 commits that was really 2;
+Kuzushi 2026-10-16 answered a reader-feedback question from a `main` 33 commits behind
+and stated a fault the newest code had already fixed.

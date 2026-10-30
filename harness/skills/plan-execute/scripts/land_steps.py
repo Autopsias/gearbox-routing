@@ -17,6 +17,7 @@ desynchronising the operator's index from HEAD**. Those two are forbidden by nam
 in §4.2 and appear nowhere in this file.
 """
 
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -88,6 +89,10 @@ def step_worktree(plan_dir, ctx, st):
     """
     expected = rev(ctx["root"], ctx["upstream"])
     path = st.get("land_path")
+    if path and Path(path).is_dir():
+        orphan = _orphan_merge(plan_dir, ctx, st, path)
+        if orphan:
+            return orphan
     # The candidate is stale if EITHER side moved. Keying only on the default
     # branch left a land worktree holding a merge of an OLD plan head: the plan
     # branch gained a commit, the re-gate ran against a tree that never contained
@@ -188,8 +193,9 @@ def step_merge(plan_dir, ctx, st):
                        "resolution_required": True, "ack": None})
             save(plan_dir, ctx, st)
         return None
-    rc, out, err = git(["merge", "--no-ff", "-m", f"plan({ctx['slug']}): land", ctx["branch"]],
-                       path, timeout=600)
+    rc, out, err = _merge_watched(plan_dir, ctx, st, path,
+                                  ["merge", "--no-ff", "-m", f"plan({ctx['slug']}): land",
+                                   ctx["branch"]])
     if rc != 0:
         return _conflict_park(plan_dir, ctx, st, path, (err or out)[:2000])
     st.update({"merge_sha": rev(path, "HEAD"), "merged_plan_head": st.get("plan_head"),
@@ -199,11 +205,63 @@ def step_merge(plan_dir, ctx, st):
 
 
 def _conflict_park(plan_dir, ctx, st, path, detail):
-    """§4.6 — the land worktree is LEFT IN PLACE with the conflict intact."""
+    """§4.6 — the land worktree is LEFT IN PLACE with the conflict intact.
+
+    A non-zero `git merge` with NOTHING conflicted is not a conflict: a lock or
+    ref error (`cannot lock ref 'HEAD': is at X but expected Y`, measured when a
+    killed land's orphaned merge committed underneath this one) was parked as
+    `merge-conflict` with 0 conflicted paths and a brief that said "resolve"."""
     conflicts = conflicted(path)
+    if not conflicts:
+        return park(plan_dir, ctx, st, "merge-failed", lb.merge_failed(path, plan_dir, detail),
+                    detail=detail)
     return park(plan_dir, ctx, st, "merge-conflict",
                 lb.conflict(path, plan_dir, conflicts, porcelain(path)),
                 conflicts=conflicts, detail=detail)
+
+
+def _merge_watched(plan_dir, ctx, st, path, args):
+    """`git merge` with its pid ON DISK for exactly as long as it runs.
+
+    SIGKILL of `run.py` alone does not reach its children. The orphaned `git
+    merge` finishes its commit later, unwatched (measured: it commits
+    once its `prepare-commit-msg` hook returns, then dies before removing
+    MERGE_HEAD). A `merge_pid` still in the state is the only trace that says
+    "land started this merge and never saw it end" — `_orphan_merge` reads it."""
+    p = subprocess.Popen(["git", *args], cwd=str(path), stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True)
+    st["merge_pid"] = p.pid
+    save(plan_dir, ctx, st)
+    try:
+        out, err = p.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
+    st.pop("merge_pid", None)
+    save(plan_dir, ctx, st)
+    return p.returncode, out.strip(), err.strip()
+
+
+def _orphan_merge(plan_dir, ctx, st, path):
+    """Park when a KILLED land's `git merge` is still running, or committed on
+    its own. Runs before the land worktree is reused or torn down: a live git
+    there must not be removed under, and its commit must never be adopted as a
+    hand-resolved conflict (head != expected with no merge_sha, below)."""
+    pid = st.get("merge_pid")
+    if not pid:
+        return None
+    if lst.git_alive(pid):
+        return park(plan_dir, ctx, st, "merge-still-running",
+                    lb.merge_running(path, plan_dir, pid), pid=pid)
+    head = rev(path, "HEAD")
+    if head and head != st.get("expected"):
+        return park(plan_dir, ctx, st, "merge-unwatched",
+                    lb.merge_unwatched(path, plan_dir, st["expected"], head), head=head)
+    # Dead and HEAD never moved: nothing was committed. Any MERGE_HEAD it left
+    # is `step_merge`'s ordinary `merge-in-progress` park.
+    st.pop("merge_pid", None)
+    save(plan_dir, ctx, st)
+    return None
 
 
 # --------------------------------------------------------------------------

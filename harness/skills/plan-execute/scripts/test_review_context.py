@@ -336,3 +336,79 @@ def test_a_local_origin_ref_moved_by_the_session_folds_nothing(tmp_path):
     run("git", "update-ref", "refs/remotes/origin/main", "HEAD")  # the session hides its own work
     assert rvs.net_of_default_merges(base, r, "main") == base
     assert "session_work.txt" in _surface(r, rvs.net_of_default_merges(base, r, "main"))
+
+
+# ---------- a session that shipped through merged PRs names its own base ----------
+
+def _declare(d, ref, sid="s01"):
+    (d / "_closeouts").mkdir(exist_ok=True)
+    (d / "_closeouts" / f"{sid}.json").write_text(json.dumps({"session": sid, "review_base": ref}))
+
+
+def _events(d, name):
+    return [e for e in (json.loads(ln) for ln in (d / "run.ndjson").read_text().splitlines())
+            if e.get("event") == name]
+
+
+def test_pr_shipped_work_is_folded_out_unless_the_session_declares_review_base(tmp_path):
+    """kuzushi-belt-lock s02, 2026-10-14: the session's PR merged to main, the plan
+    branch merged main, and the fold removed the session's OWN work -> 0 files."""
+    r, run, base = _fork(tmp_path)
+    run("git", "checkout", "-q", "main")
+    _commit(run, r, "pr_work.txt", "2026-01-01T00:03:00")         # the merged PR
+    run("git", "push", "-q", "origin", "main")
+    run("git", "fetch", "-q", "origin")
+    run("git", "checkout", "-q", "plan")
+    run("git", "merge", "-q", "--no-edit", "origin/main")
+    d = _plan(tmp_path, [{"event": "dispatch_started", "session_ids": ["s01"],
+                          "ts": "2026-01-01T00:02:30+00:00"}])
+    rvs.record_base(str(d), "s01", base)
+    assert "pr_work.txt" not in _surface(r, rvs.get_base(str(d), "s01", str(r)))  # the bug
+    _declare(d, base)
+    assert "pr_work.txt" in _surface(r, rvs.get_base(str(d), "s01", str(r)))
+    assert _events(d, "review_base_declared")[-1]["resolved"] == base
+
+
+def test_a_declared_base_that_cannot_bound_the_diff_is_refused_and_logged(tmp_path):
+    r, run = _repo(tmp_path)
+    old = _commit(run, r, "a.txt", "2026-01-01T10:00:00+00:00")
+    d = _plan(tmp_path, [])
+    _declare(d, "no-such-ref")
+    assert rvs.declared_base(str(d), "s01", str(r)) is None
+    assert "does not resolve" in _events(d, "review_base_refused")[-1]["reason"]
+    run("git", "checkout", "-q", "-b", "side")
+    side = _commit(run, r, "d.txt", "2026-01-01T13:00:00+00:00")
+    run("git", "checkout", "-q", "-")
+    _declare(d, side)
+    assert rvs.declared_base(str(d), "s01", str(r)) is None
+    assert "not an ancestor" in _events(d, "review_base_refused")[-1]["reason"]
+    _declare(d, old)
+    assert rvs.declared_base(str(d), "s01", str(r)) is None  # never its own base: fail closed
+    assert "no runner-recorded base" in _events(d, "review_base_refused")[-1]["reason"]
+    rvs.record_base(str(d), "s01", old)                    # the known positive
+    assert rvs.declared_base(str(d), "s01", str(r)) == old
+
+
+def test_a_declared_base_can_never_narrow_the_review(tmp_path):
+    """A session naming a LATER commit must not hide its earlier commits."""
+    r, run = _repo(tmp_path)
+    _commit(run, r, "a.txt", "2026-01-01T10:00:00+00:00")
+    start = _commit(run, r, "b.txt", "2026-01-01T11:00:00+00:00")
+    _commit(run, r, "hidden.txt", "2026-01-01T12:00:00+00:00")
+    later = _commit(run, r, "c.txt", "2026-01-01T13:00:00+00:00")
+    d = _plan(tmp_path, [])
+    rvs.record_base(str(d), "s01", start)
+    _declare(d, later)
+    got = rvs.get_base(str(d), "s01", str(r))
+    assert got == start and "hidden.txt" in _surface(r, got)
+    assert _events(d, "review_base_declared")[-1]["base"] == start
+
+
+def test_no_closeout_or_no_review_base_changes_nothing(tmp_path):
+    r, run = _repo(tmp_path)
+    _commit(run, r, "a.txt", "2026-01-01T10:00:00+00:00")
+    d = _plan(tmp_path, [])
+    assert rvs.declared_base(str(d), "s01", str(r)) is None
+    _declare(d, "")
+    assert rvs.declared_base(str(d), "s01", str(r)) is None
+    assert not _events(d, "review_base_refused") and not _events(d, "review_base_declared")

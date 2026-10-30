@@ -199,8 +199,8 @@ def _supervisor():
     logic is a second copy that can drift out of them.
     """
     spec = importlib.util.spec_from_file_location("codex_supervised", SUPERVISOR)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    assert spec is not None and spec.loader is not None, SUPERVISOR
+    spec.loader.exec_module(mod := importlib.util.module_from_spec(spec))
     return mod
 
 

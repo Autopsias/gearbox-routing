@@ -210,10 +210,10 @@ def indeterminate(plan_dir, session_id, state, gate, excerpt, res):
     `res["stdout"]` and NOT `excerpt`: the excerpt is stderr+stdout concatenated
     and truncated to `GATE_EXCERPT_MAX`, so a "first 10 lines of stdout" scan
     over it reads the wrong stream from the wrong end."""
-    stdout = (res or {}).get("stdout") or ""
+    stdout, args = (res or {}).get("stdout") or "", (plan_dir, session_id, state, gate, excerpt)
     if marker_in(stdout):
         return park(plan_dir, session_id, state, gate, cause_in(stdout), excerpt)
-    return _transport(plan_dir, session_id, state, gate, excerpt)
+    return __import__("empty_surface").block(*args, stdout) or _transport(*args)
 
 
 def _transport(plan_dir, session_id, state, gate, excerpt):

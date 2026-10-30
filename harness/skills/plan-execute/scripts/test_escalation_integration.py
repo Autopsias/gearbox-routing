@@ -81,7 +81,7 @@ def test_redispatch_resets_the_ladder_and_bumps_the_generation(tmp_path, capsys)
     plan_dir = make_plan(tmp_path, [SESS])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
     _arm(plan_dir, "s01", consecutive=3, reworks=3)
-    _record_refusal(plan_dir, "s01", "fable", "medium", capsys)
+    _record_refusal(plan_dir, "s01", "opus", "xhigh", capsys)   # v39: top automatic rung
     before = esca.session_state(plan_dir, "s01")
     assert before["refused"] and before["generation"] == 0
 
@@ -99,7 +99,7 @@ def test_amend_session_model_resets_the_ladder(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, [SESS])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
     _arm(plan_dir, "s01", consecutive=3, reworks=3)
-    _record_refusal(plan_dir, "s01", "fable", "medium", capsys)
+    _record_refusal(plan_dir, "s01", "opus", "xhigh", capsys)   # v39: top automatic rung
     # A mutation refuses on mid-flight verify state (it rewrites manifest.json, and
     # verify state is digest-bound). Settle it — the ladder state under test lives
     # in run_state.json, which no mutation touches.
@@ -360,7 +360,7 @@ def test_exhausting_the_budget_mid_ladder_names_the_untried_rungs(tmp_path, caps
     # The rung the LAST attempt actually ran on...
     assert "escalation stopped at rung 1 (opus@high)" in reason, reason
     # ...and the rungs the exhausted budget never bought.
-    assert "fable@medium" in reason, f"untried rungs not named: {reason}"
+    assert "opus@xhigh" in reason, f"untried rungs not named: {reason}"
     assert "max_rework" in reason                     # ...and what to do about it
 
 
@@ -451,8 +451,10 @@ def test_a_SECOND_root_cause_climbs_from_the_rung_reached_not_from_the_floor(
     sigfile.write_text("cause A\n")
     plan_dir = _loop_plan(tmp_path, capsys, max_rework=5, gates=_sig_gate(sigfile))
     seen = []
-    for i in range(6):
-        if i == 3:
+    # v39: the ladder above sonnet@high is two rungs (opus@high, opus@xhigh), so
+    # cause B arrives right after A has bought rung 1.
+    for i in range(5):
+        if i == 2:
             sigfile.write_text("cause B — a completely different thing\n")
         m = _attempt(plan_dir, capsys)
         seen.append((m["model_arg"], m["reasoning"]))
@@ -461,9 +463,8 @@ def test_a_SECOND_root_cause_climbs_from_the_rung_reached_not_from_the_floor(
         ("sonnet", "high"),      # attempt 1 — nothing armed
         ("sonnet", "high"),      # A failed once: rework at the same rung
         ("opus", "high"),        # A failed twice: armed, rung 1
-        ("opus", "xhigh"),       # A failed a third time: rung 2
-        ("opus", "xhigh"),       # B is a DIFFERENT error: progress, hold the rung
-        ("fable", "medium"),     # B failed twice: armed again, rung 3
+        ("opus", "high"),        # B is a DIFFERENT error: progress, hold the rung
+        ("opus", "xhigh"),       # B failed twice: armed again, rung 2
     ], seen
 
 

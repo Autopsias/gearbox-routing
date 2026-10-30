@@ -6,8 +6,10 @@ transcript, and the guard's state dir pointed at tmp. Nothing touches ~/.gearbox
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -112,4 +114,73 @@ def test_refused_dispatch_does_not_hold_the_guard_open(tmp_path):
     plant(tmp_path)
     t = transcript(tmp_path, issued=["toolu_a"], notified=[],
                    results={"toolu_a": "Permission for this action was denied by the Claude Code auto mode classifier."})
+    assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 2
+
+
+def agent_life(tmp_path, *, send_after_note, subagent_age_s):
+    """Agent `aX` dispatched, notified, and messaged (before or after the notification);
+    its subagent transcript was last written `subagent_age_s` seconds ago."""
+    use = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "toolu_a", "name": "Agent", "input": {}}]}}
+    note = {"type": "user", "message": {"content":
+            "<task-notification>\n<task-id>aX</task-id>\n<tool-use-id>toolu_a</tool-use-id>\n<status>completed</status>\n</task-notification>"}}
+    send = [{"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "toolu_s", "name": "SendMessage", "input": {"to": "aX", "message": "go on"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_s", "content":
+                '{"success":true,"message":"Resuming agent aX","resumedAgentId":"aX"}'}]}}]
+    rows = [use, note, *send] if send_after_note else [use, *send, note]
+    t = tmp_path / "t.jsonl"
+    t.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    sub = tmp_path / "t" / "subagents" / "agent-aX.jsonl"
+    sub.parent.mkdir(parents=True)
+    sub.write_text("{}\n")
+    then = time.time() - subagent_age_s
+    os.utime(sub, (then, then))
+    return t
+
+
+@pytest.mark.parametrize("send_after_note,age", [(True, 600), (False, 5)])
+def test_allows_while_a_notified_agent_was_resumed_or_is_writing(tmp_path, send_after_note, age):
+    plant(tmp_path)
+    t = agent_life(tmp_path, send_after_note=send_after_note, subagent_age_s=age)
+    assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 0
+
+
+def test_blocks_when_the_agent_is_really_dead(tmp_path):
+    # Known positive: message sent BEFORE the last notification, transcript idle 10 min.
+    plant(tmp_path)
+    t = agent_life(tmp_path, send_after_note=False, subagent_age_s=600)
+    assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 2
+
+
+# Real interim notification, s98 of the Kuzushi kuzushi-videos plan.
+INTERIM_NOTE = (
+    "<task-notification>\n<task-id>ac7be2c74f44ec80b</task-id>\n<tool-use-id>toolu_a</tool-use-id>\n"
+    "<status>completed</status>\n<summary>Agent \"Run plan session s98\" finished</summary>\n"
+    "<note>This agent stopped with background work of its own still running. It may resume on its own when "
+    "that work completes or reports, and the same task-id notifies again if it does; the result below may be "
+    "interim.</note>\n<result>This agent has not reported yet: it is waiting on its own background work and "
+    "will deliver its report through SubagentHandback when that finishes.\n</result>\n</task-notification>")
+FINAL_NOTE = (
+    "<task-notification>\n<task-id>ac7be2c74f44ec80b</task-id>\n<status>completed</status>\n"
+    "<note>A task-notification fires each time this agent stops with no live background children of its own.</note>\n"
+    "<result>closeout written</result>\n</task-notification>")
+
+
+def _with_notes(tmp_path, *notes):
+    t = transcript(tmp_path, issued=["toolu_a"], notified=[])
+    with t.open("a") as fh:
+        for n in notes:
+            fh.write(json.dumps({"type": "user", "message": {"role": "user", "content": n}}) + "\n")
+    return t
+
+
+def test_interim_notification_keeps_agent_running(tmp_path):
+    plant(tmp_path)
+    t = _with_notes(tmp_path, INTERIM_NOTE)
+    assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 0
+
+
+def test_final_notification_after_interim_ends_it(tmp_path):
+    plant(tmp_path)
+    t = _with_notes(tmp_path, INTERIM_NOTE, FINAL_NOTE)
     assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 2

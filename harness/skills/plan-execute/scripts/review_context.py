@@ -29,12 +29,12 @@ SCOPE fixes the second: the surface is restricted to the paths a session owns.
 Both are OPTIONAL. Absent, the gate keeps its old whole-tree behaviour — this
 adds a bound, it never silently narrows what an existing plan reviews.
 """
-import json
 import pathlib
 import subprocess
 
 import plan_scope as ps
 import run_state_io as rsi
+import safe_json as sj
 
 BASE_ENV = "PLAN_EXECUTE_REVIEW_BASE"
 SCOPE_ENV = "PLAN_EXECUTE_REVIEW_SCOPE"
@@ -81,12 +81,11 @@ def first_dispatch_at(plan_dir, session_id):
     except OSError:
         return None
     for ln in lines:                       # first match wins: FIRST dispatch
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
         if (rec.get("event") == "dispatch_started"
-                and session_id in (rec.get("session_ids") or [])):
+                and session_id in sj.get_list(rec, "session_ids", [])):
             return rec.get("ts")
     return None
 
@@ -126,11 +125,10 @@ def harness(plan_dir, session_id):
         return CLAUDE
     seen = CLAUDE
     for ln in lines:
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
-        if session_id not in (rec.get("session_ids") or []):
+        if session_id not in sj.get_list(rec, "session_ids", []):
             continue
         if rec.get("event") == "dispatch_started":
             seen = CODEX if rec.get("harness") == CODEX else CLAUDE
@@ -280,6 +278,9 @@ def get_base(plan_dir, session_id, cwd=None):
     an ancestor of the plan branch by construction, a drifted base is not.
     """
     cwd = cwd or "."
+    declared = declared_base(plan_dir, session_id, cwd)
+    if declared:
+        return declared            # never folded: a PR-shipped session's work IS main's
     base = (recorded_base(plan_dir, session_id)
             or record_base(plan_dir, session_id,
                            derive_base(plan_dir, session_id, cwd)))
@@ -287,6 +288,59 @@ def get_base(plan_dir, session_id, cwd=None):
     if pinned and not usable_base(base, cwd):
         return pinned
     return net_of_default_merges(base, cwd, ps.claim(plan_dir).get("default_branch") or "main")
+
+
+REVIEW_BASE_KEY = "review_base"
+
+
+def declared_base(plan_dir, session_id, cwd):
+    """The base the session NAMED in its closeout (`review_base`), resolved to a
+    commit, or None.
+
+    For a session that ships through GitHub PRs from its own worktree. Its work
+    reaches the plan worktree only as default-branch commits, so
+    `net_of_default_merges` folds ALL of it out of the surface and the gate sees
+    0 files: s02 of kuzushi-belt-lock went INDETERMINATE three times
+    and halted the plan as a "transport failure". The session knows its range;
+    the runner cannot. `review_base` is the commit its first PR started from, and
+    the surface is `git diff <review_base>` with no fold.
+
+    NEVER NARROWER THAN THE SESSION'S RECORDED BASE. A review gate must not take
+    its range from the code it reviews: a session that named a LATER commit would
+    hide its earlier commits (security review of the first cut). So
+    when the recorded base can bound this diff, the field only switches the fold
+    off and the recorded base is the base -- wider than the session's own PRs if
+    another session merged after it was dispatched, which costs review time and
+    never hides work. The declared commit itself is NEVER the base: with no
+    usable recorded base the plan's pinned base serves, and with neither the field
+    is refused (fail closed: the old surface, and an empty one blocks). Also
+    refused when it does not resolve or is not an ANCESTOR of HEAD; every outcome
+    is logged for the operator.
+    """
+    try:
+        rec = sj.load_dict((pathlib.Path(plan_dir) / "_closeouts"
+                            / f"{session_id}.json").read_bytes())
+    except OSError:
+        return None
+    ref = (sj.get_str(rec, REVIEW_BASE_KEY) or "").strip()
+    if not ref:
+        return None
+    try:
+        proc = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+                              cwd=cwd, capture_output=True, text=True, check=False, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        proc = None
+    sha = proc.stdout.strip() if proc and proc.returncode == 0 else ""
+    base = next((b for b in (recorded_base(plan_dir, session_id), ps.pinned_base(plan_dir))
+                 if usable_base(b, cwd)), None)
+    why = ("does not resolve to a commit here" if not sha
+           else "is not an ancestor of HEAD" if not usable_base(sha, cwd)
+           else "" if base else "no runner-recorded base (session or plan pin) bounds this diff")
+    base = None if why else base
+    rsi.log_event(plan_dir, "review_base_refused" if why else "review_base_declared",
+                  session_ids=[session_id], review_base=ref, resolved=sha or None,
+                  **({"reason": why} if why else {"base": base}))
+    return base
 
 
 def net_of_default_merges(base, cwd, branch):

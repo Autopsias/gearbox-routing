@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 
+import safe_json as sj
 import shipping as shp
 import verify_pass as vp
 from worktree import git
@@ -97,9 +98,24 @@ def at_land_gates(land_path, plan_tree):
     """[(gate_id, descriptor)] for every ``at_land: true`` gate, sorted by id.
     Each is resolved from the same candidate-tree entry discovery read."""
     reg = registry(land_path)
-    return [(gid, shp.gate_descriptor(gid, g, lambda c=_cwd(gid, g): _rooted(plan_tree, c)))
+    return [(gid, shp.gate_descriptor(gid, _runnable(gid, g), lambda c=_cwd(gid, g): _rooted(plan_tree, c)))
             for gid, g in sorted(reg.items())
             if isinstance(g, dict) and g.get("at_land") is True]
+
+
+def _runnable(gid, g):
+    """``g`` when it names what to run: a skill gate a non-empty ``skill`` string, any
+    other gate a non-empty ``argv`` list of strings. Else a malformed registry, refused
+    at discovery rather than crashing ``gate_descriptor`` or running a wrong argv."""
+    if g.get("kind") == "skill":
+        ok = bool(sj.get_str(g, "skill"))
+    else:
+        argv = sj.get_list(g, "argv")
+        ok = bool(argv) and all(isinstance(a, str) for a in argv)
+    if not ok:
+        raise Unreadable(f"{REGISTRY}: gate {gid!r} names nothing to run "
+                         f"(skill={g.get('skill')!r}, argv={g.get('argv')!r})")
+    return g
 
 
 def _cwd(gid, g):

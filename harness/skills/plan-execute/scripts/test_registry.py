@@ -181,12 +181,12 @@ def test_lock_info_none_when_no_lock_file(tmp_path):
     assert reg.lock_info(tmp_path / "unlocked") is None
 
 
-def test_lock_info_degrades_age_s_none_on_naive_started_at(tmp_path):
+def test_lock_info_reads_naive_started_at_as_utc(tmp_path):
     """Rework fix (MEDIUM, gate llm-review-low attempt 1): a naive (no
     tzinfo) `started_at` — a legacy or hand-edited pidfile — used to raise an
     uncaught TypeError from `datetime.now(UTC) - naive_dt`, since only
-    ValueError was caught. That crashed the whole read-only plans-status run
-    instead of degrading. This test fails without the fix."""
+    ValueError was caught. That crashed the whole read-only plans-status run.
+    It now reads as UTC (safe_json.parse_iso_aware), so it has an age."""
     plan_dir = tmp_path / "naive-lock"
     plan_dir.mkdir()
     (plan_dir / ".lock").write_text(json.dumps({
@@ -196,7 +196,7 @@ def test_lock_info_degrades_age_s_none_on_naive_started_at(tmp_path):
     }))
     info = reg.lock_info(plan_dir)
     assert info is not None
-    assert info["age_s"] is None
+    assert isinstance(info["age_s"], float)
 
 
 @pytest.mark.parametrize("bad_contents", ["[]", '"x"', "3", "null"])

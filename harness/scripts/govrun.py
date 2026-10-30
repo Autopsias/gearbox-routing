@@ -97,6 +97,7 @@ from govrun_config import (
     load_slots,
     validate_slots,
 )
+from govrun_cores import acquire_cores
 from govrun_errors import Refused
 from govrun_locks import _try_lock, acquire, write_holder
 from govrun_pytest_budget import (
@@ -125,11 +126,15 @@ __all__ = [
 
 
 USAGE = """usage: govrun [--class ci|interactive] [--max-wait SECONDS] [--] COMMAND...
+       govrun --cores N [--class ci|interactive] [--max-wait SECONDS] [--] COMMAND...
        govrun --status
 
   --class      which slot class to queue for (default: interactive)
   --max-wait   seconds to wait for a slot; 0 waits forever
                (default: interactive 120, ci 0)
+  --cores N    a non-pytest job (video, a build) that uses N cores: skip the
+               worker slot and take N of the machine's core tokens. Without
+               it, a job takes the worker slot plus one core per worker.
   --status     print slot holders, hook wiring and budget agreement"""
 
 
@@ -159,37 +164,47 @@ def _parse_max_wait(raw):
     return value
 
 
+# Every govrun option that takes a value, spelled `--opt V` or `--opt=V`.
+VALUE_OPTS = {"--class": "class", "--max-wait": "max-wait",
+              "--max_wait": "max-wait", "--cores": "cores"}
+
+
 def parse_args(argv):
     """Hand-rolled so the PAYLOAD's own flags are never eaten. Stops at the
     first token that is not a govrun option (or at an explicit `--`)."""
-    klass, max_wait, status, i = DEFAULT_CLASS, None, False, 0
+    opts, status, i = {}, False, 0
     while i < len(argv):
         arg = argv[i]
         if arg == "--status":
             status, i = True, i + 1
-        elif arg in ("-h", "--help"):
+            continue
+        if arg in ("-h", "--help"):
             print(USAGE)
             sys.exit(0)
-        elif arg == "--class":
-            klass, i = _opt_value(argv, i, "--class"), i + 2
-        elif arg.startswith("--class="):
-            klass, i = arg.split("=", 1)[1], i + 1
-        elif arg in ("--max-wait", "--max_wait"):
-            max_wait, i = _opt_value(argv, i, "--max-wait"), i + 2
-        elif arg.startswith("--max-wait="):
-            max_wait, i = arg.split("=", 1)[1], i + 1
-        elif arg == "--":
+        if arg == "--":
             i += 1
             break
-        else:
+        name, eq, value = arg.partition("=")
+        if name not in VALUE_OPTS:
             break
+        if eq:
+            i += 1
+        else:
+            value, i = _opt_value(argv, i, name), i + 2
+        opts[VALUE_OPTS[name]] = value
+    max_wait = opts.get("max-wait")
     if max_wait is not None:
         max_wait = _parse_max_wait(max_wait)
-    return klass, max_wait, status, argv[i:]
+    cores = opts.get("cores")
+    if cores is not None:
+        if not cores.isdigit() or int(cores) < 1:
+            raise Refused(f"--cores must be a whole number >= 1, got {cores!r}")
+        cores = int(cores)
+    return opts.get("class", DEFAULT_CLASS), max_wait, status, cores, argv[i:]
 
 
 def main(argv):
-    klass, max_wait, status, cmd = parse_args(argv)
+    klass, max_wait, status, cores, cmd = parse_args(argv)
     slots = load_slots()
     if status:
         return cmd_status(slots)
@@ -198,19 +213,30 @@ def main(argv):
     if max_wait is None:
         max_wait = DEFAULT_MAX_WAIT.get(klass, DEFAULT_MAX_WAIT[DEFAULT_CLASS])
 
-    slot, fd, waited = acquire(slots, klass, max_wait)
-    check_budget(cmd, slot["workers"])  # on acquire, BEFORE exec
-    write_holder(slot, klass, cmd, waited)
-    sys.stderr.write(f"govrun: acquired {slot['name']} after {waited:.0f}s\n")
+    if cores is not None:
+        fds, waited = acquire_cores(cores, max_wait)
+        sys.stderr.write(f"govrun: acquired {cores} cores after {waited:.0f}s\n")
+        os.environ["GOVRUN_CORES"] = str(cores)
+    else:
+        # Slot first, then its cores: a cores-only job never takes the slot, so
+        # this one order can never deadlock against it.
+        slot, fd, waited = acquire(slots, klass, max_wait)
+        check_budget(cmd, slot["workers"])  # on acquire, BEFORE exec
+        fds, waited = acquire_cores(slot["workers"], max_wait, waited)
+        fds.append(fd)
+        write_holder(slot, klass, cmd, waited)
+        sys.stderr.write(f"govrun: acquired {slot['name']} after {waited:.0f}s\n")
+        os.environ["PYTEST_XDIST_AUTO_NUM_WORKERS"] = str(slot["workers"])
+        os.environ["GOVRUN_CORES"] = str(slot["workers"])
     sys.stderr.flush()
 
-    os.environ["PYTEST_XDIST_AUTO_NUM_WORKERS"] = str(slot["workers"])
     if klass in NICE_BY_CLASS:
         os.nice(NICE_BY_CLASS[klass])
     # The lock must OUTLIVE this process image. Without this the fd is
     # close-on-exec (PEP 446) and the slot frees itself the instant the payload
     # starts — measured, see the module docstring.
-    os.set_inheritable(fd, True)
+    for held in fds:
+        os.set_inheritable(held, True)
     try:
         os.execvp(cmd[0], cmd)
     except OSError as exc:

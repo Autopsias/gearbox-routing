@@ -36,6 +36,8 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+import safe_json as sj
+
 from ship_locks import (  # noqa: F401  (re-exported: callers use ssio.<name>)
     LEASE_RATIONALE,
     REPO_LOCK_DIRNAME,
@@ -107,16 +109,14 @@ def read_json_with_bak(path):
     path = Path(path)
     if not path.exists():
         return None
-    try:
-        return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
-        bak = path.with_name(path.name + ".bak")
-        if bak.exists():
-            try:
-                return json.loads(bak.read_text())
-            except (json.JSONDecodeError, OSError):
-                pass
-        raise ShipStateError(f"shipping-state file {path} is corrupt and has no usable .bak")
+    for p in (path, path.with_name(path.name + ".bak")):
+        try:
+            data = sj.load_dict(p.read_bytes())
+        except OSError:
+            data = None
+        if data is not None:
+            return data
+    raise ShipStateError(f"shipping-state file {path} is corrupt and has no usable .bak")
 
 
 # --------------------------------------------------------------------------

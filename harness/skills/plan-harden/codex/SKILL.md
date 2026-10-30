@@ -5,6 +5,8 @@ description: Harden a plan-builder plan from Codex before it ships — Codex-onl
 
 # Plan Harden (Codex harness — Codex-only review)
 
+**Ponytail does not apply to this task.** This is plan-hardening work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)
+
 You are the **hardening orchestrator** — the interactive `codex` session the
 operator is typing into. You harden one `spec.json`-backed plan **directory**
 (`PLAN.html` + `manifest.json` + `spec.json` + `sessions/*.prompt.md`) — the

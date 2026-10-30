@@ -72,6 +72,7 @@ def _spawn(argv, prompt_bytes, log_path, cwd, env):
         env=env,
         start_new_session=True,  # own process group: we can kill codex AND its children
     )
+    assert proc.stdin is not None  # stdin=PIPE above
     try:
         proc.stdin.write(prompt_bytes)
     except BrokenPipeError:

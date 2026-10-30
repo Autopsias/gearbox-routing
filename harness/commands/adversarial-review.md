@@ -8,6 +8,8 @@ allowed-tools: ["Read", "Write", "Edit", "Grep", "Glob", "Bash", "Skill", "Enter
 
 Hint: "$ARGUMENTS"
 
+**Ponytail does not apply to this task.** This is review and plan-hardening work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)
+
 You are the **review orchestrator**. Two models, two roles, strict scope boundaries: Codex attacks implementation-level exploitability, Claude (Opus) reviews architecture/intent/operations. Claude synthesizes both into unified findings. This command runs in phases. **All phases are mandatory when applicable -- do NOT stop early.**
 
 Use `TaskCreate` to enumerate PHASE 1, 2a-2d, and 3a-3e as trackable tasks so progress is visible.
@@ -372,6 +374,8 @@ When in doubt, classify as unique rather than false-consensus.
 
 `NEEDS ATTENTION` if any finding has severity >= HIGH and confidence >= 0.6. Otherwise `APPROVE`.
 
+**When the brief states a blocking rule, that rule replaces the severity rule above.** A land or gate review brief may carry a `Blocking rule:` line, agreed with the owner BEFORE the review starts — for example "only a finding that breaks the plan's stated goal or invariant blocks". Then the verdict is `NEEDS ATTENTION` only for a finding that meets that rule. Every other finding keeps its severity label and goes under a `### Follow-up list (non-blocking)` heading, so nothing is dropped. Never widen the rule mid-review; a finding you think should block but does not meet the rule goes under a separate `### Owner calls` heading, prefixed `owner call:`, never into the plain follow-up list. With no `Blocking rule:` line, the severity rule above applies unchanged. Why: on the cloudflare-security-vendor land, an unscoped "find anything" review failed rounds 1-5, each on a new edge case in one mechanism; round 7, under a stated blocking rule, passed in one round (`_plans/cloudflare-security-vendor-2026-10-23/_evidence/land/adversarial-review-report*.md`).
+
 ### Output format
 
 ```
@@ -382,6 +386,7 @@ When in doubt, classify as unique rather than false-consensus.
 **Artifacts**: adversarial-review-{ts}-claude.md, adversarial-review-{ts}-codex.md
 
 ### Verdict: [NEEDS ATTENTION | APPROVE]
+Blocking rule: [the brief's `Blocking rule:` line verbatim, or "default: severity >= HIGH, confidence >= 0.6"]
 
 ### Consensus Findings
 [Both models independently identified -- highest confidence]
@@ -402,6 +407,12 @@ Recommendation: [unified]
 
 ### Conflicts
 [If any -- both perspectives without resolution]
+
+### Owner calls
+[Only when the brief states a blocking rule: findings you think should block that do not meet it, each prefixed `owner call:`]
+
+### Follow-up list (non-blocking)
+[Only when the brief states a blocking rule: every other finding that does not meet it, with severity, source model and location]
 
 ### Top 3 Improvements
 1. ...

@@ -134,7 +134,7 @@ def n_policy_lock(m):
     operations that dropped one writer's fields."""
     import compact_store
 
-    compact_store.policy_lock = contextlib.nullcontext
+    compact_store.policy_lock = contextlib.nullcontext  # ty: ignore[invalid-assignment]  # a breaker: the wrong value IS the point
 
 
 def n_order(m):
@@ -159,13 +159,13 @@ def n_worker_guard(m):
     """Empty WORKER_MARKERS, the table env_session() reads to spot a worker."""
     import compact_store
 
-    compact_store.WORKER_MARKERS = ()
+    compact_store.WORKER_MARKERS = ()  # ty: ignore[invalid-assignment]  # a breaker: the wrong value IS the point
 
 
 def n_settings_guard(m):
     """Hand back the UNGUARDED registration — `python3 <path>` with nothing
     checking the path is there, which is exactly how it used to be written."""
-    kit.hook_commands = lambda: ['python3 "$HOME/.claude/hooks/compact-policy.py" prompt']
+    kit.hook_commands = lambda: ['python3 "$HOME/.claude/hooks/compact-policy.py" prompt']  # ty: ignore[invalid-assignment]  # a breaker: the wrong value IS the point
 
 
 def n_hold_inert(m):
@@ -174,7 +174,7 @@ def n_hold_inert(m):
     pair now exists to catch."""
     import compact_safepoint
 
-    compact_safepoint.HOLD_IS_INERT_FOR_TYPES = ("orchestrator",)
+    compact_safepoint.HOLD_IS_INERT_FOR_TYPES = ("orchestrator",)  # ty: ignore[invalid-assignment]  # a breaker: the wrong value IS the point
 
 
 def n_operator_loud(m):

@@ -294,20 +294,207 @@ a subagent to read and only the operator can fire it — which is exactly why
    agents its path.
 5. **Apply the false-positive bar** to what comes back. A finding is confirmed
    only when the agent names (a) file and line, (b) the path by which
-   attacker-controlled input reaches it, and (c) the concrete impact. Drop
-   everything else: "potential", "consider", missing defence-in-depth, style,
-   and anything inside a test fixture or a vendored tree.
-6. **Record confirmed findings only.** Any confirmed exploitable finding →
-   `fail`; otherwise `pass` with "N code files across M scopes reviewed, 0
-   confirmed". Never paste raw agent output into the detail.
+   attacker-controlled input reaches it, and (c) the concrete impact. A lead
+   that names (a) and (b) and a concrete impact that depends on facts the source
+   cannot settle (a deployment setting, a firewall rule, an environment value —
+   name every decisive one) is kept as **needs validation**. Drop everything
+   else: "potential", "consider", missing defence-in-depth, style, and anything
+   inside a test fixture or a vendored tree.
+6. **Record confirmed findings and needs-validation leads.** Any confirmed
+   exploitable finding → `fail`. Each needs-validation lead → an advisory
+   `warn` whose detail starts "needs validation:" and names each missing fact
+   and how the owner can check it. Otherwise `pass` with "N code files across
+   M scopes reviewed, 0 confirmed". Never paste raw agent output into the detail.
 
 ## `--deep` (optional, slower)
 
-Add three passes before render. Read Sentry's `security-review` SKILL.md
-(install [getsentry/skills](https://github.com/getsentry/skills) yourself; it is
-not vendored here) and review the **whole repo** by it, recording confirmed findings into
-`sec.sast` — `sec.diff-review` only ever sees the review window, so this is the
-pass that reaches code no recent commit touched. Run the test suite a second
+Add three passes before render. The first is the **whole-repo** security
+pass into `sec.sast` — `sec.diff-review` only ever sees the review window, so
+this is the pass that reaches code no recent commit touched. Pick its route
+first with `python3 <skill>/scripts/exposure.py .`. A repo opts in as reachable
+from outside by committing `.claude/exposure.json`
+(`{"exposed": true, "reason": "<how it is reachable>", "since": "YYYY-MM-DD"}`);
+no file means not exposed, and a symlinked one is refused. The first output
+line names the route. Every route records `sec.sast` through exposure.py, never
+by typing repo-derived text into a shell command: for the Sentry routes, write
+the detail to a file with your file-writing tool (not `echo` or a heredoc) and
+run `python3 <skill>/scripts/exposure.py record . <status> --detail-file <file>`
+(an empty or blank detail records `pending`, never the old detail under a new status).
+
+- **`sentry`** — today's pass. Read
+  `<skill>/vendor/security-review/SKILL.md` and review the whole repo by it,
+  recording confirmed findings (and needs-validation leads, by the same rule as
+  step 5) into `sec.sast` with `exposure.py record`, with a detail that starts
+  `route: sentry`.
+- **`sentry-downgrade <path>`** — the repo was exposed before (this clone ran
+  the exposed route, or a commit once set `"exposed": true`) and has no
+  committed `exposure.json` with a reason now. Run the Sentry pass and record
+  it with `exposure.py record` as `warn` or `fail` (it refuses `pass` here),
+  then run `python3 <skill>/scripts/exposure.py record-route .`: it puts
+  `route changed from cloudflare-quick to sentry: …` first in the detail and
+  makes the status `warn` (a Sentry `fail` stays `fail`), never `pass`. It
+  returns on every `--deep` run until the file is back, or the owner commits it with
+  `"exposed": false` and a reason — the acknowledgement. Only the exact bytes
+  of a regular file in the last commit count: an uncommitted edit does not.
+  Leaving the exposed route never hides what it left open: on both Sentry
+  routes, `record` and `record-route` read the open set, keep `fail` while a
+  confirmed finding is open and at least `warn` for any other open item, and
+  name them in the detail.
+- **`error: <reason>`** (exit 2) — a broken `exposure.json` (including a
+  reason that is not valid UTF-8 text, or JSON nested too deeply to parse:
+  `not readable JSON (nested too deeply)`), a dirty worktree
+  (up to five files named), no commit, no Node, a re-pinned vendor tree, or
+  git failing to read the history of `exposure.json` (`history: …`; a path
+  that is not a git repository is one). Run
+  `python3 <skill>/scripts/exposure.py record-route .`, which records `sec.sast`
+  `pending` with `exposure error: <reason>` (or `route error: <reason>` when
+  the cause is not the file); name the cause to the operator and
+  stop the security pass. A broken file is never read as "not exposed".
+- **`cloudflare-quick <output dir>`** (line 2: `reason: <reason>`) — the
+  exposed route. It costs about 25 agent calls (trial), capped at
+  **40**. Run one exposed audit per repo at a time: `open-items` is read before
+  the audit, and only check-run itself holds the lock.
+  1. `python3 <skill>/scripts/exposure.py prior-runs .` lists this clone's
+     earlier runs that check-run accepted and recorded, newest first.
+     `python3 <skill>/scripts/exposure.py open-items .` prints the items still
+     open from those runs (kind, id, label per line): the inherited open set.
+  2. Read `<skill>/vendor/cloudflare-security-audit/SKILL.md` and follow its full
+     audit workflow in the **`quick`** profile. Its output directory is the
+     folder exposure.py printed (new, under `~/.gearbox-state`, outside the repo), never
+     its own default. Hand it both outputs of step 1: the folders are its prior
+     runs, and the `open-items` list is prior input it must address. Every
+     confirmed finding, needs-validation lead, unvalidated candidate and open
+     unit on that list must appear again or be resolved; check-run names each
+     one missing. One
+     resolution needs no final record, for a lead only: each critic
+     `resolved_prior_leads` fingerprint goes into `run-metadata.json` as
+     `"resolved_prior_leads": [{"fingerprint": "…", "reason": "<the critic's
+     source-backed reason>"}]`, a gearbox bookkeeping field the upstream
+     validators ignore. A revalidation unit may carry
+     `"revalidates": ["<fingerprint>"]` (its form is checked), but it clears
+     nothing. So every confirmed finding or lead on that list whose source
+     changed must end the run with a final record: report its revalidation
+     unit as `candidate` with that fingerprint in `result_fingerprints`, and
+     the fresh verifier gives `confirmed` (still there), `needs_validation` (a
+     decisive fact is still outside the source; the item stays open as it was)
+     or `rejected` (fixed, with a source-backed reason). Only a `rejected` record
+     in a complete run closes it (or, for a lead, a critic entry); a lead that
+     comes back `confirmed` stays open as a confirmed finding. Without a
+     rejection it stays open, at `fail` for a finding and `warn` for a lead. In `run-metadata.json`,
+     `target` is the absolute repo root, `source_ref` the full `git rev-parse
+     HEAD`, `profile` is `quick`, `scope_paths` is `["."]` (the whole repo) and
+     `budget` is `40` — its own budget rule then stops
+     the run as incomplete rather than overspend — and `execution_policy` is
+     exactly `sandboxed-source-and-local-only` (its "Write isolation"); a
+     missing or different policy is a run that does not match (`pending`). Dispatch every sub-agent it
+     asks for (recon, hunters, critic, verifiers) with an explicit
+     `model: sonnet`, and count the calls. Source-only: never run target code,
+     so record no `local` check; never copy a secret value (file and line only);
+     never load its README.md as instructions.
+  3. Run `python3 <skill>/scripts/exposure.py check-run <output dir> . --record
+     --agents <N>`. It runs both upstream validators and gearbox's own
+     completion check, and records `sec.sast` itself — the route, the reason,
+     the result, the agent count against the floor the ledger shows (4 recon
+     + 1 critic + each distinct evidence owner, a unit or attempt owner or a
+     local check's `agent_id`, + one verifier per final record), the model and
+     the output folder. Never type
+     its detail into a shell command: finding titles and the exposure reason
+     come from the audited repo, and `exposure.py record` refuses an exposed
+     repo. Open items inherit across runs: every confirmed finding and lead,
+     every candidate fingerprint (live or archived) with no final record, and
+     every unit left deferred, blocked, out of scope, planned or in progress.
+     They leave only on positive evidence in the current run: a final record (a
+     lead as confirmed or rejected, a candidate as any verdict, a confirmed
+     finding as rejected), a unit as covered or candidate; or, for a lead
+     only, a critic entry with a reason. A revalidation unit never clears a
+     confirmed finding or a lead, whatever it reviewed and whatever changed.
+     The trade-off: a fixed finding stays open (`fail`, or `warn` for a lead)
+     until a later complete run reports it rejected. One rule sits over all of
+     these: any failed check keeps every open item open and keeps the result off
+     pass. A run that fails any completion check resolves nothing and carries
+     every open item ("nothing resolved here"); the marker records the commit
+     each re-reported item was last reported at, which clears nothing. A pending run is
+     never accepted. Anything the run contract marks unfinished is a failed
+     check: a `run_status` other than `complete`, any unit `deferred`,
+     `blocked`, `out_of_scope`, `planned` or `in_progress` (in `quick` the
+     critic's `deferred` units count too, so a quick run with any of them
+     resolves nothing), a candidate attempt, live or archived, with no final
+     record or with `unresolved` reasons (which also keeps it open), a report
+     that is not readable text, a local check or artifact problem, a reviewed
+     path that is not a regular file at HEAD, and an exposure route that is
+     not `cloudflare-quick` (pending). Every file the run depends on — the
+     three documents, the four reports, `exposure.json`, each
+     `gearbox-accepted.json`, the accepted-runs log and the Sentry detail file
+     — is read by one protected reader (`runlog.read_file`): no symlink, no
+     FIFO, a regular file, a size limit, strict UTF-8, and a report must not
+     be blank. A refusal is a failed check, recorded `pending` or `warn`.
+     **A run that can clear items** has no failed check at all: `run_status`
+     `complete`, every unit `covered`, `candidate` or `not_applicable` (no
+     `deferred`, so in `quick` the final critic accepted no new work), every
+     candidate attempt with a final record and empty `unresolved`, all four
+     reports readable, only `source` checks, and every reviewed path a
+     regular file at HEAD. Until such a run reports it `rejected`, a fixed
+     finding stays at `fail`, however many runs it takes; a lead stays open
+     until such a run reports it `rejected` or a critic entry resolves it, and a
+     `confirmed` record turns it into a confirmed finding at `fail`, not closed
+     (step 2 says how a fixed one gets its record). Leaving an item out
+     never resolves it, and every resolution is named on the "resolved here"
+     line. Check-runs on one repo take turns (a lock in
+     the run parent), so two overlapping audits cannot erase each other's
+     items. Its mapping: a confirmed finding open now or
+     never resolved → `fail`; any other open item (needs-validation leads take
+     the "needs validation:" warn lane from step 5) or an incomplete run →
+     `warn`, never `pass`; rejected → dropped. One check holds one status, so
+     fail beats warn beats pass, and every lead goes into the one detail. The
+     full rules, including what counts as incomplete (a reviewed path that is
+     not a regular file at HEAD — missing, ignored, a folder, a symlink or a
+     submodule — is one), live in `_status`, `_carry`, `_cleared` and
+     `_incomplete` in `scripts/cf_check.py`.
+  4. On `pending` (no Node, a validator that failed or hung, a re-pinned vendor
+     tree, a run that does not match this repo, more than 40 agent calls or
+     fewer than the ledger shows, a dirty tree — only the files repo-health
+     writes, `.claude/health/` scorecard.json, HEALTH.html and history.jsonl,
+     are exempt — a commit made while it ran, a run folder that already holds
+     `gearbox-accepted.json`, a malformed bookkeeping field, unreadable open-set
+     state, or any crash — each is recorded as `pending`, never left as the
+     older result; check-run records `pending` first and the final status only
+     after the run is accepted) stop. Do
+     not fall back to the Sentry pass: that would hide that the exposed route
+     did not run. When the cause is "open-set state unreadable" — including
+     `accepted markers exist but the log is empty: run repair-log` (the log is
+     missing or blank while a run folder still holds `gearbox-accepted.json`) — run
+     `python3 <skill>/scripts/exposure.py repair-log .`. It keeps the open set
+     of the newest run the log names, adds every item of a readable marker the
+     log does not name, and writes them into a new repair run. Exit 2
+     (`refused: …`) means a logged run's marker, or any other marker, cannot be
+     read (a symlink or FIFO is refused before reading); nothing was written,
+     because that marker could hold the newest state. Stop and name it to the
+     operator: only the owner decides to restore it or give up its items. For
+     a marker in a run folder the log does not name, the refusal names the
+     folder: check-run never read state from it, so deleting that unlogged
+     run folder is safe unless the log is known to have lost lines. Items from a marker the log does not name
+     can re-open something a later run resolved: a false fail, never a false
+     pass, cleared by a final record in a later run. Then run check-run again.
+     One case is different: a logged run folder whose marker is gone
+     (`missing from a logged run folder`). Do not run repair-log for it: it
+     always refuses that case. Stop and name the folder to the owner. Only the
+     owner decides to restore the marker or delete the folder. Deleting that
+     folder leaves check-run `pending` until repair-log rebuilds the open set
+     from the older markers; items only that marker held are lost. Never delete
+     the log by hand: check-run stays `pending` until repair-log rebuilds it
+     from the markers.
+
+  Run folders hold vulnerability details and stay under `~/.gearbox-state` until deleted
+  by hand. Keep the newest few per repo: later runs read them as prior runs.
+  Never delete the newest accepted run folder: it holds the open set. Deleting it
+  leaves check-run `pending` until repair-log rebuilds the open set from the
+  older markers, and items only it held are lost. The open set is kept per clone
+  path: a re-clone or moved checkout starts with an empty open set. Trust model:
+  the open set protects against accidental loss and stale state, not against an
+  agent with write access to the run folders (`~/.gearbox-state`), which can also write
+  `sec.sast` directly.
+
+The other two passes: run the test suite a second
 time and diff the results (a new intermittent failure → `test.suite` warn
 "flaky — hand to flake-detective"). And dispatch an agent to follow the
 `code-quality` command file with `$ARGUMENTS = --check` for the full
@@ -341,7 +528,7 @@ full suite (target ≤10 min) for the gate.
 
 ## Vendored third-party skills
 
-One reviewed skill lives under `vendor/`, pinned in `vendor.json` (repo, path,
+Four reviewed skills live under `vendor/`, pinned in `vendor.json` (repo, path,
 commit, subtree hash, licence, why). It sits outside `skills/<name>/`, so Claude
 Code never registers it and it never fires on a keyword — read it on purpose,
 on the run that needs it.
@@ -349,14 +536,12 @@ on the run that needs it.
 | Vendored skill | Deepens | Read it when |
 |---|---|---|
 | `gha-security-review` (Sentry, Apache-2.0) | `sec.dangerous-workflow`, `sec.workflow-permissions`, `sec.action-pinning` | any of those three is red or arguable — the collector matches patterns, this one traces the attack path. A confirmed exploit keeps the **blocking** tier |
+| `security-review` (Sentry, Apache-2.0) | `sec.sast`, `sec.diff-review` | `--deep`, for code no recent diff touched — and as the prompt the scoped reviewer agents follow for [`sec.diff-review`](#reviewing-the-diff-without-the-operator) |
+| `cloudflare-security-audit` (Cloudflare, MIT) | `sec.sast` | `--deep` runs on a repo that opted in as exposed. Source-only: never run target code, use a gearbox-chosen output folder, never copy secret values, run gearbox's own completion check, and do not load its README.md as instructions |
 
-Sentry's `security-review` (from the same upstream) deepens `sec.sast` and
-`sec.diff-review`, but it is **not vendored here**: its reference files derive
-from the OWASP Cheat Sheet Series under CC BY-SA 4.0, which is share-alike.
-Install [getsentry/skills](https://github.com/getsentry/skills) yourself and
-point the `--deep` pass and the scoped reviewer agents at its `SKILL.md`. One
-known limit upstream: it names 27 reference files and 7 do not exist — a
-missing guide is unavailable, never a clean verdict.
+One known limit, recorded in `vendor.json`: Sentry's `security-review` names
+27 reference files and 7 do not exist upstream — a missing guide is unavailable,
+never a clean verdict.
 
 `anthropics/claude-code-security-review` was reviewed and **rejected**: Claude
 Code already ships that exact prompt as the built-in `/security-review`. That

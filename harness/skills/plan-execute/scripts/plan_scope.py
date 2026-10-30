@@ -316,7 +316,7 @@ def dispatch_preamble(plan_dir, session, session_id, member_path):
 
 
 def dispatch_preamble_with_digest(plan_dir, session, session_id, member_path):
-    """`dispatch_preamble`, with the cross-session findings digest
+    """`dispatch_preamble`, with the owner's checkpoint answer
     (`findings_digest.digest`) prepended and the standing dispatch guidance
     appended -- the exact prefix run.py's Claude funnel puts in front of every
     dispatched prompt. Lives here (not in run.py) so that file, which sits on a

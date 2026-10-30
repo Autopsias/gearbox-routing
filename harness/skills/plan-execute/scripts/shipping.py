@@ -45,6 +45,7 @@ import manifest_io as mio
 import plan_scope as pscope
 import plan_ship as pship
 import run_state_io as rsi
+import safe_json as sj
 import ship_state_io as ssio
 import shipping_adapter as adapter
 
@@ -78,14 +79,14 @@ def _load_registry(plan_dir, project_filename, bundled_filename):
     bundled = _bundled_default(bundled_filename)
     if bundled.is_file():
         try:
-            merged.update(json.loads(bundled.read_text()))
-        except (json.JSONDecodeError, OSError):
+            merged.update(sj.load_dict(bundled.read_bytes()) or {})
+        except OSError:
             pass
     local = find_project_root(plan_dir) / ".claude" / project_filename
     if local.is_file():
         try:
-            merged.update(json.loads(local.read_text()))
-        except (json.JSONDecodeError, OSError):
+            merged.update(sj.load_dict(local.read_bytes()) or {})
+        except OSError:
             pass
     return merged
 
@@ -709,13 +710,8 @@ def _record_failure(plan_dir, session_id, state, step, excerpt):
 
 def ship_finalize(plan_dir, session_id, _state=None):
     state = _state or ssio.load_ship_state(plan_dir, session_id)
-    durations = None
-    if state and state.get("started_at"):
-        try:
-            started = datetime.fromisoformat(state["started_at"])
-            durations = int((datetime.now(UTC) - started).total_seconds() * 1000)
-        except ValueError:
-            durations = None
+    started = sj.parse_iso_aware(state.get("started_at")) if state else None
+    durations = None if started is None else int((datetime.now(UTC) - started).total_seconds() * 1000)
     if state:
         state["replayed_at"] = _now()
         _persist_state(plan_dir, session_id, state)

@@ -393,3 +393,80 @@ def test_function_length_bar_cannot_be_self_written_either(tmp_path: Path) -> No
         f"a commit wrote its own function bar and passed:\n{proc.stdout}"
     )
     assert "m.py" in proc.stdout and "BLOCKING" in proc.stdout
+
+
+# --- check_types: the type-error ratchet -------------------------------------
+
+def _load_check_types():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("check_types", SCRIPTS / "check_types.py")
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+TY_CONCISE = (
+    "hooks/a.py:10:5: error[invalid-assignment] Object of type `str` is not assignable to `int`\n"
+    "hooks/a.py:12:5: error[invalid-assignment] Object of type `str` is not assignable to `int`\n"
+    "hooks/a.py:20:1: warning[redundant-condition] Condition is always true\n"
+    "scripts/b.py:3:8: error[unresolved-import] Cannot resolve imported module `nope`\n"
+    "Found 4 diagnostics\n"
+)
+
+
+def test_check_types_counts_per_file_and_rule() -> None:
+    ct = _load_check_types()
+    counts = ct.count_diagnostics(TY_CONCISE)
+    assert counts == {
+        ("hooks/a.py", "invalid-assignment"): 2,
+        ("hooks/a.py", "redundant-condition"): 1,
+        ("scripts/b.py", "unresolved-import"): 1,
+    }
+
+
+def test_check_types_blocks_only_a_rising_count() -> None:
+    ct = _load_check_types()
+    baseline = ct.count_diagnostics(TY_CONCISE)
+    same = ct.judge(ct.count_diagnostics(TY_CONCISE), baseline)
+    assert same == ([], [])
+    # One more invalid-assignment in a.py, one fewer in b.py: block the rise,
+    # report the fall, never net them against each other.
+    moved = TY_CONCISE.replace("scripts/b.py:3:8: error[unresolved-import] Cannot resolve imported module `nope`\n", "") \
+        + "hooks/a.py:30:5: error[invalid-assignment] again\n"
+    blocking, stale = ct.judge(ct.count_diagnostics(moved), baseline)
+    assert blocking == [("hooks/a.py", "invalid-assignment", 3, 2)]
+    assert stale == [("scripts/b.py", "unresolved-import", 1, 0)]
+    # A file the baseline never saw blocks on its first diagnostic.
+    fresh = TY_CONCISE + "lib/new.py:1:1: error[unresolved-import] Cannot resolve imported module `x`\n"
+    blocking, _ = ct.judge(ct.count_diagnostics(fresh), baseline)
+    assert blocking == [("lib/new.py", "unresolved-import", 1, 0)]
+
+
+@pytest.mark.skipif(
+    _load_check_types().find_ty() is None, reason="ty not installed",
+)
+def test_check_types_end_to_end_against_a_planted_error(tmp_path: Path) -> None:
+    """Positive control first: a gate that is green on an empty input proves nothing."""
+    (tmp_path / "pyproject.toml").write_text('[tool.ty.src]\ninclude = ["src"]\n', encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    bad = tmp_path / "src" / "bad.py"
+    bad.write_text('x: int = "not an int"\n', encoding="utf-8")
+    proj = str(tmp_path)
+
+    first = run("check_types.py", "--project", proj)
+    assert first.returncode == 1, first.stdout + first.stderr
+    assert "BLOCK src/bad.py: 1 x invalid-assignment" in first.stdout
+
+    assert run("check_types.py", "--project", proj, "--generate-baseline").returncode == 0
+    recorded = json.loads((tmp_path / ".type-exceptions").read_text())
+    assert recorded == {"exceptions": [{"file": "src/bad.py", "rule": "invalid-assignment", "count": 1}]}
+    assert run("check_types.py", "--project", proj).returncode == 0
+
+    bad.write_text('x: int = "not an int"\ny: int = "nor this"\n', encoding="utf-8")
+    assert run("check_types.py", "--project", proj).returncode == 1
+
+    bad.write_text("x: int = 1\n", encoding="utf-8")
+    under = run("check_types.py", "--project", proj)
+    assert under.returncode == 0
+    assert "below baseline src/bad.py" in under.stdout

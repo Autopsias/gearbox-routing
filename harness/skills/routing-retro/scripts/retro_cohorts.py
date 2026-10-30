@@ -15,6 +15,7 @@ import os
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from statistics import median
+from typing import Any
 
 from compaction_ledger import parse_ts
 from retro_common import (
@@ -240,8 +241,8 @@ def cost_cells(records):
     cell that fails and escalates is not reported as cheap. A session with a
     null-cost attempt, or a gap in its attempt numbers, is counted as
     incomplete-cost and kept out of the median."""
-    cells = defaultdict(lambda: {"attempts": 0, "with_usage": 0, "costs": [], "sessions": [],
-                                 "incomplete": 0})
+    cells: defaultdict[tuple, dict[str, Any]] = defaultdict(
+        lambda: {"attempts": 0, "with_usage": 0, "costs": [], "sessions": [], "incomplete": 0})
     sessions = defaultdict(list)
     for r in records:
         cell = cells[_ran_cell(r)]

@@ -97,6 +97,23 @@ def test_clean_fixture_passes_and_records_result(tmp_path):
     assert len(hist) == 1 and json.loads(hist[0])["bf"] == 0
 
 
+def test_set_keeps_an_exposure_error_detail_through_render(tmp_path):
+    # SKILL.md --deep records a broken .claude/exposure.json as pending with
+    # this detail; it must reach the page intact, not as a blank pending row.
+    import html
+    repo = make_repo(tmp_path, dirty=False)
+    health.collect(repo)
+    detail = ("exposure error: /r/.claude/exposure.json: "
+              '"exposed": true needs a non-empty "reason"')
+    health.main(["set", "sec.sast", "pending", detail, "--repo", str(repo)])
+    card = json.loads((repo / ".claude" / "health" / "scorecard.json").read_text())
+    sast = next(c for c in card["checks"] if c["id"] == "sec.sast")
+    assert (sast["status"], sast["detail"]) == ("pending", detail)
+    render.render(repo)
+    page = (repo / ".claude" / "health" / "HEALTH.html").read_text()
+    assert html.escape(detail.split(": ", 1)[1]) in page
+
+
 def _c(tier, status):
     return {"tier": tier, "status": status}
 

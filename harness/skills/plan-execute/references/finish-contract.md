@@ -1,5 +1,16 @@
 # Finish contract — FROZEN 2026-10-01 (v1, rework 2)
 
+## Contents
+
+- [Operator decisions — recorded, not open](#operator-decisions-2026-10-01--recorded-not-open)
+- [Decisions taken in s01](#decisions-taken-in-s01)
+- [When `plan` returns `finish`](#when-plan-returns-finish)
+- [Preflight — before any write](#preflight--before-any-write)
+- [The four steps, in order](#the-four-steps-in-order)
+- [What finish may touch — and may never touch](#what-finish-may-touch--and-may-never-touch)
+- [Frozen interfaces](#frozen-interfaces)
+- [Revision notes](#revision-notes)
+
 **`finish` is the last step of every plan. It makes sure the plan's whole record
 is on the default branch, reports anything left behind, brings the operator's
 checkout up to date when that is provably safe, and reports CI's verdict.** It

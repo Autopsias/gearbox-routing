@@ -65,10 +65,11 @@ The heavy command has to LEAD its segment, so a wrapper in front of it hides it
 unless the wrapper is on the SHORT, EXPLICIT list in `governor_parse`'s
 `TRANSPARENT`. The list is deliberately closed, not a general solution.
 RESIDUAL GAP, for s04 to document: `bash -c …`, `sh -c …`, `xargs`, `sudo`,
-`make test`, `npm run …`, `just`, `tox`, `nohup`, `timeout 600 …`, `stdbuf`,
-and any project script that runs pytest or docker internally are all OPAQUE —
-the hook renders no decision on them. A transparent wrapper's OWN flags are
-skipped (`nice -n 10 pytest -n 8` is seen since 2026-09-08), and env's `-S`,
+`make test`, `npm run …`, `just`, `tox`, `stdbuf`, and any project script
+that runs pytest or docker internally are all OPAQUE — the hook renders no
+decision on them. A transparent wrapper's OWN flags are skipped (`nice -n 10
+pytest -n 8` is seen since 2026-09-08; `timeout -s KILL 600 pytest -n 8` and
+its DURATION since 2026-10-18), and env's `-S`,
 which re-splits ONE quoted string into the command, is put back into words
 (`env -S 'pytest -n 8'` is seen). `bash -c '…'` hands its string to a shell,
 not to a word split, and stays opaque: that is where the closed list ends.
@@ -76,12 +77,24 @@ not to a word split, and stays opaque: that is where the closed list ends.
 WIRING (settings.json, hooks.PreToolUse, matcher "Bash"):
 
     {"type": "command",
-     "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\"; s=$?; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }",
-     "timeout": 5}
+     "command": "p=…/governor-hook.py; [ -f \"$p\" ] || exit 0; in=$(cat);
+                 <fast path: no pytest/py.test/docker in $in -> exit 0>;
+                 printf '%s' \"$in\" | python3 \"$p\"; <non-zero -> exit 2>",
+     "timeout": 15, "onFailure": "block"}     (verbatim: settings.json)
 
-`timeout` is explicit because a hook TIMEOUT IS AN ALLOW — see above. Five
-seconds is ~25x the 200 ms budget this hook's own latency test enforces, so
-hitting it means something is very wrong, not merely slow.
+A hook TIMEOUT IS AN ALLOW unless `onFailure` is "block" — and,
+with the Mac swapping, this hook outran its 5 s and an unwrapped `pytest -n 4`
+ran. `"onFailure": "block"` makes a timeout a BLOCK (probed that day on Claude
+Code 2.1.302). That is only affordable because of the FAST PATH in front of
+Python: a payload that cannot spell `pytest`/`py.test`/`docker` (case-folded,
+quotes and backslashes dropped, the same characters shlex removes) exits 0 in
+the shell, so `git status` never waits on Python and never times out. Only a
+heavy-LOOKING call pays for this file, and a slow verdict on it blocks.
+Two consequences, both deliberate: a DISARMED hook now refuses only those
+calls, and an over-deep `env -S` nest with no such word in it is allowed —
+nothing heavy can hide in text that never spells it.
+The timeout is 15 s, not 5: at load 54-75 an ALLOWED `govrun -- pytest` call
+took up to 3.5 s here, and a block on a wrapped call is a false one.
 
 The `[ -f "$p" ]` guard stays: a hook that is not installed must not break
 Bash. What changed is the case where it IS installed and cannot

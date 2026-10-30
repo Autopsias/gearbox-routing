@@ -17,6 +17,7 @@ resolving ``--theirs`` could delete it. The approval is a decision input, and
 
 import hashlib
 import json
+import subprocess
 import time
 from pathlib import Path
 
@@ -76,6 +77,15 @@ def merge_in_progress(cwd):
     """
     rc, out, _ = git(["rev-parse", "--git-path", "MERGE_HEAD"], cwd)
     return rc == 0 and (Path(cwd) / out).exists()
+
+
+def git_alive(pid):
+    """Is ``pid`` a running git process? (``ps`` exits non-zero for a dead pid.)
+
+    The ``git`` name check stops a recycled pid from reading as our merge. A
+    false "alive" only parks; it never lets a land walk on."""
+    p = subprocess.run(["ps", "-o", "comm=", "-p", str(pid)], capture_output=True, text=True)
+    return p.returncode == 0 and "git" in p.stdout
 
 
 def porcelain(cwd):

@@ -1,5 +1,16 @@
 # Claude Code loop primitives — verified contracts (2026-01)
 
+## Contents
+
+- [Subagents / the Agent (Task) tool](#subagents--the-agent-task-tool)
+- [Workflows ("ultracode")](#workflows-ultracode)
+- [/loop & ScheduleWakeup](#loop--schedulewakeup)
+- [Cloud Routines (`/schedule`) — machine-closed durability](#cloud-routines-schedule--machine-closed-durability)
+- [Background tasks](#background-tasks)
+- [Per-gate autonomy policy — block vs notify-and-continue (OR-03)](#per-gate-autonomy-policy--block-vs-notify-and-continue-or-03)
+- [Eval-gate best practices (shaped the verify design)](#eval-gate-best-practices-shaped-the-verify-design)
+- [Gotchas that mattered here](#gotchas-that-mattered-here)
+
 What `/plan-builder` and `/plan-execute` actually rely on, verified against the
 in-harness tool contracts and the official docs (docs.claude.com, Jan 2026).
 **Corrects** a common confusion: the Agent *tool* in Claude Code is NOT the Agent

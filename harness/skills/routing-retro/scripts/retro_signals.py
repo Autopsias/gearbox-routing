@@ -18,7 +18,7 @@ from pathlib import Path
 from retro_cohorts import _as_epoch, _parse_ts, _stats, _touches_fable
 from retro_common import (
     ADOPTION_ATTEMPTS_PER_SUCCESS_MAX, ADOPTION_MIN_N, ADOPTION_PASS_MIN,
-    APEX_REVISIT_THRESHOLD, EXCLUDED_TERMINAL_RESULTS,
+    APEX_REVIEWED_THROUGH, APEX_REVISIT_THRESHOLD, EXCLUDED_TERMINAL_RESULTS,
     MIN_N_DOWNGRADE_OPEN, MIN_N_UPGRADE, PROPOSAL_ELIGIBLE_RESULTS, SMOKE_N,
     default_adoptions_path, stamp_path,
 )
@@ -36,7 +36,31 @@ def _effort_unbound(cohort):
     return a1.get("backend") == "claude" and a1.get("effort_mechanism") != "tier_agent"
 
 
-def aggregate_canaries(experimental_cohorts, adoptions):
+# The build canaries' declared cells. plan-builder writes the tag from this file, but a
+# plan that pins another model keeps the tag too (2026-10-18: Kuzushi a plan session/a plan session pinned
+# Opus/high under sonnet-low-agentic-20261010 — 14 Opus/Fable rows counted as Sonnet).
+BUILD_CANARIES = Path(__file__).resolve().parents[2] / "plan-builder" / "references" / "build-canaries.json"
+
+
+def declared_cells(path=None):
+    """{proposal_id: (model, reasoning)} from the build-canary config; {} if unreadable.
+    A canary not listed there (an older hand-authored one) gets no cell check."""
+    try:
+        cfg = json.loads(Path(path or BUILD_CANARIES).read_text())
+        return {c["proposal_id"]: (c["model"].lower(), c["reasoning"]) for c in cfg["canaries"]}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def _off_cell(cohort, cell):
+    """A cohort authored at another cell than the canary's never ran the cell under test."""
+    a1 = cohort["attempt1"]
+    return cell is not None and ((a1.get("model_authored") or "").lower(),
+                                 a1.get("reasoning_authored")) != cell
+
+
+def aggregate_canaries(experimental_cohorts, adoptions, cells=None):
+    cells = declared_cells() if cells is None else cells
     by_pid = defaultdict(list)
     for c in experimental_cohorts:
         pid = ((c["attempt1"].get("routing_experiment") or {}).get("proposal_id"))
@@ -49,6 +73,9 @@ def aggregate_canaries(experimental_cohorts, adoptions):
         # v25: 4abfa765d726 counted five opus@low cohorts that all ran at the
         # orchestrator's effort. An unbound cohort is no evidence either way, so it
         # leaves the smoke batch and every statistic and is counted once, by name.
+        a1 = cohorts_sorted[0]["attempt1"]
+        off_cell = [c for c in cohorts_sorted if _off_cell(c, cells.get(pid))]
+        cohorts_sorted = [c for c in cohorts_sorted if not _off_cell(c, cells.get(pid))]
         unbound = [c for c in cohorts_sorted if _effort_unbound(c)]
         bound = [c for c in cohorts_sorted if not _effort_unbound(c)]
         eligible = [c for c in bound if c["terminal"].get("result") in PROPOSAL_ELIGIBLE_RESULTS]
@@ -56,6 +83,8 @@ def aggregate_canaries(experimental_cohorts, adoptions):
                             if c["terminal"].get("result") in EXCLUDED_TERMINAL_RESULTS)
         if unbound:
             excluded["effort_unbound"] = len(unbound)
+        if off_cell:
+            excluded["cell_not_canary"] = len(off_cell)
         stats = _stats(eligible)
         # DELIBERATE CHOICE [HARDENED finding 1]: the smoke batch is drawn from
         # `eligible` (gate-checked passed/exhausted only), never `cohorts_sorted`
@@ -89,12 +118,12 @@ def aggregate_canaries(experimental_cohorts, adoptions):
         else:
             stage = "adoption-evidence-insufficient"
 
-        a1 = cohorts_sorted[0]["attempt1"]
+        cell = cells.get(pid) or (a1.get("model_authored"), a1.get("reasoning_authored"))
         out.append({
             "proposal_id": pid,
             "class": a1.get("task_class"),
             "kind": (a1.get("routing_experiment") or {}).get("kind"),
-            "cell": f"{a1.get('model_authored')}@{a1.get('reasoning_authored')}",
+            "cell": f"{cell[0]}@{cell[1]}",
             "backend": a1.get("backend"),
             "stage": stage,
             "smoke_failed": smoke_failed,
@@ -111,7 +140,14 @@ def aggregate_canaries(experimental_cohorts, adoptions):
 # Apex revisit callout (SSOT-01 trigger — ESC-01's fable escalation apex).
 # --------------------------------------------------------------------------
 def apex_revisit(complete_cohorts):
-    count = sum(1 for c in complete_cohorts if any(_touches_fable(r) for r in c["records"]))
+    # Only fable cohorts that ran AFTER the last review count (int() tolerates a quoted version).
+    def _after_review(r):
+        try:
+            return int(str(r.get("ssot_version_ran") or 0).lstrip("v")) > APEX_REVIEWED_THROUGH
+        except ValueError:
+            return False
+    count = sum(1 for c in complete_cohorts
+                if any(_touches_fable(r) and _after_review(r) for r in c["records"]))
     fires = count >= APEX_REVISIT_THRESHOLD
     return {
         "cumulative_fable_escalation_cohorts": count,

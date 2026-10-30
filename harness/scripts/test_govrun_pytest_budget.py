@@ -732,6 +732,8 @@ def refused(command, budget=BUDGET):
     "hatch run ",
     "rye run ",
     "env FOO=1 nice ",
+    "timeout 600 ",        # opaque until 2026-10-18 (a example-project session)
+    "gtimeout -s KILL -k 5 --preserve-status 1700 ",
 ])
 def test_a_wrapped_pytest_is_budgeted_like_a_bare_one(wrapper):
     """govrun is handed a whole payload, so a runner in front of pytest is the

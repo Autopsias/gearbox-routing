@@ -293,30 +293,6 @@ def _report_dropped(cwd, base, scope, exclude, changed):
               file=sys.stderr)
 
 
-def _empty_surface_msg(level, surface, scope, exclude):
-    """The INDETERMINATE text for a surface with nothing in it — naming whichever
-    of the two filters was applied.
-
-    NO SILENT SHRINKING on this branch either. The land re-gate excludes
-    `_plans/<slug>/` and sets NO scope, so a land whose surface came out empty
-    BECAUSE of the exclusion used to say nothing about it at all, and the
-    operator was sent looking for a missing --base that was never the cause.
-    """
-    msg = (f"llm-review-{level}: INDETERMINATE — the reviewed surface is EMPTY "
-           f"({surface} has 0 changed files and there are 0 untracked files), so a "
-           f"green verdict would say nothing about the session's work. If the session "
-           f"COMMITTED its changes, pass --base <ref> (or PLAN_EXECUTE_REVIEW_BASE) "
-           f"naming the commit it started from.")
-    if scope:
-        msg += (f" NOTE: review_scope {', '.join(scope)} was applied -- if the "
-                f"session's work lives outside it, the SCOPE is wrong; an empty "
-                f"scoped surface is refused here rather than passed.")
-    if exclude:
-        msg += (f" NOTE: {', '.join(exclude)} was EXCLUDED from the surface; if the "
-                f"session's work lives there, the exclusion is wrong.")
-    return msg
-
-
 def resolve_surface(level, cwd, base, plan_dir=None, session=None, scope=(), exclude=()):
     """-> (new_files, base) to review, or (None, exit_code) when it must refuse.
 
@@ -389,7 +365,7 @@ def resolve_surface(level, cwd, base, plan_dir=None, session=None, scope=(), exc
         # was passed: `git diff HEAD` is empty, the reviewer is handed nothing,
         # and an empty findings array reads as a PASS. Measured on
         # the model-portability plan, where every session hit it.
-        print(_empty_surface_msg(level, surface, scope, exclude), file=sys.stderr)
+        __import__("empty_surface").report(level, surface, scope, exclude)
         return None, INDETERMINATE
     print(f"[llm-review-gate] reviewed surface = {surface} "
           f"({len(changed)} changed file(s)) + {len(new_files)} untracked file(s)"

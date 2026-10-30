@@ -27,7 +27,7 @@ block runs exactly as before.
   `require_evidence` (the evidence assertion is then the whole gate).
   **Fix rounds run review gates first:** on a rework pass `verify-begin` moves review gates (skill-kind, or argv gates that run `llm_review_gate.py`) ahead of the others, keeping relative order inside each group, because a review finding sends the session back anyway and a test run spent before it is wasted. The first pass keeps the declared order.
 - **`on_fail`** — `rework` (default) or `halt`.
-- **`max_rework`** — int 0–6 (ceiling raised from 5 so the longest escalation ladder, `sonnet@medium`, is authorable; default 2 since 2026-08-20, was 1). The bound on the rework loop.
+- **`max_rework`** — int 0–5 (ceiling raised 5 → 6, 6 → 7, 7 → 8, then lowered 8 → 5 when SSOT v39 withdrew the automatic fable rungs — it always equals the longest escalation ladder, `sonnet@low` → `opus@xhigh`; default 2 since 2026-08-20, was 1). The bound on the rework loop.
 - **`require_evidence`** (Vista ③, default `false`) — when `true`, the session's
   closeout MUST carry an `evidence` array (see closeout-contract.md); at
   `verify-finalize` every listed path must exist and be non-empty or `DONE` is
@@ -420,6 +420,41 @@ its reason (no silent caps), and an empty *scoped* surface is `INDETERMINATE`
 prints the surface's **size** (`N files, +A/-D`) with the detection band it
 falls in; see "Sizing" below for why that number is the one to watch.
 
+**A session that ships through merged PRs names its own base.** The
+runner folds every default-branch commit merged in since dispatch out of the
+base (`net_of_default_merges`), so main's already-reviewed code is not reviewed
+again. A session that works in its own worktree and merges through GitHub PRs
+gets its work into the plan worktree ONLY as default-branch commits, so the fold
+removes all of it and the surface is 0 files (kuzushi-belt-lock s02: three
+identical empty runs, then a halt blamed on the transport). Setting
+`PLAN_EXECUTE_REVIEW_BASE` in the orchestrator's environment does nothing — the
+runner computes the value. The supported way is the closeout field
+`review_base`: the commit the session's first PR started from (the default-branch
+tip before its first merge). `review_context.declared_base` reads it from
+`_closeouts/<sid>.json` and resolves it in the gate's cwd. The field switches the
+fold **off**; the base is the session's RECORDED base, else the plan's pinned
+base. The declared commit itself is **never** the base, and with neither a
+recorded nor a pinned base the field is refused (fail closed). **A declared base can never narrow the review:** a gate must not take its
+range from the code it reviews, and a session that named a later commit would
+hide its earlier commits (found by a security review of the first cut,
+2026-10-14). The cost is a wider surface when another session merged after this
+one was dispatched; that costs review time and never hides work. A
+`review_base` that does not resolve, is not an ancestor of HEAD, or has no
+runner-recorded base to stand on is refused and
+logged as `review_base_refused`; an accepted one is logged as
+`review_base_declared` with the base actually used. The closeout digest ignores
+the field, so the orchestrator may add it to a persisted closeout after the fact
+without state drift.
+
+**An empty surface is not a transport failure.** The gate prints the stdout line
+`SURFACE: empty` (`empty_surface.MARKER`) and exits 2 as before — the
+three-outcome contract is unchanged. `verifier_park.indeterminate` routes that
+line to `empty_surface.block`: the session blocks AT ONCE (the same surface comes back
+on every run, so a retry is waste), the halt reason names `review_base` as the
+remedy, no rework is charged and the transport budget is not touched. Remedy:
+add `"review_base": "<sha>"` to `_closeouts/<sid>.json`, then `clear-halt` and
+`verify-begin --session <sid> --resume`.
+
 ### Why a fresh context per session, instead of one review at the end
 
 The reviewer starts from nothing: it did not write the code, has not been
@@ -442,6 +477,28 @@ ladder is a spend decision as much as a depth one: the measured spread from low
 to high is ~6×, on a ten-line diff. That is the argument for steering the level
 off `task_class` rather than defaulting everything to high, and for putting the
 deterministic gates first so a broken build never pays for a review.
+
+**Sensitive paths raise the level, even with no declared risk.**
+`scripts/sensitive_paths.py` holds a short list: `hooks/`, `settings.json`,
+`githooks/`, `scripts/gearbox*`, `model-routing.yaml` and `.github/workflows/`,
+all anchored at the repo root. `verify.compute_gates` reads the session's changed
+files the way its review gates do (same tree, same review base, same
+`review_scope`). If any file matches, each low review gate is swapped for its
+medium one (`llm-review-low` → `llm-review-medium`, `cross-family-review-low` →
+`cross-family-review-medium`, and the same for the `-canary` pair), and
+`adversarial-review` is added when absent. The gate **id** changes, not only the
+level, because the review ledger keys on the id (see 969feba). A session with
+no `verify` block that hits the list gets a synthesized one (`adversarial-review`,
+one rework) from `sensitive_paths.effective_verify`, used by both `apply` and
+`verify`, so it still enters the verify sub-loop. If a git tree's file set
+cannot be read (git fails, or the plan worktree is gone), it fails closed: the
+gates are raised as on a hit. A tree with no `.git` at all reads as empty, since
+nothing there can ship. The count that
+justified it is in `evals/review/COUNTS.md`: 5 sensitive sessions passed with only
+`-low` reviews, 3 had no review gate at all, and 4 confirmed misses sit on a
+sensitive path. The list is edited by hand. The bundled default registry has no
+`adversarial-review`, so a project that lacks that entry halts with `gate-missing`
+on its first sensitive hit, by design.
 
 ### Sizing the surface, and what a rework actually reviews
 
@@ -595,6 +652,60 @@ round you add with `add-session` takes the findings of both reviews.
 This replaces the old recommendation to run `claude ultrareview` at plan close
 (operator decision): it billed $5–25 per run, and nobody ran it.
 
+### Land review stop rules — agree what blocks before the review runs
+
+An unlimited "find anything" review does not converge on a security-shaped
+mechanism: each round samples a new edge case. Measured on
+`cloudflare-security-vendor-2026-10-23`: the `adversarial-review` land re-gate
+failed rounds 1–5, each on a new edge case in the same open-set mechanism, until
+s16 removed that mechanism. Round 7, scoped to the delta under a stated blocking
+rule, passed in one round (`_evidence/land/adversarial-review-report*.md`,
+`_decisions/s17-land-review-r6.md`). So the orchestrator writes every land or
+gate review brief by these three rules:
+
+1. **Write the blocking rule into the brief before the review starts.** Default
+   wording: `Blocking rule: only a finding that breaks the plan's stated goal or
+   one of its invariants blocks; every other finding goes to the follow-up list.`
+   Cite the goal and the invariants word for word from the plan's
+   acceptance-review session prompt (`acceptance_review: true`): plan-builder
+   asks for them at build time (its "Verification posture"), so the owner
+   agreed them on plan approval. A plan with no such list (built earlier, or
+   with no acceptance-review session) — name them yourself from PLAN.html and
+   say so in the brief. The reviewer applies the rule (`/adversarial-review` Step 4). Record `passed`
+   when no finding meets the rule. Write the follow-up list into the
+   `--result-file` you hand `land-record`, so it reaches the land brief, AND
+   append it to `_decisions/land-followups.md` in the plan folder (one heading
+   per round), which the finish report names. A finding marked `owner call:`
+   goes into the land brief as a question; it does not turn the gate red by
+   itself, because the land's own human approval still stops on it. The owner
+   may set a narrower or wider rule; record it verbatim in `_decisions/`.
+2. **After a passed round, re-review only the delta.** When a later land
+   re-gate follows a round that passed (or follows a fix round for a recorded
+   finding), the brief pins the scope to `git diff <passed-round commit>
+   <candidate>` plus the invariants those files touch, and states that the
+   invariant tests guard the rest. Run those invariant tests before the review
+   and list their result in the brief. A new finding outside the delta blocks
+   only if it meets the blocking rule AND YOU (the orchestrator) reproduce it —
+   the same shape as the per-session ledger above ("a new finding **outside**
+   the delta blocks only at `high`/`critical`"). One that meets the rule but you
+   have not reproduced yet goes to the land brief as `owner call:`, never to the
+   plain follow-up list. Never accept the reviewer's own word, or its missing
+   `repro`, as the reason to clear it: the reviewed diff could steer that (the
+   canary policy's `unproven` reasoning above).
+3. **After two failed rounds on the same mechanism, bring a decision card — do
+   not patch a third time by default.** "Same mechanism" means the same
+   function or file appears in the blocking findings of both rounds; name it on
+   the card. The card offers (a) simplify or remove the
+   mechanism, (b) patch again, each with the elapsed time and rounds so far,
+   and your recommendation. This is the "repeated step's cost visibly
+   compounds" rule in `~/.claude/CLAUDE.md` applied to land review; it is a
+   prompt for the owner, not an automatic stop. On the measured plan, (a) at
+   round 3 would probably have saved rounds 3–5 (an estimate, not a measurement).
+
+These rules never weaken a deterministic gate: a red test gate stays red, and a
+finding that shows a false pass (a check that reports pass when it must fail)
+or a silently dropped open finding always blocks.
+
 ### Canary review policy — `*-canary` gates
 
 `llm-review-low-canary`, `llm-review-medium-canary`, `cross-family-review-low-canary` and
@@ -612,6 +723,18 @@ failed only on a review gate, 385 of 811 high findings sat in code written to fi
 finding, and 162 sessions ended at their rework cap instead of on a verdict. A plan opts in by
 naming the `-canary` gate instead of the production one. Judge it on first-attempt pass rate,
 rounds per session, and how many moved findings were real defects, before widening it.
+
+## Judged on recall (added)
+
+A reviewer change is a new model, a new prompt line, or a new gate level. Judge it in this order. First, detection: how many known defects in `evals/review/misses.json` it catches, on the real-miss slice in `evals/review/slice/`. Second, false blocks on clean diffs. Only third, rework rounds. This plan judges the Sonnet reviewer, which has been the standing `llm-review-*` default since 2026-10-11 and is not a canary. The slice compares it with Opus on the same older diffs. This plan does not judge the round-cap canaries `llm-review-low-canary` and `llm-review-medium-canary`. They act on repair rounds, and the slice runs single diffs. There is no recall number yet. The owner stopped the reviewer run. The headline pair (sonnet-med against opus-med) runs on all 32 samples after this plan lands. Full record: `evals/review/recall-readout.md`.
+
+| Measure | Result | Decision |
+|---|---|---|
+| Confirmed misses (`misses`, N1) | 16; bar is 10 | BUILD, counted 2026-10-17 |
+| Light-reviewed sensitive sessions (`sensitive_light_reviewed`, N2) | 5; bar is 5. Plus 3 with no review gate (`sensitive_no_review_gate`) | BUILD, counted 2026-10-17 |
+| Reviewer recall on the slice | No recall yet: 16 fail and 16 pass samples built | Runs after this plan lands |
+
+Re-count, in this order, from the worktree root: `python3 evals/review/count_real_misses.py`, then `python3 evals/review/count_light_reviewed_sensitive.py`, then a hand classification of the new rows, then `python3 evals/review/check_counts.py`. Next re-count due 2026-12-01.
 
 ## Cross-family review — `cross-family-review-low|medium|high` (added)
 
@@ -678,7 +801,10 @@ harness-side park, session s05):**
   2026-10-11, after five background reviews each found a narrower gap):** fix a
   finding only when it is HIGH or affects a real repo today; log any other one
   here, one line each, and tell the operator in one line. Logged, not fixed:
-  - (none yet)
+  - 2026-10-12 (background security review, "secret-scan-allowlist-widening"):
+    `_gitleaks_pin_budget` counts a `gitleaks git` pin (`<sha>:path:rule:line`) as a
+    path:rule pin, and forgives by path:rule, not by line. Not HIGH: a change that
+    edits `.gitleaksignore` is refused, so only the original tree's own pins count.
 - **What that exit 2 does, landed (session s05):** `verify.py`'s
   `_run_gate` routes it to `rework._indeterminate`'s split in
   `verifier_park.indeterminate()`. The marker IS read — the FIRST
@@ -765,7 +891,8 @@ operator's code to Anthropic, which they may specifically not want.
   reviewer never started or never answered) — which re-runs free of
   charge up to `verifier_park.MAX_TRANSPORT` (2) attempts before becoming
   a named blocker, per the "Restricted-repo behaviour" section above; this
-  path never confuses the two.
+  path never confuses the two. An exit 2 that prints `SURFACE: empty` is neither: it
+  blocks at once and names `review_base` (see "The surface is BOUNDED").
 
 - **Launch requirement — measured, quoted verbatim from session s05a's
   sandbox probe (recorded in this plan's `_evidence/s05a/sandbox-probe.txt`),

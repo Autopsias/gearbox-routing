@@ -43,6 +43,8 @@ import os
 import re
 from pathlib import Path
 
+import safe_json as sj
+
 #: THE SEVERITY FLOOR. A finding at or above this blocks; anything below is
 #: recorded `noted` -- visible, carried forward, never a reason to re-dispatch.
 #: Applies on EVERY attempt, including the first: a low-severity finding on
@@ -107,10 +109,10 @@ def load_accepted(plan_dir, session):
     convergence line counts what it cleared.
     """
     try:
-        raw = json.loads(accepted_path(plan_dir, session).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        raw = sj.load_dict(accepted_path(plan_dir, session).read_bytes())
+    except OSError:
         return []
-    entries = (raw.get("accepted") or []) if isinstance(raw, dict) else []
+    entries = sj.get_list(raw, "accepted") or []
     out = []
     for e in entries:
         if not isinstance(e, dict):
@@ -157,11 +159,8 @@ def load(plan_dir, session):
         return []
     out = []
     for ln in p.read_text().splitlines():
-        try:
-            rec = json.loads(ln)
-        except ValueError:
-            continue
-        if isinstance(rec, dict):
+        rec = sj.load_dict(ln)
+        if rec is not None:
             out.append(rec)
     return out
 

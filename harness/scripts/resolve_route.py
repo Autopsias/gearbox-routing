@@ -660,8 +660,8 @@ def _escalation_walk(profile: _Profile, current: dict) -> "dict | str":
     # WEAKER than the one the session just left, i.e. an "escalation" that
     # descends. The OpenAI lane has the same defect one tier lower.
     # The entry key makes the mandated Anthropic climb
-    # expressible end to end: sonnet@high -> opus@HIGH -> fable@MEDIUM ->
-    # fable@high -> fable@xhigh -> exhausted.
+    # expressible end to end: sonnet@high -> opus@HIGH -> opus@XHIGH -> exhausted
+    # (SSOT v39; through v38 it continued -> fable@MEDIUM -> fable@high -> fable@xhigh).
     #
     # Validated in `_Profile.escalation` (declared tier + a real rung of that
     # tier's ladder), so the lookup here can be a plain `.get` without a second

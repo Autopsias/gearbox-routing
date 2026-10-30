@@ -17,6 +17,8 @@ You are a **pre-flight hardening orchestrator**. The user has a plan (in plan mo
 
 Args: "$ARGUMENTS"
 
+**Ponytail does not apply to this task.** This is plan-hardening work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)
+
 ---
 
 ## SETUP — Argument parsing, plan resolution, environment detection

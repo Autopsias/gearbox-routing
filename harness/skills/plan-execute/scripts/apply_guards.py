@@ -5,8 +5,9 @@ run.py so the orchestrator's apply path stays one screen: which harness last
 dispatched the session, whether a codex dispatch left its receipt, and — in
 `escalation.undispatched_rework` — whether `begin` ran since the last failure.
 """
-import json
 from pathlib import Path
+
+import safe_json as sj
 
 
 def last_dispatch_harness(plan_dir, session_id):
@@ -23,11 +24,10 @@ def last_dispatch_harness(plan_dir, session_id):
         return None
     seen = None
     for ln in lines:
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
-        if rec.get("event") == "dispatch_started" and session_id in (rec.get("session_ids") or []):
+        if rec.get("event") == "dispatch_started" and session_id in sj.get_list(rec, "session_ids", []):
             seen = rec.get("harness") or "claude"
     return seen
 
@@ -45,11 +45,10 @@ def last_codex_dispatch(plan_dir, session_id):
         return None
     last = None
     for ln in lines:
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
-        if rec.get("event") == "codex_dispatch" and session_id in (rec.get("session_ids") or []):
+        if rec.get("event") == "codex_dispatch" and session_id in sj.get_list(rec, "session_ids", []):
             last = rec
     return last
 

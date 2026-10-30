@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from host_id import host_fields, same_host  # noqa: F401  (host_fields re-exported for ship_locks)
+import safe_json as sj
 
 STALE_LOCK_SECONDS = 3600  # 1 hour
 
@@ -62,13 +63,10 @@ def load_state(plan_dir):
     p = Path(plan_dir) / "run_state.json"
     if not p.exists():
         return _default_state()
-    try:
-        state = json.loads(p.read_text())
-    except json.JSONDecodeError:
-        return _default_state()
     # Guard the parsed VALUE, not just the parse: valid JSON that is a list or a
     # scalar would make every `state.get(...)` below raise AttributeError.
-    return state if isinstance(state, dict) else _default_state()
+    state = sj.load_dict(p.read_bytes())
+    return _default_state() if state is None else state
 
 
 def save_state(plan_dir, state):
@@ -367,14 +365,9 @@ def _pid_alive(pid):
 
 def lock_age_seconds(info):
     """Age of a lock record in seconds, or None when ``started_at`` is missing
-    or unparseable (a naive timestamp cannot be subtracted from an aware now)."""
-    started = (info or {}).get("started_at")
-    if not started:
-        return None
-    try:
-        return (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
-    except (ValueError, TypeError):
-        return None
+    or unparseable. A naive stamp reads as UTC."""
+    started = sj.parse_iso_aware(sj.get_str(info, "started_at"))
+    return None if started is None else (datetime.now(UTC) - started).total_seconds()
 
 
 def lock_on_this_host(info):
@@ -405,10 +398,8 @@ def acquire_lock(plan_dir):
     lp = _lock_path(plan_dir)
     if lp.exists():
         try:
-            info = json.loads(lp.read_text())
-        except (json.JSONDecodeError, OSError):
-            info = {}
-        if not isinstance(info, dict):
+            info = sj.load_dict(lp.read_bytes()) or {}
+        except OSError:
             info = {}
         if not lock_stale(info):
             foreign = ("" if lock_on_this_host(info) else
@@ -436,10 +427,10 @@ def lock_holder(plan_dir):
     if not lp.exists():
         return None
     try:
-        info = json.loads(lp.read_text())
-    except (json.JSONDecodeError, OSError):
+        info = sj.load_dict(lp.read_bytes())
+    except OSError:
         return None
-    if not isinstance(info, dict) or lock_stale(info):
+    if info is None or lock_stale(info):
         return None
     return info
 
@@ -505,7 +496,7 @@ def get_receipt(plan_dir, session_id):
     attribute a served model to a SPECIFIC resolution must check the receipt's
     `generation`/`attempt` against that resolution's own — see
     `outcomes._fresh_receipt`, which is the only place that does."""
-    return (load_state(plan_dir).get("dispatch_receipts") or {}).get(session_id)
+    return sj.get_dict(sj.get_dict(load_state(plan_dir), "dispatch_receipts"), session_id)
 
 
 # --------------------------------------------------------------------------

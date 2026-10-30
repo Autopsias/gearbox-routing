@@ -530,7 +530,7 @@ def test_concurrent_appends_never_interleave(tmp_path):
         assert len(json.loads(line)["pad"]) == 300
 
 
-def test_append_line_writes_exactly_once(tmp_path):
+def test_append_line_writes_exactly_once(tmp_path, monkeypatch):
     """Atomicity above rests on there being ONE write() call. Count it, so a
     refactor that splits the payload fails here rather than in production."""
     calls = []
@@ -540,11 +540,9 @@ def test_append_line_writes_exactly_once(tmp_path):
         calls.append(len(data))
         return real_write(fd, data)
 
-    os.write = counting_write
-    try:
+    with monkeypatch.context() as patched:  # restored BEFORE the assert below
+        patched.setattr(os, "write", counting_write)
         store.append_line(str(tmp_path / "one.ndjson"), {"a": 1})
-    finally:
-        os.write = real_write
     assert len(calls) == 1, calls
     assert open(tmp_path / "one.ndjson", encoding="utf-8").read() == '{"a":1}\n'
 

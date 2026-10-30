@@ -8,9 +8,9 @@ run.py's `status` output and the PLAN.html badge consume. Nothing here mutates
 shipping state, and nothing here imports shipping back, so shipping.py can
 re-export these names for its existing callers without a cycle.
 """
-import json
 from pathlib import Path
 
+import safe_json as sj
 import ship_state_io as ssio
 
 # The durable step-status vocabulary (`_shipping_state/<sid>.json` values).
@@ -75,13 +75,12 @@ def _recent_shipping_events(plan_dir, tail):
         return []
     out = []
     for line in p.read_text().splitlines():
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
+        rec = sj.load_dict(line)
+        if rec is None:
             continue
         if str(rec.get("event", "")).startswith("post_session_"):
             ev = {"event": rec["event"], "ts": rec.get("ts"),
-                  "session": (rec.get("session_ids") or [None])[0]}
+                  "session": (sj.get_list(rec, "session_ids") or [None])[0]}
             for k in ("reason", "failed_step", "declared_steps"):
                 if k in rec:
                     ev[k] = rec[k]

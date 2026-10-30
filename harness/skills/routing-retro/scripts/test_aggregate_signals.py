@@ -21,11 +21,19 @@ from retro_test_helpers import _canary, _cohort, _rec, _run, _write
 # --------------------------------------------------------------------------
 # Apex revisit callout
 # --------------------------------------------------------------------------
-def _fable_escalated_cohort(session):
+def _fable_escalated_cohort(session, ssot_version_ran=39):
     return _cohort(
-        session, result="passed",
+        session, result="passed", ssot_version_ran=ssot_version_ran,
         escalated_from={"authored": {"model": "opus"}, "ran": {"model": "fable"}, "rung": 2, "generation": 0},
     )
+
+
+def test_apex_revisit_ignores_cohorts_already_reviewed(tmp_path, ssot_path):
+    """v39: cohorts that ran at ssot_version <= APEX_REVIEWED_THROUGH were reviewed."""
+    recs = [r for i in range(6) for r in _fable_escalated_cohort(f"old{i}", ssot_version_ran=38)]
+    out = _run(tmp_path, ssot_path, recs)
+    assert out["apex_revisit"]["cumulative_fable_escalation_cohorts"] == 0
+    assert out["apex_revisit"]["callout"] is False
 
 
 def test_apex_revisit_callout_fires_at_five(tmp_path, ssot_path):
@@ -613,3 +621,36 @@ def test_pass_rate_ignoring_review_counts_only_review_gate_reworks():
     assert st["first_attempt_pass_rate"] == 0.2
     assert st["first_attempt_pass_rate_ignoring_review"] == 0.4
     assert retro_cohorts._stats([])["first_attempt_pass_rate_ignoring_review"] is None
+
+
+def test_canary_drops_cohorts_authored_off_the_declared_cell(tmp_path, ssot_path, monkeypatch):
+    # 2026-10-18: Kuzushi s06/s07 pinned Opus/high in the manifest yet kept the tag
+    # sonnet-low-agentic-20261010; 14 Opus/Fable rows read as the Sonnet canary failing.
+    # PLANT: off-cell cohorts (even a failing one) must leave the stats and the smoke batch.
+    import retro_signals
+    cfg = tmp_path / "build-canaries.json"
+    cfg.write_text(json.dumps({"canaries": [
+        {"proposal_id": "pidCell", "model": "sonnet", "reasoning": "low"},
+        {"proposal_id": "pidAllOff", "model": "sonnet", "reasoning": "low"}]}))
+    monkeypatch.setattr(retro_signals, "BUILD_CANARIES", cfg)
+    on = dict(proposal_id="pidCell", reasoning_authored="low")
+    recs = (_canary("c1", ts="2026-08-01T00:00:00+00:00", **on)
+            + _canary("o1", result="exhausted", ts="2026-08-02T00:00:00+00:00",
+                      proposal_id="pidCell", model_authored="Opus", reasoning_authored="high")
+            + _canary("c2", ts="2026-08-03T00:00:00+00:00", **on)
+            + _canary("c3", ts="2026-08-04T00:00:00+00:00", **on)
+            + _canary("a1", ts="2026-08-05T00:00:00+00:00", proposal_id="pidAllOff",
+                      model_authored="opus", reasoning_authored="high")
+            # ALLOW CONTROL: a canary missing from the config keeps every cohort.
+            + _canary("x1", ts="2026-08-06T00:00:00+00:00", proposal_id="pidUnlisted",
+                      model_authored="opus", reasoning_authored="high"))
+    out = _run(tmp_path, ssot_path, recs)
+    by = {c["proposal_id"]: c for c in out["canaries"]}
+    assert by["pidCell"]["stats"]["n"] == 3
+    assert by["pidCell"]["smoke_failed"] is False
+    assert by["pidCell"]["excluded"] == {"cell_not_canary": 1}
+    assert by["pidCell"]["cell"] == "sonnet@low"
+    assert by["pidAllOff"]["stats"]["n"] == 0
+    assert by["pidAllOff"]["excluded"] == {"cell_not_canary": 1}
+    assert by["pidUnlisted"]["stats"]["n"] == 1
+    assert "cell_not_canary" not in by["pidUnlisted"]["excluded"]

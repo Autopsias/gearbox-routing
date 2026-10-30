@@ -20,6 +20,7 @@ import contextlib
 import copy
 import io
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -606,6 +607,26 @@ def _run_all_checks():
     # validates clean. The tests below prove: the version gate itself (the fix),
     # the refusal side (unchanged plants), and the two positive shapes.
     # ---------------------------------------------------------------------------
+
+def test_dashboard_js_guard_skips_on_eslint_timeout(monkeypatch, tmp_path, capsys):
+    """A hung eslint probe must warn and skip, not stall or fail the build."""
+    monkeypatch.delenv("PLAN_EXECUTE_SKIP_BROWSER_CHECKS", raising=False)
+    monkeypatch.setattr(build_plan.shutil, "which", lambda _name: "/usr/bin/fake")
+
+    real_run = subprocess.run
+
+    def _hang(cmd, **kw):
+        if cmd[0] != "npx":
+            return real_run(cmd, **kw)
+        assert kw.get("timeout"), "eslint subprocess has no timeout"
+        raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+
+    monkeypatch.setattr(build_plan.subprocess, "run", _hang)
+    out = tmp_path / "plan"
+    build_plan.build(copy.deepcopy(BASE), out)
+    assert (out / "PLAN.html").exists()
+    assert "timed out after" in capsys.readouterr().err
+
 
 def run_core_checks():
     """Run the whole core pass once, reporting only what THIS suite recorded."""

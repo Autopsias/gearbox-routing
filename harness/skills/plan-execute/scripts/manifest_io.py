@@ -9,6 +9,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import safe_json as sj
+
 
 class ManifestError(Exception):
     pass
@@ -22,9 +24,11 @@ def load_manifest(plan_dir):
         m = json.loads(p.read_text())
     except json.JSONDecodeError as e:
         raise ManifestError(f"manifest.json is not valid JSON: {e}") from e
+    if sj.as_dict(m) is None:
+        raise ManifestError(f"manifest.json is not a JSON object (got {type(m).__name__})")
 
     version = m.get("plan_schema_version")
-    if version is None or version < 2:
+    if sj.get_int(m, "plan_schema_version") is None or version < 2:
         raise ManifestError(
             f"plan_schema_version is {version!r} — /plan-execute requires >= 2. "
             "This looks like a v1 (Cowork-era) plan. Rebuild via "

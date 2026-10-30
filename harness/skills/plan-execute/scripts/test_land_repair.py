@@ -444,7 +444,7 @@ def test_a_gate_red_again_on_the_same_candidate_is_not_flaky_from_the_old_re_run
 
 def test_a_diff_git_cannot_read_holds_every_flaky_test(tmp_path, monkeypatch):
     monkeypatch.setattr(lst, "range_files", lambda *a, **k: None)
-    st = {"land_path": str(tmp_path.resolve()), "expected": "e", "plan_head": "h"}
+    st: dict = {"land_path": str(tmp_path.resolve()), "expected": "e", "plan_head": "h"}
     lfk.hold(st, "g", lfk.names("g", ["tests/t.py::test_x"], ""))
     assert st["plan_touched_flakes"]["g: tests/t.py::test_x"]["file"] == "tests/t.py"
 

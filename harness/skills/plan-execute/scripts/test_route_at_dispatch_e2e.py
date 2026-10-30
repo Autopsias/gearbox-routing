@@ -58,7 +58,7 @@ CLAUDE_JSON = {
 def _spec():
     items = [{"id": f"it-{n}", "title": f"IT-{n}", "category": "c", "touches": "src/a.py",
               "prior_art": {"decision": "build", "source": "fixture"}} for n in (1, 2, 3)]
-    sess = [
+    sess: list[dict] = [
         {"id": "s01", "title": "S1", "task_class": "standard_build", "items": ["it-1"]},
         {"id": "s02", "title": "S2", "task_class": "agentic_build", "items": ["it-2"],
          "peer_triggers": ["architecture_decision"],
@@ -102,7 +102,8 @@ class Fixture:
         self.env.update(PLAN_EXECUTE_ROUTING_SSOT=str(self.routing),
                         PLAN_EXECUTE_OUTCOME_LEDGER=str(self.ledger),
                         PLAN_EXECUTE_EGRESS_ROOT=str(egress),
-                        PLAN_EXECUTE_SKIP_BROWSER_CHECKS="1")
+                        PLAN_EXECUTE_SKIP_BROWSER_CHECKS="1",
+                        PLAN_EXECUTE_TIER_AGENT_DIR=str(TREE / "agents"))
         self._build()
 
     def _build(self):
@@ -163,6 +164,7 @@ def _harness(fx, provider):
 
 def _cell(fx, task_class, provider):
     got = rr.resolve(task_class, provider, ssot_path=str(fx.routing))
+    assert isinstance(got, dict), got
     return got["model_id"], got["native_effort"] or ""
 
 
@@ -324,6 +326,7 @@ def test_an_unpinned_session_climbs_from_its_resolved_cell_after_two_same_signat
     nxt = rr.escalate("standard_build", "anthropic",
                       current={"model_id": base[0], "native_effort": base[1] or None},
                       ssot_path=str(fx.routing))
+    assert isinstance(nxt, dict), nxt
     out, err = fx.begin("s03")
     m = out["batch"][0]
     assert m["escalated_from"]["authored"] == {"model": base[0], "reasoning": base[1]}

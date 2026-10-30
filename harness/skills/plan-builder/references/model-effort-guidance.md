@@ -75,7 +75,7 @@ overview / Claude Code model-config).
 > **Freshness.** Model names, defaults, and the effort ladder rev often. As of
 > **2026-09-29**: **Opus 5.5** ($4/$20; the `Opus` token — Opus 5 held the slot
 > from 2026-07-25 at $5/$25) is the standing default for ALL judgment work — deep-reasoning → `medium`, linchpin + hard
-> agentic → `high`; **Sonnet** keeps standard build + fan-out shards (the `Sonnet` token serves
+> agentic → `high`; **Sonnet** keeps standard build (at `low` since SSOT v38) + fan-out shards (the `Sonnet` token serves
 > **Sonnet 5.5** since 2026-09-28, same $2/$10; its effort levels are recalibrated, so every
 > Sonnet calibration cell below is a **Sonnet 5 measurement**, SSOT v29); **Fable (5.1
 > since v24) is the escalation apex only** (credit-metered; a Fable dispatch
@@ -88,7 +88,7 @@ overview / Claude Code model-config).
 
 ## What the class defaults are (the executor's input, not the author's choice)
 
-> **Default a standard session to `Sonnet · medium`; a HARD coding/agentic or
+> **Default a standard session to `Sonnet · low` (SSOT v38); a HARD coding/agentic or
 > integration session to `Opus · high`** (Opus 5.5 since 2026-09-22) (on our own calibration run, Opus·high
 > dominates Sonnet·high on the hard-agentic distribution — Sonnet·high
 > stays fine for LIGHTER integration work). Route architecture / novel /
@@ -97,8 +97,9 @@ overview / Claude Code model-config).
 > **`Opus · high`**. Opus's ladder STOPS at `high`: `high`→`xhigh` is a DEAD
 > RUNG (no measurable gain for materially higher cost) and `max` is weak
 > (operator-elected only, marginal at best).
-> **Fable (5.1) is the escalation apex, not a standing pick** — raise MODEL from
-> Opus·high only when the two named triggers persist: a problem unsolved in prior
+> **Fable (5.1) is the escalation apex, not a standing pick** — since SSOT v39 the
+> automatic rework climb stops at Opus·xhigh and never enters Fable, so the author
+> elects it by authoring the session on Fable, only when the two named triggers persist: a problem unsolved in prior
 > rounds, or whole-codebase/large-context synthesis (1M ctx). De-escalate to
 > **`Haiku 5.5 · low`** for mechanical batch work. Haiku is not a Sonnet
 > substitute for build work: on 40 public tasks it passed as many as Sonnet 5.5
@@ -147,9 +148,9 @@ fan-out default:
 |---|---|
 | Long-horizon agentic (many steps, self-correction, hours async) | **Opus 5.5 · high** (dominates fable + sonnet on the hard-agentic distribution, on our own calibration run) |
 | Gate / verdict / adversarial-review sessions where judgment quality compounds | **Opus 5.5 · medium→high** |
-| Quality-ceiling cases — the exact work was UNSOLVED in prior rounds/sessions | **Opus 5.5 · high → Fable 5.1 · low→medium** (escalation trigger (a): raise MODEL from Opus·high, then climb Fable one rung at a time) |
+| Quality-ceiling cases — the exact work was UNSOLVED in prior rounds/sessions | **Opus 5.5 · high**; if it stays unsolved, the operator AUTHORS a re-run on **Fable 5.1 · medium** (escalation trigger (a); since SSOT v39 the automatic climb stops at Opus·xhigh and never enters Fable) |
 | Very-large-context sessions (whole-corpus reads / synthesis pushing past Opus limits) | **Fable 5.1 · medium→high** (1M ctx; escalation trigger (b) — the one shape that still reaches Fable directly) |
-| Standard build | Sonnet · medium — unchanged |
+| Standard build | Sonnet 5.5 · low (SSOT v38: first-attempt 0.90 vs 0.78 at medium over real plan sessions; climbs to medium → high on failure) |
 | Light integration build | Sonnet · high (`xhigh` was a dead rung on Sonnet 5 — unmeasured on 5.5, so the stop at `high` is kept as policy) |
 | Hard coding / agentic / integration build | **Opus 5.5 · high** (Sonnet's top rung dominated by Opus's, on our own calibration run) |
 | Architecture / novel / security-sensitive / hard debug | **Opus 5.5 · medium** (dominates the retired Fable·low pin on both axes, on our own calibration run; escalate to `high` on the two named triggers) |

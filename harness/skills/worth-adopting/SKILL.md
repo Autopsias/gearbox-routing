@@ -136,8 +136,10 @@ failure, because the first two are cheap and remove most proposals.
    the pain. Measure the target before you give it a pain that a note records: the note can
    be about another repo. A pain in another repo counts only if the target is where the fix
    would live, and the report names the repo that has the pain.
-2. **Does the target already cover it?** HAVE and equal or worse: DROP. HAVE and theirs is
-   better: the proposal becomes a change to the existing part. Never add a second mechanism
+2. **Does the target already cover it?** HAVE and equal or worse: DROP, and the line names
+   the part of ours that covers each part of theirs; "the same idea" is not a comparison, and
+   an idea at the centre of the source gets a full row, never a one-line DROP. HAVE and theirs
+   is better: the proposal becomes a change to the existing part. Never add a second mechanism
    beside the first one.
 3. **What is the smallest form?** Go down this list and stop at the first form that gives
    most of the gain: delete something, change a setting or one line, edit an existing skill,
@@ -182,7 +184,8 @@ decision card ask.
 **Give each survivor a route.** A change to one file can be built in the same session after
 the owner says yes. A change that touches more than one file or skill goes to `/plan-builder`.
 Something that the owner will run again belongs to a named skill or command, and the smallest
-form says which one.
+form says which one. A review or a check that fits one repo today goes into `/repo-health`,
+which runs on any repo, not into a new skill or a repo-local file.
 
 ## 6. Verify what the surviving verdicts rest on
 
@@ -214,7 +217,8 @@ nothing can follow from it.
 
 **Close open outcomes.** A verdict teaches nothing until its outcome is on record. After the
 report, take at most three older rows, the oldest first, whose decision or result is `open`,
-or whose `due` date is past. For each, do only the cheap checks: does the path exist, is the
+or whose `due` date is past. A due stated as "after the next N plans, scans or sessions" is
+past when the count is met or 14 days have gone by. For each, do only the cheap checks: does the path exist, is the
 part wired, did the measurement run (a log, a saved number, a scheduled job). Write what you
 find into the row, with the date. If a measurement needs real work, do not do it now; the
 chat reply names it as owed.

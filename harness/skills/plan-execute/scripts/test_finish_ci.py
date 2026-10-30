@@ -12,7 +12,7 @@ import json
 import os
 import subprocess
 import sys
-import time
+import types
 import zlib
 from pathlib import Path
 
@@ -185,13 +185,26 @@ def test_red_names_workflow_job_step_and_failing_tests(env):
         "tests": ["skills/a/test_x.py::test_y", "skills/a/test_x.py::test_z[claude]"]}]
 
 
-def test_red_returns_at_once_while_a_sibling_is_still_running(env):
+def _fake_clock(monkeypatch):
+    """finish_ci's clock, advanced only by its own sleep(). The wall time of the fake-gh
+    subprocesses (seconds on a loaded runner) never reaches a grace or a deadline, so a
+    wait is measured exactly and costs no real sleep. Fake time is free, so the real poll
+    interval comes back: the fixture's 0.05 s would make a 90 s grace 1800 looks.
+    Returns the one-cell "now"."""
+    monkeypatch.setattr(finish_ci, "POLL_INTERVAL_S", 30)
+    now = [0.0]
+    monkeypatch.setattr(finish_ci, "time", types.SimpleNamespace(
+        monotonic=lambda: now[0], sleep=lambda s: now.__setitem__(0, now[0] + s)))
+    return now
+
+
+def test_red_returns_at_once_while_a_sibling_is_still_running(env, monkeypatch):
     s = env.shas["SHA"]
     env.spec(list=exact(env, run(1, s, "verify", "failure"),
                         run(2, s, "lint", status="in_progress")))
-    start = time.monotonic()
+    now = _fake_clock(monkeypatch)
     res = env.verdict(timeout_s=30)
-    assert res["verdict"] == "red" and time.monotonic() - start < 10
+    assert res["verdict"] == "red" and now[0] == 0, "red must not wait for the sibling"
     assert res["failed_checks"][0]["job"] == "(no failed job reported)"  # jobs query failed
 
 
@@ -291,11 +304,10 @@ def test_a_run_that_registers_late_decides_within_the_grace(env, monkeypatch):
 
 
 def test_no_run_after_the_grace_is_unknown_not_timeout(env, monkeypatch):
-    monkeypatch.setattr(finish_ci, "NO_RUN_GRACE_S", 0.2)
-    start = time.monotonic()
-    res = env.verdict(timeout_s=60)
+    now = _fake_clock(monkeypatch)
+    res = env.verdict(timeout_s=600)
     assert res == finish_ci._result("unknown", "no-run-for-sha")
-    assert time.monotonic() - start < 10, "the grace, not the timeout, bounds the wait"
+    assert finish_ci.NO_RUN_GRACE_S <= now[0] < 600, "the grace, not the timeout, bounds the wait"
 
 
 def _red_with_base(env, base_runs, base_jobs=None):
@@ -396,17 +408,16 @@ def test_every_call_is_capped_by_what_is_left_of_the_timeout(env, monkeypatch):
 
 def test_blocking_calls_never_overrun_a_tiny_timeout(env, monkeypatch):
     seen = []
+    now = _fake_clock(monkeypatch)
 
     def blocking(argv, **kw):  # every subprocess hangs until its timeout kills it
         seen.append(kw.get("timeout"))
-        time.sleep(kw["timeout"])
+        now[0] += kw["timeout"]
         raise subprocess.TimeoutExpired(argv, kw["timeout"])
 
     monkeypatch.setattr(finish_ci.subprocess, "run", blocking)
-    t0 = time.monotonic()
     res = env.verdict(timeout_s=1)
-    assert time.monotonic() - t0 < 2, seen
-    assert sum(seen) <= 1.1, seen
+    assert now[0] <= 1 and sum(seen) <= 1, seen
     assert res["verdict"] != "green"
 
 def test_mixed_fallback_reports_the_exact_red_run_under_match_descendant(env):

@@ -15,7 +15,9 @@ import sys
 from pathlib import Path
 
 from govrun_config import _read_json, _read_text, state_dir
+from govrun_cores import core_budget, free_cores
 from govrun_errors import Refused
+from govrun_queue import waiting
 from govrun_locks import _try_lock
 
 # The governor's PreToolUse hook carries the worker budget as an INLINED LITERAL (it must
@@ -248,6 +250,11 @@ def cmd_status(slots):
     for slot in slots:
         out(f"slot {slot['name']} workers={slot['workers']} "
             f"classes={','.join(slot['classes'])} {_holder_line(slot)}")
+    budget = core_budget()
+    out(f"cores: {budget - free_cores(budget)} of {budget} held "
+        "(video and other --cores jobs, plus one per worker of the slot holder)")
+    out(f"queue: {waiting('slot')} waiting for the slot, "
+        f"{waiting('cores')} waiting for cores (first come, first served)")
     report_hook(out, slots)
     report_errors(out)
     return 0

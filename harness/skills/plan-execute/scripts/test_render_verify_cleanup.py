@@ -29,6 +29,19 @@ def test_no_chrome_child_survives_the_render_call(tmp_path, monkeypatch):
     monkeypatch.delenv(rv.SKIP_ENV, raising=False)
     monkeypatch.setattr(rv, "_find_chrome", lambda: str(fake))
 
+    # check()'s timeout clock starts at communicate(), after Popen returns. Hold
+    # Popen back until the fake has written its pidfile, so a loaded machine
+    # cannot kill the fake before child.pid exists (2026-10-17 CI flake).
+    real_popen = subprocess.Popen
+
+    def popen_after_pidfile(*a, **kw):
+        proc = real_popen(*a, **kw)
+        deadline = time.monotonic() + 60
+        while not (pidfile.exists() and pidfile.read_text().strip()) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        return proc
+
+    monkeypatch.setattr(rv.subprocess, "Popen", popen_after_pidfile)
     out = rv.check(tmp_path, timeout=1)
     child = int(pidfile.read_text())
     try:

@@ -182,7 +182,7 @@ def test_a_tool_probe_whose_clean_fixture_carries_the_defect_is_ERROR():
     assert "CLEAN fixture already trips" in rec["note"]
 
 
-@pytest.mark.skipif(shutil.which("definitely-not-a-real-tool"), reason="impossible")
+@pytest.mark.skipif(shutil.which("definitely-not-a-real-tool") is not None, reason="impossible")
 def test_a_missing_tool_is_a_GAP_never_an_na():
     """Unverified is not not-applicable: an unrun probe stays a gap."""
     rec = probe_checks.run_tool_probe(

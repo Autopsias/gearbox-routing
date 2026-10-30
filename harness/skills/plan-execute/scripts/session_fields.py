@@ -35,6 +35,8 @@ def _class_default(task_class):
     provider = pl.load_routing()[0] or "anthropic"
     try:
         got = resolve_route.resolve(task_class, provider)
+        if not isinstance(got, dict):  # EXHAUSTED: the provider opted this class out
+            raise ValueError(f"no rung ({got})")
         return str(got["model_id"]), str(got.get("native_effort") or "")
     except Exception as e:  # noqa: BLE001 — any gap is a refusal, never a half-set cell
         raise ValueError(f"task_class {task_class!r} does not resolve on provider "

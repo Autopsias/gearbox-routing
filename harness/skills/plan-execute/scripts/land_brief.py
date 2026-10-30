@@ -141,6 +141,64 @@ def conflict(land_path, plan_dir, conflicted, full_status):
     ])
 
 
+def merge_failed(land_path, plan_dir, detail):
+    """§4.6 — `git merge` failed with NOTHING conflicted. Not a conflict, so the
+    conflict brief's "resolve, then commit" would send the operator the wrong way."""
+    return "\n".join([
+        "LAND PARKED — `git merge` failed in the land worktree, and no path is conflicted. "
+        "This is NOT a merge conflict. Nothing was pushed.",
+        "",
+        "git said:",
+        *(f"  {ln}" for ln in (detail or "").strip().splitlines()[:20]),
+        "",
+        "A `cannot lock ref` or `File exists ... .lock` error means another git process "
+        "is writing in this worktree, or one died and left its lock file.",
+        "",
+        "Recover:",
+        "  ps -axo pid,ppid,command | grep '[g]it '   # wait for, or end, any git there",
+        f"  cd {land_path}",
+        "  git status",
+        "  git merge --abort      # only if `git status` shows a merge in progress",
+        f"  run.py land-resume {plan_dir}",
+    ])
+
+
+def merge_running(land_path, plan_dir, pid):
+    """An earlier `land` was killed, and the `git merge` it started is still alive."""
+    return "\n".join([
+        f"LAND PARKED — the `git merge` an earlier land started (pid {pid}) is still "
+        "running in the land worktree. That land was killed, but its git child was not. "
+        "Nothing was pushed.",
+        "",
+        "Do NOT run `git merge --abort` while it runs: the merge can still write its "
+        "commit after the abort, and a later land would treat that commit as yours.",
+        "",
+        "Recover:",
+        f"  kill {pid}             # or wait for it to exit",
+        f"  run.py land-resume {plan_dir}",
+        "",
+        f"The worktree is {land_path}. The next land checks what that merge left behind.",
+    ])
+
+
+def merge_unwatched(land_path, plan_dir, expected, head):
+    """A killed land's orphaned `git merge` finished on its own and moved HEAD."""
+    return "\n".join([
+        "LAND PARKED — an earlier land was killed during its merge, and the orphaned "
+        f"`git merge` then committed on its own: HEAD is {head[:12]}, not the expected "
+        f"{expected[:12]}. Nothing watched that commit, and nothing was pushed.",
+        "",
+        "This is not a hand-resolved conflict, and `git merge --abort` keeps that "
+        "commit. Put the land worktree back at the expected base; the land then "
+        "redoes the merge itself:",
+        "",
+        f"  cd {land_path}",
+        "  git status              # anything of yours here is lost by the reset",
+        f"  git reset --hard {expected}",
+        f"  run.py land-resume {plan_dir}",
+    ])
+
+
 def review(candidate, gates, plan_dir, land_path, root, prior=None, warning=None):
     """§5.1/§5.3 — the human land decision, bound to the exact revision approved.
 

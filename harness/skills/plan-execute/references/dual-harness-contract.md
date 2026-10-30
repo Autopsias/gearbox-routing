@@ -1,5 +1,19 @@
 # Dual-harness contract — one plan directory, two orchestrators
 
+## Contents
+
+- [1. Probe log](#1-probe-log)
+- [2. Decision D1 — harness detection is an explicit `--harness` flag, never env sniffing](#2-decision-d1--harness-detection-is-an-explicit---harness-flag-never-env-sniffing)
+- [3. Decision D2 — the Codex-side dispatch loop: the orchestrator runs the commands itself](#3-decision-d2--the-codex-side-dispatch-loop-the-orchestrator-runs-the-commands-itself)
+- [4. Decision D3 — Claude-pinned sessions translate through the SSOT, with a receipt that names what was lost](#4-decision-d3--claude-pinned-sessions-translate-through-the-ssot-with-a-receipt-that-names-what-was-lost)
+- [4.5 Decision D3b — a session declares the shell it needs, and the dispatch grants it](#45-decision-d3b--a-session-declares-the-shell-it-needs-and-the-dispatch-grants-it)
+- [5. Decision D4 — policy inside the Codex harness](#5-decision-d4--policy-inside-the-codex-harness)
+- [6. Decision D5 — single-source layout and how `gearbox deploy` renders it](#6-decision-d5--single-source-layout-and-how-gearbox-deploy-renders-it)
+- [7. Open questions for later sessions](#7-open-questions-for-later-sessions)
+- [8. What each downstream session owes this contract](#8-what-each-downstream-session-owes-this-contract)
+- [9. Decision D6 — the replan, mutation and worktree surface under Codex](#9-decision-d6--the-replan-mutation-and-worktree-surface-under-codex)
+- [10. Route at dispatch (plan schema v8) — the openai side](#10-route-at-dispatch-plan-schema-v8--the-openai-side)
+
 **Status:** ACCEPTED (2026-07-28, plan `example-harness-plan-2026-07-28` session S01, item CP-01).
 **Scope:** how a single `_plans/<slug>-<date>/` directory (PLAN.html + manifest.json +
 `sessions/*`) is built and run from **either** Claude Code **or** Codex CLI.
@@ -144,7 +158,6 @@ PROBE-4-DONE
 > from `(task_class, provider)` via `resolve_route.resolve`, never by tier-name lookup
 > across two non-parallel line-ups. The code change lands with the escalation work; this
 > banner is the honest interim state, not a fixed one.
-
 
 ```
 $ PLAN_EXECUTE_ROUTING_SSOT=./model-routing.yaml python3 -c "…_resolve_codex_dispatch…"

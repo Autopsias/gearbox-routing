@@ -5,6 +5,8 @@ description: Stress-tests code, plans, ideas, architecture, requirements, polici
 
 # Adversarial Review
 
+**Ponytail does not apply to this task.** This is review and plan-hardening work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)
+
 ## Operating Contract
 
 - Review the artifact; do not edit it unless the user explicitly requests revision.

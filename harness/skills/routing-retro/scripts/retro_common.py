@@ -59,6 +59,10 @@ MALFORMED_MAX_LINES = 3             # >= this many -> abort
 MALFORMED_MAX_RATIO = 0.02          # > this ratio -> abort
 
 APEX_REVISIT_THRESHOLD = 5
+#: The apex revisit was last REVIEWED at SSOT v39 over every fable cohort that ran at
+#: ssot_version <= 38 (1/4 converted since v28 -> the automatic fable rung was withdrawn).
+#: Only cohorts that ran AFTER that review count toward the next callout.
+APEX_REVIEWED_THROUGH = 38
 
 # [HARDENED finding 6] cost_per_success reads each attempt's `usage.cost_usd`
 # (route-at-dispatch contract rule 6, written by plan-execute's outcomes.py).

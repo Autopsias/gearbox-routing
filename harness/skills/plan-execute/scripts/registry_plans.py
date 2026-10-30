@@ -6,14 +6,13 @@ registry.py's module docstring for the full design rationale (constraint 2:
 PID liveness is not plan liveness).
 """
 
-import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 import article_block as ab
 import dispatch as dsp
 import manifest_io as mio
 import run_state_io as rsi
+import safe_json as sj
 from registry_guard import _guarded
 
 PLAN_HTML = "PLAN.html"
@@ -41,15 +40,13 @@ def lock_info(plan_dir):
     if not lock_path.exists():
         return None
     try:
-        info = json.loads(lock_path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return {"pid": None, "started_at": None, "host": None, "alive": False, "age_s": None}
-    if not isinstance(info, dict):
-        # Valid JSON but the wrong shape (a list, string, number, bool, or
-        # null — e.g. a `.lock` hand-edited to `[]` or `3`). `info.get(...)`
-        # below would raise AttributeError for any of these; degrade to the
-        # same null record as an unparseable pidfile rather than crash the
-        # whole read-only plans-status run over one plan's malformed file.
+        info = sj.load_dict(lock_path.read_bytes())
+    except OSError:
+        info = None
+    if info is None:
+        # Unparseable, or valid JSON of the wrong shape (a `.lock` hand-edited to
+        # `[]` or `3`): degrade to a null record rather than crash the whole
+        # read-only plans-status run over one plan's malformed file.
         return {"pid": None, "started_at": None, "host": None, "alive": False, "age_s": None}
     pid = info.get("pid")
     started = info.get("started_at")
@@ -60,19 +57,8 @@ def lock_info(plan_dir):
         # truncated pidfile) raises from `os.kill` itself, not just from a
         # missing process — degrade the same as "not alive", never crash.
         alive = False
-    age_s = None
-    if started:
-        try:
-            age_s = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds()
-        except (ValueError, TypeError):
-            # ValueError: not a parseable ISO string. TypeError: a naive (no
-            # tzinfo) started_at parses fine but can't subtract against the
-            # aware `datetime.now(UTC)` above — a legacy or hand-edited
-            # pidfile must degrade to age_s=None, never crash the whole
-            # read-only plans-status run.
-            age_s = None
     return {"pid": pid, "started_at": started, "host": info.get("host"),
-            "alive": alive, "age_s": age_s}
+            "alive": alive, "age_s": rsi.lock_age_seconds(info)}
 
 
 def _html_text(plan_dir):

@@ -9,3 +9,5 @@ A wide window is a cost: every turn re-reads the whole context, so keep tool out
 (read the sections you need, not whole files twice).
 
 Proceed with the request: $ARGUMENTS
+
+**Ponytail does not apply to this task.** This is research work, not a code change. Ignore the ponytail plugin's rules here (smallest change, skip what nobody asked for, a short reply): be thorough, cover the whole question, and report in full. Ponytail applies again when you write code. (Owner decision, `docs/worth-adopting/2026-10-19-ponytail-v5.md`.)

@@ -61,7 +61,8 @@ def worker_count(value):
 
 
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-TRANSPARENT = {"env", "nice", "time"}
+# Wrapper -> positional words before the payload (`timeout DURATION cmd`: one).
+TRANSPARENT = {"env": 0, "nice": 0, "time": 0, "timeout": 1, "gtimeout": 1}
 # Runner front-ends, each of which takes a `run` word before the real payload.
 # A table with two entries in it was itself the bypass: `uvx pytest -n 8`,
 # `uv run -- pytest -n 8`, `uv tool run pytest -n 8` and the pipenv/pdm/hatch/rye
@@ -99,14 +100,14 @@ def runner_words(name, rest):
 # wrapper WORD stopped at the option and never saw the pytest behind it
 # (all three ALLOWED). The value-taking ones need their value
 # skipped too; `--` ends the wrapper's options, as it does for the runners.
-WRAPPER_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-P", "-n",
-                      "--adjustment", "-o"}
+WRAPPER_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-P", "-n", "--adjustment",
+                      "-o", "-s", "--signal", "-k", "--kill-after"}
 # The same options as single letters, for CLUSTERS: `env -iu HOME`, `time -ao
 # log`, `nice -n10`. In a cluster the first value letter ends the walk and its
 # value is the rest of the token, or the next token when nothing is attached
 # (`env -iS 'pytest -n 8'` and `env -S'pytest -n 8'` both run pytest,
 # measured). `S` is env's split-string: `resplit_env_s` turns it into words.
-WRAPPER_VALUE_LETTERS = "uCPnoS"
+WRAPPER_VALUE_LETTERS = "uCPnoSsk"
 
 
 def option_width(args, index):
@@ -203,7 +204,7 @@ def peel_wrappers(cmd):
             index += 1
             continue
         if name in TRANSPARENT:
-            index += 1 + wrapper_options(cmd[index + 1:])
+            index += 1 + wrapper_options(cmd[index + 1:]) + TRANSPARENT[name]
             continue
         step = runner_words(name, cmd[index + 1:])
         if step is None:

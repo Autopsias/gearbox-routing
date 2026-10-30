@@ -1,5 +1,14 @@
 # Shipping actions (post-session version-control + deploy)
 
+## Contents
+
+- [The shipping sub-loop](#the-shipping-sub-loop)
+- [Registries (project-local)](#registries-project-local)
+- [Safety guarantees (so you don't have to)](#safety-guarantees-so-you-dont-have-to)
+- [New `run.ndjson` events](#new-runndjson-events)
+- [Shipping recovery](#shipping-recovery)
+- [Finish](#finish)
+
 Loaded on demand — read this when `apply` reports a non-null `post_session` for a
 session. Registry shapes live in `shipping-registries.md`.
 

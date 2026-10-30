@@ -6,9 +6,8 @@ Split out of `governor-hook.py` to get that file under the repo's
 half (`heavy`, `decide`, `hook_mode`, the output, the entry point). Nothing here
 decides anything — every function answers a question about the text.
 
-Latency measured (40 paired `git status` runs): the split runs ~1 ms
-FASTER than a one-file rebuild — an imported module is byte-cached, a `__main__`
-script is not, and this file imports only stdlib. Plan record.
+Latency measured (40 paired runs): the split is ~1 ms FASTER than one
+file (an imported module is byte-cached, a `__main__` script is not). Plan record.
 
 THE OBJECTION THAT SURVIVES: a split adds a way to disarm the guard — this file
 missing, stale, or shadowed on the deploy target. The hook runs as a script, so
@@ -21,8 +20,7 @@ ARMED/DISARMED from a decision the hook renders, not a regex on the file; and
 `test_governor_parse.py` runs the hook from a deploy-only directory, and again
 with this file deleted.
 
-Self-check: hooks/test_governor_parse.py, and hooks/test_governor_hook.py for
-everything reached through the hook.
+Self-check: hooks/test_governor_parse.py and hooks/test_governor_hook.py.
 """
 import io
 import os
@@ -71,7 +69,9 @@ ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # wrappers` pins the two, so a runner added to one table is added to both or the
 # gate reddens. A two-entry table was itself the bypass: `uvx pytest -n 8` and
 # `uv run -- pytest -n 8` were ALLOWED while `pytest -n 8` denied.
-TRANSPARENT = {"env", "nice", "time"}
+# VALUE = positional words before the payload (`timeout [opts] DURATION cmd`: 1);
+# `timeout 1700 python -m pytest -n 6` ran unseen from example-project.
+TRANSPARENT = {"env": 0, "nice": 0, "time": 0, "timeout": 1, "gtimeout": 1}
 # Words that LEAD a segment without being the command — the job follows one word in: reserved
 # words (`if true; then pytest -n 8` -> segment `then pytest -n 8`) and command-prefix builtins
 # (`coproc`/`nohup`/`command`/`exec pytest -n 8`) both hid a heavy job and `peel` stopped at the
@@ -117,7 +117,7 @@ class CommandText(io.StringIO):
         LEADING its segment, and dropping a `#` cannot promote one.
     """
 
-    def readline(self):
+    def readline(self, size: int = -1, /):  # StringIO's signature; shlex passes no size
         text, at = self.getvalue(), self.tell()  # `at` is just past the `#`
         if at >= 2 and text[at - 2] not in COMMENT_BOUNDARY:
             return ""                            # mid-word `#`, not a comment
@@ -177,18 +177,18 @@ def runner_words(name, rest):
     return None
 
 
-# Options the transparent wrappers take in FRONT of the payload. `env -i`, `nice
-# -n 10`, `time -p` are valid, and a peel that skipped only the wrapper WORD
-# stopped at the option and never saw the pytest (2026-09-08, all three ALLOWED).
+# Options the transparent wrappers take in FRONT of the payload (`env -i`, `nice
+# -n 10`, `time -p`, `timeout -s KILL -k 5`); a peel that skipped only the wrapper
+# WORD stopped at the option and never saw the pytest (2026-09-08, ALLOWED).
 # Value-taking ones need their value skipped too; `--` ends the wrapper's options.
-WRAPPER_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-P", "-n",
-                      "--adjustment", "-o"}
+WRAPPER_VALUE_OPTS = {"-u", "--unset", "-C", "--chdir", "-P", "-n", "--adjustment",
+                      "-o", "-s", "--signal", "-k", "--kill-after"}
 # The same options as single letters, for CLUSTERS: `env -iu HOME`, `nice -n10`.
 # In a cluster the first value letter ends the walk; its value is the rest of the
 # token, or the next token when nothing is attached (`env -iS 'pytest -n 8'` and
 # `env -S'pytest -n 8'` both run pytest). `S` is env's split-string: resplit_env_s
 # turns it into words.
-WRAPPER_VALUE_LETTERS = "uCPnoS"
+WRAPPER_VALUE_LETTERS = "uCPnoSsk"
 
 
 def option_width(args, index):
@@ -344,7 +344,7 @@ def peel(segment):
             index += 1  # a `NAME=value`, or a keyword like `then`/`do`/`!`
             continue
         if name in TRANSPARENT:
-            index += 1 + wrapper_options(segment[index + 1:])
+            index += 1 + wrapper_options(segment[index + 1:]) + TRANSPARENT[name]
             continue
         if name == "govrun":
             leads = True
@@ -472,7 +472,7 @@ def addopts(tokens):
                 return value.split()
         name = os.path.basename(token)
         if name in TRANSPARENT:  # `env -i X=1`: its options do not end the scan
-            index += 1 + wrapper_options(tokens[index + 1:])
+            index += 1 + wrapper_options(tokens[index + 1:]) + TRANSPARENT[name]
             continue
         if name in BUILTIN_ASSIGNERS:
             # `declare -x PYTEST_ADDOPTS=…`: skip the builtin AND its options.

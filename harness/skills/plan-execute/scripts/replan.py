@@ -57,6 +57,7 @@ import closeout_pipeline as cp
 import manifest_io as mio
 import plan_mutate as pm
 import run_state_io as rsi
+import safe_json as sj
 
 REPLAN_DIR = "_replan"
 REPLAN_DECISIONS = ("amend", "retire", "proceed")
@@ -86,11 +87,9 @@ def record_path(plan_dir, session_id):
 
 def load(plan_dir, session_id):
     p = record_path(plan_dir, session_id)
-    if not p.is_file():
-        return None
     try:
-        return json.loads(p.read_text())
-    except (OSError, ValueError):
+        return sj.load_dict(p.read_bytes()) if p.is_file() else None
+    except OSError:
         return None
 
 

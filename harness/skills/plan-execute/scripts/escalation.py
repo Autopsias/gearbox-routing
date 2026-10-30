@@ -431,14 +431,14 @@ def _demo():  # pragma: no cover - ponytail: smallest runnable self-check
     import resolve_route as rr
 
     cur = {"model_id": "sonnet", "native_effort": "medium"}
-    seen = [cur]
+    seen: list[dict] = [cur]
     while cur != rr.EXHAUSTED and len(seen) < 12:
         cur = rr.escalate("agentic_build", "anthropic", current=cur)
-        if cur != rr.EXHAUSTED:
+        if isinstance(cur, dict):  # the only non-dict is the EXHAUSTED sentinel
             seen.append(cur)
     print(" -> ".join(f"{r['model_id']}@{r['native_effort']}" for r in seen))
-    assert seen[-1] == {"model_id": "fable", "native_effort": "xhigh"}, seen[-1]
-    print("OK: the climb ends at fable@xhigh — never opus@max, never fable@max.")
+    assert seen[-1] == {"model_id": "opus", "native_effort": "xhigh"}, seen[-1]
+    print("OK: the climb ends at opus@xhigh (v39) — never fable, never opus@max.")
 
 
 if __name__ == "__main__":

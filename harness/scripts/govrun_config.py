@@ -41,7 +41,7 @@ from govrun_errors import Refused
 # `--max-wait` and exits 75 with "queue timeout, not a test failure". That is the
 # intended trade — a legible refusal beats an OOM kill, and the caller can re-run
 # or pass `--max-wait 0` and launch in the BACKGROUND.
-DEFAULT_SLOTS = [
+DEFAULT_SLOTS: list[dict] = [
     {"name": "shared", "workers": 4, "classes": ["ci", "interactive"]},
 ]
 DEFAULT_CLASS = "interactive"

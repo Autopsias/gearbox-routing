@@ -3187,6 +3187,83 @@ def _extract_inline_script(html_text):
     return max(blocks, key=len) if blocks else None
 
 
+def _eslint_dashboard_errors(script):
+    """Run ESLint ``no-undef`` over ``script``; return its severity-2 messages.
+
+    Returns ``None`` (after a stderr warning) when eslint is unavailable, times
+    out, or prints unparseable output — skipped, not passed.
+    """
+    # MEASURED: `time npx --no-install eslint --version` x3 on this
+    # machine = 94.3 s, 13.5 s, 4.0 s. Despite --no-install, npx can reach the
+    # npm registry, so a slow network stalls a plan build for minutes (a build
+    # took ~6 min). Warm runs take seconds; the probe cap sits
+    # above the 13.5 s case and below the 94 s stall. The lint call is the same
+    # npx start-up plus a lint of one inline script, so it gets double.
+    probe_timeout_s = 30
+    lint_timeout_s = 60
+
+    try:
+        probe = subprocess.run(
+            ["npx", "--no-install", "eslint", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=probe_timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            "WARNING: dashboard JS validation skipped — eslint not available via "
+            f"`npx --no-install eslint` (probe timed out after {probe_timeout_s}s).",
+            file=sys.stderr,
+        )
+        return
+    if probe.returncode != 0:
+        print(
+            "WARNING: dashboard JS validation skipped — eslint not available via "
+            "`npx --no-install eslint` (run `npm i -g eslint` to enable the guard).",
+            file=sys.stderr,
+        )
+        return
+
+    try:
+        proc = subprocess.run(
+            [
+                "npx", "--no-install", "eslint",
+                "--no-config-lookup",
+                "--config", str(DASHBOARD_ESLINT_CONFIG),
+                "--stdin", "--stdin-filename", "dashboard.js",
+                "-f", "json",
+            ],
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=lint_timeout_s,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            "WARNING: dashboard JS validation skipped — eslint timed out after "
+            f"{lint_timeout_s}s.",
+            file=sys.stderr,
+        )
+        return
+    try:
+        results = json.loads(proc.stdout or "[]")
+    except json.JSONDecodeError:
+        print(
+            "WARNING: dashboard JS validation skipped — could not parse eslint output "
+            f"(exit {proc.returncode}): {(proc.stderr or '').strip()[:300]}",
+            file=sys.stderr,
+        )
+        return
+
+    errors = [
+        m
+        for r in results
+        for m in r.get("messages", [])
+        if m.get("severity") == 2
+    ]
+    return errors
+
+
 def validate_dashboard_js(html_text):
     """Static-check the dashboard's inline JS for undefined identifiers.
 
@@ -3227,47 +3304,7 @@ def validate_dashboard_js(html_text):
         )
         return
 
-    probe = subprocess.run(
-        ["npx", "--no-install", "eslint", "--version"],
-        capture_output=True,
-        text=True,
-    )
-    if probe.returncode != 0:
-        print(
-            "WARNING: dashboard JS validation skipped — eslint not available via "
-            "`npx --no-install eslint` (run `npm i -g eslint` to enable the guard).",
-            file=sys.stderr,
-        )
-        return
-
-    proc = subprocess.run(
-        [
-            "npx", "--no-install", "eslint",
-            "--no-config-lookup",
-            "--config", str(DASHBOARD_ESLINT_CONFIG),
-            "--stdin", "--stdin-filename", "dashboard.js",
-            "-f", "json",
-        ],
-        input=script,
-        capture_output=True,
-        text=True,
-    )
-    try:
-        results = json.loads(proc.stdout or "[]")
-    except json.JSONDecodeError:
-        print(
-            "WARNING: dashboard JS validation skipped — could not parse eslint output "
-            f"(exit {proc.returncode}): {(proc.stderr or '').strip()[:300]}",
-            file=sys.stderr,
-        )
-        return
-
-    errors = [
-        m
-        for r in results
-        for m in r.get("messages", [])
-        if m.get("severity") == 2
-    ]
+    errors = _eslint_dashboard_errors(script)
     if errors:
         detail = "\n".join(
             f"  line {m.get('line')}:{m.get('column')}  "

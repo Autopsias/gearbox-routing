@@ -48,11 +48,13 @@ assert "override-incomplete" not in lint(8, {"task_class": "standard_build", "mo
                                              "reasoning": "max", "why_model": "x"})
 
 # Contract section 4: a cross-provider override (a Codex model on an anthropic tree) skips the
-# floor check; a same-provider one still gets it. anthropic standard_build defaults to sonnet/medium.
+# floor check; a same-provider one still gets it. anthropic standard_build defaults to sonnet/low
+# since routing SSOT v38 (no lower effort exists), so the same-provider case uses agentic_build
+# (opus/high) to stay a below-the-floor known positive.
 cross = {"task_class": "standard_build", "peer_triggers": ["x"], "model": "gpt-5.6-luna",
          "reasoning": "low", "why_model": "x"}
 assert "override-below-floor" not in lint(8, cross, tree="anthropic"), "cross-provider skips the floor"
-same = {**cross, "model": "sonnet"}
+same = {**cross, "task_class": "agentic_build", "model": "opus"}
 assert "override-below-floor" in lint(8, same, tree="anthropic"), "same provider, lower effort"
 assert "override-without-reason" in lint(8, {**same, "why_model": "   "}, tree="anthropic"), "blank reason"
 

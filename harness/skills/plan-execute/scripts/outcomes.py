@@ -44,6 +44,7 @@ import ran_cell
 from ran_cell import SOURCE_ATTESTED, SOURCE_REQUESTED, SOURCE_UNKNOWN  # noqa: F401 (re-exported)
 import route_at_dispatch as rad
 import run_state_io as rsi
+import safe_json as sj
 
 KILL_SWITCH_ENV = "PLAN_EXECUTE_NO_OUTCOME_LEDGER"
 LEDGER_PATH_ENV = "PLAN_EXECUTE_OUTCOME_LEDGER"  # allow-listed test/override var
@@ -114,11 +115,10 @@ def _events(plan_dir, event_type, session_id):
         return []
     out = []
     for ln in lines:
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
-        if rec.get("event") == event_type and session_id in (rec.get("session_ids") or []):
+        if rec.get("event") == event_type and session_id in sj.get_list(rec, "session_ids", []):
             out.append(rec)
     return out
 
@@ -400,11 +400,9 @@ def _append_dedup(path, rec):
                 existing = existing.strip()
                 if not existing:
                     continue
-                try:
-                    if json.loads(existing).get("record_id") == rec["record_id"]:
-                        return {"written": False, "duplicate": True}
-                except ValueError:
-                    continue  # a torn/short line from a crash — not this record
+                # a torn/short line from a crash, or a non-object line, is not this record
+                if sj.get_str(sj.load_dict(existing), "record_id") == rec["record_id"]:
+                    return {"written": False, "duplicate": True}
             fh.seek(0, os.SEEK_END)
             _write_full(fh, payload)
             fh.flush()

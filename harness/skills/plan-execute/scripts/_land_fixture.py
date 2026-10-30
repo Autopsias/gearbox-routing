@@ -24,6 +24,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import land_state as lst  # noqa: E402
 import plan_worktree as pwt  # noqa: E402
+from proc_group import kill_group  # noqa: E402
 from worktree import git  # noqa: E402
 
 RUN_PY = SCRIPTS / "run.py"
@@ -219,25 +220,44 @@ exit 0
 def _arm_slow_commit(fx):
     """Make the land-worktree merge SLOW so a kill lands inside it: `git merge`
     runs `prepare-commit-msg` before it writes the merge commit, so a kill there
-    leaves MERGE_HEAD and a staged merge with no commit — the real shape."""
+    leaves MERGE_HEAD and a staged merge with no commit — the real shape.
+
+    The hook waits on the marker, not a fixed `sleep 60`: if a `git merge` ever
+    survives the kill, it resumes the moment the marker goes and fails the proof
+    at once, instead of 60 s later inside whatever step happens to be running."""
     hook = Path(fx["root"]) / ".git" / "hooks" / "prepare-commit-msg"
-    hook.write_text(f"#!/bin/sh\n[ -f '{fx['root']}/.SLOW' ] && sleep 60\nexit 0\n")
+    hook.write_text(f"#!/bin/sh\nwhile [ -f '{fx['root']}/.SLOW' ]; do sleep 0.1; done\n"
+                    "exit 0\n")
     hook.chmod(0o755)
     (Path(fx["root"]) / ".SLOW").touch()
 
-def _kill_when(fx, iso, ready, pick, timeout=60):
-    """Start a REAL `run.py land` child, SIGKILL it once `ready(state)` holds."""
+def _kill_when(fx, iso, ready, pick, timeout=900):
+    """Start a REAL `run.py land` child, SIGKILL it once `ready(state)` holds.
+
+    The kill takes the child's WHOLE process group, not just `run.py`. A bare
+    `proc.kill()` orphaned the `git merge` run.py had started: it finished its
+    merge commit after the hook returned and moved HEAD under the NEXT land's
+    merge (`cannot lock ref 'HEAD': is at X but expected Y`, reported as
+    "merge-conflict"). Reproduced 3/3, 2026-10-16; CI run 38816996775.
+
+    The wait ends when `ready` holds or the child exits, not on a wall-clock
+    guess: the armed hook holds the child inside the window until its marker
+    goes, so it cannot slip past. A 60 s guess expired before the merge at load
+    ~70 (measured). `timeout` is only a hang guard, run_cli's own."""
     proc = subprocess.Popen([sys.executable, str(RUN_PY), "land", str(iso["plan_dir"])],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            cwd=str(SCRIPTS))
+                            cwd=str(SCRIPTS), start_new_session=True)
     picked, deadline = None, time.time() + timeout
     while time.time() < deadline:
+        exited = proc.poll() is not None      # read BEFORE the state, or a last write is lost
         st = lst.load(iso["plan_dir"]) or {}
         if ready(st):
             picked = pick(st)
             break
+        if exited:
+            break
         time.sleep(0.3)
-    proc.kill()
+    kill_group(proc)
     proc.wait(timeout=30)
     marker = Path(fx["root"]) / ".SLOW"
     if marker.exists():

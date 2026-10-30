@@ -136,6 +136,7 @@ def test_a_transcript_with_no_model_window_still_records_the_int(tmp_path, monke
 
     import importlib.util
     spec = importlib.util.spec_from_file_location("ct_probe", octx.CONTEXT_TOKENS_PATH)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     tokens, window, source = module.context_tokens(str(path))

@@ -139,6 +139,17 @@ def test_the_prompt_puts_new_files_in_the_reviewed_surface():
     assert "UNTRACKED" not in bare
 
 
+def test_the_prompt_asks_for_one_finding_per_defect_class():
+    # 2026-10-17 (worth-adopting, Anthropic code-review post): passes 11-13 of one
+    # session each found one more instance of one class. The prompt now asks for
+    # the class once with every instance listed, on every surface shape.
+    for p in (g.build_prompt("low", ""),
+              g.build_prompt("high", "abc123"),
+              g.build_prompt("medium", "", ["new_file.py"])):
+        assert "ONE FINDING PER DEFECT CLASS" in p
+        assert "lists EVERY other file and line" in p
+
+
 # --------------------------------------------------------------------------
 # The committed-work surface. `git diff HEAD` is EMPTY once a
 # session commits, so the reviewer was handed nothing and its empty findings

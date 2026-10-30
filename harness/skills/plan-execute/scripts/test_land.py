@@ -30,7 +30,8 @@ import land_brief as lb  # noqa: E402
 import land_state as lst  # noqa: E402
 import dispatch as dsp  # noqa: E402
 import land_steps  # noqa: E402
-from _land_fixture import (_arm_prepush, build_repo,  # noqa: E402
+from _land_fixture import (_arm_prepush, _arm_slow_commit,  # noqa: E402
+                           _kill_when, build_repo,
                            checked_out_branch, isolate, local_main, main_side,
                            origin_main, run_cli, work)
 from worktree import git  # noqa: E402
@@ -451,24 +452,13 @@ def test_a_kill_between_the_merge_and_the_push_resumes_idempotently(fx):
 def test_a_kill_inside_the_merge_confines_the_mess_to_the_land_worktree(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
-    hook = fx["root"] / ".git" / "hooks" / "prepare-commit-msg"
-    hook.write_text(f"#!/bin/sh\n[ -f '{fx['root']}/.SLOW' ] && sleep 60\nexit 0\n")
-    hook.chmod(0o755)
-    (fx["root"] / ".SLOW").touch()
+    _arm_slow_commit(fx)
     before_local, before_origin = local_main(fx), origin_main(fx)
-    proc = subprocess.Popen([sys.executable, str(SCRIPTS / "run.py"), "land",
-                             str(iso["plan_dir"])], stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, cwd=str(SCRIPTS))
-    land_path, deadline = None, time.time() + 60
-    while time.time() < deadline:
-        st = lst.load(iso["plan_dir"]) or {}
-        land_path = st.get("land_path")
-        if land_path and lst.merge_in_progress(land_path):
-            break
-        time.sleep(0.2)
-    proc.kill()
-    proc.wait(timeout=30)
-    (fx["root"] / ".SLOW").unlink()
+    # `_kill_when` kills run.py's whole process group: a bare `proc.kill()` left
+    # its `git merge` alive to commit later, under the next land's merge.
+    _, land_path = _kill_when(fx, iso, lambda st: st.get("land_path")
+                              and lst.merge_in_progress(st["land_path"]),
+                              lambda st: st.get("land_path"))
     assert land_path and lst.merge_in_progress(land_path)
     # The mess is CONFINED: the operator's checkout is untouched and no ref moved.
     assert local_main(fx) == before_local and origin_main(fx) == before_origin
@@ -480,6 +470,10 @@ def test_a_kill_inside_the_merge_confines_the_mess_to_the_land_worktree(fx):
     assert "git merge --abort" in out["brief"]
     # ...and cleanup owns it: the brief's own command, then the land completes.
     git(["merge", "--abort"], land_path, check=True)
+    # ...and the killed merge never committed. A surviving `git merge` writes its
+    # commit and dies before clearing MERGE_HEAD, so every check above still
+    # passes and the next land adopts that unwatched commit as a resolution.
+    assert git(["rev-parse", "HEAD"], land_path)[1] == lst.load(iso["plan_dir"])["expected"]
     rc2, out2 = _ack_and_land(iso["plan_dir"])
     assert (rc2, out2["action"]) == (0, "landed")
     assert origin_main(fx) != before_origin

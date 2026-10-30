@@ -236,7 +236,7 @@ def _codex_worktree_files(plan_dir, session, prompt_file, worktree_path, stamp,
     digest = fd.digest(plan_dir, sid)
     feedback = _feedback_path(plan_dir, sid)
     feedback_text = feedback.read_text() if feedback.is_file() else ""
-    _refuse_restricted_text({"findings digest": digest,
+    _refuse_restricted_text({"checkpoint answer": digest,
                              f"rework feedback file {feedback.name}": feedback_text},
                             opted_in)
     if feedback_text:
@@ -284,7 +284,7 @@ def _codex_no_worktree_prompt(plan_dir, sid, prompt_file, stamp, opted_in=False)
     digest-prefixed copy. Deliberately does NOT add feedback-text handling —
     this funnel never did, and that gap is out of scope here."""
     digest = fd.digest(plan_dir, sid)
-    _refuse_restricted_text({"findings digest": digest}, opted_in)
+    _refuse_restricted_text({"checkpoint answer": digest}, opted_in)
     if not digest:
         return str(prompt_file)
     runtime_dir = Path(plan_dir) / "_codex"

@@ -21,6 +21,8 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+import safe_json as sj
+
 OPEN_TAG = "<plan-execute-closeout>"
 CLOSE_TAG = "</plan-execute-closeout>"
 VALID_RESULTS = {"DONE", "BLOCKED", "PARTIAL"}
@@ -423,7 +425,9 @@ def mark_replayed(plan_dir, session_id):
     target = Path(plan_dir) / "_closeouts" / f"{session_id}.json"
     if not target.exists():
         return
-    rec = json.loads(target.read_text())
+    rec = sj.as_dict(json.loads(target.read_text()))
+    if rec is None:
+        return
     rec["replayed"] = True
     rec["replayed_at"] = _now()
     target.write_text(json.dumps(rec, indent=2, ensure_ascii=False))
@@ -433,7 +437,7 @@ def load_closeout(plan_dir, session_id):
     target = Path(plan_dir) / "_closeouts" / f"{session_id}.json"
     if not target.exists():
         return None
-    return json.loads(target.read_text())
+    return sj.as_dict(json.loads(target.read_text()))
 
 
 def never_finished(plan_dir, session_id):

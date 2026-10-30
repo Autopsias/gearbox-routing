@@ -51,8 +51,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\"; s=$?; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }",
-            "timeout": 5
+            "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; in=$(cat); printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134' | LC_ALL=C grep -qiF -e pytest -e py.test -e docker || exit 0; printf '%s' \"$in\" | python3 \"$p\"; s=$?; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }",
+            "timeout": 15,
+            "onFailure": "block"
           }
         ]
       },
@@ -82,6 +83,28 @@
           {
             "type": "command",
             "command": "p=\"$HOME/.claude/hooks/safe-refactor-advisory.sh\"; [ -f \"$p\" ] || exit 0; exec bash \"$p\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" pre",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stop",
+            "timeout": 5
           }
         ]
       }

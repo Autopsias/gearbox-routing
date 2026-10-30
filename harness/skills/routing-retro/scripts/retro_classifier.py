@@ -33,6 +33,8 @@ def load_classifier():
             continue
         import importlib.util                          # noqa: PLC0415
         spec = importlib.util.spec_from_file_location("_compact_policy", cand)
+        if spec is None or spec.loader is None:
+            continue
         mod = importlib.util.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)

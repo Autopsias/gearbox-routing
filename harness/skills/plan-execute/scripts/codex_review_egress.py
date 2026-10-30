@@ -139,7 +139,7 @@ def egress_reason(cwd):
     ssot = _load_routing()[1]
     origin = _ORIGIN.get(cwd)
     hit = real_env(origin) if origin else None
-    if hit and not _egress_opt_in(ssot, Path(origin)):
+    if origin and hit and not _egress_opt_in(ssot, Path(origin)):
         return (f"{hit} (a real .env* file beside the reviewed code: Codex's read-only sandbox "
                 f"can read any file on this machine, so the copy alone does not keep it out) "
                 f"(tree {origin})")

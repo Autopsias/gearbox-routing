@@ -86,6 +86,7 @@ def load_pathspec(path):
     """Reuse gearbox-classify.py's parser — one pathspec, one parser."""
     spec = importlib.util.spec_from_file_location(
         "gearbox_classify", os.path.join(SELF, "gearbox-classify.py"))
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod.load_pathspec(path)

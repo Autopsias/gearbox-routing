@@ -19,6 +19,7 @@ import manifest_io as mio
 import outcomes as outc
 import route_at_dispatch as rad
 import run_state_io as rsi
+import safe_json as sj
 import stuck_protocol as sp
 from verify_pass import GATE_PASSED
 from verify_paths import (GATE_FAILED, _feedback_path, _html, _save_state,
@@ -360,8 +361,8 @@ def settle_blocked_closeout(plan_dir, session_id, closeout):
     path = verify_state_path(plan_dir, session_id)
     if not path.exists():
         return False
-    state = json.loads(path.read_text())
-    if state.get("outcome") in (GATE_PASSED, "halted"):
+    state = sj.as_dict(json.loads(path.read_text()))
+    if state is None or state.get("outcome") in (GATE_PASSED, "halted"):
         return False
     state["closeout_digest"] = closeout.get("_closeout_digest")
     state["closeout_persisted_at"] = closeout.get("_persisted_at")

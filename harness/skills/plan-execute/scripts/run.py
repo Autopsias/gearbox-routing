@@ -204,6 +204,8 @@ import render_verify as rv
 import replan as rp
 import route_at_dispatch as rad
 import run_state_io as rsi
+import safe_json as sj
+import sensitive_paths as sensp
 import session_fields as sess_fields
 import ship_state_io as ssio
 import shipping as shp
@@ -376,7 +378,8 @@ def _reasoning_directive(raw):
 # tier agent: they fall back to the prepend path with `effort_enforced: false` so
 # the gap is VISIBLE in the member payload instead of silently inheriting.
 # opus@xhigh IS mapped since v1.20 — it became a live escalation rung.
-_TIER_AGENT_DIR = Path.home() / ".claude" / "agents"
+# PLAN_EXECUTE_TIER_AGENT_DIR: tests point a subprocess run at the checkout's agents/.
+_TIER_AGENT_DIR = Path(os.environ.get("PLAN_EXECUTE_TIER_AGENT_DIR") or Path.home() / ".claude" / "agents")
 _TIER_AGENTS = {
     # Haiku 5.5 takes the dial, but the only haiku tier agent is tier-haiku, pinned
     # `effort: low` — the mechanical class's level. A haiku@medium or haiku@unset session
@@ -624,11 +627,10 @@ def _apply_attempt(plan_dir, session_id):
     # this session belong to the current cohort.
     prior = 0
     for ln in lines:
-        try:
-            rec = json.loads(ln)
-        except ValueError:
+        rec = sj.load_dict(ln)
+        if rec is None:
             continue
-        if session_id not in (rec.get("session_ids") or []):
+        if session_id not in sj.get_list(rec, "session_ids", []):
             continue
         if rec.get("event") == "escalation_reset":
             prior = 0          # new generation, new cohort: the count restarts
@@ -3345,7 +3347,7 @@ def cmd_apply(plan_dir, session_id, output_file, dry_run_shipping=False):
     # the orchestrator runs the verify sub-loop (verify-begin → … → verify-finalize)
     # which flips DOING→DONE only after every gate passes (or →PARTIAL on rework /
     # →BLOCKED on exhaustion). See verify.py.
-    verify_block = session.get("verify")
+    verify_block = sensp.effective_verify(plan_dir, session_id, session.get("verify"))
     verify_pending = bool(verify_block) and res == "DONE"
 
     # Apply session-level status.
@@ -4031,8 +4033,8 @@ def _unfinished_shipping(plan_dir):
             continue  # `<sid>.rN.json` — archived by a redispatch round
         sid = parts[0]
         try:
-            state = json.loads(p.read_text())
-            if not shp._all_done(state):
+            state = sj.load_dict(p.read_text())
+            if state is None or not shp._all_done(state):
                 out.append(sid)
         except (OSError, ValueError, KeyError):
             out.append(sid)

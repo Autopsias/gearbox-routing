@@ -282,7 +282,7 @@ sys.path.insert(0, str(SCRIPTS.parent.parent / "plan-builder" / "scripts"))
 
 import build_plan                                                    # noqa: E402
 
-FIXTURE_SPEC = {
+FIXTURE_SPEC: dict = {
     "title": "Parallel Contract Fixture Plan",
     "categories": [{"key": "work", "label": "Work"}],
     "items": [

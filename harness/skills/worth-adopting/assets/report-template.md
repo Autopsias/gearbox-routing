@@ -18,7 +18,7 @@
 - **What gets better:** <quality or cost, plain words> — pain on record: `<file:line or note>`, in <repo>
 - **Smallest form and route:** <delete … | one line in … | edit <existing part> | one new file | subsystem> — <build in this session | `/plan-builder`>
 - **Carry cost:** <always-loaded context, hook time, dependency, upkeep, data that leaves the machine, or "none found">
-- **How we will know:** <the measurement; for a TRIAL, the result that makes it an ADOPT>
+- **How we will know:** <the command to run, a calendar date it is due (never only "after the next N …"), and for a TRIAL the result that makes it an ADOPT>
 - **Checked in this run:** <doc page quoted, command run, file re-opened>
 
 ## Lets the target delete or simplify

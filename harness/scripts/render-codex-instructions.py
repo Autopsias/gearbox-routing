@@ -67,6 +67,7 @@ def render_claude_md(text: str) -> str:
             else:
                 out.append(line)
             continue
+        assert closer is not None  # set together with mode
         if closer.match(s):
             mode = closer = None
         elif ANY_MARKER.match(s):

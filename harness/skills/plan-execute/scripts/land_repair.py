@@ -38,6 +38,7 @@ import re
 import shlex
 import uuid
 from pathlib import Path
+from typing import Any
 
 import article_block as ab
 import land_flaky as lfk
@@ -49,6 +50,7 @@ import plan_mutate as pm
 import plan_worktree as pwt
 import review_context as rvs
 import run_state_io as rsi
+import safe_json as sj
 import verify_pass as vp
 import worktree as wt
 from land_state import park, rev, save
@@ -190,8 +192,8 @@ def _rerun(plan_dir, ctx, st, red, gates):
     gate (it declares the review base) is never re-run: re-reviewing an unchanged
     tree answers nothing new."""
     key = f"{st.get('gate_key')}:{json.dumps(_cand(st), sort_keys=True)}"
-    memo = st.get("rerun") if (st.get("rerun") or {}).get("candidate") == key else None
-    memo = memo or {"candidate": key, "gates": {}}
+    prior = st.get("rerun") if (st.get("rerun") or {}).get("candidate") == key else None
+    memo: dict[str, Any] = prior or {"candidate": key, "gates": {}}
     fresh = set()
     for r in red:
         g = r["gate_id"]
@@ -301,12 +303,11 @@ def _source_item(plan_dir, spec):
     last = done[-1] if done else (sessions[0]["id"] if sessions else None)
     log = Path(plan_dir) / "run.ndjson"
     for line in (log.read_text().splitlines() if log.is_file() else []):
-        try:
-            e = json.loads(line)
-        except ValueError:
+        e = sj.load_dict(line)
+        if e is None:
             continue
         if e.get("event") in ("verify_passed", "batch_completed"):
-            last = next((s for s in e.get("session_ids") or [] if s in done), last)
+            last = next((s for s in sj.get_list(e, "session_ids", []) if s in done), last)
     sess = next((s for s in sessions if s["id"] == last), None)
     item = sess["items"][0] if sess else None
     cat = next((i["category"] for i in spec["items"] if i["id"] == item), None)

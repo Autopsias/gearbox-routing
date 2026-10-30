@@ -32,6 +32,7 @@ SPINE = ("ts", "session", "event", "source", "policy_version", "reason")
 def load_policy():
     """Import compact-policy.py under a legal module name (it has a hyphen)."""
     spec = importlib.util.spec_from_file_location("compact_policy_under_test", HOOK)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     sys.path.insert(0, HERE)  # so its own `from context_tokens import ...` resolves
@@ -46,6 +47,7 @@ def load_context_tokens():
     spec = importlib.util.spec_from_file_location(
         "context_tokens_under_test", os.path.join(HERE, "context_tokens.py")
     )
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

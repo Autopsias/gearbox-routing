@@ -1,6 +1,7 @@
 name: quality-ratchet
 
-# CI backstop for the three vendored quality-ratchet checkers (tools/).
+# CI backstop for the three vendored quality-ratchet checkers (tools/), plus
+# the opt-in type-error ratchet where a repo has adopted tools/check_types.py.
 #
 # The pre-commit hooks judge only STAGED files, so a local `SKIP=` (or a
 # --no-verify that should never happen) is survivable exactly because this job
@@ -29,7 +30,10 @@ jobs:
     # A repo that pays for no hosted minutes sets the repository variable
     # QUALITY_RATCHET_RUNS_ON to a JSON runner label list, e.g.
     # ["self-hosted","macOS","ARM64"]. Unset keeps GitHub's hosted runner.
-    runs-on: ${{ fromJSON(vars.QUALITY_RATCHET_RUNS_ON || '"ubuntu-latest"') }}
+    # A pull request from a fork always gets the hosted runner: on a public
+    # repo, a self-hosted runner would execute a stranger's code on the
+    # owner's machine.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON(vars.QUALITY_RATCHET_RUNS_ON || '"ubuntu-latest"') }}
     # Without this a job inherits GitHub's 360-minute default: a hung
     # step burns six hours of runner time and reports nothing. The
     # ratchet takes well under a minute.
@@ -37,6 +41,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes or calls the API, so keep the token out of
+          # .git/config where any later step could read it.
+          persist-credentials: false
 
       - name: Set up Python (uv)
         # uv, not actions/setup-python: setup-python writes to the hosted
@@ -49,8 +57,13 @@ jobs:
 
       - name: Install ruff (complexity checker backend)
         # Pinned so CI and the commit hook can never disagree about a score;
-        # bump deliberately, alongside a local ruff bump.
-        run: uv pip install ruff==0.14.10
+        # bump deliberately, alongside a local ruff bump. A repo whose own
+        # lint pins another ruff sets the repository variable
+        # QUALITY_RATCHET_RUFF (e.g. 0.16.6) so the complexity counts in its
+        # baseline keep the version they were recorded with.
+        env:
+          RUFF_VERSION: ${{ vars.QUALITY_RATCHET_RUFF || '0.14.10' }}
+        run: uv pip install "ruff==$RUFF_VERSION"
 
       - name: Prove the checkers can still fail
         # A gate that returns "clean" because its input was empty is worse
@@ -66,9 +79,13 @@ jobs:
           cond = "\n".join(f"    if n == {i}: return {i}" for i in range(20))
           (plant / "bad.py").write_text(f"def huge():\n{body}\n\ndef twisty(n):\n{cond}\n    return 0\n")
           EOF
-          ! python tools/check_file_sizes.py --project "$plant"
-          ! python tools/check_function_lengths.py --project "$plant"
-          ! python tools/check_complexity.py --project "$plant"
+          # `! cmd` never trips `set -e`: only the LAST such line could ever
+          # fail the step. Assert each exit code instead: 1 is "violation";
+          # 2 (a tool error) must not pass for a block.
+          for checker in check_file_sizes check_function_lengths check_complexity; do
+            rc=0; python "tools/$checker.py" --project "$plant" || rc=$?
+            test "$rc" -eq 1 || { echo "::error::$checker missed the planted file (exit $rc)"; exit 1; }
+          done
 
       - name: File size ratchet (whole project)
         run: python tools/check_file_sizes.py --project .
@@ -78,3 +95,31 @@ jobs:
 
       - name: Complexity ratchet (whole project)
         run: python tools/check_complexity.py --project .
+
+      - name: Type-error ratchet (whole project)
+        # Opt-in: runs only where the repo has adopted it by committing
+        # tools/check_types.py, a [tool.ty] scope and a .type-exceptions
+        # baseline. vendor_quality.py does not vendor check_types.py, because a
+        # repo with no baseline would count every diagnostic as a rise.
+        # ty pinned: a bump changes which rules fire, so bump and re-record
+        # .type-exceptions in one commit. Record the baseline in THIS
+        # environment (Python 3.12, only ruff and ty installed). Positive
+        # control first, as above: a planted error must block, a recorded one
+        # must pass, a rise must block, a fall must pass, before the repo's own
+        # all-clear is trusted.
+        if: hashFiles('tools/check_types.py') != ''
+        run: |
+          set -euo pipefail
+          uv pip install ty==0.0.89
+          plant=$(mktemp -d)
+          mkdir "$plant/src"
+          printf '[tool.ty.src]\ninclude = ["src"]\n' > "$plant/pyproject.toml"
+          printf 'x: int = "not an int"\n' > "$plant/src/bad.py"
+          rc=0; python tools/check_types.py --project "$plant" || rc=$?; test "$rc" -eq 1
+          python tools/check_types.py --project "$plant" --generate-baseline
+          python tools/check_types.py --project "$plant"
+          printf 'x: int = "not an int"\ny: int = "nor this"\n' > "$plant/src/bad.py"
+          rc=0; python tools/check_types.py --project "$plant" || rc=$?; test "$rc" -eq 1
+          printf 'x: int = 1\n' > "$plant/src/bad.py"
+          python tools/check_types.py --project "$plant" | grep -q "below baseline src/bad.py"
+          python tools/check_types.py --project .

@@ -35,7 +35,7 @@ REPO = Path(__file__).resolve().parents[3]
 # comparison would pass on nothing and the v8 positive control would fail.
 PRE_V8_BUILDER = "e14bd6dd25b2a42000047108684496177b791a34"
 
-_V8 = {
+_V8: dict = {
     "title": "Route at dispatch fixture",
     "plan_schema_version": 8,
     "created": "2026-09-29",

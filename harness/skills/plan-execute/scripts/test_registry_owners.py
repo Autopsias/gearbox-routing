@@ -447,9 +447,9 @@ def test_collect_joins_plans_branches_and_worktrees(tmp_path, monkeypatch):
 def test_cli_plans_status_survives_naive_started_at_lock(tmp_path):
     """Rework fix (MEDIUM) end-to-end: `run.py plans-status --json` run as a
     real subprocess against a repo whose plan has a naive (no tzinfo)
-    `started_at` in its `.lock` must still exit 0 and report `age_s: null`
-    for that plan — not crash the whole read-only run with an uncaught
-    TypeError."""
+    `started_at` in its `.lock` must still exit 0 and report a numeric
+    `age_s` (the stamp reads as UTC) — not crash the whole read-only run with
+    an uncaught TypeError."""
     root = _wt_repo(tmp_path)
     plan_dir = _make_plan(root, "fixture", _todo_session())
     (plan_dir / ".lock").write_text(json.dumps({
@@ -466,7 +466,7 @@ def test_cli_plans_status_survives_naive_started_at_lock(tmp_path):
 
     data = json.loads(result.stdout)
     row = next(p for p in data["plans"] if p["plan"] == "fixture")
-    assert row["lock"]["age_s"] is None
+    assert isinstance(row["lock"]["age_s"], float)
 
 
 def test_cli_plans_status_survives_corrupt_worktree_group_state(tmp_path, monkeypatch):

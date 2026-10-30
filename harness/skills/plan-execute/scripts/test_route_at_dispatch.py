@@ -86,7 +86,7 @@ V7 = [
      "prompt": "work"},
 ]
 GOLDEN_V7 = {
-    "claude": "44b298cdfecdbee0c25f2f4dd7dcbf4f3a1791b8b32051d12189de6c742b6131",
+    "claude": "4b7d78283a69dadd3c984690656546c6bef94390328eac204fcb38abf9ac2e0b",
     "codex": "a17f95af7ce8093a3fedec0f08fa020b903ef667b7c93515cff6b3c580f7018f",
 }
 
@@ -214,7 +214,7 @@ def _move_standard_build(routing):
     text = routing.read_text()
     old = rad.routing_version(text)
     text = re.sub(r"^version:\s*\d+", f"version: {old + 1}", text, count=1, flags=re.M)
-    text, n = re.subn(r"(  standard_build: \{ tier: workhorse,\s+effort: )standard",
+    text, n = re.subn(r"(  standard_build: \{ tier: workhorse,\s+effort: )(?:standard|light)",
                       r"\1thorough", text, count=1)
     assert n == 1, "the fixture edit did not land — the test would pass on nothing"
     routing.write_text(text)

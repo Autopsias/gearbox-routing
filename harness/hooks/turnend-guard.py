@@ -23,6 +23,14 @@ per session (state under ~/.gearbox-state/turnend-guard/); then the turn may end
 Every failure path allows the stop — a guard that cannot read is not a guard
 that should trap the session.
 
+RESUMED AGENTS: an agent that already sent its completion notification can run
+again — SendMessage resumes it ("Resuming agent ...") or queues a message for
+its next tool round, and a notification can say it "stopped with background work
+of its own still running". So an agent also counts as running when a resume or
+queued SendMessage targeted it after its last notification (notifications carry
+the agent id as <task-id>), or when its subagent transcript
+(<transcript>/subagents/agent-*.jsonl) changed within RECENT_S seconds.
+
 ponytail: a dispatch that dies without a notification stays "outstanding" and
 the guard stays open for it; plan-execute's crash recovery still covers that.
 """
@@ -32,12 +40,21 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 MAX_BLOCKS = 3
 BG_TOOLS = ("Agent", "Workflow", "Task")
 DOING_RE = re.compile(r'<article class="session" id="([^"]+)"[^>]*data-status="DOING"')
-NOTE_RE = re.compile(r"<tool-use-id>([^<]+)</tool-use-id>")
+NOTE_RE = re.compile(r"<task-notification>(.*?)</task-notification>")
+TASK_RE = re.compile(r"<task-id>([^<]+)</task-id>")
+TOOL_RE = re.compile(r"<tool-use-id>([^<]+)</tool-use-id>")
+# An agent that stops while its own background work still runs gets an INTERIM
+# "completed" notification; the final one comes later under the same task-id,
+# often without a tool-use-id. Seen 2026-10-14, Kuzushi kuzushi-videos s98/s101.
+INTERIM = "background work of its own still running"
+RESUMED = ("Resuming agent", "queued for delivery")
+RECENT_S = 120
 
 
 def state_dir() -> Path:
@@ -65,32 +82,55 @@ def plans_of(cwd: Path, session_id: str) -> list[Path]:
     return out
 
 
-def _scan_blocks(line: str, issued: dict, results: dict) -> None:
-    """One transcript line: record background tool_use ids and their tool_result text."""
+def _scan_blocks(line: str, issued: dict, results: dict, sends: dict) -> list:
+    """One transcript line: record background tool_use ids and their tool_result text.
+    Returns the agent ids a SendMessage on this line resumed or queued a message for."""
     try:
         msg = (json.loads(line).get("message") or {}).get("content")
     except ValueError:
-        return
+        return []
+    woken = []
     for c in msg if isinstance(msg, list) else []:
         if c.get("type") == "tool_use" and (c.get("name") in BG_TOOLS or (
             c.get("name") == "Bash" and (c.get("input") or {}).get("run_in_background")
         )):
             issued[c.get("id")] = c.get("name")
+        elif c.get("type") == "tool_use" and c.get("name") == "SendMessage":
+            sends[c.get("id")] = (c.get("input") or {}).get("to")
+        elif c.get("type") == "tool_result" and c.get("tool_use_id") in sends:
+            if any(m in str(c.get("content")) for m in RESUMED):
+                woken.append(sends[c["tool_use_id"]])
         elif c.get("type") == "tool_result" and c.get("tool_use_id") in issued:
             results[c["tool_use_id"]] = str(c.get("content"))
+    return woken
 
 
 def background_outstanding(transcript_path: str | None) -> int:
-    """Background dispatches issued minus those whose task-notification arrived."""
+    """Background dispatches issued minus those whose task-notification arrived,
+    plus agents whose latest notification is interim (still waiting on their own work),
+    or 1 when a notified agent was resumed or its subagent transcript is fresh."""
     if not transcript_path or not os.path.isfile(transcript_path):
         return 0
-    issued, done, results = {}, set(), {}
+    if subagent_recently_active(transcript_path):
+        return 1
+    issued, done, results, sends, waiting = {}, set(), {}, {}, set()
+    last_note, resumed = {}, {}  # agent id -> line number
     with open(transcript_path, errors="replace") as fh:
-        for line in fh:
+        for i, line in enumerate(fh):
             if "tool_use" in line:
-                _scan_blocks(line, issued, results)
-            if "<tool-use-id>" in line:
-                done.update(NOTE_RE.findall(line))
+                for a in _scan_blocks(line, issued, results, sends):
+                    resumed[a] = i
+            for note in NOTE_RE.findall(line) if "<task-notification>" in line else ():
+                done.update(TOOL_RE.findall(note))
+                task = (TASK_RE.findall(note) or [None])[0]
+                last_note[task] = i
+                (waiting.add if INTERIM in note else waiting.discard)(task)
+    if any(i > last_note.get(a, -1) for a, i in resumed.items()):
+        return 1
+    return _count_live(issued, done, results) + len(waiting - {None})
+
+
+def _count_live(issued: dict, done: set, results: dict) -> int:
     # A dispatch the harness refused (permission denied, hook block) never ran, so
     # it cannot be "still running": a background Bash counts only once its result
     # confirms the launch; an Agent/Workflow drops on a refusal text.
@@ -105,6 +145,18 @@ def background_outstanding(transcript_path: str | None) -> int:
             continue
         live += 1
     return live
+
+
+def subagent_recently_active(transcript_path: str) -> bool:
+    """Any subagent transcript of this session written within RECENT_S seconds."""
+    now = time.time()
+    for f in Path(transcript_path).with_suffix("").joinpath("subagents").glob("agent-*.jsonl"):
+        try:
+            if now - f.stat().st_mtime < RECENT_S:
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def main() -> int:

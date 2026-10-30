@@ -56,6 +56,7 @@ import plan_scope as pscope
 import render_verify as rv
 import replan as rp
 import run_state_io as rsi
+import sensitive_paths as sensp
 import ship_state_io as ssio
 import shipping as shp
 import shipping_adapter as adapter
@@ -75,9 +76,11 @@ GATE_PENDING = "pending"
 # --------------------------------------------------------------------------
 # Resolution
 # --------------------------------------------------------------------------
-def _resolved_verify(manifest, session_id):
+def _resolved_verify(manifest, session_id, plan_dir):
     s = mio.session_by_id(manifest).get(session_id)
-    return (s.get("verify") if s else None) or None
+    if not s:
+        return None
+    return sensp.effective_verify(plan_dir, session_id, s.get("verify") or None) or None
 
 
 def compute_gates(plan_dir, manifest, session_id):
@@ -86,10 +89,12 @@ def compute_gates(plan_dir, manifest, session_id):
     Reuses ``shipping.resolve_gate`` so a verify gate and a ``pre_deploy_gate``
     with the same id resolve identically. Raises ``shipping.StepResolveError``
     (unknown gate id; claimed-but-vanished plan worktree) to halt precisely."""
-    vb = _resolved_verify(manifest, session_id)
+    vb = _resolved_verify(manifest, session_id, plan_dir)
     if not vb:
         return []
-    return [shp.resolve_gate(plan_dir, gid, session_id) for gid in (vb.get("gates") or [])]
+    # A change hitting a sensitive path swaps low review ids for medium (sensitive_paths).
+    ids = sensp.raise_gates(sensp.session_paths(plan_dir, session_id), vb.get("gates") or [])
+    return [shp.resolve_gate(plan_dir, gid, session_id) for gid in ids]
 
 
 # --------------------------------------------------------------------------
@@ -132,7 +137,7 @@ gate_cwd = pscope.gate_cwd
 def verify_begin(plan_dir, session_id, *, dry_run=False, resume=False):
     manifest = mio.load_manifest(plan_dir)
     gates = compute_gates(plan_dir, manifest, session_id)
-    vb0 = _resolved_verify(manifest, session_id)
+    vb0 = _resolved_verify(manifest, session_id, plan_dir)
     require_ev = bool(vb0 and vb0.get("require_evidence"))
     # A verify block with no gates but require_evidence STILL runs — the evidence
     # assertion fires at verify-finalize. Only a truly empty block is a noop.
@@ -174,7 +179,7 @@ def verify_begin(plan_dir, session_id, *, dry_run=False, resume=False):
         elif not resume:
             return _requires_resume(session_id, state)  # RT-04
     else:
-        vb = _resolved_verify(manifest, session_id)
+        vb = _resolved_verify(manifest, session_id, plan_dir)
         state = _new_state(plan_dir, manifest, session_id, gates, vb)
         _save_state(plan_dir, session_id, state)
         rsi.log_event(plan_dir, "verify_started", session_ids=[session_id],
@@ -335,7 +340,7 @@ def _check_named_checks(plan_dir, session_id):
     ``checks`` is non-empty — independent of ``require_evidence`` (the schema
     allows checks to stand alone). Returns ``(ok, excerpt)``."""
     try:
-        vb = _resolved_verify(mio.load_manifest(plan_dir), session_id)
+        vb = _resolved_verify(mio.load_manifest(plan_dir), session_id, plan_dir)
     except Exception:  # noqa: BLE001 — no manifest → nothing to assert
         return True, ""
     checks = (vb or {}).get("checks") or []

@@ -15,6 +15,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import safe_json as sj
+
 from ssot_policy import _content_allowlist, _egress_opt_in
 
 
@@ -332,6 +334,9 @@ def _gitleaks_pass(exe, target, ignore_root, expected_bytes, link_root, allow,
         findings = json.loads(proc.stdout or "[]")
     except ValueError:
         return (f"gitleaks produced unparseable output for {target} — this tree "
+                "cannot be cleared for egress (fail-closed)")
+    if not isinstance(findings, list) or not all(sj.as_dict(f) is not None for f in findings):
+        return (f"gitleaks output for {target} is not a list of findings — this tree "
                 "cannot be cleared for egress (fail-closed)")
     for f in findings:
         path = f.get("File") or target

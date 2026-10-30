@@ -100,6 +100,7 @@ import article_block as ab  # noqa: E402
 import build_plan as bp  # noqa: E402
 import closeout_pipeline as cp  # noqa: E402
 import dispatch as dsp  # noqa: E402
+import safe_json as sj  # noqa: E402
 import session_fields as sess_help  # noqa: E402
 import structural_gate as sg  # noqa: E402
 # Re-exported: callers and tests reach these as `pm.<name>`, and nothing
@@ -144,9 +145,12 @@ def load_spec(plan_dir):
             "hand edits corrupted the page."
         )
     try:
-        return json.loads(p.read_text())
+        spec = json.loads(p.read_text())
     except json.JSONDecodeError as e:
         raise MutationError(f"{p} is not valid JSON: {e}") from e
+    if sj.as_dict(spec) is None:
+        raise MutationError(f"{p} is not a JSON object (got {type(spec).__name__})")
+    return spec
 
 
 def project_root_for(plan_dir):
@@ -332,7 +336,7 @@ def build_generation(plan_dir, spec, *, touched_sessions, status_ops, log_entry)
     manifest = bp.gen_manifest(spec)
     prior_manifest_path = plan_dir / "manifest.json"
     if prior_manifest_path.is_file():
-        prior = json.loads(prior_manifest_path.read_text())
+        prior = sj.as_dict(json.loads(prior_manifest_path.read_text())) or {}
         if "created" in prior:
             # `created` is stamped with today's date at build time; regenerating
             # must not rewrite the plan's birthday.
@@ -405,8 +409,8 @@ def _live_state_files(plan_dir, subdir):
 
 def _read_json(path):
     try:
-        return json.loads(path.read_text())
-    except (OSError, ValueError):
+        return sj.load_dict(path.read_bytes())
+    except OSError:
         return None
 
 
@@ -1024,7 +1028,9 @@ def consistency_report(plan_dir):
     if render_html_for(spec, plan_dir, prior_html) != prior_html:
         bad.append("PLAN.html does not match a render of spec.json")
 
-    manifest = json.loads((plan_dir / "manifest.json").read_text())
+    manifest = sj.as_dict(json.loads((plan_dir / "manifest.json").read_text()))
+    if manifest is None:
+        return {"ok": False, "problems": bad + ["manifest.json is not a JSON object"]}
     gen = bp.gen_manifest(spec)
     gen["created"] = manifest.get("created", gen.get("created"))
     # Same carve-out as `build_generation`, but ONE-WAY: a plan built by an OLDER

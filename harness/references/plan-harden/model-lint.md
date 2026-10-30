@@ -47,7 +47,7 @@ unchanged, and the five new rules below run too.
   medium < high < xhigh < max` (no dial lowest). So every opus cell outranks every sonnet
   cell, and a same-model, lower effort is below. It is NOT "the default is reachable by
   `escalate()` steps": for `deep_reasoning` on anthropic (default `opus@medium`) the walk from
-  `sonnet@high` goes `opus@high → opus@xhigh → fable@…`, never visiting `opus@medium`, yet
+  `sonnet@high` goes `opus@high → opus@xhigh` (then stops, v39), never visiting `opus@medium`, yet
   `sonnet@high` is below. Compute it with the shared resolver
   (`resolve_route.below_floor(task_class, provider, cell)`, which both this lint and the
   builder call), never a hand-written ladder, on the ladder of the **override's own
@@ -292,11 +292,12 @@ no-oped; HARDENED:codex-verify-r2 — the fixed `< 3` threshold this replaced wa
   "
   ```
   `rungs_to_apex(start_cell)` is that count — the number of REWORK ATTEMPTS from the
-  session's own starting cell until the ladder reaches the apex rung (e.g. `fable@xhigh` on
-  the Claude lane or `gpt-5.6-sol@max` on the Codex lane): one for the mandatory same-rung
+  session's own starting cell until the ladder reaches the apex rung (e.g. `opus@xhigh` on
+  the Claude lane since SSOT v39 — the automatic fable rungs were withdrawn — or
+  `gpt-5.6-sol@max` on the Codex lane): one for the mandatory same-rung
   retry (`stuck_protocol` needs two same-signature failures before the first climb) plus one
-  per `escalate()` call after that. Verified against the live SSOT:
-  `opus@high` → 4, `opus@medium` → 5, `sonnet@high` → 5 — these are the same worked examples
+  per `escalate()` call after that. Verified against the live SSOT v39:
+  `opus@high` → 2, `opus@medium` → 3, `sonnet@high` → 3, `sonnet@low` → 5 — these are the same worked examples
   `skills/plan-builder/references/schemas.md`'s `max_rework` sizing guidance states, computed
   the same way. Flag the session when its declared `max_rework` is:
   - **`< 2`** — no escalation is possible at all (the stuck protocol needs two same-rung

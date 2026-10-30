@@ -223,7 +223,7 @@ def test_a_hold_anchors_to_the_gate_relative_path_when_both_are_changed(monkeypa
     for pkg in ("pkgB", "zz"):
         diff = {"tests/t.py", f"{pkg}/tests/t.py"}
         monkeypatch.setattr(lst, "range_files", lambda *a, **k: diff)
-        st = {"land_path": "/land", "expected": "e", "plan_head": "h1"}
+        st: dict = {"land_path": "/land", "expected": "e", "plan_head": "h1"}
         lfk.hold(st, "gate-b", [("tests/t.py::test_x", "tests/t.py")], cwd=f"/land/{pkg}")
         assert st["plan_touched_flakes"]["gate-b: tests/t.py::test_x"]["file"] \
             == f"{pkg}/tests/t.py", st

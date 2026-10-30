@@ -10,22 +10,21 @@ measured times, not guesses.
 """
 
 import argparse
-import json
 import statistics
 from collections import defaultdict
 from pathlib import Path
+
+import safe_json as sj
 
 
 def runs(repo, since=""):
     out = defaultdict(list)
     for f in sorted(Path(repo).expanduser().glob("_plans/*/run.ndjson")):
         for line in f.read_text(errors="replace").splitlines():
-            try:
-                e = json.loads(line)
-            except ValueError:
-                continue
-            if (isinstance(e, dict) and e.get("event") == "gate_run"
-                    and isinstance(e.get("seconds"), (int, float)) and e.get("ts", "") >= since):
+            e = sj.load_dict(line)
+            if (e is not None and e.get("event") == "gate_run"
+                    and isinstance(e.get("seconds"), (int, float))
+                    and sj.get_str(e, "ts", "") >= since):
                 out[e.get("gate")].append(float(e["seconds"]))
     return out
 

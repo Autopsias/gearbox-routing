@@ -30,6 +30,8 @@ import json
 import sys
 from pathlib import Path
 
+import safe_json as sj
+
 _TOKENS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_creation_tokens")
 UNAVAILABLE = {**dict.fromkeys(_TOKENS), "cost_usd": None, "cost_source": "none",
                "source": "unavailable", "scope": "worker"}
@@ -244,10 +246,10 @@ def price(usage, served_model, table, rates):
 def ledger_usage(receipt):
     """The rule-6 usage block for one outcome record, from THIS dispatch's
     receipt (None when there is none or it is stale). Never raises."""
-    usage = (receipt or {}).get("usage")
-    if not isinstance(usage, dict) or usage.get("source") in (None, "unavailable"):
+    usage = sj.get_dict(receipt, "usage")
+    if usage is None or usage.get("source") in (None, "unavailable"):
         return dict(UNAVAILABLE)
-    served = (receipt.get("attested") or {}).get("model")
+    served = sj.get_str(sj.get_dict(receipt, "attested"), "model")
     try:
         if usage.get("cost_source") == "reported":
             return dict(usage)

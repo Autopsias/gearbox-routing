@@ -32,7 +32,12 @@ DEFAULT_MAX_REWORK = 2
 #: session could not be AUTHORED to reach its own apex -- and plan-harden's
 #: `max-rework-cannot-reach-apex` lint could only tell the author to clamp to a
 #: number that still cannot get there, which reads as compliance and is not.
-MAX_REWORK_CEILING = 7
+#: 7 -> 8: routing SSOT v38 made sonnet@low the standard_build
+#: default, one rung below sonnet@medium, so the longest ladder is now 8.
+#: 8 -> 5: SSOT v39 withdrew the three automatic fable rungs, so the
+#: longest ladder is now 5 (sonnet@low -> sonnet@medium -> sonnet@high -> opus@high
+#: -> opus@xhigh). A spec authored at 6-8 is refused on its next build: lower it.
+MAX_REWORK_CEILING = 5
 
 #: Declared WRITES per session -- files, not prompt chars -- measured
 #: over every plan on this machine: 74 sessions / 18 plans, median 3, p75 5,

@@ -20,11 +20,12 @@ follow, so it must be reached on purpose, never by keyword match.
 | Directory | Upstream | Licence |
 |---|---|---|
 | `gha-security-review/` | [getsentry/skills](https://github.com/getsentry/skills) `skills/gha-security-review` | Apache-2.0 |
+| `security-review/` | [getsentry/skills](https://github.com/getsentry/skills) `skills/security-review` | Apache-2.0 |
+| `cloudflare-security-audit/` | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) `skills/security-audit` | MIT |
 
-Sentry's `security-review` from the same upstream is **not vendored**: its
-reference files derive from the OWASP Cheat Sheet Series under CC BY-SA 4.0,
-which is share-alike. Install [getsentry/skills](https://github.com/getsentry/skills)
-yourself if you want it.
+Re-pinning `cloudflare-security-audit` also requires a review of `exposure.py check-run` (its code is `scripts/cf_check.py`), the `CONTRACT_TREE` in `scripts/exposure.py`, and their tests.
+
+Sentry's `security-review` derives from the OWASP Cheat Sheet Series (CC BY-SA 4.0).
 
 ## Not vendored, and why
 

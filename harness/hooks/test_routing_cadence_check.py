@@ -21,6 +21,7 @@ SCRIPT = HERE / "routing-cadence-check.py"
 
 def load():
     spec = importlib.util.spec_from_file_location("routing_cadence_check_test_target", SCRIPT)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

@@ -114,9 +114,10 @@ def test_the_ceiling_is_the_longest_ladder_the_ssot_actually_defines():
     POSITIVE for the pin: a shorter starting rung must come out strictly under
     the ceiling, or the walk is not walking."""
     longest = max(_rungs_to_apex(m, e) for m, e in
-                  [("opus", "high"), ("opus", "medium"), ("sonnet", "high"), ("sonnet", "medium")])
-    assert longest == pl.MAX_REWORK_CEILING == 7
-    assert _rungs_to_apex("opus", "high") == 5 < pl.MAX_REWORK_CEILING
+                  [("opus", "high"), ("opus", "medium"), ("sonnet", "high"), ("sonnet", "medium"),
+                   ("sonnet", "low")])
+    assert longest == pl.MAX_REWORK_CEILING == 5          # v39: fable rungs withdrawn
+    assert _rungs_to_apex("opus", "high") == 2 < pl.MAX_REWORK_CEILING
 
 
 def test_build_plan_accepts_a_max_rework_that_can_reach_the_apex():
@@ -128,7 +129,7 @@ def test_build_plan_accepts_a_max_rework_that_can_reach_the_apex():
             bp._validate_verify_block({"gates": ["g"], "max_rework": bad}, "s01.verify")
             raise AssertionError(f"max_rework={bad!r} should have been refused")
         except ValueError as e:
-            assert "max_rework must be an int 0..7" in str(e)
+            assert f"max_rework must be an int 0..{pl.MAX_REWORK_CEILING}" in str(e)
 
 
 # --- stale prose references --------------------------------------------------

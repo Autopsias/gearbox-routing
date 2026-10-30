@@ -97,6 +97,7 @@ from pathlib import Path
 
 import article_block as ab
 import parallel_contract as pcon
+import safe_json as sj
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 # Reuse plan-builder's hand-maintained allowlist rather than forking it — the
@@ -202,7 +203,8 @@ def _eslint_verdict(proc):
         results = json.loads(proc.stdout or "[]")
     except ValueError:
         results = []
-    if proc.returncode not in (0, 1) or not results:
+    if proc.returncode not in (0, 1) or not isinstance(results, list) or not results \
+            or not all(isinstance(r, dict) for r in results):     # not a report: never a pass
         return {"status": "skipped",
                 "reason": f"eslint did not lint (rc={proc.returncode}): {proc.stderr[:400]}"}
 
@@ -562,10 +564,9 @@ def check_containment(plan_dir):
     manifest_path = Path(plan_dir) / "manifest.json"
     if not html_path.exists() or not manifest_path.is_file():
         return {"status": "skipped", "reason": "PLAN.html or manifest.json not found"}
-    try:
-        manifest = json.loads(manifest_path.read_text())
-    except ValueError as e:
-        return {"status": "skipped", "reason": f"manifest.json is not valid JSON: {e}"}
+    manifest = sj.load_dict(manifest_path.read_bytes())
+    if manifest is None:
+        return {"status": "skipped", "reason": "manifest.json is not valid JSON or not an object"}
     try:
         problems = containment_report(html_path.read_bytes().decode("utf-8"), manifest)
     except Exception as e:  # noqa: BLE001 — never let a page quirk break `status`

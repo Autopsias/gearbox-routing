@@ -107,6 +107,7 @@ def extract_variant_block(source_text: str, variant: str) -> str:
         )
     b = SRC_BEGIN_RE.search(section)
     e = SRC_END_RE.search(section)
+    assert b and e  # findall counted exactly one of each above
     if b.end() > e.start():
         raise fatal(f"variant '{variant}' source markers are reordered (END before BEGIN)")
     inner = section[b.end():e.start()]

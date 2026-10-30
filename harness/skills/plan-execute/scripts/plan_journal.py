@@ -18,6 +18,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import safe_json as sj
+
 JOURNAL_DIR = "_mutation"
 JOURNAL_NAME = "journal.json"
 
@@ -155,7 +157,9 @@ def recover(plan_dir):
             shutil.rmtree(stage, ignore_errors=True)
             out.append({"txn": stage.name, "action": "discarded_uncommitted"})
             continue
-        journal = json.loads(jpath.read_text())
+        journal = sj.as_dict(json.loads(jpath.read_text()))
+        if journal is None:
+            raise ValueError(f"{jpath} is not a JSON object; refusing to replay it")
         applied = _apply_journal(plan_dir, stage, journal)
         out.append(
             {

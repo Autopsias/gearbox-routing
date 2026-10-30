@@ -762,6 +762,11 @@ so no downstream session mistakes one for the other.
 the exact tree that will be pushed**, with `_plans/<plan-slug>/` excluded from the
 gate's file set (§10.1). Gating the merge and then pushing a descendant would gate
 a tree that never ships.
+The path prefixes in the repo-root `.review-exclude` are excluded too, read from
+the BASE commit (`git show <expected>:.review-exclude`), never from the plan's
+tree: a plan cannot drop its own code from its land review by editing the list.
+It is for stored data a reviewer cannot read in one pass, such as defect samples
+that hold known defects on purpose (added).
 
 **5.1c — `gate_digest` is defined canonically, because an undefined digest is not
 a binding.** "A digest over the gate results" leaves the algorithm, the ordering

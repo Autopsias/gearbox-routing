@@ -69,6 +69,7 @@ from pathlib import Path
 
 import plan_scope as pscope
 import review_context as rc
+import safe_json as sj
 import ship_state_io as ssio
 import worktree as wt
 
@@ -228,11 +229,11 @@ def _since_dispatch(plan_dir, session_id, path, where):
         return None                      # plan never orchestrated: no run to be proof of
     try:
         when = datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc)
-        started = datetime.fromisoformat(ts)
-    except (OSError, ValueError) as e:
+    except OSError as e:
         return _indeterminate("dating the artifact", str(e))
-    if started.tzinfo is None:
-        started = started.replace(tzinfo=timezone.utc)
+    started = sj.parse_iso_aware(ts)
+    if started is None:
+        return _indeterminate("dating the artifact", f"unparseable dispatch stamp {ts!r}")
     if when >= started:
         return None
     return (f"last written {when.isoformat(timespec='seconds')}, BEFORE this session was "

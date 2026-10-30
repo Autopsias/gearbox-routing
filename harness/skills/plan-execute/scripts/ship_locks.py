@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import run_state_io as rsi
+import safe_json as sj
 
 
 def _fsync_dir(dirpath):
@@ -156,10 +157,9 @@ def _lease_seconds(guarded_timeout):
 
 def _read_lock(lp):
     try:
-        info = json.loads(Path(lp).read_text())
-    except (json.JSONDecodeError, OSError):
+        return sj.load_dict(Path(lp).read_bytes()) or {}
+    except OSError:
         return {}
-    return info if isinstance(info, dict) else {}
 
 
 def _lease_state(info):
@@ -172,9 +172,8 @@ def _lease_state(info):
         return "unreadable"
     if not rsi.lock_on_this_host(info):
         return "foreign-host"
-    try:
-        expires = datetime.fromisoformat(info["expires_at"])
-    except (KeyError, TypeError, ValueError):
+    expires = sj.parse_iso_aware(info.get("expires_at"))
+    if expires is None:
         # No usable expiry (legacy pidfile-era lock, or hand-edited): fall back
         # to the run lock's staleness horizon measured from started_at.
         age = rsi.lock_age_seconds(info)

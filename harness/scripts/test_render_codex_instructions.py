@@ -8,6 +8,7 @@ import pytest
 _SPEC = importlib.util.spec_from_file_location(
     "render_codex_instructions",
     Path(__file__).with_name("render-codex-instructions.py"))
+assert _SPEC is not None and _SPEC.loader is not None
 rci = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(rci)
 

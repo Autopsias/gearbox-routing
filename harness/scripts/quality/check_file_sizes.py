@@ -283,7 +283,7 @@ def check_staged(project_path: Path, config: dict, exceptions: dict[str, int]) -
             " grow past what it already\nrecorded. Raising the number in"
             f" {EXC_FILE} is not the fix.\n\nThe fix: extract a cohesive"
             " group of functions into a new module and import\nit back here."
-            "\n\nRe-run: python3 scripts/quality/check_file_sizes.py --staged"
+            f"\n\nRe-run: python3 {sys.argv[0]} --staged"
         )
     if inherited:
         print(f"\n=== Inherited debt ({len(inherited)} WARNING, staged) ===")

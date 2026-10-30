@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.path.join(HERE, "agent-elapsed-nag.py")
 
 spec = importlib.util.spec_from_file_location("nag", HOOK)
+assert spec is not None and spec.loader is not None
 nag = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(nag)
 
@@ -52,13 +53,23 @@ def main():
     with tempfile.TemporaryDirectory() as root:
         os.environ["CLAUDE_AGENT_NAG_ROOT"] = root
         bash = {"session_id": SESSION, "tool_name": "Bash"}
-        agent = {"session_id": SESSION, "tool_name": "Agent"}
+        agent = {"session_id": SESSION, "tool_name": "Agent",
+                 "tool_input": {"run_in_background": False}}
+        bg_agent = {"session_id": SESSION, "tool_name": "Agent"}
 
         # KNOWN NEGATIVE 1: nothing dispatched at all.
         assert nag.run("pre", bash) is None, "spoke with no dispatch open"
 
-        # KNOWN NEGATIVE 2: a dispatch that just started.
-        assert nag.run("pre", agent) is None, "the dispatch call itself spoke"
+        # KNOWN NEGATIVE 2: a foreground dispatch that just started.
+        assert nag.run("pre", agent) is None, "a foreground dispatch call spoke"
+        nag.run("stop", {"session_id": SESSION})
+
+        # KNOWN POSITIVE: a background dispatch (the default) asks for a +30 min timer,
+        # because an idle orchestrator runs no tools for this hook to speak through.
+        text = nag.run("pre", bg_agent)
+        assert text and "CronCreate" in text and "30 minutes" in text, f"no timer prompt: {text!r}"
+        nag.run("stop", {"session_id": SESSION})
+        assert nag.run("pre", agent) is None
         assert nag.run("pre", bash) is None, "spoke before 30 minutes"
 
         # KNOWN POSITIVE: the same dispatch, 31 minutes old.

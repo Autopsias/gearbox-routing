@@ -144,8 +144,8 @@ def _settled(res, grace_end):
 POLL_INTERVAL_S = 30
 NO_RUN_GRACE_S = 90  # bounded wait for a push's run to register; never past the deadline
 _CALL_TIMEOUT_S = 60
-_DEADLINE = contextvars.ContextVar("finish_ci_deadline", default=None)
-_REPO = contextvars.ContextVar("finish_ci_repo", default=None)
+_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar("finish_ci_deadline", default=None)
+_REPO: contextvars.ContextVar[str | None] = contextvars.ContextVar("finish_ci_repo", default=None)
 _FIELDS = ("databaseId,headSha,status,conclusion,createdAt,workflowName,workflowDatabaseId,"
            "event,attempt")
 _PASS = ("success", "neutral", "skipped")

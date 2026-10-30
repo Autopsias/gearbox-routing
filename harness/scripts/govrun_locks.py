@@ -21,6 +21,12 @@ from datetime import datetime
 
 from govrun_config import EXIT_QUEUE_TIMEOUT, POLL_SECONDS, _lock_path, state_dir
 from govrun_errors import Refused
+from govrun_queue import ahead, drop_ticket, take_ticket
+
+# A queued job says so, and again every NOTE_SECONDS: a ci-class wait has no
+# limit, and a GitHub CI job sat 1621 s in this loop with an
+# empty log, then hit the job timeout mid-suite with no hint why.
+NOTE_SECONDS = 300
 
 
 def _try_lock(slot):
@@ -118,23 +124,26 @@ def _try_lock(slot):
 
 
 def acquire(slots, klass, max_wait):
-    """Poll eligible slots until one locks. Returns (slot, fd, waited_seconds).
+    """Wait in the slot queue until this job is first and a slot locks.
+    Returns (slot, fd, waited_seconds).
 
-    ponytail: queue order is POLL ORDER, not FIFO — a late arrival can win a
-    slot ahead of a job that has waited longer, and there is no aging. Accepted:
-    the contenders here are a handful of long jobs, not a thundering herd.
-    Upgrade path if it ever bites: a ticket file per waiter (monotonic counter
-    in the state dir) and admit only the lowest outstanding ticket.
+    First come, first served: only the oldest live waiter tries the slots (see
+    govrun_queue). Poll order bit — an example_app CI job queued
+    45 min while later arrivals took the slot — so this is no longer accepted.
     """
     eligible = [s for s in slots if klass in s["classes"]]
     if not eligible:
         raise Refused(f"no slot admits class {klass!r}; slots admit "
                       f"{sorted({c for s in slots for c in s['classes']})}")
     start = time.monotonic()
+    next_note = 0.0
+    ticket_fd, ticket = take_ticket("slot")
     while True:
-        for slot in eligible:
+        first = ahead(ticket) == 0
+        for slot in eligible if first else []:
             fd = _try_lock(slot)
             if fd is not None:
+                drop_ticket(ticket_fd, ticket)
                 return slot, fd, time.monotonic() - start
         waited = time.monotonic() - start
         if max_wait and waited >= max_wait:
@@ -142,9 +151,38 @@ def acquire(slots, klass, max_wait):
                 f"govrun: queue timeout, not a test failure — waited "
                 f"{waited:.0f}s for a free {klass!r} slot and gave up "
                 f"(--max-wait {max_wait:g}). The machine is busy; nothing ran. "
+                f"{_holders(eligible)} "
                 "Retry later, or pass --max-wait 0 and run in the background.\n")
             sys.exit(EXIT_QUEUE_TIMEOUT)
+        if waited >= next_note:
+            sys.stderr.write(f"govrun: queued {waited:.0f}s for a free {klass!r} slot, "
+                             f"{ahead(ticket)} job(s) ahead. {_holders(eligible)}\n")
+            sys.stderr.flush()
+            next_note = waited + NOTE_SECONDS
         time.sleep(POLL_SECONDS)
+
+
+def _holders(slots):
+    """Who holds each slot, from the holder files. Best effort: a missing or
+    torn file says so instead of failing the wait."""
+    parts = []
+    for slot in slots:
+        try:
+            h = json.loads((state_dir() / f"{slot['name']}.holder.json").read_text())
+            parts.append(f"Slot {slot['name']!r} held by pid {h['pid']} ({h['class']}, "
+                         f"since {h['started_at']}): {_program(h['command'])}.")
+        except (OSError, ValueError, KeyError, TypeError):
+            parts.append(f"Slot {slot['name']!r}: holder unknown.")
+    return " ".join(parts)
+
+
+def _program(command):
+    """The holder's program name only (`make`), never its arguments. The queue
+    notice goes to CI logs on GitHub, and the holder is another job on this
+    machine whose argv can carry a secret. `govrun --status` shows the full
+    command locally."""
+    argv = shlex.split(command)
+    return os.path.basename(argv[0]) if argv else "?"
 
 
 def write_holder(slot, klass, cmd, waited):

@@ -109,16 +109,12 @@ def test_no_answer_appends_given_false_and_says_not_agreement(parked, capsys):
 
 
 # (d)
-def test_no_checkpoint_no_entry_and_digest_unchanged(tmp_path, capsys):
+def test_no_checkpoint_no_entry_and_digest_empty(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, _sessions())
     out = _resume(plan_dir, capsys, file=_answer_file(plan_dir, "x"))
     assert not (plan_dir / FILE).exists()
     assert out["checkpoint_answer_note"] == "--answer-file/--no-answer ignored: no checkpoint was resumed"
-    ledger = plan_dir / "_verify_state" / "s09.findings.ndjson"
-    ledger.parent.mkdir()
-    ledger.write_text(json.dumps({"kind": "finding", "fid": "f", "file": "a.py", "line": 1,
-                                  "severity": "high", "summary": "Same as before.", "status": "open"}) + "\n")
-    assert fd.digest(plan_dir, "s02").startswith("Findings reviewers already raised")
+    assert fd.digest(plan_dir, "s02") == ""
 
 
 # (e)

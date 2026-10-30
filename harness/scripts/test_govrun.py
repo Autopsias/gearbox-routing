@@ -104,6 +104,10 @@ def test_a_second_job_queues_behind_the_first(state, jobs):
     assert "SECOND" in out
     assert waited >= 1.0, f"the second job did not queue (finished in {waited:.2f}s)"
     assert "govrun: acquired shared after" in err
+    # The wait is visible, and names what it waits for: the program, never its args.
+    assert ("govrun: queued 0s for a free 'interactive' slot, 0 job(s) ahead. "
+            "Slot 'shared' held by pid") in err
+    assert ": sleep." in err and "sleep 2" not in err
     assert first.poll() == 0
 
 
@@ -117,12 +121,13 @@ def test_two_jobs_do_not_queue_when_the_table_has_two_slots(state, jobs):
 
     start = time.monotonic()
     second = jobs(state, ["echo", "SECOND"], max_wait=0, env=TWO_SLOTS)
-    out, _ = second.communicate(timeout=30)
+    out, err = second.communicate(timeout=30)
     waited = time.monotonic() - start
 
     assert second.returncode == 0
     assert "SECOND" in out
     assert waited < 1.0, f"the second job queued despite a free slot ({waited:.2f}s)"
+    assert "govrun: queued" not in err  # no wait, no queue notice
 
 
 def test_the_lock_survives_execvp_so_the_payload_holds_the_slot(state, jobs):
@@ -183,6 +188,7 @@ HOLD_THEN_VALIDATE = """
 import importlib.util, os, sys, time
 os.environ["GOVRUN_STATE_DIR"] = sys.argv[2]
 spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+assert spec is not None and spec.loader is not None
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 slot = mod.DEFAULT_SLOTS[0]
@@ -218,6 +224,7 @@ def test_validation_does_not_drop_a_lock_the_same_process_holds(state, then):
         [sys.executable, "-c", HOLD_THEN_VALIDATE, str(GOVRUN), str(state),
          then],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert holder_proc.stdout is not None and holder_proc.stderr is not None
     try:
         name = holder_proc.stdout.readline().strip()
         assert name, "the holder child never reported a slot: " + \
@@ -457,6 +464,7 @@ def test_the_wait_defaults_fail_fast_for_interactive_and_never_for_ci():
     that ceiling. Interactive must fail fast; CI must queue."""
     import importlib.util
     spec = importlib.util.spec_from_file_location("govrun_mod", GOVRUN)
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.DEFAULT_MAX_WAIT["interactive"] == 120
@@ -701,6 +709,7 @@ def probes_module():
     import importlib.util
     path = GOVRUN.parent / "govrun_probes.py"
     spec = importlib.util.spec_from_file_location("govrun_probes_mod", path)
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
