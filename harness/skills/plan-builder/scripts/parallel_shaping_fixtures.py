@@ -80,7 +80,7 @@ def chained_justified():
     ))
 
 
-_GATES = {"s02": "code-review-gate", "s03": "test-orchestrate"}
+_GATES = {"s02": "code-review-gate", "s03": "llm-review-low"}
 
 
 def worktree_group():
@@ -164,7 +164,7 @@ CASES = [
     ("worktree-group", "ALLOW — isolated group auto-emits its integration session",
      worktree_group, True, True,
      {"error": None, "integration": {"depends_on": ["s02", "s03"],
-                                     "gates": ["code-review-gate", "test-orchestrate"],
+                                     "gates": ["code-review-gate", "llm-review-low"],
                                      "git": "commit"}}),
     ("member-ships", "PLANT — group member declares commit-push",
      member_ships, True, False,
