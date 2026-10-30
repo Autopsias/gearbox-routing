@@ -108,7 +108,7 @@ esac
 # --- layer 3: allowlist what publishes --------------------------------------
 # Checked BEFORE the expensive scans: an unexpected top-level path is the most
 # alarming finding and the cheapest to detect.
-ALLOWED=".github .githooks .gitignore .gitleaks.toml ARCHITECTURE.md CHANGELOG.md CLAUDE.md CODEOWNERS CODE_OF_CONDUCT.md CONTRIBUTING.md GENERICIZATION.md LICENSE README.md SECURITY.md claude docs harness install.sh scripts"
+ALLOWED=".github .githooks .gitignore .gitleaks.toml ARCHITECTURE.md CHANGELOG.md CLAUDE.md CODEOWNERS CODE_OF_CONDUCT.md CONTRIBUTING.md GENERICIZATION.md LICENSE README.md SECURITY.md claude docs harness install-module install.sh scripts"
 UNEXPECTED=""
 for top in $(git ls-files | cut -d/ -f1 | sort -u); do
     case " $ALLOWED " in
