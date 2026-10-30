@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Self-check for dispatch-audit.sh. Every case is paired: the hook must CLASSIFY the
 # drift it is meant to catch (plant), and must NOT cry drift on a fully-pinned dispatch
-# (allow control). Plus the invariant that matters most: it always allows, even on
-# garbage input, because an observer that can block a dispatch is a liability.
+# (allow control). Plus the invariant that matters most: it exits 0 with no stdout,
+# even on garbage input. An observer that can block a dispatch is a liability, and
+# one that prints an "allow" decision bypasses the user's permission rules.
 #
 # Run: bash hooks/test_dispatch_audit.sh
 set -uo pipefail
@@ -14,7 +15,7 @@ fails=0
 
 run() {  # run <payload> ; sets OUT (stdout) and LOG (last log line)
   export CLAUDE_DISPATCH_AUDIT_LOG="$TMP/audit.ndjson"
-  OUT="$(printf '%s' "$1" | python3 "$HOOK" 2>/dev/null)"
+  OUT="$(printf '%s' "$1" | python3 "$HOOK" 2>/dev/null)"; RC=$?
   LOG="$(tail -n 1 "$CLAUDE_DISPATCH_AUDIT_LOG" 2>/dev/null || true)"
 }
 
@@ -22,15 +23,15 @@ check() {  # check <name> <condition-result> <detail>
   if [ "$2" = "0" ]; then echo "PASS $1"; else echo "FAIL $1: $3"; fails=$((fails+1)); fi
 }
 
-# --- always-allow invariant, including on garbage -------------------------------
+# --- silent-pass invariant, including on garbage --------------------------------
 for payload in \
   '{"tool_input":{"model":"opus","subagent_type":"tier-opus-high"}}' \
   'not json at all' \
   '{"tool_input":"a string, not an object"}' \
   '' ; do
   run "$payload"
-  echo "$OUT" | grep -qE '"permissionDecision":[[:space:]]*"allow"'
-  check "always allows (payload: ${payload:0:34})" $? "did not emit an allow decision: $OUT"
+  [ "$RC" -eq 0 ] && [ -z "$OUT" ]
+  check "exits 0 with no decision (payload: ${payload:0:34})" $? "rc=$RC stdout: $OUT"
 done
 
 # --- drift classification: plant each class, then the allow control --------------
@@ -128,9 +129,9 @@ check "append-only (line count $before -> $after)" $? "expected exactly one new 
 
 # --- an unwritable log must not break the dispatch -------------------------------
 export CLAUDE_DISPATCH_AUDIT_LOG="/dev/null/cannot/exist/audit.ndjson"
-OUT="$(printf '%s' '{"tool_input":{"model":"opus"}}' | python3 "$HOOK" 2>/dev/null)"
-echo "$OUT" | grep -qE '"permissionDecision":[[:space:]]*"allow"'
-check "unwritable log still allows the dispatch" $? "got: $OUT"
+OUT="$(printf '%s' '{"tool_input":{"model":"opus"}}' | python3 "$HOOK" 2>/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ]
+check "unwritable log still exits 0 with no decision" $? "rc=$RC stdout: $OUT"
 
 grep -qE '(^|[|;&]|[[:space:]])python3 +-c' "$HOOK"
 [ $? -ne 0 ]

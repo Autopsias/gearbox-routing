@@ -14,8 +14,10 @@ WHY THIS EXISTS. Two silent-drift paths have no error to catch:
      path, which waits for a dispatch ERROR, never fires — the session just runs on
      the wrong model. Detection has to be observational, which is this hook.
 
-It is an OBSERVER, never a gate: it always allows, and any failure inside it is
-swallowed. A broken audit log must never block a dispatch. It records what was
+It is an OBSERVER, never a gate: it exits 0 with no stdout, so it gives no
+permission decision and the normal permission flow stays in charge (an "allow"
+would bypass the permission system entirely; see governor-hook.py). Any failure
+inside it is swallowed. A broken audit log must never block a dispatch. It records what was
 REQUESTED (all a PreToolUse hook can see) — hooks cannot read the effort a subagent
 will actually run at, and cannot change model or effort at all.
 
@@ -33,12 +35,6 @@ import json
 import os
 import sys
 
-ALLOW = {
-    "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "allow",
-    }
-}
 
 # Default OUTSIDE both versioned trees, for two reasons measured the hard way:
 #   (1) `gearbox deploy` is fail-closed on unclassified paths in the deploy target. An
@@ -127,10 +123,8 @@ def build_record(ev):
 
 
 def main():
-    # Emit the allow decision FIRST and flush it, so nothing below can prevent the
-    # dispatch — not an exception, not a full disk, not a bad payload.
-    sys.stdout.write(json.dumps(ALLOW) + "\n")
-    sys.stdout.flush()
+    # No stdout and exit 0 on every path: the dispatch goes through the normal
+    # permission flow, and nothing below can block it.
     try:
         ev = json.loads(sys.stdin.read() or "{}")
         if not isinstance(ev, dict):

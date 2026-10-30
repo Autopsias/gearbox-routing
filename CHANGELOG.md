@@ -10,6 +10,8 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 - `harness/hooks/dispatch-audit.py` and its self-check now ship. The harness
   `routing-retro` loads it, so its compaction report failed without it. The
   [routing skills card](docs/modules/routing-skills.md) now installs and wires it.
+  It now exits 0 with no output. Before, it answered every Agent call with
+  `permissionDecision: "allow"`, which skips your permission rules for that call.
 - Tests that pin the original setup's routing policy or plan history now skip in
   this copy, which ships an example policy: 4 in plan-builder, 34 in plan-execute
   (46 with their variants). Each skip names its reason. The suites now pass here:
