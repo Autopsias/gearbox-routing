@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Install harness modules from their cards in docs/modules/.
+
+    ./install-module --list                      every module, with what it does
+    ./install-module git-safety statusline       install modules into ~/.claude
+    ./install-module --dry-run plan-pipeline     show what would happen, change nothing
+    ./install-module --with-optional govrun      also install the parts a card marks optional
+    ./install-module --remove git-safety         take its settings.json entries out, print its delete steps
+    ./install-module --claude-home DIR NAME      install into DIR instead of ~/.claude
+
+The card is the single source: the tool runs the ```bash blocks and merges the
+```json blocks of its "## Install" section. It runs only mkdir, cp, chmod, cd and
+rm inside the Claude home. Any other command (a tool install, a dry run, a job
+that must be looked at first) is printed for you to run yourself. A block tagged
+`optional`, or a line ending in `# optional...`, is skipped unless you pass
+--with-optional. settings.json is backed up before every change.
+
+Removal never deletes files: Remove steps can touch files another module shares,
+or your own data, so the tool prints them for you to read and run.
+Standard library only.
+"""
+import argparse
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+CARDS = ROOT / "docs" / "modules"
+SAFE = {"mkdir", "cp", "chmod", "cd", "rm"}
+NOT_MODULES = {"author-tooling"}  # documents files that only work in the author's setup
+
+
+def section(text, title):
+    m = re.search(rf"^## {title}[^\n]*\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    return m.group(1) if m else ""
+
+
+def blocks(text, lang):
+    """(code, optional) for each fenced block of this language."""
+    return [(m.group(2), "optional" in m.group(1))
+            for m in re.finditer(rf"^```{lang}([^\n]*)\n(.*?)^```", text, re.S | re.M)]
+
+
+def card(name):
+    path = CARDS / f"{name}.md"
+    if name in NOT_MODULES or not path.exists():
+        sys.exit(f"no module named {name!r}. Run ./install-module --list")
+    return path.read_text(encoding="utf-8")
+
+
+def logical_lines(code):
+    """Join backslash continuations; drop blanks and comment-only lines."""
+    out = []
+    for line in code.replace("\\\n", " ").splitlines():
+        if line.strip() and not line.strip().startswith("#"):
+            out.append(line)
+    return out
+
+
+def split_script(code, with_optional):
+    """Return (lines to run, lines to show the user, lines skipped as optional)."""
+    run, show, skipped = [], [], []
+    for line in logical_lines(code):
+        if re.search(r"#\s*optional", line, re.I) and not with_optional:
+            skipped.append(line)
+            continue
+        line = re.sub(r"\s+#.*$", "", line)
+        parts = [p.strip() for p in line.split("&&")]
+        if all(_safe(p) for p in parts):
+            run.append(line)
+        else:
+            show.append(line)
+    return run, show, skipped
+
+
+def _safe(cmd):
+    words = cmd.split()
+    if not words or words[0] not in SAFE:
+        return False
+    if words[0] == "rm":  # only inside the Claude home, never a bare folder of it
+        targets = [w for w in words[1:] if not w.startswith("-")]
+        return bool(targets) and all(w.startswith("~/.claude/") and w.count("/") >= 3 for w in targets)
+    return True
+
+
+def run_script(lines, home):
+    # macOS `cp -n` exits 1 when it keeps an existing file, which is what the card asks for
+    lines = [l + " || true" if l.startswith("cp -n ") else l for l in lines]
+    script = "set -euo pipefail\n" + "\n".join(l.replace("~/.claude", '"$GEARBOX_HOME"') for l in lines)
+    env = {**os.environ, "GEARBOX_HOME": str(home)}
+    res = subprocess.run(["bash", "-c", script], cwd=ROOT, env=env, capture_output=True, text=True)
+    if res.returncode:
+        sys.exit(f"a copy step failed (exit {res.returncode}):\n{res.stderr.strip()}")
+
+
+def load_settings(path):
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as e:
+        sys.exit(f"{path} is not valid JSON ({e}); fix it first, nothing was changed")
+    if not isinstance(data, dict):
+        sys.exit(f"{path} does not hold a JSON object; nothing was changed")
+    return data
+
+
+def merge(settings, frag):
+    """Add each hook group that is not already there; set other top-level keys."""
+    notes = []
+    for key, value in frag.items():
+        if key == "hooks":
+            hooks = settings.setdefault("hooks", {})
+            for event, groups in value.items():
+                have = hooks.setdefault(event, [])
+                for g in groups:
+                    if g not in have:
+                        have.append(g)
+                        notes.append(f"added a {event} hook")
+        elif settings.get(key) != value:
+            if key in settings:
+                notes.append(f"replaced your {key!r} (the old value is in the backup)")
+            else:
+                notes.append(f"set {key!r}")
+            settings[key] = value
+    return notes
+
+
+def unmerge(settings, frag):
+    notes = []
+    for key, value in frag.items():
+        if key == "hooks":
+            hooks = settings.get("hooks", {})
+            for event, groups in value.items():
+                for g in groups:
+                    if g in hooks.get(event, []):
+                        hooks[event].remove(g)
+                        notes.append(f"removed a {event} hook")
+                if event in hooks and not hooks[event]:
+                    del hooks[event]
+        elif settings.get(key) == value:
+            del settings[key]
+            notes.append(f"removed {key!r}")
+    return notes
+
+
+def write_settings(path, settings, dry):
+    if dry:
+        return
+    if path.exists():
+        shutil.copy2(path, path.with_name(f"{path.name}.bak-{time.strftime('%Y%m%d%H%M%S')}"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def fragments(text, with_optional):
+    install = section(text, "Install")
+    return [json.loads(code) for code, opt in blocks(install, "json") if with_optional or not opt]
+
+
+def install(name, home, dry, with_optional):
+    text = card(name)
+    install_text = section(text, "Install")
+    run, show, skipped = [], [], []
+    for code, opt in blocks(install_text, "bash"):
+        if opt and not with_optional:
+            skipped += logical_lines(code)
+            continue
+        r, s, k = split_script(code, with_optional)
+        run, show, skipped = run + r, show + s, skipped + k
+    if not run:
+        sys.exit(f"{name}: its card has no copy steps to run")
+    print(f"== {name}")
+    if dry:
+        print("  would run:\n    " + "\n    ".join(run))
+    else:
+        run_script(run, home)
+        print(f"  copied its files into {home}")
+    settings_path = home / "settings.json"
+    settings = load_settings(settings_path)
+    notes = [n for f in fragments(text, with_optional) for n in merge(settings, f)]
+    if notes:
+        write_settings(settings_path, settings, dry)
+        print(f"  settings.json: {'; '.join(notes)}" + (" (dry run)" if dry else ""))
+    if skipped:
+        print("  skipped (optional; add --with-optional to include):\n    " + "\n    ".join(skipped))
+    if show:
+        print("  run these yourself after you read the card:\n    " + "\n    ".join(show))
+    needs = re.search(r"\| \*\*Needs\*\* \| (.*?) \|\n", text)
+    if needs and needs.group(1).strip().lower() != "nothing":
+        print(f"  needs: {needs.group(1)}")
+    print(f"  next: start a new Claude Code session, then do 'Check it works' in docs/modules/{name}.md")
+
+
+def remove(name, home, dry):
+    text = card(name)
+    settings_path = home / "settings.json"
+    settings = load_settings(settings_path)
+    notes = [n for f in fragments(text, True) for n in unmerge(settings, f)]
+    print(f"== {name}")
+    if notes:
+        write_settings(settings_path, settings, dry)
+        print(f"  settings.json: {'; '.join(notes)}" + (" (dry run)" if dry else ""))
+    else:
+        print("  settings.json: nothing of this module's to remove")
+    steps = section(text, "Remove").strip()
+    print("  To delete its files, read and run the card's Remove steps:\n")
+    print("    " + steps.replace("\n", "\n    "))
+
+
+def list_modules():
+    rows = []
+    for path in sorted(CARDS.glob("*.md")):
+        if path.stem in NOT_MODULES:
+            continue
+        text = path.read_text(encoding="utf-8")
+        title = text.splitlines()[0].lstrip("# ")
+        lead = re.sub(r"\s+", " ", text.split("\n\n", 2)[1]).strip()
+        lead = re.match(r"(.+?[.!?])(\s|$)", lead).group(1) if re.match(r"(.+?[.!?])(\s|$)", lead) else lead
+        rows.append((path.stem, title, lead))
+    width = max(len(r[0]) for r in rows)
+    for stem, title, lead in rows:
+        print(f"{stem.ljust(width)}  {title}\n{' ' * width}  {lead}")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 epilog="\n\n".join(__doc__.split("\n\n")[1:3]))
+    ap.add_argument("modules", nargs="*", help="module names, as in --list")
+    ap.add_argument("--list", action="store_true", help="list the modules and stop")
+    ap.add_argument("--dry-run", action="store_true", help="show what would happen; change nothing")
+    ap.add_argument("--with-optional", action="store_true", help="also install parts a card marks optional")
+    ap.add_argument("--remove", action="store_true", help="remove the modules' settings.json entries")
+    ap.add_argument("--claude-home", default=str(Path.home() / ".claude"),
+                    help="target folder (default: ~/.claude)")
+    a = ap.parse_args(argv)
+    if a.list or not a.modules:
+        list_modules()
+        if not a.list:
+            print("\nInstall one with: ./install-module <name>   (preview first with --dry-run)")
+        return 0
+    home = Path(a.claude_home).expanduser().resolve()
+    for name in a.modules:
+        card(name)  # fail on a bad name before anything is written
+    for name in a.modules:
+        remove(name, home, a.dry_run) if a.remove else install(name, home, a.dry_run, a.with_optional)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

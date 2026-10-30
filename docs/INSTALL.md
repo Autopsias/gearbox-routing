@@ -32,19 +32,20 @@ modules read the routing policy; their cards say so.
 ### Step 1: try it in a scratch folder
 
 The installer never touches your real `~/.claude` unless you ask for it twice.
-Run it into a new folder first:
+Run it into a new folder first. With no `--claude-home`, it makes a new
+`./gearbox-install-<timestamp>` folder:
 
 ```bash
 git clone https://github.com/Autopsias/gearbox-routing.git
 cd gearbox-routing
-./install.sh --claude-home /tmp/gearbox-try --accept-example-profile --provider anthropic
+./install.sh --accept-example-profile
 ```
 
 The last lines of the output tell you if it worked:
 
 ```
 install.sh summary
-  target home:     /tmp/gearbox-try
+  target home:     /path/to/gearbox-routing/gearbox-install-20261030082043
   active_provider:  anthropic
   files copied:     30
   files backed up:  0
@@ -105,7 +106,7 @@ home. It needs both opt-in flags:
 
 ```bash
 ./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude \
-  --accept-example-profile --provider anthropic
+  --accept-example-profile
 ```
 
 Your existing `~/.claude/CLAUDE.md` keeps its content. The installer adds the
@@ -189,7 +190,9 @@ first case.
 ## Part 2 — Harness modules
 
 `harness/` is a copy of a working Claude Code setup. You do not install it as
-a whole. You pick modules from [`MODULES.md`](MODULES.md) and copy their files.
+a whole. You pick modules from [`MODULES.md`](MODULES.md) (or run
+`./install-module --list`), and `./install-module` installs them from their
+cards.
 
 ### Five rules
 
@@ -215,13 +218,28 @@ directly and skip those steps.
 
 ### The steps for one module
 
-1. Open the module's card in [`MODULES.md`](MODULES.md).
-2. Install what the card lists under **Needs** first.
-3. Run the card's **Install** commands from the repo root.
-4. If the card has a `settings.json` fragment, merge it into the `"hooks"`
-   object of `~/.claude/settings.json`. Keep your existing entries.
-5. Start a new Claude Code session.
-6. Do the card's **Check it works** step.
+1. Find the module: `./install-module --list`, or the cards in [`MODULES.md`](MODULES.md).
+2. Read its card. Install what it lists under **Needs** first, and read its **Cautions**.
+3. Preview, then install:
+
+   ```bash
+   ./install-module --dry-run <name>
+   ./install-module <name>
+   ```
+
+   It copies the files the card lists into `~/.claude` and adds the card's
+   hook entries to `~/.claude/settings.json`. It backs up `settings.json` before
+   each change, never adds an entry twice, and keeps your own entries.
+   It runs only `mkdir`, `cp`, `chmod`, `cd`, and `rm` inside `~/.claude`.
+   It prints any other step on the card for you to run yourself.
+   Parts that a card marks optional are skipped; add `--with-optional` to
+   include them.
+4. Start a new Claude Code session.
+5. Do the card's **Check it works** step.
+
+`--claude-home DIR` installs into another folder, for example to try a module
+first. Each card also shows its steps as plain shell commands, if you prefer
+to copy the files by hand.
 
 To check your setup after a merge, run `/doctor` in Claude Code. It reports a
 settings file that it cannot parse, slow hooks, and unused skills compared
@@ -230,7 +248,9 @@ with their context cost. It asks before it changes anything
 
 ### Remove a module
 
-Do the card's **Remove** steps: delete the files it lists, and delete its
-entries from `~/.claude/settings.json`. Every hook entry on the cards starts
-with a check that its file exists, so a hook file that you delete first does no
-harm; still delete its entry to keep the settings file clean.
+1. Run `./install-module --remove <name>`. It takes the module's entries out of
+   `~/.claude/settings.json` (after a backup) and prints the card's **Remove**
+   steps.
+2. Read those steps, then run them. The tool does not delete files itself:
+   some files are shared with other modules, and some steps delete your own
+   data, such as run history.

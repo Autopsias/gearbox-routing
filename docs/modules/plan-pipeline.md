@@ -51,13 +51,13 @@ policy by going up three folders from its own location.
 mkdir -p ~/.claude/skills ~/.claude/agents ~/.claude/scripts
 cp -R harness/skills/plan-builder harness/skills/plan-execute ~/.claude/skills/
 cp harness/agents/tier-*.md harness/agents/session-effort-worker.md ~/.claude/agents/
-cp harness/scripts/resolve_route.py harness/scripts/model_prices.py ~/.claude/scripts/
+cp harness/scripts/resolve_route.py harness/scripts/resolve_route_demo.py harness/scripts/model_prices.py ~/.claude/scripts/
 cp -n harness/model-routing.yaml ~/.claude/model-routing.yaml    # -n: never replace your own
 ```
 
-Add-ons:
+Optional add-ons:
 
-```bash
+```bash optional
 # Plan helpers and /plan-harden
 mkdir -p ~/.claude/references ~/.claude/commands
 cp harness/scripts/repo-profile-cache.py ~/.claude/scripts/
@@ -72,15 +72,19 @@ mkdir -p ~/.claude/hooks
 cp harness/hooks/turnend-guard.py harness/hooks/verify-state-guard.py ~/.claude/hooks/
 ```
 
-For the guard hooks, merge these into the `"hooks"` object of `~/.claude/settings.json`:
+For the guard hooks: `./install-module plan-pipeline` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
-```json
-"Stop": [
-  { "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10, "statusMessage": "Turn-end guard: open plan work?" } ] }
-],
-"PreToolUse": [
-  { "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/verify-state-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10 } ] }
-]
+```json optional
+{
+  "hooks": {
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10, "statusMessage": "Turn-end guard: open plan work?"}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/verify-state-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10}]}
+    ]
+  }
+}
 ```
 
 ## Check it works
@@ -101,7 +105,7 @@ rm ~/.claude/commands/plan-harden.md ~/.claude/hooks/turnend-guard.py ~/.claude/
 ```
 
 Keep `~/.claude/model-routing.yaml` and the scripts if another module uses them.
-Delete the hook entries from `settings.json`. Plans you built stay in each
+Run `./install-module --remove plan-pipeline` to take the hook entries out of `settings.json`. Plans you built stay in each
 project's `_plans/` folder.
 
 ## Cautions

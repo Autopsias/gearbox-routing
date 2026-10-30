@@ -20,11 +20,12 @@ mkdir -p ~/.claude/scripts
 cp harness/scripts/statusline.sh ~/.claude/scripts/
 ```
 
-Set this top-level key in `~/.claude/settings.json`. It replaces any status
-line you have now:
+`./install-module statusline` sets this key in `~/.claude/settings.json` and backs up the file first. It replaces any status line you have now:
 
 ```json
-"statusLine": { "type": "command", "command": "bash ~/.claude/scripts/statusline.sh" }
+{
+  "statusLine": {"type": "command", "command": "bash ~/.claude/scripts/statusline.sh"}
+}
 ```
 
 ## Check it works
@@ -34,7 +35,7 @@ Row 2 shows the session, the model and its effort, and the folder.
 
 ## Remove
 
-Delete the `statusLine` key, then `rm ~/.claude/scripts/statusline.sh`.
+Run `./install-module --remove statusline`, then `rm ~/.claude/scripts/statusline.sh`.
 
 ## Cautions
 

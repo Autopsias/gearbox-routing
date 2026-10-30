@@ -34,13 +34,16 @@ python3 ~/.claude/scripts/agent_janitor.py prune --dry-run
 python3 ~/.claude/scripts/agent_janitor.py install
 ```
 
-Optional — the session-end hook. Merge this into the `"hooks"` object of
-`~/.claude/settings.json`:
+Optional — the session-end hook (add `--with-optional`). `./install-module agent-janitor` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
-```json
-"SessionEnd": [
-  { "hooks": [ { "type": "command", "command": "~/.claude/hooks/agent-janitor-sessionend.py", "timeout": 30, "async": true } ] }
-]
+```json optional
+{
+  "hooks": {
+    "SessionEnd": [
+      {"hooks": [{"type": "command", "command": "~/.claude/hooks/agent-janitor-sessionend.py", "timeout": 30, "async": true}]}
+    ]
+  }
+}
 ```
 
 ## Check it works
@@ -62,7 +65,7 @@ rm ~/.claude/scripts/agent_janitor.py ~/.claude/scripts/janitor_paths.py ~/.clau
 rm -r ~/.claude/scripts/launchd ~/.claude/skills/janitor-status ~/.claude/skills/janitor-stop
 ```
 
-Delete the `SessionEnd` entry if you added it.
+Run `./install-module --remove agent-janitor` to take the `SessionEnd` entry out of `settings.json`.
 
 ## Cautions
 

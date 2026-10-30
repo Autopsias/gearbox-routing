@@ -146,38 +146,61 @@ your own task mix, see [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
 ## Get started
 
-The two kinds of parts install differently.
+You need `git`, `bash` and Python 3. Each step is optional; take the ones you want.
 
-**The routing framework** installs with one command. Try it in a scratch
-folder first; the installer never writes to your real `~/.claude` unless you
-ask twice:
+**1. Get the repo.**
 
 ```bash
 git clone https://github.com/Autopsias/gearbox-routing.git
 cd gearbox-routing
-./install.sh --claude-home /tmp/gearbox-try --accept-example-profile --provider anthropic
 ```
 
-The last lines show `guard: PASS`. Then follow [`docs/INSTALL.md`](docs/INSTALL.md)
-to install into `~/.claude`, which also adds `/routing-update` and
-`/routing-retro`.
+**2. The routing framework.** Try it first. This command installs into a new
+`gearbox-install-<time>` folder here and never touches your real setup:
 
-**Everything else** you copy one module at a time from `harness/`, following
-its card. The cards give Claude Code paths (`~/.claude/…`); the
-[Codex row above](#works-with) says what runs in Codex. Install only what you
-will use: every installed skill, command and subagent that Claude can start on
-its own adds its name and description to the agent's context on every turn.
-Good places to start:
+```bash
+./install.sh --accept-example-profile
+```
 
-| If you want… | Install |
+The last lines show `guard: PASS`. When you are happy, install it for real.
+The long flag is on purpose: the installer writes to your real `~/.claude` only
+when you say so twice.
+
+```bash
+./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude --accept-example-profile
+```
+
+It backs up every file it changes, and `--uninstall` puts them back
+([`docs/INSTALL.md`](docs/INSTALL.md)). Add `--provider openai`, `gemini` or
+`zai` for another provider.
+
+**3. Harness modules.** Pick modules by name. `./install-module` copies a
+module's files into `~/.claude` and adds its hooks to your `settings.json`
+(after a backup). It runs the steps on the module's card, and it prints any
+step it will not run for you, such as installing an outside tool.
+
+```bash
+./install-module --list                       # every module, one line each
+./install-module --dry-run git-safety         # see what it would do
+./install-module git-safety statusline        # install
+./install-module --remove git-safety          # undo its settings.json entries
+```
+
+Then start a new Claude Code session. Install only what you will use: every
+skill, command and subagent that Claude can start on its own adds its name and
+description to the agent's context on every turn. The cards give Claude Code
+paths (`~/.claude/…`); the [Codex row above](#works-with) says what runs in
+Codex. Good places to start:
+
+| If you want… | Run `./install-module` with |
 |---|---|
-| The right model for each task | The routing framework (above), then the [routing skills](docs/modules/routing-skills.md) |
-| A health check and quality pass on a repo | [Repo health](docs/modules/repo-health.md), [code quality](docs/modules/code-quality.md), [test and CI commands](docs/modules/test-and-ci.md) with the [support agents](docs/modules/support-agents.md) |
-| Second-model review of code and plans | [Adversarial review](docs/modules/adversarial-review.md), [grilling](docs/modules/grilling.md), [investigation](docs/modules/investigation.md) |
-| Large jobs run as checked sessions | [Plan pipeline](docs/modules/plan-pipeline.md), plus adversarial review and grilling for `/plan-harden` |
-| Small, safe wins | [Git safety guard](docs/modules/git-safety.md), [status line](docs/modules/statusline.md) |
-| To see what your sessions cost | [Cost and usage](docs/modules/cost-and-usage.md) |
-| Long sources turned into a one-page brief for a decision | [Executive summaries](docs/modules/tldr.md), with [explainers](docs/modules/eli5.md) for the visual page |
+| The right model for each task | step 2 above; it also installs [`routing-skills`](docs/modules/routing-skills.md) |
+| A health check and quality pass on a repo | [`repo-health`](docs/modules/repo-health.md) [`code-quality`](docs/modules/code-quality.md) [`test-and-ci`](docs/modules/test-and-ci.md) [`support-agents`](docs/modules/support-agents.md) |
+| Second-model review of code and plans | [`adversarial-review`](docs/modules/adversarial-review.md) [`grilling`](docs/modules/grilling.md) [`investigation`](docs/modules/investigation.md) |
+| Large jobs run as checked sessions | [`plan-pipeline`](docs/modules/plan-pipeline.md), plus `adversarial-review` and `grilling` for `/plan-harden` |
+| Small, safe wins | [`git-safety`](docs/modules/git-safety.md) [`statusline`](docs/modules/statusline.md) |
+| To see what your sessions cost | [`cost-and-usage`](docs/modules/cost-and-usage.md) |
+| Long sources turned into a one-page brief for a decision | [`tldr`](docs/modules/tldr.md) [`eli5`](docs/modules/eli5.md) |
 
 ## What using it looks like
 

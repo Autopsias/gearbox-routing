@@ -8,6 +8,10 @@ subagent files are Claude Code features. You do not install it as a whole. You p
 modules you want, and each module has a card that says what it does, what it
 needs, and how to install, check and remove it.
 
+To install a module, use its card's file name: `./install-module repo-health`
+installs [`modules/repo-health.md`](modules/repo-health.md). Add `--dry-run`
+to preview it first ([`INSTALL.md`](INSTALL.md#the-steps-for-one-module)).
+
 To see every skill, command, subagent and hook on one page, with how you
 start each one, read [the catalogue](CATALOG.md).
 

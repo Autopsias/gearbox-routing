@@ -26,10 +26,16 @@ cp harness/hooks/safe-refactor-advisory.sh ~/.claude/hooks/
 chmod +x ~/.claude/hooks/safe-refactor-advisory.sh
 ```
 
-Optional: merge this entry into the `"PreToolUse"` list in `~/.claude/settings.json`:
+Optional hook (add `--with-optional`). `./install-module safe-refactor` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
-```json
-{ "matcher": "Write", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/safe-refactor-advisory.sh\"; [ -f \"$p\" ] || exit 0; exec bash \"$p\"" } ] }
+```json optional
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Write", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/safe-refactor-advisory.sh\"; [ -f \"$p\" ] || exit 0; exec bash \"$p\""}]}
+    ]
+  }
+}
 ```
 
 ## Check it works
@@ -49,7 +55,7 @@ rm ~/.claude/agents/safe-refactor.md ~/.claude/hooks/safe-refactor-advisory.sh
 rm -r ~/.claude/agents/references/safe-refactor
 ```
 
-Then delete the `PreToolUse` entry.
+Run `./install-module --remove safe-refactor` to take the `PreToolUse` entry out of `settings.json`.
 
 ## Cautions
 

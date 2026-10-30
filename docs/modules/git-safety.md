@@ -24,10 +24,16 @@ cp harness/rules/git-safety.md ~/.claude/rules/
 mkdir -p ~/.claude/docs && cp harness/docs/reference_git_safety_playbook.md ~/.claude/docs/   # optional: the worked patterns the rule points to
 ```
 
-Merge this entry into the `"PreToolUse"` list in `~/.claude/settings.json`:
+`./install-module git-safety` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
 ```json
-{ "matcher": "Bash", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10 } ] }
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10}]}
+    ]
+  }
+}
 ```
 
 ## Check it works
@@ -42,7 +48,7 @@ message. In a clean repo the command is not blocked.
 rm ~/.claude/hooks/git-tree-guard.py ~/.claude/rules/git-safety.md
 ```
 
-Then delete the `PreToolUse` entry.
+Run `./install-module --remove git-safety` to take the `PreToolUse` entry out of `settings.json`.
 
 ## Cautions
 

@@ -6,6 +6,33 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Added (simpler install)
+- **`./install-module`** installs harness modules by name from their cards:
+  `--list`, `--dry-run`, `--with-optional`, `--remove`, `--claude-home`. It
+  copies the files, merges the hook entries into `settings.json` after a
+  backup and never twice, runs only `mkdir`/`cp`/`chmod`/`cd` and `rm` inside
+  the Claude home, and prints every other card step for you to run.
+  `--remove` takes out only its `settings.json` entries and prints the card's
+  delete steps.
+- **`scripts/test_install_module.py`** installs every module into a scratch
+  folder in CI, checks that installed Python files find their imports, that a
+  second install changes nothing, that removal restores `settings.json`, and
+  that each card's hook entry equals the one in `harness/settings.json`.
+- README and INSTALL show the shortest commands: `./install.sh
+  --accept-example-profile` to try the routing framework, and
+  `./install-module <name>` for modules.
+
+### Fixed (module cards found by the new install test)
+- **govrun** did not install `govrun_cores.py`, `govrun_queue.py` and
+  `govrun_python_m.py`, so the installed wrapper could not start. Its hook
+  entry was also out of date (15 s timeout, pre-filter, `onFailure: block`).
+- **plan-pipeline** did not install `resolve_route_demo.py`, which
+  `resolve_route.py` imports.
+- **small-hooks** hook entries now match the exported settings (file check,
+  `*` matcher).
+- Every hook fragment on a card is now a complete JSON object that you can
+  merge as it is.
+
 ### Added (harness export 2026-10-29 and docs for new readers)
 - **`docs/CATALOG.md`**: every skill, command, subagent and hook in `harness/`,
   one line each, with how you start it and its module card.

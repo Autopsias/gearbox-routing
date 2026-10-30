@@ -25,20 +25,23 @@ mkdir -p ~/.claude/hooks
 cp harness/hooks/agent-elapsed-nag.py ~/.claude/hooks/
 ```
 
-Merge into the `"hooks"` object of `~/.claude/settings.json` (from the hook's
-own docstring; add the `PreToolUse` object to your existing list):
+`./install-module small-hooks` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
 ```json
-"PreToolUse": [
-  { "hooks": [ { "type": "command", "command": "python3 ~/.claude/hooks/agent-elapsed-nag.py pre", "timeout": 5 } ] }
-],
-"SubagentStop": [
-  { "hooks": [ { "type": "command", "command": "python3 ~/.claude/hooks/agent-elapsed-nag.py stop", "timeout": 5 } ] }
-]
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" pre", "timeout": 5}]}
+    ],
+    "SubagentStop": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stop", "timeout": 5}]}
+    ]
+  }
+}
 ```
 
-The `PreToolUse` entry has no matcher on purpose: the hook must see every tool
-call to notice the elapsed time.
+The `PreToolUse` entry matches every tool (`*`) on purpose: the hook must see
+every tool call to notice the elapsed time.
 
 ## Check it works
 
@@ -53,7 +56,7 @@ In use: after a subagent runs for 30 minutes, the next tool call carries a
 
 ## Remove
 
-Delete the hook's `settings.json` entries first, then the file:
+Run `./install-module --remove small-hooks` to take the hook's entries out of `settings.json`. Then delete the file:
 
 ```bash
 rm ~/.claude/hooks/agent-elapsed-nag.py

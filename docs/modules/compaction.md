@@ -33,25 +33,28 @@ cp harness/hooks/compact-policy.py \
    harness/hooks/context_tokens.py harness/hooks/window_trust.py ~/.claude/hooks/
 ```
 
-Merge these four entries into the `"hooks"` object of `~/.claude/settings.json`:
+`./install-module compaction` adds this to `~/.claude/settings.json` for you. By hand: add each entry to the matching list under `"hooks"`, and keep your own entries.
 
 ```json
-"SessionStart": [
-  { "matcher": "compact", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" session-start", "timeout": 10 } ] }
-],
-"UserPromptSubmit": [
-  { "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt", "timeout": 10 } ] }
-],
-"PreCompact": [
-  { "matcher": "auto", "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" pre-compact", "timeout": 10 } ] }
-],
-"PostCompact": [
-  { "hooks": [ { "type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" post-compact", "timeout": 10 } ] }
-]
+{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "compact", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" session-start", "timeout": 10}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt", "timeout": 10}]}
+    ],
+    "PreCompact": [
+      {"matcher": "auto", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" pre-compact", "timeout": 10}]}
+    ],
+    "PostCompact": [
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" post-compact", "timeout": 10}]}
+    ]
+  }
+}
 ```
 
-If an event key already exists in your file, add only the object inside its
-brackets. Each command starts with a file check, so a missing file does no harm.
+Each command starts with a file check, so a missing file does no harm.
 
 ## Check it works
 
@@ -70,7 +73,7 @@ rm ~/.claude/hooks/compact-policy.py \
 rm -rf ~/.gearbox-state/compaction    # optional: the ledger and policy files
 ```
 
-Then delete the four entries from `settings.json`. To turn it off without
+Run `./install-module --remove compaction` to take the four entries out of `settings.json`. To turn it off without
 removing it, set `GEARBOX_COMPACT_POLICY=off` or create the file
 `~/.gearbox-state/compaction/DISABLED`.
 
