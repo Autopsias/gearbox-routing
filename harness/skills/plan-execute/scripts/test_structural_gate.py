@@ -304,13 +304,9 @@ def test_apply_refuses_done_when_dashboard_write_silently_fails(tmp_path, monkey
     assert _status(plan_dir, "s01") == "BLOCKED"
     assert rsi.is_halted(plan_dir)
 
-    # This transcript is the evidence artifact required by S07's verify block.
-    transcript_path = Path(
-        "~/.claude/_plans/"
-        "example-reliability-plan-2026-07-03/_evidence/s07/"
-        "refused-done-transcript.txt"
-    )
-    transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    # S07's verify block once took this transcript as evidence; that plan is closed and
+    # its copy is committed, so a test run must not rewrite a real plan folder.
+    transcript_path = tmp_path / "refused-done-transcript.txt"
     transcript_path.write_text(
         "PS-01 structural DONE-gate refusal transcript "
         "(test_structural_gate.py::test_apply_refuses_done_when_dashboard_write_silently_fails)\n\n"
