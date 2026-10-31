@@ -378,7 +378,9 @@ def resolve_verify(session, phases_by_id):
     if not merged.get("gates") and not merged.get("require_evidence") and not merged.get("checks"):
         return None
     merged.setdefault("on_fail", "rework")
-    merged.setdefault("max_rework", pl.DEFAULT_MAX_REWORK)
+    # the class default is for a session routed at dispatch; a pinned model keeps the global one
+    merged.setdefault("max_rework", pl.DEFAULT_MAX_REWORK if session.get("model")
+                      else pl.default_max_rework(session.get("task_class")))
     return merged
 
 

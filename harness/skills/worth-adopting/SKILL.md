@@ -165,7 +165,8 @@ Verdicts:
 
 - **ADOPT**: passes the bar, and the evidence is in hand. State the smallest form.
 - **TRIAL**: probably passes, and one measurement decides it. State the measurement and the
-  result that would make it an ADOPT.
+  result that would make it an ADOPT. If it takes minutes and reads only this machine, run it
+  in step 6 and give the verdict it supports; else option 1 of the card is "run it now".
 - **PARK**: good, and blocked (a standing rule, vendor terms, an unverified mechanism, a missing
   release). State the condition that re-opens it.
 - **DROP**: fails the bar. One line with the reason.
@@ -212,16 +213,15 @@ Keep the report to one page. Each bullet is one or two lines, a DROP is one line
 appears once: the first test runs wrote 1,100 words for one TRIAL, and the length was most of
 the extra run time. The report is a record for the next run, not an essay for the owner.
 
-A row with no ADOPT and no TRIAL gets `none needed` as its decision and its result, because
-nothing can follow from it.
+A row with no ADOPT and no TRIAL gets `none needed` as its decision and its result.
 
 **Close open outcomes.** A verdict teaches nothing until its outcome is on record. After the
 report, take at most three older rows, the oldest first, whose decision or result is `open`,
 or whose `due` date is past. A due stated as "after the next N plans, scans or sessions" is
 past when the count is met or 14 days have gone by. For each, do only the cheap checks: does the path exist, is the
 part wired, did the measurement run (a log, a saved number, a scheduled job). Write what you
-find into the row, with the date. If a measurement needs real work, do not do it now; the
-chat reply names it as owed.
+find into the row, with the date. If a measurement needs real work, do not do it now. Owed
+once, the chat reply names it; already marked owed, it becomes a decision-card option.
 
 Then reply in the chat, in plain words, in about 250 words when there is something to decide
 and in a few lines when there is not, in this order:
@@ -229,10 +229,10 @@ and in a few lines when there is not, in this order:
 1. One sentence with the result: how many proposals, how many worth action, and the largest one.
 2. Each ADOPT and TRIAL in two or three lines: what gets better, the smallest form, the carry cost.
 3. One line that counts the PARK and DROP verdicts and gives the report path.
-4. A decision card, only if at least one ADOPT or TRIAL exists. Use the briefing format of the
-   owner's `CLAUDE.md` (the template has its four parts): three options at most, and only
+4. A decision card, only if an ADOPT, a TRIAL or a twice-owed measurement exists. Use the
+   briefing format of `CLAUDE.md` (the template has its four parts): three options at most, and only
    options that you checked are executable.
-5. One last line for each measurement that an older row owes ("Owed: the compaction re-measure
+5. One last line for each measurement owed for the first time ("Owed: the compaction re-measure
    from 2026-09-19 has not run").
 
 Do not paste the report into the chat. Write for a reader who did not see the source and does

@@ -74,8 +74,8 @@ overview / Claude Code model-config).
 
 > **Freshness.** Model names, defaults, and the effort ladder rev often. As of
 > **2026-09-29**: **Opus 5.5** ($4/$20; the `Opus` token — Opus 5 held the slot
-> from 2026-07-25 at $5/$25) is the standing default for ALL judgment work — deep-reasoning → `medium`, linchpin + hard
-> agentic → `high`; **Sonnet** keeps standard build (at `low` since SSOT v38) + fan-out shards (the `Sonnet` token serves
+> from 2026-07-25 at $5/$25) is the standing default for ALL judgment work — deep-reasoning → `medium`, linchpin
+> → `high`; **Sonnet** keeps standard build (at `low` since SSOT v38), agentic build (at `low` since SSOT v40, 2026-10-31, climbing to Opus · `high`) + fan-out shards (the `Sonnet` token serves
 > **Sonnet 5.5** since 2026-09-28, same $2/$10; its effort levels are recalibrated, so every
 > Sonnet calibration cell below is a **Sonnet 5 measurement**, SSOT v29); **Fable (5.1
 > since v24) is the escalation apex only** (credit-metered; a Fable dispatch
@@ -88,10 +88,10 @@ overview / Claude Code model-config).
 
 ## What the class defaults are (the executor's input, not the author's choice)
 
-> **Default a standard session to `Sonnet · low` (SSOT v38); a HARD coding/agentic or
-> integration session to `Opus · high`** (Opus 5.5 since 2026-09-22) (on our own calibration run, Opus·high
-> dominates Sonnet·high on the hard-agentic distribution — Sonnet·high
-> stays fine for LIGHTER integration work). Route architecture / novel /
+> **Default a standard session AND an agentic/integration session to `Sonnet · low`** (SSOT v38 and v40;
+> the agentic canary finished 10 of 10 real plan sessions at about half the Opus·high cost per finished
+> session, and a failure climbs `low`→`medium`→`high`→`Opus · high` under `max_rework: 4`). A session
+> you KNOW is hard from the start goes to the linchpin class (`Opus · high`), or pin `Opus · high` with the reason. Route architecture / novel /
 > security-sensitive / hard-debug work to **`Opus · medium`** (dominates
 > the retired Fable·low pin on both axes) and a genuine linchpin to
 > **`Opus · high`**. Opus's ladder STOPS at `high`: `high`→`xhigh` is a DEAD
@@ -152,7 +152,7 @@ fan-out default:
 | Very-large-context sessions (whole-corpus reads / synthesis pushing past Opus limits) | **Fable 5.1 · medium→high** (1M ctx; escalation trigger (b) — the one shape that still reaches Fable directly) |
 | Standard build | Sonnet 5.5 · low (SSOT v38: first-attempt 0.90 vs 0.78 at medium over real plan sessions; climbs to medium → high on failure) |
 | Light integration build | Sonnet · high (`xhigh` was a dead rung on Sonnet 5 — unmeasured on 5.5, so the stop at `high` is kept as policy) |
-| Hard coding / agentic / integration build | **Opus 5.5 · high** (Sonnet's top rung dominated by Opus's, on our own calibration run) |
+| Coding / agentic / integration build | **Sonnet 5.5 · low**, climbing to Opus 5.5 · high on failure (SSOT v40; the older calibration run where Opus 5·high dominated Sonnet 5·high was single-attempt, no climb, older models) |
 | Architecture / novel / security-sensitive / hard debug | **Opus 5.5 · medium** (dominates the retired Fable·low pin on both axes, on our own calibration run; escalate to `high` on the two named triggers) |
 
 **Effort on Opus 5.** Strongly elastic **`low`→`medium`→`high`** on our own

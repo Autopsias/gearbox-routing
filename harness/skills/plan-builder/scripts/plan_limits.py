@@ -18,6 +18,18 @@ import sys
 #: review gate, and sessions halted at 1-2 on the reviewer's second SAMPLE.
 DEFAULT_MAX_REWORK = 2
 
+#: Per-task-class `verify.max_rework` default, over DEFAULT_MAX_REWORK. agentic_build
+#: is 4 since routing SSOT v40 (2026-10-31, operator decision): its default moved to
+#: sonnet@low, and 4 is what the canary that proved it ran with -- enough reworks for
+#: a failing session to climb sonnet@low -> medium -> high -> opus@high on its own.
+#: Applies only to a session with no pinned `model` (routed at dispatch).
+CLASS_DEFAULT_MAX_REWORK = {"agentic_build": 4}
+
+
+def default_max_rework(task_class):
+    """The `verify.max_rework` default for a session of this task class."""
+    return CLASS_DEFAULT_MAX_REWORK.get(task_class, DEFAULT_MAX_REWORK)
+
 #: `verify.max_rework` CEILING -- the largest value `build_plan.validate_spec`
 #: accepts. 5 -> 6, then 6 -> 7 when routing SSOT
 #: v21 (96570b6) armed `opus@xhigh` as an escalation rung and lengthened every

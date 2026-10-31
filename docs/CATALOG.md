@@ -15,7 +15,7 @@ lists every file the part needs, and how to check and remove it.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 29 skills · 69 commands · 41 subagents · 9 hooks.
+Counts: 28 skills · 69 commands · 41 subagents · 9 hooks.
 
 ## Skills
 
@@ -39,7 +39,6 @@ Counts: 29 skills · 69 commands · 41 subagents · 9 hooks.
 | `mods` | `/mods`, or Claude starts it | Manages Claude Code mods for the harness: decides whether a mod is due, creates one, reviews one for trust and quality, improves one, and lists what is loaded. | [Skill authoring](modules/skill-authoring.md) |
 | `myusage-self-assessment` | `/myusage-self-assessment` only | Mine your own Claude Code session history to decide what to actually improve in your setup. | [Cost and usage](modules/cost-and-usage.md) |
 | `nlm-skill` | `/nlm-skill` only | Expert guide for the NotebookLM CLI (`nlm`) and MCP server - interfaces for Google NotebookLM. | [NotebookLM](modules/notebooklm.md) |
-| `no-mistakes` | `/no-mistakes`, or Claude starts it | Validate your code changes through the no-mistakes pipeline - automated code review, tests, lint, docs, push, PR, and CI - before they reach the configured push target. | [Pre-push gate](modules/no-mistakes.md) |
 | `plan-builder` | `/plan-builder`, or Claude starts it | Build an executable multi-session plan — interview the user, compile a JSON spec, and emit a plan directory (self-contained PLAN.html dashboard + manifest.json dispatch … | [Plan pipeline](modules/plan-pipeline.md) |
 | `plan-execute` | `/plan-execute`, or Claude starts it | The plan already exists — now run it. | [Plan pipeline](modules/plan-pipeline.md) |
 | `repo-health` | `/repo-health` only | The one front door for whole-repo reviews. | [Repo health](modules/repo-health.md) |

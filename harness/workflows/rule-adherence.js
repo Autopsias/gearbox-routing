@@ -11,7 +11,7 @@ export const meta = {
 }
 
 // args: { rules: [{ id, text }], target: string }
-// This workflow is always invoked with args built by the calling skill (e.g. no-mistakes
+// This workflow is always invoked with args built by the calling skill (formerly no-mistakes
 // --rules) - a bare/malformed invocation must fail loud, not silently fan out over nothing.
 if (!args || !Array.isArray(args.rules) || args.rules.length === 0) {
   throw new Error(

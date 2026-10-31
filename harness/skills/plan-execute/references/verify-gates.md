@@ -726,13 +726,13 @@ rounds per session, and how many moved findings were real defects, before wideni
 
 ## Judged on recall (added)
 
-A reviewer change is a new model, a new prompt line, or a new gate level. Judge it in this order. First, detection: how many known defects in `evals/review/misses.json` it catches, on the real-miss slice in `evals/review/slice/`. Second, false blocks on clean diffs. Only third, rework rounds. This plan judges the Sonnet reviewer, which has been the standing `llm-review-*` default since 2026-10-11 and is not a canary. The slice compares it with Opus on the same older diffs. This plan does not judge the round-cap canaries `llm-review-low-canary` and `llm-review-medium-canary`. They act on repair rounds, and the slice runs single diffs. There is no recall number yet. The owner stopped the reviewer run. The headline pair (sonnet-med against opus-med) runs on all 32 samples after this plan lands. Full record: `evals/review/recall-readout.md`.
+A reviewer change is a new model, a new prompt line, or a new gate level. Judge it in this order. First, detection: how many known defects in `evals/review/misses.json` it catches, on the real-miss slice in `evals/review/slice/`. Second, false blocks on clean diffs. Only third, rework rounds. This plan judges the Sonnet reviewer, which has been the standing `llm-review-*` default since 2026-10-11 and is not a canary. The slice compares it with Opus on the same older diffs. This plan does not judge the round-cap canaries `llm-review-low-canary` and `llm-review-medium-canary`. They act on repair rounds, and the slice runs single diffs. The headline pair (sonnet-med against opus-med) ran on all 32 samples (2026-10-18 to 2026-10-19) and was judged 2026-10-31. Full record: `evals/review/recall-readout.md`.
 
 | Measure | Result | Decision |
 |---|---|---|
 | Confirmed misses (`misses`, N1) | 16; bar is 10 | BUILD, counted 2026-10-17 |
 | Light-reviewed sensitive sessions (`sensitive_light_reviewed`, N2) | 5; bar is 5. Plus 3 with no review gate (`sensitive_no_review_gate`) | BUILD, counted 2026-10-17 |
-| Reviewer recall on the slice | No recall yet: 16 fail and 16 pass samples built | Runs after this plan lands |
+| Reviewer recall on the slice | opus-med 2/15 (0.13), sonnet-med 0/16; paired exact p = 0.5; 0 false blocks for both | No switch: indistinguishable at this n, judged 2026-10-31 |
 
 Re-count, in this order, from the worktree root: `python3 evals/review/count_real_misses.py`, then `python3 evals/review/count_light_reviewed_sensitive.py`, then a hand classification of the new rows, then `python3 evals/review/check_counts.py`. Next re-count due 2026-12-01.
 

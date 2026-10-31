@@ -17,6 +17,22 @@ def test_the_defaults_are_the_measured_ones():
     assert pl.SESSION_TOUCHES_P90 == 6
 
 
+def test_agentic_build_defaults_to_four_reworks_and_resolve_verify_uses_it():
+    import build_plan
+    assert pl.default_max_rework("agentic_build") == 4
+    assert pl.default_max_rework("standard_build") == pl.DEFAULT_MAX_REWORK
+    assert pl.default_max_rework(None) == pl.DEFAULT_MAX_REWORK
+    gated = {"verify": {"gates": ["pytest"]}}
+    assert build_plan.resolve_verify({**gated, "task_class": "agentic_build"}, {})["max_rework"] == 4
+    assert build_plan.resolve_verify({**gated, "task_class": "standard_build"}, {})["max_rework"] == 2
+    # an explicit value always wins over the class default
+    pinned = {"verify": {"gates": ["pytest"], "max_rework": 1}, "task_class": "agentic_build"}
+    assert build_plan.resolve_verify(pinned, {})["max_rework"] == 1
+    # a pinned model (every pre-v8 spec) keeps the global default
+    opus = {**gated, "task_class": "agentic_build", "model": "Opus"}
+    assert build_plan.resolve_verify(opus, {})["max_rework"] == pl.DEFAULT_MAX_REWORK
+
+
 def test_wide_sessions_is_strictly_over_the_p90_and_skips_unparseable():
     dw = {"s01": ["a"] * 6, "s02": ["a"] * 7, "s03": None, "s04": ["a"] * 13}
     assert pl.wide_sessions(dw) == [("s04", 13), ("s02", 7)]

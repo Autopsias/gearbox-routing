@@ -497,16 +497,21 @@ do_deploy() {
   # Like the port render, this is loud but non-fatal to the primary Claude deploy.
   say "-- sync ~/.agents skills --"
   local mirror_sync="$CD/skills/codex-skill-sync/scripts/sync_from_claude.py"
+  # The sync needs PyYAML; a Homebrew python3 bump (3.15) arrived without it.
+  local mirror_py=python3 p
+  for p in python3 python3.14 python3.13; do
+    if command -v "$p" >/dev/null && "$p" -c 'import yaml' 2>/dev/null; then mirror_py=$p; break; fi
+  done
   if [ "$codex_render_ok" != "1" ]; then
     warn "   SKIPPED: ~/.codex render failed, so port precedence is not trustworthy."
   elif [ ! -f "$mirror_sync" ]; then
     warn "   WARNING: missing $mirror_sync; Codex's generic skill mirror may be stale."
-  elif ! CLAUDE_DIR="$CD" python3 "$mirror_sync" --apply; then
+  elif ! CLAUDE_DIR="$CD" "$mirror_py" "$mirror_sync" --apply; then
     warn ""
     warn "WARNING: the ~/.agents skill sync FAILED (see above). The ~/.claude deploy"
     warn "         remains green; re-run the sync after fixing the cause:"
     warn ""
-    warn "    python3 $mirror_sync --apply"
+    warn "    $mirror_py $mirror_sync --apply"
   fi
   say ""
 

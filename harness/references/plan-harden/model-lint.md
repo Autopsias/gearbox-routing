@@ -333,9 +333,10 @@ no-oped; HARDENED:codex-verify-r2 — the fixed `< 3` threshold this replaced wa
 
 Current landscape for the recommendations (v14 SSOT — re-read `model-routing.yaml`
 `task_classes:` before trusting this paragraph verbatim, it is a summary, not the
-source): Sonnet is the `standard_build` default (`medium`, escalating to `high` — its
-live ceiling, `xhigh` is a dead rung). **Opus is the standing default for ALL other
-judgment work** — `agentic_build`/`linchpin` at `high`, `deep_reasoning` at `medium`
+source): Sonnet is the `standard_build` default (`low` since v38) and the `agentic_build` default
+(`low` since v40, `max_rework: 4`), escalating to `high` — its live ceiling, `xhigh` is a
+dead rung — then to Opus·`high`. **Opus is the standing default for the other
+judgment work** — `linchpin` at `high`, `deep_reasoning` at `medium`
 escalating to `high` — and DOMINATES Fable at every calibrated rung (v1.11 retired the
 older "Fable dominates Opus" premise this file used to assert; never emit `Opus`+`max`
 as an automatic rung regardless — dead/weak, operator opt-in only). **Fable is
@@ -343,7 +344,7 @@ escalation-apex ONLY, never a standing default for anything** — reached by esc
 the MODEL after 2 failures at the same root cause, or for whole-codebase/large-context
 synthesis; it lands at `low` and can climb `low`→`medium`→`high`→`xhigh` from there.
 `opusplan`-style split: CRUD/wiring/scaffolding/codemod work → `Sonnet` (`standard_build`);
-integration/multi-file refactor/non-obvious debugging → `Opus`/`high` (`agentic_build`);
+integration/multi-file refactor/non-obvious debugging → `Sonnet`/`low`, climbing (`agentic_build`, v40);
 architecture/ambiguous-tradeoff/hard-root-cause → `Opus`/`medium` (`deep_reasoning`); the
 plan's one-shot/irreversible session → `Opus`/`high` (`linchpin`). Codex lane
 (`providers.openai`, s08 LN-01): `gpt-5.6-luna` never below `max` (curve collapses),

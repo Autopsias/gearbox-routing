@@ -328,7 +328,7 @@ Don't default every session to Sonnet / medium. Match the tier to the work. The 
 |---|---|---|---|---|
 | Mechanical (rename sweep, formatting, codemod, doc edits) | `Haiku` | `low` | S | Well-specified, no judgement — fast + cheap wins. Haiku 5.5 takes the dial; `low` is the measured pick. Not for build work: on real tasks it passes as many as Sonnet but takes ~3x the time. |
 | Standard build (CRUD, wiring, templated features, test scaffolds) | `Sonnet` | `low` | M | **Sonnet is the broad workhorse** (Sonnet 5.5 since 2026-09-28; Sonnet 5 from 2026-06-30) — near-Opus on coding/agentic at half the Opus price. `low` since SSOT v38: the Sonnet-climb canary measured Sonnet 5.5 · `low` at first-attempt 0.90 and 1.10 attempts per success over 10 real plan sessions, against 0.78 and 1.38 at `medium` (N=156); a failure climbs to `medium`, then `high`. |
-| Integration / multi-file refactor / non-obvious debugging | `Opus` | `high` | M–L | On our own calibration run, **`Opus 5`·`high` dominates `Sonnet`·`high`** on the hard-agentic distribution — cheaper AND materially more accurate. `Opus`·`medium` is the cost-saver rung; `Sonnet`·`high` remains reasonable for LIGHTER integration work (the easy distribution isn't covered by the same run). Sonnet's `high`→`xhigh` stays a dead rung. |
+| Integration / multi-file refactor / non-obvious debugging | `Sonnet` | `low` | M–L | `Sonnet`·`low` since SSOT v40: the Sonnet-climb agentic canary finished 10 of 10 real plan sessions at 1.40 attempts each, against `Opus`·`high` at 90.5% finished and 1.91 attempts (N=347), and cost about half per finished session ($6.43 vs $11.29, re-priced from transcripts, n=9 vs 14). A failure climbs `low`→`medium`→`high`→`Opus`·`high`, so `agentic_build` defaults to `max_rework: 4`. The older calibration run (`Opus 5`·`high` dominating `Sonnet 5`·`high`, single attempt, no climb) is superseded for this class. A session you KNOW is hard from the start belongs in the linchpin row, or pin `Opus`·`high` with the reason. |
 | Architecture, ambiguous tradeoffs, security-sensitive design, hard root-cause | `Opus` | `medium` | L–XL | On our own calibration run, **`Opus 5`·`medium` dominates the old `Fable`·`low` pin on both axes** — Opus 5 (GA 2026-07-24, same $5/$25 as 4.8) inverts the earlier dominance direction. Escalate `medium`→`high` on the two named triggers. **Do not pair Opus with `xhigh`/`max`** — `high`→`xhigh` is a DEAD RUNG (no measurable gain for materially higher cost) and `max` weak (marginal at best); `max` is operator-elected only. |
 | Hard/frontier work — the plan's linchpin session (cross-cutting architecture spanning domains, one-shot irreversible adjudication, synthesis the rest of the plan rests on) | `Opus` | `high` | L–XL | On our own calibration run, `Opus 5`·`high` is the sweet-spot rung (`Fable`·`xhigh` is dominated). **Fable is escalation-apex only now** — since SSOT v39 the automatic rework climb stops at `Opus`·`xhigh` and never enters Fable, so reach Fable by AUTHORING the session on it (operator-elected) when the two named triggers persist (unsolved in prior rounds; whole-codebase/large-context synthesis where 1M context matters); it still draws usage credits (the `fable` alias resolves to `claude-fable-5-1` since 2026-09-01; the old "intermittently paywalled" note is stale — re-check `prices.fable`, never assume it), and a failed Fable dispatch **auto-degrades to Opus @ `high`** (plan-execute, per-target degrade). |
 | Spike / research (throwaway prototype to learn) | `Sonnet` | `medium` / `high` | S–M | Value is in the thinking, not the polish. |
@@ -476,7 +476,7 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   gate id is a **build-time error**. Gates run sequentially; all must pass.
 - **`on_fail`** — `rework` (default) or `halt`. `rework` re-dispatches the session
   with the gate's (redacted) output appended as feedback; `halt` stops for a human.
-- **`max_rework`** (int 0–8, default 2) — the bound on the rework loop. After it's
+- **`max_rework`** (int 0–5, default 2; 4 for an `agentic_build` session with no pinned model, since SSOT v40) — the bound on the rework loop. After it's
   exhausted, the session goes `BLOCKED` + halt.
 
   **Default to 2–3. Size to the apex only when the session genuinely needs it (revised
@@ -509,11 +509,11 @@ shipping; absent → today's behaviour (DONE is taken at face value).
 
   | Session's authored cell | Ladder to apex | `max_rework` to reach `opus@xhigh` |
   |---|---|---|
-  | `opus@high` (the `agentic_build`/`linchpin` default) | `opus@high → opus@xhigh` | **2** |
+  | `opus@high` (the `linchpin` default) | `opus@high → opus@xhigh` | **2** |
   | `opus@medium` (the `deep_reasoning` default) — needs `opus@high` first, one extra rung | `opus@medium → opus@high → opus@xhigh` | **3** |
   | `sonnet@high` (the `standard_build` ceiling) | `sonnet@high → opus@high → opus@xhigh` | **3** |
   | `sonnet@medium` (the first climb from the `standard_build` default) — needs `sonnet@high` first | `sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **4** |
-  | `sonnet@low` (the `standard_build` **default** since SSOT v38) — needs `sonnet@medium` and `sonnet@high` first | `sonnet@low → sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **5** |
+  | `sonnet@low` (the `standard_build` **default** since SSOT v38, and the `agentic_build` default since v40, which defaults to `max_rework: 4` — it reaches `opus@high`) — needs `sonnet@medium` and `sonnet@high` first | `sonnet@low → sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **5** |
 
   A session AUTHORED on fable (operator-elected) still climbs inside fable,
   `fable@medium → fable@high → fable@xhigh`; nothing climbs INTO fable since v39.

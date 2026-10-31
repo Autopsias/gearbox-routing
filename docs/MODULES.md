@@ -44,7 +44,6 @@ path on the card, and read the cautions.
 | [Outside-idea triage](modules/outside-ideas.md) | Judges what an article or repo proposes against your repo | Any |
 | [Explainers](modules/eli5.md) | Turns a subject into a story-style HTML page for a named audience | Needs the Artifact tool |
 | [Executive summaries](modules/tldr.md) | Turns long sources into a decision-first one-page brief, plus a page, deck or video from the same claims | Any — Chrome for PDF |
-| [Pre-push gate](modules/no-mistakes.md) | Runs a branch through review, tests, push, pull request and CI, with a stop at each gate | Needs the `no-mistakes` tool |
 
 ## Code quality and testing
 

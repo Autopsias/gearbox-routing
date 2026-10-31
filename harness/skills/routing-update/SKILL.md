@@ -32,7 +32,7 @@ failure or a genuinely new decision discovered mid-apply comes back to the opera
 ## Checklist (all 6 steps)
 
 - [ ] **Snapshot** — read SSOT, runbook, check git status
-- [ ] **Research** — parallel fan-out (`/claude-api` first, then external priors, **then the DeepSWE cost-vs-performance board — mandatory**), or binary-bump canary
+- [ ] **Research** — parallel fan-out (`/claude-api` first, then external priors), or binary-bump canary
 - [ ] **Impact diff** — map findings onto SSOT blocks + consumer surfaces (incl. the three skills' prose CONTENT, not just their stamps)
 - [ ] **Changeset proposal** — write the changeset file, get operator approval (the one gate)
 - [ ] **Apply** — run the full checklist top to bottom, guard-verified
@@ -72,15 +72,6 @@ Follow `references/research-protocol.md`. Summary:
   a genuinely new tier) + Perplexity for benchmarks/practitioner signal; `mcp__ref` for
   Anthropic docs deltas (effort doc, models overview, Claude Code model-config).
   Precedent artifact shape: `evals/routing/external-priors-vulcanbench-2026-07.md`.
-- **DeepSWE cost-vs-performance board — MANDATORY for any model/tier/price diff.**
-  https://deepswe.datacurve.ai/ scores Anthropic and OpenAI models on ONE harness with
-  pass@1 *and* $/task side by side — the only way to make a provider-crossing cost-quality
-  claim honestly. The changeset must carry the table for our lineup plus the resulting
-  Pareto frontier. **Fetch with `WebFetch` or `mcp__exa__web_fetch_exa` — never `curl`**
-  (client-hydrated: curl returns a 230 KB shell with zero model rows, and reads as "no
-  data"). Mind the two toggles, the ± intervals, and the fact that the board's best-config
-  rung is usually not our operating rung. Full protocol + reading rules:
-  `references/research-protocol.md` §Lane 3.
 - **Binary bump path** — run the effort-canary preflight instead; its verdict (dial live
   vs inert per model) IS the research output.
 
@@ -177,10 +168,10 @@ is only for retro-sourced proposal adopt/rollback decisions.
   fail, and rightly so — a content change without a version bump is not a supported path).
 - Applying a `prices:` change sourced from memory or a news article alone — `/claude-api`
   verification is mandatory for price rows.
-- Moving a model, tier or effort pin WITHOUT a DeepSWE cost-vs-performance reading in the
-  changeset (§Lane 3) — a pin moved on price alone is a cost decision wearing a quality
-  decision's clothes. Equally: citing a board gap that sits inside the ± confidence
-  interval as if it were a finding.
+- Moving a model, tier or effort pin on price alone — a cost decision wearing a quality
+  decision's clothes. Carry a quality reading from our own data: the outcome ledger
+  (`/routing-retro`), a canary, or the calibration eval. Equally: citing a gap inside its
+  confidence interval as if it were a finding.
 - **Bumping a `routing-ssot` stamp without running the step-7 content scan.** The stamp
   asserts the prose agrees with the SSOT; the guard only checks the number. Bumping it
   while the prose still recommends the old value is the failure this skill exists to
