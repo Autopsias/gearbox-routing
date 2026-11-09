@@ -3,9 +3,9 @@
     "name": "gha-security-review",
     "repo": "getsentry/skills",
     "path": "skills/gha-security-review",
-    "pin": "24fdb833b9e67670a027e3b482189100a69ff7f9",
-    "tree": "7506de39b90eb3f333020fef13394cd29f8809f5",
-    "reviewed": "2026-08-18",
+    "pin": "b11ee5163295996fa6449c4842749811c82ac77c",
+    "tree": "fb6e2d58f1fa676218419807f3a861814b8e640f",
+    "reviewed": "2026-11-03",
     "license": "Apache-2.0",
     "why": "Turns the three regex-level BLOCKING workflow checks (sec.dangerous-workflow, sec.workflow-permissions, sec.action-pinning) into a reasoned exploitation review. Threat model counts only attackers without write access, so it does not invent findings the repo cannot suffer."
   }

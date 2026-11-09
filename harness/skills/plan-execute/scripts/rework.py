@@ -21,6 +21,7 @@ import route_at_dispatch as rad
 import run_state_io as rsi
 import safe_json as sj
 import stuck_protocol as sp
+import untrusted_block as ub
 from verify_pass import GATE_PASSED
 from verify_paths import (GATE_FAILED, _feedback_path, _html, _save_state,
                           verify_state_path)
@@ -175,7 +176,7 @@ def _indeterminate(plan_dir, session_id, state, gate, excerpt):
         f"finding and was NOT charged as a rework attempt "
         f"(rework {state['rework_count']}/{state['max_rework']} unchanged). The gate stays "
         f"pending: fix the cause below, then `verify-begin --resume` re-runs it.\n\n"
-        f"## Gate output (redacted, tail)\n\n```\n{excerpt}\n```\n"
+        f"## Gate output (redacted, tail)\n\n{ub.gate_block(excerpt)}\n"
     )
     # STILL a failure for the STUCK protocol, just not for the BUDGET. Charging
     # nothing was right; recording nothing was not -- `sp.record_failure` has one
@@ -236,7 +237,7 @@ def _gate_failed(plan_dir, session_id, state, gate, excerpt):
     fb.write_text(
         f"# Verification feedback — {session_id} (attempt {attempt})\n\n"
         f"Gate `{gate}` FAILED. Fix the cause, then this session re-runs and "
-        f"re-verifies.\n\n## Gate output (redacted, tail)\n\n```\n{excerpt}\n```\n"
+        f"re-verifies.\n\n## Gate output (redacted, tail)\n\n{ub.gate_block(excerpt)}\n"
         + (sp.research_prompt(stuck) if stuck["triggered"] else "")
     )
     if stuck["triggered"]:

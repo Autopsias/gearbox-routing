@@ -44,6 +44,7 @@ path on the card, and read the cautions.
 | [Outside-idea triage](modules/outside-ideas.md) | Judges what an article or repo proposes against your repo | Any |
 | [Explainers](modules/eli5.md) | Turns a subject into a story-style HTML page for a named audience | Needs the Artifact tool |
 | [Executive summaries](modules/tldr.md) | Turns long sources into a decision-first one-page brief, plus a page, deck or video from the same claims | Any — Chrome for PDF |
+| [UI design and review](modules/ui-craft.md) | Builds and reviews any UI on Stageshow's design rules, with screenshots and two blind reviewers | Any — needs Node.js; Codex optional |
 
 ## Code quality and testing
 
@@ -64,7 +65,7 @@ path on the card, and read the cautions.
 | [Git safety guard](modules/git-safety.md) | Blocks commands that throw away uncommitted work | Any |
 | [Context compaction policy](modules/compaction.md) | Holds automatic compaction back until a safe moment | macOS, Linux |
 | [Status line](modules/statusline.md) | Rate limits, context, cache and model at the bottom of the screen | macOS, Linux — needs `jq` |
-| [Small hooks](modules/small-hooks.md) | A reminder for long subagents, and four hooks you can skip | Any |
+| [Small hooks](modules/small-hooks.md) | A reminder for long subagents, two usage logs, and four hooks you can skip | Any |
 | [Machine governor](modules/govrun.md) | Makes heavy test runs take turns, and can refuse a heavy run that skips the queue | macOS, Linux |
 | [Agent janitor](modules/agent-janitor.md) | Kills leftover agent processes and deletes old temp files, without asking | **macOS only** |
 

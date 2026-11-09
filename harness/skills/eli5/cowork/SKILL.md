@@ -183,8 +183,12 @@ drift enters.
 2. **Self-contained, no network.** One `<style>` block; every picture an
    inline `<svg>`; system font stacks only.
 3. **Readable on any screen.** One column, `max-width` ~720px; every `<svg>`
-   has a `viewBox` and `width:100%; height:auto`; every SVG label ≥ 13 units
-   in a 680-wide viewBox.
+   has a `viewBox` and `width:100%; height:auto`; every SVG label reaches
+   12px on a 390px phone: font-size ≥ 12 × viewBox width / 358 units (23 in
+   a 680-wide viewBox, 13 in a 380-wide one), or the drawing has a compact
+   phone twin (`data-view="wide"` / `data-view="narrow"`, swapped at 600px).
+   No table wider than the phone: three columns at most, or rows stack as
+   cards under 600px.
 4. **Both themes.** Light palette on `:root`, dark redefinitions in
    `@media (prefers-color-scheme: dark)`; explicit `body` background and
    colour; every SVG fill/stroke via `var(--…)` except gradient stops (literal

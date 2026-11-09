@@ -45,6 +45,7 @@ from ran_cell import SOURCE_ATTESTED, SOURCE_REQUESTED, SOURCE_UNKNOWN  # noqa: 
 import route_at_dispatch as rad
 import run_state_io as rsi
 import safe_json as sj
+import transcript_find
 
 KILL_SWITCH_ENV = "PLAN_EXECUTE_NO_OUTCOME_LEDGER"
 LEDGER_PATH_ENV = "PLAN_EXECUTE_OUTCOME_LEDGER"  # allow-listed test/override var
@@ -284,6 +285,24 @@ def _fresh_receipt(plan_dir, session_id, generation):
     return None
 
 
+def _receipt(plan_dir, session_id, generation, backend):
+    """The fresh receipt, else one read off the transcript `transcript_find`
+    locates — the orchestrator's `record-receipt` call is easy to forget."""
+    receipt = _fresh_receipt(plan_dir, session_id, generation)
+    if receipt or backend != "claude":
+        return receipt
+    path = transcript_find.find(plan_dir, session_id)
+    if path is None:
+        return None
+    attested, usage = attestation.read_transcript(backend, str(path))
+    agent_id = path.stem.removeprefix("agent-")
+    # shortcut: this receipt is not saved, so a later receipt's base misses this slice; upgrade if it ever matters.
+    base = attestation.usage_base(rsi.get_receipt(plan_dir, session_id), agent_id, generation,
+                                  _dispatch_ordinal(plan_dir, session_id))
+    return {"agent_id": agent_id, "transcript": str(path), "attested": attested, "usage": usage,
+            "usage_base": base, "found_by": "transcript_find"}
+
+
 # --------------------------------------------------------------------------
 # Compose
 # --------------------------------------------------------------------------
@@ -318,8 +337,9 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
 
     generation = esca.session_state(plan_dir, session_id)["generation"]
 
+    receipt = _receipt(plan_dir, session_id, generation, backend)
     model_ran, reasoning_ran, model_ran_source = ran_cell.ran_cell(
-        (_fresh_receipt(plan_dir, session_id, generation) or {}).get("attested"),
+        (receipt or {}).get("attested"),
         model_authored, reasoning_authored, escalated_from, degraded_from,
     )
     tier_ran = esca.rung_key(model_ran, reasoning_ran) if model_ran != "unknown" else "unknown"
@@ -341,7 +361,8 @@ def compose(plan_dir, session_id, *, resolution, result, verified, attempt=1,
         "model_ran_source": model_ran_source,
         "effort_mechanism": _effort_mechanism(plan_dir, session, session_id),
         "orchestrator_ctx_tokens": _orchestrator_ctx_tokens(plan_dir, session_id),
-        "usage": attestation.ledger_usage(_fresh_receipt(plan_dir, session_id, generation)),
+        "usage": attestation.ledger_usage(receipt),
+        "inline_fix": (receipt or {}).get("inline_fix"),
         "degraded_from": degraded_from,
         "escalated_from": escalated_from,
         "routing_experiment": rad.experiment(plan_dir, manifest, session),

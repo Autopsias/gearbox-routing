@@ -35,6 +35,7 @@ import finish_ci
 import finish_notes as fn
 from finish_leftovers import leftovers
 import finish_record as fr
+import finish_repair as frp
 import land_state as lst
 import plan_scope as ps
 import plan_teardown as pt
@@ -375,6 +376,16 @@ def finish(plan_dir, *, timeout_s=DEFAULT_TIMEOUT_S, apply=False):
         return _run(plan_dir, ctx, timeout_s, apply, release)
 
 
+def _locked_record(plan_dir, ctx, origin_sha, apply, lease_ok):
+    """The record step under the per-plan lock, so two finishes of one plan queue."""
+    with frp.record_lock(ctx["root"], ctx["slug"]):
+        # The pin was read before the lock; a finish that held it first has moved the branch.
+        now_sha = rev(ctx["root"], f"refs/remotes/{ctx['remote']}/{ctx['default']}")
+        if now_sha and now_sha != origin_sha and fr.ancestor(ctx["root"], origin_sha, now_sha):
+            origin_sha = now_sha
+        return fr.record(plan_dir, ctx, origin_sha, apply=apply, lease_ok=lease_ok)
+
+
 def _run(plan_dir, ctx, timeout_s, apply, release):
     """``finish`` under the run lock; ``release`` drops it before any CI poll."""
     st = ssio.read_json_with_bak(state_path(ctx["root"], ctx["slug"])) or {}
@@ -408,8 +419,7 @@ def _run(plan_dir, ctx, timeout_s, apply, release):
         if moved:                          # another run of this plan got there first
             out["action"] = "finish-superseded"
             return _done(plan_dir, ctx, out, [fn.superseded(plan_dir, moved)], "plan_finish")
-        rec, target, staged = fr.record(plan_dir, ctx, pre["origin_sha"],
-                                        apply=writes, lease_ok=lease_ok)
+        rec, target, staged = _locked_record(plan_dir, ctx, pre["origin_sha"], writes, lease_ok)
         notes.append(rec.pop("detail", None))
         out["record"] = rec
         if rec["status"] == "parked":

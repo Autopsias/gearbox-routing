@@ -17,6 +17,8 @@ Single-purpose hooks. Only one of them is useful to most people as shipped.
 | `harness/hooks/audio-hooks.sh` | Plays a sound when a task ends or when Claude needs input. | Not as shipped: it needs sound files and a preferences file that this repo does not ship. |
 | `harness/hooks/skill-eval-hook.ts` | Adds a "check your skills first" reminder to prompts that contain words such as "implement" or "build". | Only if you use the [BMAD](bmad.md) workflow; the reminder names BMAD commands. Needs `npx tsx`. |
 | `harness/hooks/gearbox-drift-warn.sh` | Ran the original author's deploy check. | **No.** It expired on 2026-08-08 and now only prints "remove me". |
+| `harness/hooks/skill-usage-log.py` | `PreToolUse` on `Skill`: writes one line per skill call to `~/.gearbox-state/skills/usage.ndjson`, so you can measure which skills run and which never trigger. | If you want to prune or tune skills from data. Its entry is in `harness/settings.json`. Test: `bash harness/hooks/test_skill_usage_log.sh`. |
+| `harness/hooks/instructions-inventory.py` | `InstructionsLoaded`: writes one line per loaded instruction file (`CLAUDE.md`, rules) to `instructions.ndjson`, so you can see what each project really loads. | If you want to trim your instruction files. Its entry is in `harness/settings.json`. Test: `python3 -m pytest harness/hooks/test_instructions_inventory.py`. |
 
 ## Install the agent nag
 

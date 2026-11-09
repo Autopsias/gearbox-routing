@@ -292,12 +292,28 @@ loses them as surely as jargon does. Add these rules on top of the ones above:
 two SVG rules learned from a shipped page (2026-08-28, labels near-invisible
 on a phone):
 
-- Text inside an SVG scales with the drawing, and on a phone the drawing
-  renders at about half its desktop width. So keep every SVG label at
-  13 units or larger in a 680-unit-wide viewBox (scale the floor in
-  proportion for other widths), and prefer a few large labels over many
-  small ones. A label you must shrink below the floor is a label the
-  drawing does not need.
+- Text inside an SVG scales with the drawing. On a 390px phone the drawing
+  is about 358px wide, so a label renders at `units × 358 / viewBox width`
+  px. Every label must reach **12px on the phone: font-size ≥ 12 × viewBox
+  width / 358 units** — 23 units in a 680-wide viewBox, 13 units in a
+  380-wide one. (The old floor, 13 units in 680, came out at 6.2–6.7px on
+  every chart page of the 2026-11-08 ui-craft review: it assumed "half
+  width" and never did the arithmetic.) Two ways to meet it:
+  1. **One drawing, few big labels.** Draw narrow (a viewBox about 380
+     wide) or keep few labels at the floor. Prefer this.
+  2. **A phone drawing beside the desktop one.** Mark the desktop drawing
+     `data-view="wide"` and a compact redraw (stacked, fewer labels)
+     `data-view="narrow"`, and add
+     `@media (max-width:600px){svg[data-view=wide]{display:none}}
+     @media (min-width:601px){svg[data-view=narrow]{display:none}}`.
+     A `wide` drawing keeps the desktop floor (13 units in 680). Compact is
+     a second design, not the same drawing squeezed.
+
+  A label you cannot fit at the floor is a label the drawing does not need.
+- A table never runs wider than the phone screen. Three columns at most on a
+  phone; a wider table stacks each row as a card under 600px. A cut column
+  with no scroll hint hides the answer (the Gama page, 2026-11-08: the
+  Verdict column showed one letter per row).
 - Every fill and stroke in every SVG takes a palette variable — no literal
   colours, so the drawings follow the viewer's theme. For text on an accent
   shape, define an `--on-accent` variable instead of writing white.
@@ -320,7 +336,8 @@ on a phone):
 
 - A label inside a box clears the box by at least 8 units on each side, measured
   at Verdana widths.
-- When it does not fit, wrap to two lines. Never shrink below 12 units.
+- When it does not fit, wrap to two lines. Never shrink below the phone
+  floor above.
 - Keep every label at least 6 units inside the viewBox edge.
 - Never let two labels' bounding boxes touch.
 - Never run a straight line through a label.
@@ -352,10 +369,11 @@ and clean shots in the third.
 1. **Font-metric estimator — the primary gate.** Run
    `python3 scripts/svg_text_audit.py <page>.html` from this skill directory.
    It estimates every `<text>` width from Verdana's advance widths, then checks
-   viewBox margins, box containment at 8-unit padding, label collisions, and
-   straight lines crossing labels. It exits 1 on any finding. Fix each one by
-   widening the box, wrapping the label, or moving the element — never by
-   shrinking below 12 units — and re-run to zero. Audit at Verdana widths even
+   viewBox margins, box containment at 8-unit padding, label collisions,
+   straight lines crossing labels, and the phone size floor. It exits 1 on
+   any finding. Fix each one by widening the box, wrapping the label, or
+   moving the element — never by shrinking below the floor — and re-run to
+   zero. Audit at Verdana widths even
    for a page with no brand font: Verdana is the conservative bound for every
    common sans.
 2. **Runtime bounding-box audit — the actual render.** With Playwright, after a
@@ -365,7 +383,8 @@ and clean shots in the third.
 3. **Read the renders.** Screenshot each `figure` element with its caption, and
    each `svg` element without, at desktop (~1280), phone (~390), dark, and
    desaturated. READ them — hunt for clipped, colliding or escaping lettering,
-   colours that vanish, and scribble glyphs. Render the full page too.
+   colours that vanish, and scribble glyphs. Render the full page too, and run the
+   `ui-craft` REVIEW pass on it for the first screen, hierarchy and phone layout.
 4. **Reader-environment render, when available.** If Claude in Chrome is
    connected, open the file in the user's own browser and screenshot each
    figure with the reader's real fonts. Otherwise say in the delivery message

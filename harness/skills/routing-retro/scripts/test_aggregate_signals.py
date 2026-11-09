@@ -413,14 +413,16 @@ def test_adoptions_default_path_derives_from_ledger_being_analyzed(tmp_path, sso
 # --------------------------------------------------------------------------
 # Round-3 review findings
 # --------------------------------------------------------------------------
-def test_smoke_failed_canary_frees_its_cell_for_a_new_experiment(tmp_path, ssot_path):
+def test_smoke_failed_canary_closes_its_downgrade_proposal(tmp_path, ssot_path):
     # Round-3 finding 3: existing_canary_pids collected EVERY experimental
     # cohort regardless of stage, so a smoke-FAILED canary kept its proposal_id
     # in the "already underway" set. The one JSON document then contradicted
     # itself -- canaries[] said "smoke-failed" while the cell said "canary
     # already underway" -- and that cell could never open another downgrade
-    # experiment. SKILL.md step 3 defines smoke-failed as "drop the proposal",
-    # so the cell must be free to open a fresh one.
+    # experiment. SKILL.md step 3 defines smoke-failed as "drop the proposal".
+    # Retro 2026-11-07: re-opening it as "open" was wrong too -- the id is
+    # epoch-free, so a re-run reuses the failed id and can never pass. The
+    # retro then offered the same dead experiment every time. Dropped = closed.
     recs = [r for i in range(6) for r in _cohort(f"ok{i}", result="passed")]
     pid = _run(tmp_path, ssot_path, recs)["cells"][0]["proposal"]["proposal_id"]
     # a smoke batch for that pid in which one gate-checked run did NOT pass
@@ -434,8 +436,23 @@ def test_smoke_failed_canary_frees_its_cell_for_a_new_experiment(tmp_path, ssot_
     assert out["canaries"][0]["stage"] == "smoke-failed"
     # the cell must NOT still be told an experiment is running
     cell = out["cells"][0]
-    assert cell["proposal"]["stage"] == "open"
-    assert "already underway" not in cell["proposal"]["recommendation"]
+    assert cell["status"] == "downgrade-dropped"
+    assert cell["proposal"] is None
+    assert pid not in {p["proposal_id"] for p in out["proposals"]}
+
+
+def test_adopted_canary_is_not_offered_again(tmp_path, ssot_path):
+    # Retro 2026-11-07: an adoption-ready canary that /routing-update already
+    # adopted kept appearing in proposals[] as "ADOPT", so the decision card
+    # offered a change that was made three weeks before.
+    ledger = tmp_path / "outcomes.ndjson"
+    (tmp_path / "adoptions.ndjson").write_text('{"proposal_id": "pidA"}\n')
+    _write(ledger, [r for i in range(10) for r in
+                    _canary(f"c{i}", result="passed", proposal_id="pidA")])
+    out = ao.run(ledger, ssot_path)
+    cn = out["canaries"][0]
+    assert cn["stage"] == "adoption-ready" and cn["adopted"] is True
+    assert "pidA" not in {p.get("proposal_id") for p in out["proposals"]}
 
 
 def test_time_to_signal_cadence_comes_from_the_pool_it_counts(tmp_path, ssot_path):

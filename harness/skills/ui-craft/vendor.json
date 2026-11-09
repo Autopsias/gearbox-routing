@@ -1,0 +1,14 @@
+[
+  {
+    "name": "stageshow",
+    "repo": "benjitaylor/skills",
+    "path": "stageshow",
+    "pin": "299140fafd08df55a9c234e610c3f64af3f45531",
+    "tree": "92857a8f6dbc0c3f5157c11a7afc4e55d488b8d6",
+    "reviewed": "2026-11-07",
+    "license": "MIT",
+    "why": "The design rules (references/craft.md), the frame-only checklist (verify.md), the blind reviewer brief (review.md), the box-fit checker (scripts/layout.mjs) and the full faux-UI kit, gold examples, teaching pairs and filming tools for product mock-ups. ui-craft reads these in place, so a re-pin brings every upstream improvement.",
+    "audit": "Node scripts only, no Python. Runtime egress: none; scripts open the URL you pass and write the report or screenshot you name. Install pulls react, react-dom, lucide-react, vite, typescript, postcss, playwright-core and the optional portless (vercel-labs) from the vendored package-lock.json; ui-craft installs them with npm ci --ignore-scripts into a work copy outside every repo, never into this tree.",
+    "caveat": "assets/app-icons.ts artwork and the kit/brands/ marks are NOT covered by the MIT licence (see NOTICE.md and kit/brands/SOURCES.md). Fine inside this private repo; keep this tree out of the public export. Upstream's own workflow writes examples/ and node_modules/ into its folder: never do that here, use the work copy from scripts/stage.sh."
+  }
+]

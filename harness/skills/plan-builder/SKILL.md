@@ -15,19 +15,21 @@ The Aurora edition gives every plan a **dual-layer voice**: the parts a human re
 
 ## What the output gives the user
 
-1. **Editorial page header** — serif title, glass-blur sticky banner, last-updated stamp.
-2. **Sticky session navigation strip** — 1 chip per session, color-coded by status, click to jump.
-3. **Operating Manual** at the very top — collapsed for humans, fully in DOM for any Claude that opens the file (this is the load-bearing rule sheet).
-4. **Plan Achievement infographic** — visual story of what the plan achieves (one of 5 structured SVG templates or `custom`).
+The page is state-first: what is done, what runs next and what needs a decision come before any story.
+
+1. **Editorial page header** — serif title and subtitle (not sticky).
+2. **Sticky session navigation strip** — 1 chip per session, color-coded by status, scrolls sideways and centres the next session.
+3. **Status card** — one big number (% of items done), one status line (sessions, items, blocked, open decisions), the next session and an "Open sNN" button. Says "Finished" when every session is closed.
+4. **Open decisions + Decision hotspots** — what the owner must still decide, high on the page.
 5. **"The plan, explained"** — eli5-derived explainer: the causal chain of steps with live status + a "You are here" marker, a plain-language "Where we are" paragraph that follows execution, one qualified analogy, defined terms, one-line recap. Optional (`explainer` spec field) but recommended on every plan.
-6. **Up Next callout** — quiet terminal-style prompt, auto-derives the next non-DONE session.
-7. **Twin donut rings** — items + sessions, status-segmented, TODO arc at reduced opacity so 0/N looks intentional.
-8. **Status filter chips + category filter chips** — both filter the cards below.
-9. **Categories status grid** — one row per category with colored accent + segmented progress bar + ratio.
-10. **Session arc timeline** — N SVG segments, status-colored, model dot below each, click jumps.
-11. **Session Plan section** — every session as a card with: step indicator ("Session 3 of 18"), title, status pill, model chip, time-effort + reasoning chips, plain-English human summary, deliverable callout, items in scope, dispatch row (subagent type / dependencies / parallel group / checkpoint), why-this-model rationale, action bar showing the `/plan-execute … --session sNN` command, collapsible agent spec pointing to the per-session prompt + context bundle, notes.
-12. **Category sections** — one per category with item cards in the same dual-layer pattern.
-13. **Floating progress pill** — bottom-right; appears once you scroll past the dashboard; shows overall % done + quick link to the next session.
+6. **Plan Achievement infographic** — visual story of what the plan achieves (one of 5 structured SVG templates or `custom`). Hidden on a phone, where its text would be too small to read.
+7. **Status filter chips + category filter chips + categories status grid** — filter the cards below; one row per category with a progress bar.
+8. **Session Plan section** — every session as a card with: step indicator ("Session 3 of 18"), title, status pill, model chip, time-effort + reasoning chips, plain-English human summary, deliverable callout, items in scope, dispatch row, the `/plan-execute … --session sNN` command, collapsible agent spec, notes. "How sessions run" is collapsed above the cards.
+9. **Category sections** — one per category with item cards in the same dual-layer pattern.
+10. **Fold of finished and later cards** — DONE, WONTFIX and DEFERRED sessions and items fold to one row, and so does every TODO session after the next one; a click, Enter/Space or a link to the card opens it. The next session is the one the status card names: a BLOCKED session outranks every other, because plan-execute halts the plan on it.
+11. **Out of scope + Plan changes** — settled boundaries and amendments, at the end.
+12. **Operating Manual** — at the end of `<main>`, collapsed for humans, fully in DOM for any Claude that opens the file (this is the load-bearing rule sheet).
+13. **Floating progress pill** — bottom-right on wide screens; appears once you scroll past the status card.
 14. **Light + dark theme** — auto via `prefers-color-scheme` + manual cycle button.
 
 ## When to invoke
@@ -35,6 +37,7 @@ The Aurora edition gives every plan a **dual-layer voice**: the parts a human re
 - "I need a plan for X" / "Build a plan to do Y" / "Create a roadmap for Z"
 - "Help me organize this body of work into sessions"
 - After running an analysis/audit that produced a long list of action items
+- "Make a plan to fix the repo-health findings" — read `../repo-health/references/fix-plan.md` first: run its steps 1–3 to get the fix list, then draft sessions with its mapping rules. Never retype findings from the dashboard; they may describe an older tree
 - After a `/design:design-critique` or similar produced ~15+ items the user wants to execute
 
 If the user has fewer than 6-8 actionable items, this skill is overkill — suggest a simpler list instead.
@@ -103,7 +106,7 @@ The technical details (`description`, `agent_instructions`, `schema`, `mockup`, 
 When to add a `schema`, `mockup`, or `code` block:
 
 - **`schema`** — when an item involves a data shape, API contract, or DB schema. JSON, SQL DDL, GraphQL, TS interface — anything an executing Claude will want to match exactly.
-- **`mockup`** — when there's a UX surface or visual layout. Inline SVG is best; ASCII works for terminal output / data tables.
+- **`mockup`** — when there's a UX surface or visual layout. Inline SVG is best; ASCII works for terminal output / data tables. A session that builds or changes a UI names `ui-craft` (BUILD, then REVIEW) in its prompt, and its REVIEW frames are the session's evidence.
 - **`code`** — when a small code excerpt clarifies the expected shape (a function signature, a config snippet, a usage example).
 
 If none of those add clarity, leave them out — empty blocks aren't helpful.
@@ -234,7 +237,7 @@ If `<plan-dir>` is omitted it defaults to `./_plans/<slug>-<today>/`. A legacy `
 
 **Rebuilding a plan that has already run.** Per-session/item status lives ONLY in PLAN.html's `data-status` attributes — `/plan-execute`'s dispatcher and its structural DONE-gate both read them there — and a rebuild re-renders every article at `TODO`. So `--rebuild` over an executed plan is **refused** unless you pass `--preserve-state`, which carries the recorded state forward: each article's status, its accumulated closeout notes, its `data-updated` stamp and its shipping badge, plus `run_state.json`. Sessions or items the rebuild **adds** start at `TODO`; ones it **removes** stay gone. To deliberately restart a plan from scratch, delete `PLAN.html` first. (Before 2026-07-28 a rebuild silently reset every status — destroying dispatch state, not just badges. The carry-over lives in `../plan-execute/scripts/article_block.py` next to the writers whose fields it must preserve.)
 
-**Dashboard JS guard.** The dashboard's status nav (session strip, donut rings, counters, progress pill) is repainted on every page load by the inline `<script>` reading each `<article>`'s `data-status`. A single runtime `ReferenceError` in a render function aborts that repaint mid-run and **silently freezes the nav** at its authored fallback statuses — the page still loads and *looks* valid (this is exactly how a `isOpus is not defined` typo shipped). `node --check` cannot catch it (runtime error, not syntax), so `build_plan.py` runs ESLint `no-undef` over the assembled inline script (`scripts/dashboard-eslint.config.mjs`) **before writing PLAN.html** and aborts the build on any undefined identifier. The check degrades gracefully (warn + skip) if Node/ESLint aren't installed. If it fails with a legitimate *new* browser or injected-data global, add it to the config's allowlist; otherwise it's a real bug in `assets/base-template.html` or `assets/infographics/*.js`.
+**Dashboard JS guard.** The dashboard's status nav (session strip, status card, counters, progress pill) is repainted on every page load by the inline `<script>` reading each `<article>`'s `data-status`. A single runtime `ReferenceError` in a render function aborts that repaint mid-run and **silently freezes the nav** at its authored fallback statuses — the page still loads and *looks* valid (this is exactly how a `isOpus is not defined` typo shipped). `node --check` cannot catch it (runtime error, not syntax), so `build_plan.py` runs ESLint `no-undef` over the assembled inline script (`scripts/dashboard-eslint.config.mjs`) **before writing PLAN.html** and aborts the build on any undefined identifier. The check degrades gracefully (warn + skip) if Node/ESLint aren't installed. If it fails with a legitimate *new* browser or injected-data global, add it to the config's allowlist; otherwise it's a real bug in `assets/base-template.html` or `assets/infographics/*.js`.
 
 ### 3b. Optionally harden the plan (`--harden`)
 
@@ -314,7 +317,7 @@ When drafting cards, write the `human_summary` and `deliverable` as if your read
 
 ### Why the Operating Manual matters
 
-The HTML embeds an Operating Manual at the top of `<main>` describing how the plan runs (`/plan-execute`), the runner-owned mutation surface (the `<!-- ARTICLE:<id> -->`-bounded blocks), what auto-recomputes (donuts, arc, categories, counters, Up Next, floating pill), and the 8 status semantics. The build script handles it; don't remove or restructure.
+The HTML embeds an Operating Manual at the end of `<main>` describing how the plan runs (`/plan-execute`), the runner-owned mutation surface (the `<!-- ARTICLE:<id> -->`-bounded blocks), what auto-recomputes (status card, categories, counters, Up Next, strip, floating pill, fold of finished and later cards), and the 8 status semantics. The build script handles it; don't remove or restructure.
 
 ### Why comment anchors matter
 

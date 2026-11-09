@@ -358,9 +358,15 @@ def main():
     files = glob.glob(os.path.join(args.projects_dir, "*", "*.jsonl"))
     if args.project:
         files = [f for f in files if args.project in os.path.basename(os.path.dirname(f))]
-    if since_ts:
-        files = [f for f in files if os.path.getmtime(f) >= since_ts]
-    files.sort(key=os.path.getmtime, reverse=True)
+    # another session can delete a transcript between the glob and the stat
+    mtimes = {}
+    for f in files:
+        try:
+            mtimes[f] = os.path.getmtime(f)
+        except FileNotFoundError:
+            pass
+    files = [f for f in mtimes if not since_ts or mtimes[f] >= since_ts]
+    files.sort(key=mtimes.__getitem__, reverse=True)
 
     sessions, skipped = [], []
     for fp in files:
@@ -370,7 +376,11 @@ def main():
         if sid in args.exclude_session:
             skipped.append({"session_id": sid, "reason": "excluded (current session?)"})
             continue
-        s = scan_session(fp, prices, model_rates)
+        try:
+            s = scan_session(fp, prices, model_rates)
+        except FileNotFoundError:
+            skipped.append({"session_id": sid, "reason": "deleted during scan"})
+            continue
         if s["entrypoint"] and s["entrypoint"].startswith("sdk") and not args.include_sdk:
             skipped.append({"session_id": sid, "reason": f"entrypoint={s['entrypoint']}"})
             continue

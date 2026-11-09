@@ -21,7 +21,7 @@
        English summaries, "what we deliver" callouts, dashboard, infographic.
     2. /plan-execute orchestrator + dispatched subagents — read the plan,
        mutate state atomically per session. Reads:
-         a. The Operating Manual at the top of <main> (collapsed for humans,
+         a. The Operating Manual at the end of <main> (collapsed for humans,
             fully in DOM for agents).
          b. The <details data-role="agent-spec"> blocks inside each card —
             agent instructions, schemas, mockups, code excerpts.
@@ -30,9 +30,9 @@
             sessions/sNN.context.md (per-session execution bundles).
 
   WHAT AUTO-RECOMPUTES on every page load (never edit these):
-    donuts, session arc, categories grid, counters, last-updated stamp,
-    sticky strip statuses, Up Next callout, plan-achievement infographic,
-    floating progress pill.
+    status card (overall %, status line, Up next), categories grid,
+    counters, last-updated stamp, sticky strip statuses, folded finished and later
+    sessions, plan-achievement infographic, floating progress pill.
 
   EVERY CLASS HOOK + ID HERE IS LOAD-BEARING for build_plan.py and the
   runtime JS. Restyle freely; rename at your peril.
@@ -1196,6 +1196,18 @@
     transition: opacity 0.2s ease, transform 0.2s ease;
   }
   .floating-progress.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  /* Back to top: shown with the progress pill, once the status card is off screen. */
+  .to-top {
+    position: fixed; bottom: 22px; right: 22px; z-index: 11;
+    min-height: 44px; padding: 0 16px; border-radius: var(--r-pill);
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg); font: 600 15px var(--font-sans); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .to-top:hover { border-color: var(--accent); color: var(--accent-dark); }
+  .to-top.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  .floating-progress { right: 116px; bottom: 26px; }
   .floating-progress .fp-mini-bar {
     width: 80px; height: 6px; background: var(--surface-2); border-radius: var(--r-pill);
     overflow: hidden; box-shadow: inset 0 0 0 1px var(--hairline);
@@ -1218,7 +1230,7 @@
   footer.page code { background: var(--surface-2); padding: 1px 5px; border-radius: 3px; font-size: 11.5px; }
   @media print {
     header.page, nav.session-strip, .floating-progress { position: static; }
-    .filters, .stats, .session-actions { display: none; }
+    .filters, .stats, .session-actions, .to-top { display: none; }
     article.item, article.session { break-inside: avoid; box-shadow: none; }
     .code-block, .prompt-block { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     .code-block pre, pre.prompt-text { color: var(--text); background: var(--surface); }
@@ -1262,7 +1274,10 @@
   .hotspot-alts li { margin-bottom: 2px; }
 
   /* === narrow-viewport overflow hardening (<~560px) — verified bodyOver=0 at 320-1100px === */
-  html, body { max-width: 100%; overflow-x: hidden; }
+  /* clip, not hidden: hidden on html+body makes body a scroll box and breaks the sticky strip */
+  html, body { max-width: 100%; overflow-x: clip; }
+  /* a jump to #sNN lands below the sticky strip, not under it */
+  html { scroll-padding-top: 88px; }
   /* grid/flex children must shrink below intrinsic content size (default min-width:auto blocks this) */
   .dashboard-top > *, .dashboard > *, main > *, .dashboard-top, .filters-col, .donut-card { min-width: 0; }
   /* long unbreakable tokens (paths, URLs, curl commands) wrap rather than overflow */
@@ -1280,6 +1295,107 @@
     /* relax the fixed 220px first column so the category bars fit any narrow panel */
     .cat-row { grid-template-columns: minmax(0, 1.3fr) minmax(24px, 1fr) auto; gap: 10px; }
     .cat-row .cat-count { min-width: 0; }
+  }
+  /* === STATE-FIRST LAYOUT (2026-11-08, ui-craft review). Overrides the rules above:
+     the status card leads, one progress number, finished and later sessions fold to a row,
+     small text at 12px or more, 40px+ controls, and a phone layout. === */
+  header.page { position: static; }
+  nav.session-strip {
+    top: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin;
+    padding-top: 10px; padding-bottom: 10px; gap: 8px;
+  }
+  nav.session-strip .strip-label { font-size: 12px; flex: none; }
+  nav.session-strip .strip-chip {
+    flex: none; display: inline-flex; align-items: center; min-height: 40px;
+    font-size: 15px; padding: 0 12px;
+  }
+  nav.session-strip .strip-chip[data-status="DONE"] { opacity: 1; }
+
+  .up-next { padding: 28px 32px; margin-bottom: 24px; animation: none; }
+  .status-top {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 24px;
+    padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--hairline);
+  }
+  .status-pct { display: flex; align-items: baseline; gap: 10px; flex: none; }
+  #status-pct {
+    font-family: var(--font-serif); font-size: clamp(56px, 5vw, 104px); line-height: 1;
+    color: var(--text); letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  }
+  .status-pct-label { font-size: 15px; color: var(--text-muted); }
+  .status-line { margin: 0; flex: 1 1 280px; font-size: clamp(16px, 1.15vw, 24px); color: var(--text); line-height: 1.5; }
+  .up-next .next-line {
+    font-family: var(--font-sans); font-size: clamp(20px, 1.5vw, 32px); line-height: 1.35;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  }
+  .up-next .next-line::before { content: none; }
+  .up-next.is-finished h3::before { display: none; }
+  /* no shipping record yet: the badge would read only "—" */
+  article[data-shipping="none"] .ship-badge { display: none; }
+  /* 24px floor for the item and session links in a card's rows (WCAG 2.5.8). */
+  .session-items a, .session-dispatch .chip a, .meta-row .session-link a { display: inline-flex; align-items: center; min-height: 24px; }
+  /* Out of scope is settled, not urgent: no accent bar. */
+  .decision-hotspots[data-cat="scope-low"] { border-left: 1px solid var(--hairline); }
+  .up-next .next-line strong { flex: 1 1 100%; font-weight: 600; }
+  .up-next .next-meta { color: var(--text-muted); font-size: 16px; }
+  .up-next .next-line a.next-open {
+    margin-left: auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 22px;
+    border: none; border-radius: var(--r-md); background: var(--accent); color: #1B1814; /* dark ink: white on this orange is under 3:1 */
+    font-size: 16px; font-weight: 600;
+  }
+  .up-next .next-line a.next-open:hover { box-shadow: 0 0 0 3px var(--accent-ring); }
+  .up-next .next-line a.next-open:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+
+  /* the status card carries the overall %, so the story keeps only its picture */
+  .achievement-counter { display: none; }
+
+  /* finished and later sessions: full contrast, folded to their header row */
+  article.session[data-status="DONE"], article.session[data-status="WONTFIX"],
+  article.session[data-status="DEFERRED"] { opacity: 1; }
+  article.session[data-status="DONE"] .session-actions,
+  article.session[data-status="WONTFIX"] .session-actions,
+  article.session[data-status="DEFERRED"] .session-actions { display: none; }
+  article.is-folded { padding-top: 14px; padding-bottom: 14px; margin-bottom: 10px; box-shadow: none; }
+  article.is-folded:hover { transform: none; }
+  article.is-folded > :not(.item-head) { display: none; }
+  article.is-folded .item-head { cursor: pointer; margin: 0; }
+  article.is-folded .item-head .chip { display: none; }
+  article.is-folded h3.title { font-size: 18px; color: var(--text-muted); }
+  article .item-head[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-sm); }
+
+  article.session .purpose-eyebrow { color: var(--text-subtle); font-size: 13px; }
+  article.session .purpose-eyebrow::before { content: none; }
+
+  /* small text: 12px floor */
+  .agent-tag, .agent-spec-body h4, .stat .count, .hotspot-pill, .explainer-step .step-num,
+  footer.page code, article.session .session-items a, nav.session-strip .strip-label { font-size: 12px; }
+  .stat, .cat-filter { min-height: 40px; display: inline-flex; align-items: center; }
+
+  .hotspot-why, .hotspot-alts { font-size: 15px; max-width: 75ch; line-height: 1.55; }
+  details.protocol-box > summary { cursor: pointer; }
+  details.protocol-box:not([open]) { padding-top: 12px; padding-bottom: 12px; }
+  .claude-manual { margin-top: 40px; }
+
+  @media (max-width: 640px) {
+    header.page .meta { font-size: 15px; }
+    nav.session-strip { padding-left: 16px; padding-right: 16px; }
+    .up-next { padding: 20px 18px; }
+    #status-pct { font-size: 52px; }
+    .status-line { flex-basis: 100%; font-size: 16px; }
+    .up-next .next-line { font-size: 19px; }
+    .up-next .next-line a.next-open { margin-left: 0; flex: 1 1 100%; justify-content: center; }
+    /* the story picture is drawn for a wide screen; on a phone its text drops to ~4px */
+    svg.phase-journey { display: none; }
+    .floating-progress { display: none; }
+    .stat, .cat-filter { min-height: 44px; }
+    article.is-folded { padding-left: 16px; padding-right: 16px; }
+    /* a long lead in the display serif runs 15+ lines on a phone */
+    article.session .session-summary { font-size: 20px; line-height: 1.4; }
+    /* the blurb beside the title squeezes it to one word per line */
+    h2.section { display: block; }
+    h2.section .section-blurb { display: block; margin: 6px 0 0; }
+    /* a folded card keeps its pill on the title row */
+    article.is-folded header.item-head { flex-wrap: nowrap; }
+    article.is-folded header.item-head .pill { flex: none; margin-left: auto; }
   }
 </style>
 </head>
@@ -1303,111 +1419,29 @@
 
 <main>
 
-<!-- =================================================================
-     CLAUDE OPERATING MANUAL — agents read; humans skim if curious.
-     Collapsed by default. <details> children are in the DOM regardless
-     of open state, so any Claude opening this file sees the rules.
-     ================================================================= -->
-<details class="claude-manual" data-role="instructions">
-  <summary>
-    <span class="manual-icon">📖</span>
-    <span>Operating manual — auto-execution via /plan-execute</span>
-    <span class="manual-summary-label">collapsed for humans, always in DOM for agents</span>
-  </summary>
-  <div class="manual-content">
-    <div class="manual-rules">
-      <div class="manual-rule manual-rule-auto">
-        <div class="manual-rule-icon">🤖</div>
-        <div class="manual-rule-body">
-          <strong>How this plan runs</strong>
-          <ul>
-            <li>This plan is executed by the <code>/plan-execute</code> skill — not copy-paste.</li>
-            <li>Invocations: <code>/plan-execute &lt;path&gt;</code>, <code>/plan-execute &lt;path&gt; --session sNN</code>, <code>/plan-execute &lt;path&gt; --resume</code>.</li>
-            <li>The orchestrator owns every write to this file. Subagents return structured closeouts; the orchestrator translates them into atomic <code>&lt;article&gt;</code> block replacements.</li>
-            <li>Dispatch graph lives in sibling <code>manifest.json</code>. Mutable runtime state lives in sibling <code>run_state.json</code>. Closeouts are written to <code>_closeouts/&lt;session&gt;.json</code> before HTML is touched.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="manual-rule manual-rule-edit">
-        <div class="manual-rule-icon">✋</div>
-        <div class="manual-rule-body">
-          <strong>Runner-owned mutation surface</strong>
-          <ul>
-            <li>The orchestrator regenerates the entire <code>&lt;article&gt;</code> block between <code>&lt;!-- ARTICLE:&lt;id&gt;:BEGIN --&gt;</code> / <code>&lt;!-- ARTICLE:&lt;id&gt;:END --&gt;</code> anchors atomically.</li>
-            <li>It updates: <code>data-status</code>, <code>data-updated</code>, the visible <code>&lt;span class="pill"&gt;</code>, and the <code>&lt;div class="notes-content"&gt;</code>.</li>
-            <li>Humans should NOT hand-edit articles. To interrupt: set <code>data-status="BLOCKED"</code> on a session — the runner halts before that session.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="manual-rule manual-rule-auto">
-        <div class="manual-rule-icon">📊</div>
-        <div class="manual-rule-body">
-          <strong>Auto-recomputed on every load — never hand-edit</strong>
-          <ul>
-            <li>Donut rings (items + sessions), session arc timeline, categories grid</li>
-            <li>All status counters, Up Next callout, floating progress pill</li>
-            <li>Sticky session strip chip statuses, last-updated stamp</li>
-            <li>Plan Achievement infographic</li>
-            <li>"The plan, explained" — step states, the "you are here" marker, and the "Where we are" paragraph</li>
-          </ul>
-        </div>
-      </div>
-      <div class="manual-rule manual-rule-read">
-        <div class="manual-rule-icon">🚦</div>
-        <div class="manual-rule-body">
-          <strong>Status semantics</strong>
-          <ul>
-            <li><code>TODO</code> — not yet dispatched · <code>DOING</code> — subagent currently in-flight</li>
-            <li><code>DONE</code> — fully complete · <code>PARTIAL</code> — some items done, needs continuation</li>
-            <li><code>AWAITS_REVIEW</code> — human checkpoint required; resume via <code>/plan-execute &lt;path&gt; --resume</code></li>
-            <li><code>BLOCKED</code> — halts the loop · <code>DEFERRED</code> / <code>WONTFIX</code> — terminal, skipped</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-    <div class="manual-closeout">
-      <strong>Subagent closeout contract</strong>
-      <p class="manual-note" style="margin-bottom:8px">Every dispatched subagent ends its final message with a <code>&lt;plan-execute-closeout&gt;</code> block containing a JSON object: <code>session</code>, <code>result</code> (<code>DONE</code> | <code>BLOCKED</code> | <code>PARTIAL</code>), <code>items_completed</code>, <code>items_blocked</code>, <code>notes</code>, <code>dispatch_next</code>, <code>human_checkpoint_reason</code>. Subagents do NOT edit this file — the closeout is the only state channel.</p>
-      <p class="manual-note">See <code>~/.claude/skills/plan-execute/references/closeout-contract.md</code> for the full contract.</p>
-    </div>
+
+<!-- STATUS CARD — the page's one answer: how far, what runs next. Auto-rendered. -->
+<section class="up-next" id="up-next" data-role="auto-render" aria-label="Plan status">
+  <div class="status-top">
+    <div class="status-pct"><span id="status-pct">0%</span><span class="status-pct-label">of items done</span></div>
+    <p class="status-line" id="status-line"></p>
   </div>
-</details>
-
-<!-- INSERT_PLAN_ACHIEVEMENT -->
-
-<!-- INSERT_EXPLAINER -->
-
-<div class="up-next" id="up-next" data-role="auto-render">
   <h3>Up next</h3>
   <div class="next-line" id="next-line">
     <strong>{{FIRST_SESSION_TITLE}}</strong> · {{FIRST_SESSION_MODEL}} · {{FIRST_SESSION_EFFORT}} ·
     <a href="#{{FIRST_SESSION_ID}}">Open session →</a>
   </div>
-</div>
+</section>
+
+<!-- INSERT_DECISION_HOTSPOTS -->
+
+<!-- INSERT_EXPLAINER -->
+
+<!-- INSERT_PLAN_ACHIEVEMENT -->
+
 
 <div class="dashboard" data-role="auto-render">
   <div class="dashboard-top">
-    <div class="donut-card">
-      <div class="donut-wrap">
-        <svg class="donut" id="items-donut" viewBox="0 0 140 140" aria-label="Items progress donut"></svg>
-        <div class="donut-center">
-          <div class="donut-bignum" id="donut-items-done">0</div>
-          <div class="donut-subnum">of <span id="donut-items-total">0</span></div>
-          <div class="donut-label">items</div>
-        </div>
-      </div>
-    </div>
-    <div class="donut-card">
-      <div class="donut-wrap">
-        <svg class="donut" id="sessions-donut" viewBox="0 0 140 140" aria-label="Sessions progress donut"></svg>
-        <div class="donut-center">
-          <div class="donut-bignum" id="donut-sessions-done">0</div>
-          <div class="donut-subnum">of <span id="donut-sessions-total">0</span></div>
-          <div class="donut-label">sessions</div>
-        </div>
-      </div>
-    </div>
-
     <div class="filters-col">
       <div class="dash-section-label">Filter by status</div>
       <div class="stats" id="status-filters">
@@ -1435,13 +1469,6 @@
   </div>
 </div>
 
-<div class="session-arc-card" data-role="auto-render">
-  <div class="dash-section-label">Session arc · click to jump · color = status · dot = model</div>
-  <svg class="session-arc" id="session-arc" viewBox="0 0 1080 70" preserveAspectRatio="none" aria-label="Session arc timeline"></svg>
-</div>
-
-<!-- INSERT_DECISION_HOTSPOTS -->
-
 <!-- ====================================================================
      SESSION PLAN — execute items across sessions without blowing context.
      Each session card has a plain-English summary (human-first) and a
@@ -1453,8 +1480,8 @@
     <span class="section-blurb">{{SESSION_PLAN_BLURB}}</span>
   </h2>
 
-  <div class="protocol-box">
-    <strong>How sessions run</strong> — applies to every session below (full version in the Operating Manual at top):
+  <details class="protocol-box">
+    <summary><strong>How sessions run</strong></summary>
     <ol>
       <li>Run <code>/plan-execute &lt;plan-dir&gt;</code> (or <code>--session sNN</code> for one). The orchestrator picks the next ready session(s) from <code>manifest.json</code>.</li>
       <li>It dispatches a subagent per session via the Task tool, running parallel-group members concurrently.</li>
@@ -1462,14 +1489,81 @@
       <li>The loop recurses until a human checkpoint (<code>AWAITS_REVIEW</code>), a blocker, or completion.</li>
     </ol>
     <p style="margin-top:8px;color:var(--text-subtle);"><strong>Counters, donuts, arc, categories, last-updated stamp all auto-recompute on page load — never hand-edit them.</strong> The orchestrator owns every write; subagents never touch this file.</p>
-  </div>
+  </details>
 
   <!-- INSERT_SESSIONS -->
 </section>
 
 <!-- INSERT_CATEGORY_SECTIONS -->
 
+<!-- INSERT_OUT_OF_SCOPE -->
+
 <!-- INSERT_PLAN_CHANGES -->
+
+<!-- =================================================================
+     CLAUDE OPERATING MANUAL — agents read; humans skim if curious.
+     Sits at the end of <main> so the reader sees the plan state first.
+     Collapsed by default. <details> children are in the DOM regardless
+     of open state, so any Claude opening this file sees the rules.
+     ================================================================= -->
+<details class="claude-manual" data-role="instructions">
+  <summary>
+    <span>How this plan runs (operating manual for /plan-execute)</span>
+  </summary>
+  <div class="manual-content">
+    <div class="manual-rules">
+      <div class="manual-rule manual-rule-auto">
+        <div class="manual-rule-body">
+          <strong>How this plan runs</strong>
+          <ul>
+            <li>This plan is executed by the <code>/plan-execute</code> skill — not copy-paste.</li>
+            <li>Invocations: <code>/plan-execute &lt;path&gt;</code>, <code>/plan-execute &lt;path&gt; --session sNN</code>, <code>/plan-execute &lt;path&gt; --resume</code>.</li>
+            <li>The orchestrator owns every write to this file. Subagents return structured closeouts; the orchestrator translates them into atomic <code>&lt;article&gt;</code> block replacements.</li>
+            <li>Dispatch graph lives in sibling <code>manifest.json</code>. Mutable runtime state lives in sibling <code>run_state.json</code>. Closeouts are written to <code>_closeouts/&lt;session&gt;.json</code> before HTML is touched.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="manual-rule manual-rule-edit">
+        <div class="manual-rule-body">
+          <strong>Runner-owned mutation surface</strong>
+          <ul>
+            <li>The orchestrator regenerates the entire <code>&lt;article&gt;</code> block between <code>&lt;!-- ARTICLE:&lt;id&gt;:BEGIN --&gt;</code> / <code>&lt;!-- ARTICLE:&lt;id&gt;:END --&gt;</code> anchors atomically.</li>
+            <li>It updates: <code>data-status</code>, <code>data-updated</code>, the visible <code>&lt;span class="pill"&gt;</code>, and the <code>&lt;div class="notes-content"&gt;</code>.</li>
+            <li>Humans should NOT hand-edit articles. To interrupt: set <code>data-status="BLOCKED"</code> on a session — the runner halts before that session.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="manual-rule manual-rule-auto">
+        <div class="manual-rule-body">
+          <strong>Auto-recomputed on every load — never hand-edit</strong>
+          <ul>
+            <li>Donut rings (items + sessions), session arc timeline, categories grid</li>
+            <li>All status counters, Up Next callout, floating progress pill</li>
+            <li>Sticky session strip chip statuses, last-updated stamp</li>
+            <li>Plan Achievement infographic</li>
+            <li>"The plan, explained" — step states, the "you are here" marker, and the "Where we are" paragraph</li>
+          </ul>
+        </div>
+      </div>
+      <div class="manual-rule manual-rule-read">
+        <div class="manual-rule-body">
+          <strong>Status semantics</strong>
+          <ul>
+            <li><code>TODO</code> — not yet dispatched · <code>DOING</code> — subagent currently in-flight</li>
+            <li><code>DONE</code> — fully complete · <code>PARTIAL</code> — some items done, needs continuation</li>
+            <li><code>AWAITS_REVIEW</code> — human checkpoint required; resume via <code>/plan-execute &lt;path&gt; --resume</code></li>
+            <li><code>BLOCKED</code> — halts the loop · <code>DEFERRED</code> / <code>WONTFIX</code> — terminal, skipped</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="manual-closeout">
+      <strong>Subagent closeout contract</strong>
+      <p class="manual-note" style="margin-bottom:8px">Every dispatched subagent ends its final message with a <code>&lt;plan-execute-closeout&gt;</code> block containing a JSON object: <code>session</code>, <code>result</code> (<code>DONE</code> | <code>BLOCKED</code> | <code>PARTIAL</code>), <code>items_completed</code>, <code>items_blocked</code>, <code>notes</code>, <code>dispatch_next</code>, <code>human_checkpoint_reason</code>. Subagents do NOT edit this file — the closeout is the only state channel.</p>
+      <p class="manual-note">See <code>~/.claude/skills/plan-execute/references/closeout-contract.md</code> for the full contract.</p>
+    </div>
+  </div>
+</details>
 
 </main>
 
@@ -1479,11 +1573,10 @@
   <span class="fp-pct" id="fp-pct">0%</span>
   <span class="fp-next" id="fp-next"></span>
 </div>
+<button type="button" class="to-top hidden" id="to-top" aria-label="Back to top of the plan"><span aria-hidden="true">↑</span> Top</button>
 
 <footer class="page">
-  Plan generated by <code>plan-builder</code> · update protocol for Claude: see the Operating Manual at the top of this file.
-  Each <code>&lt;article&gt;</code> has a stable <code>id</code> and a <code>data-status</code> attribute.
-  Counters, donuts, arc, categories, and last-updated stamp auto-recompute from <code>data-status</code> on page load.
+  Plan generated by <code>plan-builder</code>. Every counter on this page is recomputed from the session and item status on load; see the operating manual at the end of the page.
 </footer>
 
 <script>
@@ -1601,7 +1694,8 @@
     /* INSERT_INFOGRAPHIC_RENDERERS — render_phase_journey, render_maturity_ladder, render_hub_spoke, render_before_after, render_pillars, render_custom + dispatcher renderPhaseJourney */
 
     function nextSession() {
-      return ['AWAITS_REVIEW', 'DOING', 'PARTIAL', 'TODO', 'BLOCKED']
+      // BLOCKED first: plan-execute halts the whole plan on a blocked session.
+      return ['BLOCKED', 'AWAITS_REVIEW', 'DOING', 'PARTIAL', 'TODO']
         .map(status => sessions.find(s => (s.dataset.status || 'TODO') === status))
         .find(Boolean) || sessions.find(s => !['DONE', 'WONTFIX', 'DEFERRED'].includes(s.dataset.status));
     }
@@ -1776,10 +1870,29 @@
           chip.classList.remove('is-next');
         }
       });
+      // Status card: the one big number and the one status line.
+      const itemPct = counts.all > 0 ? Math.round((counts.done / counts.all) * 100) : 0;
+      const spEl = document.getElementById('status-pct');
+      if (spEl) spEl.textContent = itemPct + '%';
+      const slEl = document.getElementById('status-line');
+      if (slEl) {
+        const bits = [sCounts.done + ' of ' + sCounts.all + ' sessions done', counts.done + ' of ' + counts.all + ' items done'];
+        if (sCounts.awaits_review) bits.push(sCounts.awaits_review + ' awaiting your review');
+        if (sCounts.blocked + counts.blocked) bits.push((sCounts.blocked + counts.blocked) + ' blocked');
+        const od = document.querySelectorAll('section[data-cat="scope-medium"] .hotspot-item').length;
+        if (od) bits.push(od + ' open decision' + (od === 1 ? '' : 's'));
+        slEl.textContent = bits.join(' · ');
+      }
+
       const next = nextSession();
       if (next) {
         const stripNext = document.querySelector('.strip-chip[data-session="' + next.id + '"]');
-        if (stripNext) stripNext.classList.add('is-next');
+        if (stripNext) {
+          stripNext.classList.add('is-next');
+          // Bring the next session into view inside the strip, not off its right edge.
+          const nav = stripNext.closest('nav.session-strip');
+          if (nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = stripNext.offsetLeft - nav.clientWidth / 2 + stripNext.offsetWidth / 2;
+        }
       }
 
       const nextLine = document.getElementById('next-line');
@@ -1788,19 +1901,22 @@
           const id = next.id;
           const title = (next.querySelector('h3.title') || {}).textContent || '';
           const modelChip = next.querySelector('.chip[class*="model-"]');
-          const model = modelChip ? modelChip.textContent.trim() : '';
+          // A model "chosen at dispatch" is the same on every session: say nothing.
+          const modelText = modelChip ? modelChip.textContent.trim() : '';
+          const model = /chosen at dispatch/i.test(modelText) ? '' : modelText;
           const effortChip = next.querySelector('.chip.chip-effort');
           const effort = effortChip ? effortChip.textContent.trim() : '';
           const STATUS_NOTE = { TODO: '', DOING: ' (in progress)', AWAITS_REVIEW: ' (awaiting your review)', PARTIAL: ' (partially complete — continue)', BLOCKED: ' (blocked — see session notes)' };
           const rawStatus = next.dataset.status || 'TODO';
           const status = Object.hasOwn(STATUS_NOTE, rawStatus) ? STATUS_NOTE[rawStatus] : ' (status unrecognized — see session card)';
           nextLine.innerHTML =
-            '<strong>' + id.toUpperCase() + ' — ' + title.replace(/</g,'&lt;') + '</strong>' + status +
-            (model ? ' · ' + model : '') +
-            (effort ? ' · ' + effort : '') +
-            ' · <a href="#' + id + '">Open session →</a>';
+            '<strong>' + id.toUpperCase() + ' — ' + title.replace(/</g,'&lt;') + '</strong>' +
+            '<span class="next-meta">' + [status.replace(/^ \(|\)$/g, ''), model, effort].filter(Boolean).join(' · ') + '</span>' +
+            '<a class="next-open" href="#' + id + '">Open ' + id.toUpperCase() + ' →</a>';
         } else {
           nextLine.innerHTML = sessions.length ? '<strong>All sessions closed.</strong>' : '<strong>No sessions defined.</strong>';
+          const card = document.getElementById('up-next');
+          if (card) { card.classList.add('is-finished'); const h = card.querySelector('h3'); if (h) h.textContent = 'Finished'; }
         }
       }
 
@@ -1821,11 +1937,20 @@
 
     function setupFloatingProgress() {
       const fp = document.getElementById('floating-progress');
-      const dashboard = document.querySelector('.dashboard');
+      // Hidden while the status card (which says the same) is on screen.
+      const dashboard = document.getElementById('up-next');
       if (!fp || !dashboard) return;
+      const top = document.getElementById('to-top');
       const obs = new IntersectionObserver(([entry]) => {
         fp.classList.toggle('hidden', entry.isIntersecting);
+        if (top) top.classList.toggle('hidden', entry.isIntersecting);
       }, { threshold: 0 });
+      if (top) top.addEventListener('click', () => {
+        const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+        // Drop the #sNN so a reload opens at the top, not back at that session.
+        if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      });
       obs.observe(dashboard);
     }
 
@@ -1881,6 +2006,43 @@
     recomputeCounts();
     setupFloatingProgress();
     applyFilter();
+
+    // Finished sessions and items, and upcoming sessions after the next one, fold to one row;
+    // a click on the row (or a link to it) opens it.
+    const TERMINAL = ['DONE', 'WONTFIX', 'DEFERRED'];
+    function foldSessions() {
+      const next = nextSession();
+      const later = s => sessions.includes(s) && s !== next && (s.dataset.status || 'TODO') === 'TODO';
+      sessions.concat(items).forEach(s => {
+        const head = s.querySelector('.item-head');
+        if (!head || !(TERMINAL.includes(s.dataset.status) || later(s))) return;
+        s.classList.toggle('is-folded', ('#' + s.id) !== location.hash);
+        head.setAttribute('role', 'button');
+        head.setAttribute('tabindex', '0');
+        head.setAttribute('aria-expanded', String(!s.classList.contains('is-folded')));
+        if (head.dataset.foldBound) return;
+        head.dataset.foldBound = '1';
+        const toggle = e => {
+          if (e.target.closest('a')) return;
+          if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          s.classList.toggle('is-folded');
+          head.setAttribute('aria-expanded', String(!s.classList.contains('is-folded')));
+        };
+        head.addEventListener('click', toggle);
+        head.addEventListener('keydown', toggle);
+      });
+    }
+    window.addEventListener('hashchange', () => {
+      const t = document.getElementById(location.hash.slice(1));
+      if (t && t.classList.contains('is-folded')) {
+        t.classList.remove('is-folded');
+        const h = t.querySelector('.item-head');
+        if (h) h.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    foldSessions();
 
     // Theme toggle
     const THEME_KEY = 'plan-builder-theme-v1';

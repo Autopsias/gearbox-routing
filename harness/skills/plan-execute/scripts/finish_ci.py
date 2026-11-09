@@ -127,6 +127,8 @@ def _preflight(root, gh):
         return None, _result("unknown", "gh-missing")
     _REPO.set(_repo(root))  # every `gh run` call is pinned to the origin repo (see _gh)
     rc, _ = _run([gh_path, "auth", "status", "--active", "--hostname", _host(root)], root)
+    if rc is None:  # timed out (or could not start): slow is not logged out
+        return None, _result("pending", "timeout")
     if rc != 0:
         return None, _result("unknown", "gh-unauthenticated")
     workflows = Path(root) / ".github" / "workflows"

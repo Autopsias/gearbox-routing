@@ -25,6 +25,7 @@ root, and an event lands in `run.ndjson`.
 | `json_error` | Block found but JSON won't parse, or trailing text after it | session → BLOCKED, halt set | Same — the subagent emitted a malformed block; re-dispatch. |
 | `schema_error` | JSON parses but wrong shape (missing field, bad `result`, non-string ids) | session → BLOCKED, halt set, violations listed | Re-dispatch; if it recurs, the prompt may be mis-teaching the format. |
 | `semantic_error` | Hallucinated item id, completed∩blocked overlap, DONE without full coverage, or a malformed/unknown-id `plan_impact` on a v3+ plan | session → BLOCKED, halt set, violation named | Investigate whether the subagent actually did the work; re-dispatch or hand-correct. A `plan_impact` naming a session that is in no manifest is a subagent error, never something to quietly drop. |
+| `agent-not-finished` | No closeout block, but the text says the agent is waiting on its own background work (interim notification) | Nothing changes: no BLOCKED, no halt, exit 1; event `apply_interim_refused` logged | Wait for the agent's final message and apply that. |
 
 When a batch member fails, **finish applying the other members' closeouts first**
 (so their work is recorded) — then stop. The halt prevents the *next* batch, not

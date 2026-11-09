@@ -24,6 +24,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from common import TooDeep, loads  # noqa: F401  (re-exported: exposure.py imports them here)
+
 DOCS = ("run-metadata.json", "coverage-ledger.json", "findings.json")
 ACCEPTED = "gearbox-accepted.json"
 # In the run parent, written only by accept(): accepted run names, oldest first.
@@ -49,19 +51,6 @@ def bad_text(x):
         return any(bad_text(k) or bad_text(v) for k, v in x.items())
     return isinstance(x, list) and any(bad_text(v) for v in x)
 MAX_DOC = 5 * 1024 * 1024       # the upstream validators' own input limit
-
-
-class TooDeep(ValueError):
-    """JSON nested too deeply to parse: a ValueError, told apart from malformed JSON."""
-
-
-def loads(text):
-    """json.loads, with nesting too deep for the parser as a ValueError like any other
-    bad JSON (RecursionError is not a ValueError, so callers would miss it)."""
-    try:
-        return json.loads(text)
-    except RecursionError:
-        raise TooDeep("nested too deeply") from None
 
 
 def runs_parent(repo):

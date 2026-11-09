@@ -6,6 +6,66 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Changed (harness sync of 2026-11-09)
+This sync carries the private harness changes from 2026-10-31 to 2026-11-09.
+The routing policy (`claude/model-routing.yaml`) does not change.
+
+- **plan-builder:** `PLAN.html` is now state-first. A status card (percent
+  done, the next session, open decisions) comes first; finished sessions and
+  every TODO session after the next one fold to one row; the Operating Manual
+  moves to the end. A BLOCKED session is always "next", because plan-execute
+  stops on it. A request to "plan the repo-health fixes" now reads
+  `repo-health/references/fix-plan.md` first.
+- **repo-health:** `--plan` turns the report into one plan-builder plan.
+  `references/accepted-risks.md` and `scripts/accepted.py` record risks you
+  accept, so they stop failing the score. Red now means blocking only; an
+  advisory failure is amber. Probes report the repo, not the probe folder, and
+  quote the manifest folder in their commands. Deeply nested JSON is refused
+  before the parser, which crashed the interpreter.
+- **plan-execute:** new shared helpers `untrusted_block.py` (one fence for
+  outside text put in a prompt), `latest_by_key.py`, `land_env.py`,
+  `finish_repair.py`, `transcript_find.py` and `receipt_cmd.py`, each with
+  tests. An unlabelled inline fix is refused. A resumed builder is charged
+  only for its new work. `land` checks `python3` first, gives its probe 30 s,
+  and no longer blames the base branch for its own failure. When land parks
+  because a gate is also red on the base, both gate excerpts in the message
+  are now fenced as data, like every other gate-output site.
+- **routing-retro:** the decision card no longer offers options that went
+  stale.
+- **eli5, tldr:** labels fit a phone screen; the brief has a fixed stylesheet.
+- **improve:** a triage prompt (`references/improve/triage-prompt.md`); the
+  question check skips API-request lines.
+- **worth-adopting:** reads every named reference before a verdict.
+- **Pre-commit hook (`harness/githooks/pre-commit`):** runs `ruff` on the
+  staged Python files, so a lint error stops the commit instead of a CI run.
+- **Weekly drift script:** also asks each vendored skill (`vendor.json`) if
+  upstream released new content.
+- **Rules:** a timer ends a turn only when no other step toward the goal can
+  run now; an eval or benchmark first proves it separates one known
+  difference and prints its error, skip and at-cap counts beside the score;
+  the watchdog note about background commands is corrected.
+
+### Added (harness sync of 2026-11-09)
+- **ui-craft** skill, with a new card ([UI design and review](docs/modules/ui-craft.md)).
+  It designs and reviews any UI on Stageshow's rules. This repo does not ship
+  Stageshow: `scripts/fetch_vendor.sh` downloads the pinned commit from
+  `benjitaylor/skills` and refuses it if its tree hash differs, because some
+  of Stageshow's artwork is not MIT.
+- **`/improve` nudge** (`harness/hooks/improve-nudge.py`,
+  `harness/scripts/improve_digest.py`): offers `/improve` at your third
+  pushback, at session start when the last run is old, and once after a push,
+  merge or deploy, with hints from a short Sonnet read of the session. Optional
+  part of the [general commands](docs/modules/general-commands.md) card.
+- **Usage logs** in the [small hooks](docs/modules/small-hooks.md) card:
+  `skill-usage-log.py` (one line per skill call) and
+  `instructions-inventory.py` (one line per loaded instruction file).
+
+### Known limit
+- `harness/skills/plan-execute/scripts/land_env.py` prints a setup command
+  that uses the fixed folder `/tmp/ci-venv`. On a machine shared with other
+  users, someone else could create that folder first. Use it only on a
+  single-user machine, or edit `VENV` to a folder only you can write to.
+
 ### Fixed (harness test suites in this copy)
 - `harness/hooks/dispatch-audit.py` and its self-check now ship. The harness
   `routing-retro` loads it, so its compaction report failed without it. The

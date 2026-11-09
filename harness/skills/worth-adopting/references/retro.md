@@ -42,7 +42,7 @@ belongs in memory as feedback, not in this skill. Propose that in place of a ski
 Edit the skill in its source repo (`~/your-private-harness/skills/worth-adopting/`), never in the
 deployed copy under `~/.claude`. Walk the skill-quality rubric
 (`skills/write-a-skill/references/skill-quality-rubric.md`) over the changed file. Run
-the repo's skill tests, if it has any. Do not commit; the owner decides that.
+`uv run -q --with pytest --with pyyaml python -m pytest scripts/test_skill_frontmatter.py -q`. Do not commit; the owner decides that.
 
 ## 5. Close the record
 

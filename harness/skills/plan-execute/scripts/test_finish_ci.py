@@ -24,7 +24,7 @@ sys.path.insert(0, str(SCRIPTS))
 import finish_ci  # noqa: E402
 
 FAKE_GH = r'''#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, time
 argv = sys.argv[1:]
 spec = json.load(open(os.environ["FAKE_GH_SPEC"]))
 with open(os.environ["FAKE_GH_LOG"], "a") as log:
@@ -36,6 +36,7 @@ if "--repo" in argv:  # canned answers are keyed without it
     del argv[i:i + 2]
 if argv[:2] == ["auth", "status"]:
     # like real gh: unscoped, ANY broken host fails; --hostname checks one host
+    time.sleep(spec.get("auth_sleep", 0))
     bad = spec.get("bad_hosts", [])
     host = argv[argv.index("--hostname") + 1] if "--hostname" in argv else None
     sys.exit(spec.get("auth_rc", 0) or int(host in bad if host else bool(bad)))
@@ -78,6 +79,7 @@ def env(tmp_path, monkeypatch):
     PARENT (an ancestor) exist on origin. DESC1/DESC2 reach `root` only by fetch."""
     for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         monkeypatch.delenv(var, raising=False)
+    finish_ci._DEADLINE.set(None)  # ci_verdict never clears it: a fake clock's value blocks later calls
     (tmp_path / "gitconfig").write_text("")
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -257,10 +259,11 @@ def test_a_schedule_run_on_the_sha_is_ignored(env):
         assert argv[argv.index("--limit") + 1] == "100"
 
 
-def test_timeout_gives_pending_never_green(env):
+def test_timeout_gives_pending_never_green(env, monkeypatch):
     s = env.shas["SHA"]
     env.spec(list=exact(env, run(40, s, status="in_progress")))
-    res = env.verdict(timeout_s=3)
+    _fake_clock(monkeypatch)  # a real 3 s deadline fit one look on a loaded runner
+    res = env.verdict(timeout_s=90)
     assert (res["verdict"], res["reason"]) == ("pending", "timeout")
     looks = [c for c in env.calls() if c[:3] == ["run", "list", "--commit"]]
     assert len(looks) >= 2, "a non-zero timeout must poll more than once"
@@ -283,6 +286,12 @@ def test_gh_unauthenticated_is_unknown_and_lists_nothing(env):
     res = env.verdict()
     assert (res["verdict"], res["reason"]) == ("unknown", "gh-unauthenticated")
     assert all(c[:2] != ["run", "list"] for c in env.calls())
+
+
+def test_slow_auth_check_is_pending_timeout_not_unauthenticated(env):
+    env.spec(auth_sleep=5)  # the login check outlives the deadline: slow, not logged out
+    res = env.verdict(timeout_s=1)
+    assert (res["verdict"], res["reason"]) == ("pending", "timeout")
 
 
 def test_no_workflows_is_unknown(env):

@@ -36,7 +36,8 @@ function display(statuses) {
 }
 
 test('unfinished sessions never masquerade as completion', () => {
-  const active = display(['BLOCKED', 'DOING']);
+  const active = display(['DONE', 'DOING']);
+  assert.match(display(['BLOCKED', 'DOING']).next, /S1.*blocked/i);
   assert.match(active.next, /S2.*in progress/); // known-positive selection
   const blocked = display(['DONE', 'BLOCKED']);
   assert.match(blocked.next, /S2.*blocked/i);
@@ -54,6 +55,8 @@ test('unfinished sessions never masquerade as completion', () => {
   const empty = display([]);
   assert.match(empty.next, /No sessions defined/);
   assert.match(empty.floating, /no sessions/);
-  assert.match(display(['BLOCKED', undefined]).next, /S2/);
+  // plan-execute halts on a blocked session, so it outranks a later to-do session.
+  assert.match(display(['BLOCKED', undefined]).next, /S1.*blocked/i);
+  assert.match(display(['DONE', 'BLOCKED', 'TODO']).next, /S2.*blocked/i);
   assert.match(display(['TODO', 'PARTIAL', 'DOING', 'AWAITS_REVIEW']).next, /S4/);
 });

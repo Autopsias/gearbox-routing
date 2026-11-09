@@ -126,8 +126,9 @@ def answer_for(question: str, result_line: dict, content):
 
 
 # Line types that quote the tool's name without calling it (measured:
-# 790 'attachment' prompt snapshots in 30 days). Anything else is a call or a format change.
-NOT_A_CALL = {"attachment"}
+# 790 'attachment' prompt snapshots in 30 days; 2026-11-07: 854 lines with the two api-request
+# types, which hold the tool schema or repeat a real call). Anything else is a call or a format change.
+NOT_A_CALL = {"attachment", "api-request-shape", "api-request-blob"}
 ASK_NAME = re.compile(r'"name":\s*"AskUserQuestion"')
 
 

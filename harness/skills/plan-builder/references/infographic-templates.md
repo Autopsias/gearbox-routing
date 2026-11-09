@@ -216,7 +216,7 @@ The structured templates ship with polished CSS. Custom SVGs you author have to 
 
 The polished mountain-climb example in `assets/custom-examples/mountain-climb.svg` demonstrates all of these principles. Reference it with `"svg_inline_file": "/path/to/skill/assets/custom-examples/mountain-climb.svg"` in the spec, OR copy the SVG inline as a starting point and modify.
 
-The bar to clear: when you take a screenshot of the rendered infographic, it should feel like it belongs on the same page as the donut rings and frosted-glass header. If it looks like it was lifted from a different document, you haven't applied the principles above.
+The bar to clear: when you take a screenshot of the rendered infographic, it should feel like it belongs on the same page as the status card and serif header. If it looks like it was lifted from a different document, you haven't applied the principles above.
 
 ### `svg_inline` vs `svg_inline_file`
 

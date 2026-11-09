@@ -223,7 +223,7 @@ def _advance(plan_dir, session_id, gates, state, dry_run):
 # text was unrecoverable, because the raw gate output is not persisted anywhere
 # else. Still bounded (redaction and a cap both still apply), just wide enough to
 # hold a full findings array.
-GATE_EXCERPT_MAX = 8000
+from untrusted_block import GATE_EXCERPT_MAX  # noqa: E402, F401 -- also re-exported
 
 
 def verify_record(plan_dir, session_id, gate, status, result_file=None):

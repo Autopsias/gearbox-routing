@@ -8,6 +8,7 @@ instead of appending a duplicate.
 """
 import html
 import json
+import re
 from pathlib import Path
 
 from common import parse_json, typed
@@ -133,20 +134,30 @@ def board_html(card, layers, history):
             f'<span class="sq q-{typed(h.get("layers"), dict, {}).get(key, "")}"></span>'
             for h in recent)
         sq += f'<span class="sq q-{layers[key]}"></span>'
+        # a button, not a span: the detail must open by tap and keyboard, not hover only
         chips = "".join(
-            f'<span class="chip {CHIP[c["status"]]}" title="{esc(c["id"])} — {esc(c["detail"])}">'
-            f'<span class="g">{GLYPH[c["status"]]}</span>{esc(SHORT.get(c["id"], c["id"]))}</span>'
+            f'<button type="button" class="chip {chip_class(c)}" aria-expanded="false" '
+            f'title="{esc(c["id"])} — {esc(c["detail"])}" '
+            f'data-detail="{esc(c["id"])} — {esc(c["detail"])}">'
+            f'<span class="g">{GLYPH[c["status"]]}</span>{esc(SHORT.get(c["id"], c["id"]))}</button>'
             for c in mine)
         out.append(
             f'    <section class="layer"><div class="layer-head">'
-            f'<h3>{esc(name)}</h3><span class="layer-state {wcls}">{word}</span>'
-            f'<div class="trend">{lscore}{sq}</div></div>'
-            f'<div class="chips">{chips}</div></section>')
+            f'<div class="lname"><h3>{esc(name)}</h3><span class="layer-state {wcls}">{word}</span></div>'
+            f'<div class="trend" title="score now; squares: this area over its last runs, newest right">'
+            f'{lscore}{sq}</div></div>'
+            f'<div class="chips">{chips}</div>'
+            f'<p class="chip-detail" aria-live="polite"></p></section>')
     return "\n".join(out)
 
 
-def finding_html(c):
-    fcls = "f-fail" if c["status"] == "fail" else "f-warn"
+def chip_class(c):
+    """Red is for blocking failures only; an advisory fail keeps its ✕ but goes amber."""
+    return "c-warn" if c["status"] == "fail" and not blocking(c) else CHIP[c["status"]]
+
+
+def finding_html(c, fold=False):
+    fcls = "f-fail" if c["status"] == "fail" and blocking(c) else "f-warn"
     glyph = GLYPH[c["status"]]     # total: certified() proves the status is one
     detail, paths = esc(c["detail"]), ""
     if ": " in c["detail"]:
@@ -157,18 +168,26 @@ def finding_html(c):
             paths = f'<code class="paths">{esc(tail)}</code>'
     fix = f'<div class="ffix">→ fix: <code>{esc(c["fix"])}</code></div>' if c["fix"] else ""
     layer = esc(LAYERS.get(c["layer"], c["layer"]).lower())
-    return (f'    <li class="finding {fcls}"><div class="fhead">'
-            f'<span class="fglyph">{glyph}</span>'
+    head = (f'<span class="fglyph">{glyph}</span>'
             f'<span class="ftitle">{esc(c["title"])}</span>'
-            f'<span class="fid mono">{esc(c["id"])} · {layer}</span></div>'
-            f'<p class="fbody">{detail}{paths}</p>{fix}</li>')
+            f'<span class="fid mono">{esc(c["id"])} · {layer}</span>')
+    body = f'<p class="fbody">{detail}{paths}</p>{fix}'
+    if fold:   # advisory: title row only, detail one tap away, so the list stays short
+        return (f'    <li><details class="finding {fcls}"><summary class="fhead">{head}</summary>'
+                f'{body}</details></li>')
+    return f'    <li class="finding {fcls}"><div class="fhead">{head}</div>{body}</li>'
 
 
-def findings_list(items, empty_msg):
+def findings_list(items, empty_msg, fold=False):
     if not items:
         return f'  <div class="allclear">{esc(empty_msg)}</div>'
     return ('  <ul class="findings">\n'
-            + "\n".join(finding_html(c) for c in items) + "\n  </ul>")
+            + "\n".join(finding_html(c, fold) for c in items) + "\n  </ul>")
+
+
+# The page a user reopens later carries the command, so a forgotten --plan is never lost.
+PLAN_OPTION = ('Build one plan for every item with plan-builder: run '
+               '<code>/repo-health --plan</code> (it reuses this report).')
 
 
 def decision_html(bf, af, warns, pend_blocking):
@@ -176,16 +195,15 @@ def decision_html(bf, af, warns, pend_blocking):
         n = len(bf) + len(pend_blocking)
         intro = "Blocking items are open. Pick one:"
         opts = [f'<span class="rec">Recommended:</span> fix (or run) the {n} blocking '
-                'item(s) above now — each lists its command or fix route.',
-                'Then batch the advisory items through the routed skills '
-                '(/code-quality --fix, /test-orchestrate, /ci-orchestrate).',
+                f'item{"" if n == 1 else "s"} below now — each lists its command or fix route.',
+                PLAN_OPTION,
                 'Accept the risk explicitly and re-run repo-health within a week.']
     elif af or warns:
         intro = "No blocking items. Pick one:"
         opts = ['<span class="rec">Recommended:</span> dispatch the routed fixes for the '
-                'advisory items above in one batch.',
-                'Accept the current state and re-run repo-health in ~4 weeks.',
-                'Adopt the missing gates (ratchet/CI) so these stop recurring.']
+                'advisory items below in one batch.',
+                PLAN_OPTION,
+                'Accept the current state and re-run repo-health in ~4 weeks.']
     else:
         intro = "Everything green."
         opts = ['<span class="rec">Recommended:</span> nothing to do. '
@@ -244,7 +262,9 @@ def render(repo):
     checked = (f"{len(card['checks'])} checks · {passes} pass · {len(pend)} not run · "
                f"{nas} not applicable in this repo")
     stale = staleness(repo, card)
-    stale_html = f'<div class="stale">! {esc(stale)}</div>' if stale else ""
+    stale_html = (f'<div class="stale">! '
+                  f'{re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(stale))}</div>'
+                  if stale else "")
     tpl = (Path(__file__).parent.parent / "assets" / "template.html").read_text()
     page = (tpl.replace("{{TITLE}}", esc(f"{card['repo']} Health"))
             .replace("{{REPO}}", esc(card["repo"]))
@@ -263,7 +283,8 @@ def render(repo):
             .replace("<!-- INSERT_BLOCKING_LIST -->",
                      findings_list(bf + pend_blocking, "No blocking findings."))
             .replace("<!-- INSERT_ADVISORY_LIST -->",
-                     findings_list(af + warns + pend_advisory, "No advisory findings."))
+                     findings_list(af + warns + pend_advisory, "No advisory findings.",
+                                   fold=True))
             .replace("<!-- INSERT_DECISION_CARD -->",
                      decision_html(bf, af, warns, pend_blocking))
             .replace("<!-- INSERT_HISTORY_STRIP -->",

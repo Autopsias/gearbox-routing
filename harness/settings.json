@@ -32,6 +32,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" session-start",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -41,6 +51,26 @@
             "type": "command",
             "command": "p=\"$HOME/.claude/hooks/compact-policy.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/instructions-inventory.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"",
+            "timeout": 5
           }
         ]
       }
@@ -96,12 +126,34 @@
         ]
       },
       {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/skill-usage-log.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "*",
         "hooks": [
           {
             "type": "command",
             "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" pre",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" finished",
+            "timeout": 10
           }
         ]
       }

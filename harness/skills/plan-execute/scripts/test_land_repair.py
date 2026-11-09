@@ -244,7 +244,7 @@ def test_a_gate_red_on_the_base_parks_inherited_and_the_base_run_is_cached(tmp_p
                                        "ci-gate": _gate(tmp_path, body, timeout=61)}))
     rc, out = _land(iso)
     assert out["kind"] == "gate-inherited" and _base_runs(tmp_path) == 2, out
-
+    assert "on the base" in out["brief"] and "plan did not break" in out["brief"]
 
 
 def test_a_red_review_gate_is_repaired_without_a_base_run(tmp_path):

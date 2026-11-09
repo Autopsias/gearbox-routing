@@ -229,7 +229,8 @@ def _report(*, now, epoch, value_floor, provider, boundary, total_lines, malform
         "did_it_help": dih,
         "proposals": (
             [c["proposal"] for c in cell_entries if c["proposal"]]
-            + [c for c in canaries if c["stage"] == "adoption-ready"]
+            # an adopted canary is history, not an option: did_it_help[] reports it
+            + [c for c in canaries if c["stage"] == "adoption-ready" and not c["adopted"]]
         ),
         "markdown": markdown,
         "cost_per_success_caveat": COST_PER_SUCCESS_CAVEAT,
@@ -328,7 +329,7 @@ def run_deferred(ledger_path, ssot_path, since=None, last=None, now=None, adopti
 
     cell_entries = []
     for key, agg in sorted(cell_aggs.items()):
-        proposal, status = cell_proposal(key, agg, epoch, existing_canary_pids)
+        proposal, status = cell_proposal(key, agg, epoch, existing_canary_pids, _finished_pids)
         task_class, model, reasoning, backend = key
         cell_entries.append({
             "task_class": task_class, "model_authored": model, "reasoning_authored": reasoning,

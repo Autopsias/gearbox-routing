@@ -61,7 +61,7 @@ Both top-level keys are always present, both are always arrays. An empty ledger 
 | `gaps[].sightings[].session` | The session this sighting came from. Prefer the real Claude Code session id. Fall back to the run date (`YYYY-MM-DD`) only when no id is available — see "Session identity" below, because the fallback can under-count. |
 | `gaps[].sightings[].quote` | The verbatim excerpt that evidenced the gap in that session — a transcript quote, or the cited config text (`path:line`) for a file-derived finding. Word-for-word, not paraphrased. This is what gate 1 produced; storing it is what lets gate 3 later judge "materially new". |
 | `gaps[].sightings[].seen` | Date the sighting was recorded, `YYYY-MM-DD`. Drives the 90-day expiry. |
-| `gaps[].retired` | `null` while the gap is live. Set to `YYYY-MM-DD` once a rule covers it. A retired gap is never presented again. |
+| `gaps[].retired` | `null` while the gap is live. Set to `YYYY-MM-DD` once a rule covers it. A retired gap is not presented again, with two exceptions: a `standing-default-` key and an open candidate line (see "Matching a finding to a gap key" and "The candidate line"). |
 | `rejections[].edit` | One-line summary of the exact edit the user rejected, naming the target file. Specific enough that a later run can tell whether it is proposing the same thing. |
 | `rejections[].rejected` | Date of the rejection, `YYYY-MM-DD`. |
 | `rejections[].evidence_then` | The verbatim quotes that supported the edit *at the moment it was rejected*. This is the baseline "materially new evidence" is measured against. |
@@ -99,6 +99,9 @@ resets and the gate holds forever.
    not 'covered'. A PASS in the `--after <that date>` question-class run is presented
    as a 'Standing default' finding of kind 'Ignored default' (the adopted text, its
    target file, three post-adoption member questions), never dropped.
+   Second exception: a retired match never drops an open `Remove-the-cause candidate`
+   line (see "The candidate line"). An accepted note retires its gap; the code fix
+   proposed beside it stays open and is still shown once.
 4. Only with no match, mint a new kebab-case slug naming the gap.
 
 When it is genuinely ambiguous, reuse the existing key. Merging two gaps into one
@@ -165,9 +168,29 @@ already declined once.
 
 When a finding is **accepted and applied**, set that gap's `retired` to today's
 date. The rule now covers it; further sightings are noise. Do not delete the gap —
-the retirement date is the record of when it was closed. For a `standing-default-`
+the retirement date is the record of when it was closed. Retiring a gap never closes
+an open candidate line. For a `standing-default-`
 key the date is the adoption date: it restarts that class's count (`--after`), and
 a class that passes the bar again after it is an 'Ignored default' finding.
+
+### The candidate line
+
+One line grammar, written here once; `learning-capture.md`, `commands/improve.md`
+section 4a and `full-scope-history-agents.md` cite it. A memory note carries the
+line `Remove-the-cause candidate (<state>): <change> -- <plan slug> <date>`. All
+waiting forms keep the prefix `Remove-the-cause candidate (open`, so a yes cannot hide
+an unbuilt fix:
+
+- `(open)` and `(open, 3rd time)` wait for a decision.
+- `(open, started <date>: <session or plan name>)` means the owner said yes. The reader
+  skips it for 30 days, then presents it again. A repeat count goes after the mark, as
+  `(open, started <date>: <name>, 3rd time)`, so the line still starts `(open, started`.
+- `(closed <date>: built <commit or plan>)` and `(closed <date>: declined)` end it.
+
+Each open line is its own finding and its own mark; never merge two lines, even in one
+note, because they can propose different work. A mark is one line edit, read just
+before the write. Accepting a note about the same gap retires the gap but never closes
+a candidate line.
 
 ### Recording a rejection
 

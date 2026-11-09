@@ -28,6 +28,7 @@ sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "skills" / "routing-retro" / "scripts"))
 
+import apply_guards  # noqa: E402
 import attestation  # noqa: E402
 import model_prices  # noqa: E402
 import outcomes as outc  # noqa: E402
@@ -256,6 +257,63 @@ def test_agent_and_codex_tokens_reach_the_ledger(tmp_path, isolated):
             second["cost_usd"]) == ("codex-json", 127125, 2417664, None)
 
 
+def test_resumed_builder_charges_only_the_new_part_of_its_transcript(tmp_path, isolated):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = tmp_path / "agent-1.jsonl"
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL[:2]))
+    outc.write(plan_dir, "s01", resolution="a", result="rework", verified=False, attempt=1)
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL))
+    outc.write(plan_dir, "s01", resolution="b", result="rework", verified=False, attempt=2)
+    _dispatch_and_record(plan_dir, str(path))  # re-recorded id: the agent did no work
+    outc.write(plan_dir, "s01", resolution="c", result="done_unverified", verified=False, attempt=3)
+    first, second, third = (r["usage"] for r in _ledger(isolated))
+    counts = lambda u: tuple(u[k] for k in attestation._TOKENS)  # noqa: E731
+    assert counts(first) == (2, 181, 20830, 22260)
+    assert counts(second) == (4, 2060, 92421, 31199)
+    assert counts(third) == (0, 0, 0, 0)
+    assert third["cost_usd"] == 0.0
+    _, whole = attestation.read_transcript("claude", str(path))
+    assert [sum(c) for c in zip(counts(first), counts(second))] == list(counts(whole))
+    assert first["cost_usd"] + second["cost_usd"] == pytest.approx(
+        attestation.price(whole, "claude-opus-5-5", TABLE, model_prices.rates)["cost_usd"])
+
+
+def test_rerecording_one_dispatch_keeps_its_slice(tmp_path, isolated):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = tmp_path / "agent-1.jsonl"
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL[:2]))
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL))
+    run.cmd_record_receipt(plan_dir, "s01", "agent-1", str(path), "claude")  # same dispatch again
+    outc.write(plan_dir, "s01", resolution="b", result="done_unverified", verified=False, attempt=2)
+    assert _ledger(isolated)[0]["usage"]["output_tokens"] == 2060
+
+
+def test_a_new_agent_and_a_codex_id_reuse_are_charged_whole(tmp_path, isolated):
+    plan_dir = make_plan(tmp_path, [SESS])
+    _dispatch_and_record(plan_dir, _jsonl(tmp_path / "a.jsonl", WORKFLOW_FINAL))
+    _dispatch_and_record(plan_dir, _jsonl(tmp_path / "b.jsonl", WORKFLOW_FINAL), agent="agent-2")
+    outc.write(plan_dir, "s01", resolution="a", result="rework", verified=False, attempt=2)
+    # A codex receipt's agent id is the session id, so the id repeats across separate streams.
+    codex = tmp_path / "codex.log.jsonl"
+    codex.write_text(CODEX_JSON)
+    _dispatch_and_record(plan_dir, str(codex), backend="codex", agent="s01")
+    _dispatch_and_record(plan_dir, str(codex), backend="codex", agent="s01")
+    outc.write(plan_dir, "s01", resolution="b", result="done_unverified", verified=False, attempt=4)
+    fresh, codex_row = (r["usage"] for r in _ledger(isolated))
+    assert fresh["output_tokens"] == 2241
+    assert codex_row["cache_read_tokens"] == 2417664
+
+
+def test_a_transcript_that_shrank_leaves_the_slice_unknown(tmp_path, isolated):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = tmp_path / "agent-1.jsonl"
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL))
+    _dispatch_and_record(plan_dir, _jsonl(path, WORKFLOW_FINAL[:2]))
+    outc.write(plan_dir, "s01", resolution="a", result="done_unverified", verified=False, attempt=2)
+    usage = _ledger(isolated)[0]["usage"]
+    assert (usage["output_tokens"], usage["cost_usd"], usage["cost_source"]) == (None, None, "none")
+
+
 def test_no_receipt_and_stale_receipt_both_read_unavailable_with_null_counts(tmp_path, isolated):
     plan_dir = make_plan(tmp_path, [SESS])
     outc.write(plan_dir, "s01", resolution="a", result="rework", verified=False, attempt=1)
@@ -323,3 +381,86 @@ def test_cheap_cell_that_escalates_costs_more_per_completed_session(tmp_path):
     assert (o["median_cost_per_completed_session"], o["completed_sessions"]) == (2.0, 1)
     assert s["median_cost_per_completed_session"] > o["median_cost_per_completed_session"]
     assert (s["attempts"], s["attempts_with_usage"], s["attempts_with_cost"]) == (3, 2, 2)
+
+
+# --------------------------------------------------------------------------
+# A label on an attempt that no agent did
+# --------------------------------------------------------------------------
+def _agent_jsonl(path, timestamp):
+    path.write_text(json.dumps({"type": "assistant", "timestamp": timestamp, "message": {
+        "id": "m1", "model": "claude-opus-5-5", "stop_reason": "end_turn",
+        "usage": {"input_tokens": 1, "output_tokens": 1}}}) + "\n")
+    return str(path)
+
+
+def _closeout(tmp_path):
+    out = tmp_path / "closeout.txt"
+    out.write_text("no closeout block here")
+    return str(out)
+
+
+
+
+def test_no_agent_request_after_begin_is_refused_and_apply_repeats_it(tmp_path, isolated, capsys):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = _agent_jsonl(tmp_path / "agent-1.jsonl", "2026-01-01T00:00:00Z")
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    with pytest.raises(SystemExit):  # the very first attempt: the agent ran before `begin`
+        run.cmd_record_receipt(plan_dir, "s01", "agent-1", path, "claude")
+    assert json.loads(capsys.readouterr().out)["failure"] == "inline-fix-unlabelled"
+    assert rsi.get_receipt(plan_dir, "s01") is None
+    with pytest.raises(SystemExit):
+        run.cmd_apply(plan_dir, "s01", _closeout(tmp_path))
+    assert json.loads(capsys.readouterr().out)["failure"] == "inline-fix-unlabelled"
+
+
+def test_the_reason_label_passes_apply_and_reaches_the_ledger(tmp_path, isolated, capsys):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = _agent_jsonl(tmp_path / "agent-1.jsonl", "2026-01-01T00:00:00Z")
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    with pytest.raises(SystemExit):
+        run.cmd_record_receipt(plan_dir, "s01", "agent-1", path, "claude", inline_fix="   ")  # blank is no reason
+    run.cmd_record_receipt(plan_dir, "s01", "agent-1", path, "claude", inline_fix="one-line test fix")
+    assert rsi.get_receipt(plan_dir, "s01")["inline_fix"] == "one-line test fix"
+    assert apply_guards.unlabelled_inline_fix(plan_dir, "s01") is None
+    outc.write(plan_dir, "s01", resolution="a", result="rework", verified=False, attempt=1)
+    assert _ledger(isolated)[0]["inline_fix"] == "one-line test fix"
+
+
+def test_a_new_begin_clears_a_refused_receipt(tmp_path, isolated, capsys):
+    plan_dir = make_plan(tmp_path, [SESS])
+    path = _agent_jsonl(tmp_path / "agent-1.jsonl", "2026-01-01T00:00:00Z")
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    with pytest.raises(SystemExit):
+        run.cmd_record_receipt(plan_dir, "s01", "agent-1", path, "claude")
+    assert apply_guards.unlabelled_inline_fix(plan_dir, "s01")
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    assert apply_guards.unlabelled_inline_fix(plan_dir, "s01") is None
+
+
+@pytest.mark.parametrize("backend, transcript", [("claude", None), ("codex", "future")])
+def test_work_after_begin_or_no_evidence_is_accepted(tmp_path, isolated, capsys, backend, transcript):
+    plan_dir = make_plan(tmp_path, [SESS])
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    path = None if transcript is None else _agent_jsonl(tmp_path / "a.jsonl", "2026-01-01T00:00:00Z")
+    run.cmd_record_receipt(plan_dir, "s01", "agent-1", path, backend)
+    assert rsi.get_receipt(plan_dir, "s01")["agent_id"] == "agent-1"
+    resumed = _agent_jsonl(tmp_path / "b.jsonl", "2099-01-01T00:00:00Z")
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    run.cmd_record_receipt(plan_dir, "s01", "agent-1", resumed, "claude")  # a resume that did real work
+    assert rsi.get_receipt(plan_dir, "s01")["inline_fix"] is None
+
+
+def test_the_agent_id_finds_its_transcript_when_none_is_passed(tmp_path, isolated, monkeypatch, capsys):
+    import transcript_find
+    root = tmp_path / "projects"
+    home = root / "p" / "sess" / "subagents"
+    home.mkdir(parents=True)
+    _agent_jsonl(home / "agent-abc.jsonl", "2026-01-01T00:00:00Z")
+    monkeypatch.setenv(transcript_find.ROOT_ENV, str(root))
+    assert transcript_find.by_agent("abc") == home / "agent-abc.jsonl"
+    assert transcript_find.by_agent("missing") is None
+    plan_dir = make_plan(tmp_path, [SESS])
+    rsi.log_event(plan_dir, "dispatch_started", session_ids=["s01"])
+    with pytest.raises(SystemExit):
+        run.cmd_record_receipt(plan_dir, "s01", "abc", None, "claude")

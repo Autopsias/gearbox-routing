@@ -267,6 +267,19 @@ def test_an_ABSENT_manifest_over_an_EMPTY_vendor_dir_is_still_clean(tmp_path, mo
     assert vendor.main(["verify"]) == 0
 
 
+def test_skill_dir_reads_the_OTHER_skills_manifest_and_trees(tmp_path, monkeypatch):
+    """ui-craft reuses this script with --skill-dir. Both halves must move: a
+    tree in the other skill's vendor/ with no pin there must refuse (2), which
+    proves the disk read followed the flag and did not stay on repo-health."""
+    for name in ("SKILL_DIR", "MANIFEST", "VENDOR_DIR"):
+        monkeypatch.setattr(vendor, name, getattr(vendor, name))  # restore after
+    (tmp_path / "vendor" / "unpinned").mkdir(parents=True)
+    (tmp_path / "vendor.json").write_text("[]")
+    assert vendor.main(["--skill-dir", str(tmp_path), "verify"]) == 2
+    assert vendor.VENDOR_DIR == tmp_path.resolve() / "vendor"
+    assert vendor.main(["--skill-dir"]) == 2
+
+
 # ---------- fix_rows: the comment promised a guard the code did not have ----------
 
 def test_fix_rows_tolerates_a_check_dict_with_no_id():

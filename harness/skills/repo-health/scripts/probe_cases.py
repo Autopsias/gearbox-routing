@@ -230,6 +230,10 @@ CASES = [
     C("cq.file-size", "boundary: 500 lines pass, 501 lines refuse",
       {"src/app.py": lines(501)}, ("warn", r"over 500 lines: src/app\.py \(501\)"),
       clean={"src/app.py": lines(500)}, clean_expect=("pass", r"no oversized")),
+    C("cq.file-size", "a test file gets the ratchet's 800-line test limit, not 500",
+      {"tests/test_app.py": lines(801)},
+      ("warn", r"tests/test_app\.py \(801, test limit 800\)"),
+      clean={"tests/test_app.py": lines(800)}, clean_expect=("pass", r"no oversized")),
     # The glob pair, one per size check: the SAME oversized file is a finding
     # outside the excluded tree and silent inside it. Previously excluded()
     # matched bare path components only, so the clean half of each case warned.
@@ -274,8 +278,8 @@ CASES = [
       plant_setup=hide_from_worktree(WFP)),
     C("sec.dep-vulns", "control: a tracked manifest that will not open must not take "
                        "the check off the board",
-      {}, ("pending", r"run: pip-audit"), kind="control",
-      clean_expect=("pending", r"run: pip-audit"),
+      {}, ("pending", r"run: .*pip-audit"), kind="control",
+      clean_expect=("pending", r"run: .*pip-audit"),
       plant_setup=hide_from_worktree("requirements.txt")),
     C("hyg.tracked-junk", "a committed .venv (a DOT directory — the miss)",
       {".venv/lib/site.py": "x = 1\n"}, ("warn", r"tracked: \.venv/lib/site\.py")),
@@ -342,7 +346,7 @@ CASES = [
     # ---- gates on the expensive probes: pending vs na ----
     C("sec.dep-vulns", "gate: manifest removed",
       {"requirements.txt": None}, ("na", NO_MANIFEST),
-      clean_expect=("pending", r"run: pip-audit")),
+      clean_expect=("pending", r"run: .*pip-audit")),
     C("hyg.dep-unused", "gate: manifest removed",
       {"requirements.txt": None}, ("na", NO_MANIFEST),
       clean_expect=("pending", r"deptry")),
@@ -356,7 +360,7 @@ CASES = [
       {"requirements.txt": None, "functional_requirements.txt": PROSE},
       ("na", NO_MANIFEST),
       clean={"requirements.txt": None, "requirements-ci.txt": "requests==2.32.3\n"},
-      clean_expect=("pending", r"run: pip-audit")),
+      clean_expect=("pending", r"run: .*pip-audit")),
     C("cq.lint", "gate: no first-party source at all",
       dict(NO_PY), ("na", r"no first-party \.py/\.ts/\.js files tracked"),
       clean_expect=("pending", r"ruff check \.")),

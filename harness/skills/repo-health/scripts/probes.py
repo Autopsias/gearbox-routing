@@ -12,7 +12,8 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from common import check, run, pending_if_unread, read_or_unread
+from accepted import audit_commands, cd_prefix, project_dir
+from common import check, pending_if_unread, read_or_unread, run
 from shape import MANIFEST_LOOKED_FOR
 from vendor import vendored_dirs
 
@@ -161,8 +162,9 @@ def pending_checks(repo, shape, files=None):
                                  "test_*.py/*_test.py/tests/ among the tracked .py files")
     no_workflows = ("" if shape["workflows"]
                     else "no .github/workflows/*.yml — this repo runs no GitHub Actions")
-    audit = (["pip-audit  (or: uvx pip-audit)"] if shape["py"] else []) \
-        + (["npm audit --audit-level=high"] if "package.json" in " ".join(shape["manifests"]) else [])
+    pdir = project_dir(shape["manifests"]) or "."
+    where = cd_prefix(pdir)
+    audit = audit_commands(repo, shape, pdir)
 
     yield check("sec.secrets-history", "security", "blocking",
                 "No secrets in git history", "pending",
@@ -180,8 +182,8 @@ def pending_checks(repo, shape, files=None):
     yield probe("sec.supply-chain", "security", "advisory",
                 "Dependency tree free of supply-chain risk", no_manifest,
                 f"run: Trail of Bits' supply-chain-risk-auditor (trailofbits/skills, not "
-                f"vendored here; install it yourself): collect.py . --json {findings}  then "
-                f"render.py {findings} — covers the whole "
+                f"vendored here; install it yourself): {where}python3 collect.py . --json {findings}  then "
+                f"python3 render.py {findings} — covers the whole "
                 "lockfile tree, abandoned upstreams, publisher concentration, "
                 "install scripts")
     yield probe("sec.diff-review", "security", "advisory",
@@ -222,6 +224,7 @@ def pending_checks(repo, shape, files=None):
                 "only if xdist is installed: pytest -p randomly (order) and pytest -n 2, "
                 "twice each — both green twice => safe; else record na with the reason"), suite_unread, "test-suite presence")
     yield probe("ci.wall-clock", "ci", "advisory", "CI wall-clock reasonable", no_workflows,
-                "run: gh run list --limit 20 --json durationMs,conclusion,workflowName")
+                "run: gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName"
+                " | python3 <skill>/scripts/health.py ci-median  (duration = updatedAt - startedAt)")
 
 

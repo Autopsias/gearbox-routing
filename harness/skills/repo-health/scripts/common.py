@@ -7,6 +7,7 @@ imports a sibling.
 """
 import fnmatch
 import json
+import re
 import subprocess
 
 FIRST_PARTY = ("actions/", "github/")
@@ -16,6 +17,46 @@ FIRST_PARTY = ("actions/", "github/")
 # they drift apart. JUNK_PARTS is derived, never retyped.
 JUNK_DIRS = ("node_modules/", ".venv/", "__pycache__/", "dist/", "build/")
 JUNK_PARTS = {d.strip("/") for d in JUNK_DIRS}
+
+
+# ---------- the one JSON parse ----------
+
+# No file this skill reads is nested anywhere near this. The limit is ours, checked by a
+# linear scan BEFORE the C parser runs: the parser's own limit is the C stack, which
+# differs by Python version and thread, and past it the whole interpreter dies
+# (SIGILL, rc=132 on 3.13) instead of raising.
+MAX_JSON_DEPTH = 200
+_TOKEN = re.compile(r'"[^"\\]*(?:\\.[^"\\]*)*"|[\[\]{}]', re.DOTALL)
+
+
+class TooDeep(ValueError):
+    """JSON nested too deeply to parse: a ValueError, told apart from malformed JSON."""
+
+
+def check_depth(text, limit=MAX_JSON_DEPTH):
+    """Raise TooDeep when `text` nests brackets deeper than `limit`. Linear, no recursion;
+    brackets inside strings do not count. Text that is not JSON passes: the parser says so."""
+    if isinstance(text, (bytes, bytearray)):
+        text = bytes(text).decode("utf-8", "replace")
+    depth = 0
+    for m in _TOKEN.finditer(text):
+        ch = m.group()
+        if ch in "[{":
+            depth += 1
+            if depth > limit:
+                raise TooDeep("nested too deeply")
+        elif ch in "]}":
+            depth -= 1
+
+
+def loads(text):
+    """json.loads for UNTRUSTED text: depth is checked first, so a deep file is a
+    ValueError (TooDeep) on every Python version and never reaches the C parser."""
+    check_depth(text)
+    try:
+        return json.loads(text)
+    except RecursionError:              # belt only: the scan above is what guarantees it
+        raise TooDeep("nested too deeply") from None
 
 
 # ---------- the one type guard ----------
@@ -51,7 +92,7 @@ def parse_json(text, want=dict, default=None):
     this is the only JSON entry point in the collector for that reason.
     """
     try:
-        return typed(json.loads(text), want, default)
+        return typed(loads(text), want, default)
     except (ValueError, TypeError):
         return default
 

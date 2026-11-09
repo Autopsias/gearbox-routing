@@ -133,6 +133,13 @@ def _no_ambient_provider_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_transcripts(tmp_path, monkeypatch):
+    """outcomes.compose searches ~/.claude/projects for a dispatch's transcript
+    when no receipt exists; a test must never read the real one."""
+    monkeypatch.setenv("PLAN_EXECUTE_TRANSCRIPTS_ROOT", str(tmp_path / "no-transcripts"))
+
+
+@pytest.fixture(autouse=True)
 def _no_live_build_canary(monkeypatch):
     """plan-builder's build_canary tags a NEW plan's build sessions from the LIVE outcome
     ledger, so a fixture plan built here would change shape whenever a canary is armed.

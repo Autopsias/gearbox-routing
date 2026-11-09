@@ -152,7 +152,7 @@ After waiting for agents to complete, validate each result before proceeding:
 
 **Key principle:** Never silently proceed with incomplete data — always tell the user what was skipped and why.
 
-**Stamp the full-scope run.** Only when scope is still "Historical + current conversation" here (no fallback to current-conversation scope for any reason, including a Prior-Improve agent failure) and the History Scan agent reported BOTH `TRANSCRIPT SCAN: complete` and `REVIEW-FINDINGS SCAN: complete` (an empty but successful scan counts; a failed or unreadable one does not), run `mkdir -p ~/.gearbox-state/improve && touch ~/.gearbox-state/improve/last-full-scope`. Do not touch it after a current-conversation run or after a fallback. An optional nudge hook (not part of this export) reads this path.
+**Stamp the full-scope run.** Only when scope is still "Historical + current conversation" here (no fallback to current-conversation scope for any reason, including a Prior-Improve agent failure) and the History Scan agent reported ALL THREE of `TRANSCRIPT SCAN: complete`, `REVIEW-FINDINGS SCAN: complete` and `ERROR-GROUPS SCAN: complete` (an empty but successful scan counts; a failed or unreadable one does not), run `mkdir -p ~/.gearbox-state/improve && touch ~/.gearbox-state/improve/last-full-scope`. Do not touch it after a current-conversation run or after a fallback. An optional nudge hook (not part of this export) reads this path.
 
 Then read each config file from the config map.
 
@@ -289,7 +289,8 @@ Full rules, edge cases and the ledger's failure handling:
    - **File-derived** (Phase 4c Config Health, Content Placement, Cross-Skill
      Consistency — findings produced by *reading config*, not by a user signal): the
      excerpt is the config text itself — the contradicting line, the stale reference,
-     the misplaced section — cited as `path:line`. A pure measurement (a line count, a
+     the misplaced section — cited as `path:line`. A memory note's `Remove-the-cause candidate`
+     line is file-derived: the quote is that line, cited as its absolute `path:line`. A pure measurement (a line count, a
      file count) cites the measured file and the number, and states the command that
      produced it.
    - **Review-ledger-derived** (the History Scan's 'Plan review findings' step, for
@@ -358,7 +359,8 @@ buckets — Drifted, Re-surfaced — before Targeted).
    - 'Apply all N': apply each batchable finding as its 'Proposed:' line says. For an enforcement-gap finding that is the first option the finding lists ('Remove the cause' when removal is possible, else 'Strengthen rule'). 'Modify' is never part of 'Apply all'. Then ask each exception finding on its own, one question each (Accept / Reject / Modify), in presentation order.
    - 'Review one by one': ask every finding, exceptions included, with Accept / Reject / Modify. If 8+ findings, after presenting 5, ask: "Continue with remaining findings, or apply what we have so far?"
    - 'Apply none': apply nothing from the whole list, exceptions included, and ask nothing more. Say in the run summary 'T findings declined as a set (B batch, E own question)'.
-4. **Keeps its own question.** Write this as one short block under the list. A finding keeps its own question when its edit (a) removes, demotes or moves existing text or a file out of where it lives: a deleted file or memory, a deleted or demoted rule, a Content Misplacement move, a 'Remove the cause' that deletes; or (b) changes a hook, a permission or a deny entry in any settings file, including 'Convert to hook' and 'Both' (their scope follow-up question stays); or (c) is a 'Standing default' finding: its question names the default text and the target file, and its first option starts with 'Apply this default (Recommended)'. An exception is applied only after its own yes; 'Apply none' declines it with the set.
+4. **Keeps its own question.** Write this as one short block under the list. A finding keeps its own question when its edit (a) removes, demotes or moves existing text or a file out of where it lives: a deleted file or memory, a deleted or demoted rule, a Content Misplacement move, a 'Remove the cause' that deletes; or (b) changes a hook, a permission or a deny entry in any settings file, including 'Convert to hook' and 'Both' (their scope follow-up question stays); or (c) is a 'Remove the cause' candidate from a memory note (the grammar is in `evidence-ledger.md`, "The candidate line"): it always keeps its own question, so 'Apply all' never decides one; or (d) is a 'Standing default' finding: its question names the default text and the target file, and its first option starts with 'Apply this default (Recommended)'. An exception is applied only after its own yes; 'Apply none' declines it with the set.
+   A candidate question: yes starts a session with the change as its brief (or prints the brief as a /plan-builder request where no session tool exists) and changes the line to `(open, started <date>: <name>)`; the brief tells that session to close the line as `(closed <date>: built <commit or plan>)` when its work merges. No closes the line as `(closed <date>: declined)` and records the normal rejection. 'Apply none', a skipped question or an ended run changes nothing, so the line waits for the next full-scope run.
 5. **`/improve audit` never offers 'Apply all'.** Each audit deletion, demotion and correction keeps its own question (see `relevance-audit.md`).
 
 **Order (current-only scope; full scope's order is in the reference file above):**
@@ -403,7 +405,8 @@ directly where found.
    mode, with that mode's two carve-outs (`relevance-audit.md` Step 6):
     - **Batch answers:** every finding applied by 'Apply all' is an Accepted outcome. A number named in a free-text answer is a Reject with the reason 'excluded by number, no reason given'. 'Apply none' is NOT a rejection: write no entry to `rejections`, keep the gap sightings.
     - **Accepted** (or Modified — a Modify is an acceptance, not a rejection): set that
-      gap's `retired` to today. The rule now covers it.
+      gap's `retired` to today. The rule now covers it. An open candidate line for that gap
+      stays open: the retired match never drops it (`evidence-ledger.md`, "The candidate line").
     - **Rejected**: append to `rejections` — the edit summary naming the target file,
       today's date, every verbatim quote that supported it this run (`evidence_then`),
       and the user's stated reason ("no reason given" if they gave none, never invented).

@@ -195,8 +195,11 @@ Consequences:
 
 A dispatched agent is killed after ~600s with no STREAM progress:
 `Agent stalled: no progress for 600s (stream watchdog did not recover)`. It
-measures output, not liveness — so a long, quiet command kills it in the
-foreground and in the background alike.
+measures output, not liveness — so a long, quiet command kills it while its
+turn stays open. On a single Agent dispatch, a command run with
+`run_in_background` is safe if the agent ends its turn: a silent 660 s command
+woke its agent (measured, Claude Code 2.1.319). The Bash reply says
+which case applies; see `rules/llm-review-and-agent-efficiency.md`.
 
 Measured resume degradation on one agent:
 

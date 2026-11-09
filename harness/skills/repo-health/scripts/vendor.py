@@ -7,6 +7,8 @@ ever REPORTS. Applying an update stays a human decision (see SKILL.md).
   vendor.py verify  — offline: does the local copy still match its pin?
   vendor.py check   — online: has upstream moved since the pin? (needs `gh`)
   vendor.py diff <name>  — print the upstream compare URL + changed files
+  vendor.py --skill-dir <dir> <command>  — the same, for another skill's
+      vendor.json and vendor/ (ui-craft pins Stageshow this way)
 
 Both comparisons are on the vendored directory's git TREE hash, not on a
 commit sha. A commit sha answers "did anything in the repo move", which is
@@ -20,7 +22,6 @@ Manifest: skills/repo-health/vendor.json
     "pin": "<commit we vendored from>", "tree": "<subtree sha at that pin>",
     "why": ..., "reviewed": "YYYY-MM-DD", "license": ...}]
 """
-import json
 import os
 import subprocess
 import sys
@@ -29,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import parse_json, typed_items  # noqa: E402
+from common import loads, parse_json, typed_items  # noqa: E402
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 MANIFEST = SKILL_DIR / "vendor.json"
@@ -127,8 +128,8 @@ def gh_json(path):
     if p.returncode != 0:
         return None
     try:
-        return json.loads(p.stdout)
-    except json.JSONDecodeError:
+        return loads(p.stdout)
+    except ValueError:         # malformed, or nested too deeply
         return None
 
 
@@ -265,6 +266,14 @@ def diff(entries, name):
 
 
 def main(argv):
+    global SKILL_DIR, MANIFEST, VENDOR_DIR
+    if argv[:1] == ["--skill-dir"]:
+        if len(argv) < 2:
+            print("REFUSED: --skill-dir needs a directory")
+            return 2
+        SKILL_DIR = Path(argv[1]).expanduser().resolve()
+        MANIFEST, VENDOR_DIR = SKILL_DIR / "vendor.json", SKILL_DIR / "vendor"
+        argv = argv[2:]
     try:
         entries = load()
     except UnusableManifest as exc:

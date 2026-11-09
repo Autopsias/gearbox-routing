@@ -27,12 +27,12 @@ def _texts(body, fi, out):
         w = sum(VERDANA.get(c,.62) for c in s)*size*(BOLD if attr(t,'font-weight','')=='700' else 1)
         a = attr(t,'text-anchor','start')
         x0 = x-w/2 if a=='middle' else (x-w if a=='end' else x)
-        found.append((s,(x0,y-ASC*size,x0+w,y+DESC*size),(x,y)))
+        found.append((s,(x0,y-ASC*size,x0+w,y+DESC*size),(x,y),size))
     return found
 
 def _check_one(box, rects, lines, vb, fi, out):
     """viewBox margin, box containment at 8 units, and lines crossing the label."""
-    s,(x0,y0,x1,y1),(ax,ay) = box
+    s,(x0,y0,x1,y1),(ax,ay) = box[:3]
     if x0 < vb[0]+6 or x1 > vb[0]+vb[2]-6:
         out.append((fi,'exceeds viewBox',s))
     c = [r for r in rects if r[0]<=ax<=r[0]+r[2] and r[1]<=ay<=r[1]+r[3] and r[2] < vb[2]*0.95]
@@ -54,12 +54,20 @@ def _check_collisions(texts, fi, out):
             if a[0]<b[2] and b[0]<a[2] and a[1]<b[3] and b[1]<a[3]:
                 out.append((fi,'collides with '+texts[j][0],texts[i][0]))
 
+PHONE_PX = 358  # drawing width on a 390px phone after two 16px gutters
+
+def min_label_units(vb_width, wide_only=False):
+    """Smallest font-size (viewBox units) that renders at 12px on a 390px phone.
+    A data-view="wide" drawing is hidden on phones; it keeps the desktop floor of 13 in 680."""
+    return 13 * vb_width / 680 if wide_only else 12 * vb_width / PHONE_PX
+
 def audit(path):
     src = open(path).read()
     out = []
-    for fi, svg in enumerate(re.finditer(r'<svg\b[^>]*viewBox="([^"]+)"[^>]*>(.*?)</svg>', src, flags=re.S), 1):
-        vb = [float(v) for v in svg.group(1).split()]
-        body = svg.group(2)
+    for fi, svg in enumerate(re.finditer(r'(<svg\b[^>]*viewBox="([^"]+)"[^>]*>)(.*?)</svg>', src, flags=re.S), 1):
+        vb = [float(v) for v in svg.group(2).split()]
+        body = svg.group(3)
+        floor = min_label_units(vb[2], 'data-view="wide"' in svg.group(1))
         rb = re.sub(r'<g\b[^>]*transform=[^>]*>.*?</g>', '', body, flags=re.S)
         rects = [tuple(float(attr(t,k,0)) for k in ('x','y','width','height'))
                  for t in re.findall(r'<rect\b[^>]*/?>', rb) if 'transform=' not in t]
@@ -68,8 +76,28 @@ def audit(path):
         texts = _texts(body, fi, out)
         for box in texts:
             _check_one(box, rects, lines, vb, fi, out)
+            if box[3] < floor - 0.05:
+                out.append((fi, f'font-size {box[3]:g} under the phone floor {floor:.1f} units', box[0]))
         _check_collisions(texts, fi, out)
     return out
+
+def _self_test():
+    import os
+    import tempfile
+    assert round(min_label_units(680)) == 23 and round(min_label_units(380)) == 13
+    page = ('<svg viewBox="0 0 680 100"><text x="20" y="40" font-size="14">small</text>'
+            '<text x="20" y="80" font-size="23">big</text></svg>'
+            '<svg data-view="wide" viewBox="0 0 680 100"><text x="20" y="40" font-size="14">desk</text></svg>')
+    with tempfile.NamedTemporaryFile('w', suffix='.html', delete=False) as f:
+        f.write(page)
+    found = audit(f.name)
+    os.unlink(f.name)
+    assert [c for _, b, c in found if 'floor' in b] == ['small'], found
+    print('self-test ok')
+
+if __name__ == '__main__' and sys.argv[1:] == ['--self-test']:
+    _self_test()
+    sys.exit(0)
 
 if __name__ == '__main__':
     f = audit(sys.argv[1])

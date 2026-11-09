@@ -179,8 +179,9 @@ from apply_guards import (
     last_codex_dispatch as _last_codex_dispatch,  # noqa: F401 — read by tests
     last_dispatch_harness as _last_dispatch_harness,
     missing_dispatch_receipt as _missing_dispatch_receipt,
+    refuse_if_unlabelled_inline_fix as _refuse_if_unlabelled_inline_fix,
+    refuse_if_interim as _refuse_if_interim,
 )
-import attestation
 import checkpoint_answer as ca
 import closeout_pipeline as cp
 import dispatch as dsp
@@ -203,6 +204,7 @@ import registry as reg
 import render_verify as rv
 import replan as rp
 import route_at_dispatch as rad
+import receipt_cmd
 import run_state_io as rsi
 import safe_json as sj
 import sensitive_paths as sensp
@@ -3275,7 +3277,11 @@ def cmd_apply(plan_dir, session_id, output_file, dry_run_shipping=False):
              plan_dir=plan_dir)
         sys.exit(1)
 
+    _refuse_if_unlabelled_inline_fix(plan_dir, session_id, _out)
+
     raw = Path(output_file).read_text()
+
+    _refuse_if_interim(raw, plan_dir, session_id, rsi.log_event, _out)  # WAKE-01
 
     # `plan_impact` names OTHER sessions, so its check needs the whole graph —
     # and it only applies on plans stamped at the schema version that introduced
@@ -3948,37 +3954,8 @@ def cmd_record_refusal(plan_dir, session_id, model, reasoning, reason, source):
     )
 
 
-def cmd_record_receipt(plan_dir, session_id, agent_id, transcript, backend):
-    """TEL-01 — the served-model attestation HANDOFF. The orchestrator calls this
-    exactly once per dispatch, AFTER the Agent tool call returns and BEFORE
-    apply/verify resolution — the earliest point an Agent ID exists at all, so
-    it cannot run any earlier (`begin` precedes the Agent call). The receipt is
-    what lets `outcomes.py` write `model_ran_source="attested"` instead of
-    downgrading every real outcome to `"unknown"`; see outcomes.py's module
-    docstring for the full per-backend rule.
-
-    TEL-01 finding 1 — stamps the receipt with the (generation, dispatch
-    ordinal) it belongs to, so a resolution recorded later can tell whether
-    this receipt is actually ABOUT it — see `outcomes._fresh_receipt`."""
-    if not (agent_id or "").strip():
-        raise SystemExit("refusing to record a receipt without --agent-id: the receipt IS the "
-                          "correlation between this dispatch and an Agent ID — an empty one "
-                          "proves nothing.")
-    attested, usage = attestation.read_transcript(backend, transcript)
-    generation = esca.session_state(plan_dir, session_id)["generation"]
-    dispatch_ordinal = outc._dispatch_ordinal(plan_dir, session_id)  # noqa: SLF001 — same module family
-    rec = rsi.record_receipt(plan_dir, session_id, agent_id=agent_id, transcript=transcript,
-                             backend=backend, attested=attested,
-                             generation=generation, attempt=dispatch_ordinal, usage=usage)
-    _out(
-        {
-            "recorded": True, "session": session_id, "backend": backend,
-            "attested": bool(attested),
-            "model_ran_source": outc.SOURCE_ATTESTED if attested else outc.SOURCE_REQUESTED,
-            "receipt": rec,
-        },
-        plan_dir=plan_dir,
-    )
+def cmd_record_receipt(plan_dir, session_id, agent_id, transcript, backend, inline_fix=None):
+    receipt_cmd.record_receipt(plan_dir, session_id, agent_id, transcript, backend, inline_fix, _out)
 
 
 def cmd_clear_halt(plan_dir, cost_report=None):
@@ -4351,6 +4328,8 @@ def _add_replan_parsers(sub):
         "Usage rules: route-at-dispatch-contract.md rule 6.",
     )
     s.add_argument("--backend", default="claude", choices=("claude", "codex"))
+    s.add_argument("--inline-fix", default=None, metavar="REASON",
+                   help="You, not an agent, did this attempt's work: why. Stored on the receipt and the outcome row.")
     s = sub.add_parser(
         "resolve-replan",
         help="Answer a REPLAN park raised by a closeout's plan_impact",
@@ -4536,7 +4515,8 @@ _COMMANDS = {
     "record-refusal": lambda plan_dir, args: (
         cmd_record_refusal(plan_dir, args.session, args.model, args.reasoning, args.reason, args.source)),
     "record-receipt": lambda plan_dir, args: (
-        cmd_record_receipt(plan_dir, args.session, args.agent_id, args.transcript, args.backend)),
+        cmd_record_receipt(plan_dir, args.session, args.agent_id, args.transcript, args.backend,
+                           args.inline_fix)),
     "resolve-replan": lambda plan_dir, args: cmd_resolve_replan(plan_dir, args.session, args.decision, args.reason),
     "recommend-replan": lambda plan_dir, args: cmd_recommend_replan(plan_dir, args.session, args.recommendation),
     "add-session": lambda plan_dir, args: cmd_add_session(plan_dir, args),

@@ -287,6 +287,7 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
     """No model may review this code: park at AWAITS_REVIEW for a human."""
     import article_block as ab  # noqa: PLC0415
     import run_state_io as rsi  # noqa: PLC0415
+    import untrusted_block as ub  # noqa: PLC0415
     from verify_paths import _feedback_path, _html, _now, _save_state  # noqa: PLC0415
 
     reason = reason_for(cause)
@@ -308,13 +309,12 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
     # reads the closeout's `human_checkpoint_reason`, and it is what makes
     # shipping DEFER while the park stands. `closeout_digest` deliberately
     # excludes this field, so writing it cannot read as state-drift.
-    # One field, two authors — both visible, neither silently replaced.
     set_closeout_checkpoint(plan_dir, session_id, reason if not prior else (
         f"{reason}\n\nALSO STANDING — this session's own checkpoint: {prior}"))
     fb = _feedback_path(plan_dir, session_id)
     fb.parent.mkdir(parents=True, exist_ok=True)
     fb.write_text(_brief(session_id, gate, cause, prior)
-                  + f"\n## Gate output (redacted, tail)\n\n```\n{excerpt}\n```\n")
+                  + f"\n## Gate output (redacted, tail)\n\n{ub.gate_block(excerpt)}\n")
     ab.apply_mutation(_html(plan_dir), session_id, status="AWAITS_REVIEW",
                       note=f"on-box verification required: {reason}")
     rsi.log_event(plan_dir, "verifier_park", session_ids=[session_id], gate=gate,

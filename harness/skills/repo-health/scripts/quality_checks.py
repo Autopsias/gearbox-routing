@@ -29,7 +29,15 @@ SRC_EXT = {".py", ".ts", ".tsx", ".js", ".jsx"}
 # has recorded a baseline gets both numbers — the raw one here and the ratcheted
 # one there — which is the point of having two checks rather than one.
 FILE_LIMIT = 500
+TEST_FILE_LIMIT = 800
 FUNC_LIMIT = 100
+
+
+def is_test_file(rel):
+    """The house ratchet's own test-file rule (check_file_sizes.is_test_file)."""
+    parts, name = Path(rel).parts, Path(rel).name
+    return (any(p in ("tests", "test") for p in parts)
+            or name.startswith("test_") or name.endswith("_test.py"))
 
 
 def cq_file_size(repo, files):
@@ -52,11 +60,14 @@ def cq_file_size(repo, files):
         except OSError:
             unread.append(f)
             continue
-        if n > FILE_LIMIT:
+        if is_test_file(f):
+            if n > TEST_FILE_LIMIT:
+                big.append(f"{f} ({n}, test limit {TEST_FILE_LIMIT})")
+        elif n > FILE_LIMIT:
             big.append(f"{f} ({n})")
     return unmeasured(
         check("cq.file-size", "code_quality", "advisory",
-              f"Source files under {FILE_LIMIT} lines",
+              f"Source files under {FILE_LIMIT} lines (tests {TEST_FILE_LIMIT})",
               "warn" if big else "pass",
               (f"over {FILE_LIMIT} lines: " + ", ".join(big[:8])
                + ("…" if len(big) > 8 else "")) if big

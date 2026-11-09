@@ -63,6 +63,7 @@ fixed afterwards.
 A scored session is evidence, not a finding. Convert with this bar:
 
 1. Only **repeated waste** or worse, and **block**, generate finding candidates.
+   Exception: a group from `tool_error_clusters.py` with 3 or more Transcripts is a "Remove the cause" candidate even when no single session reaches repeated waste. The finding names the instruction, skill text or guard message that causes the call, with its file:line, in whichever project holds it; if no cause is found, it says so and names the group. A group whose fix is a permission rule goes to `/fewer-permission-prompts`, not here.
 2. For each candidate, name the moment: the tool call, edit, or exchange where the
    waste or defect happened — quoted verbatim, cited with its session. That is the
    excerpt Phase 5 gate 1 demands.

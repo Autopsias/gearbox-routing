@@ -95,7 +95,7 @@ def test_land_ack_refuses_a_gate_inherited_park(fx):
     # an inherited red gate, so a `gate-inherited` park cannot be acked through.
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
-    work(iso["tree"], REG, _registry(**{"ci-gate": _ci("exit 1")}))
+    work(iso["tree"], REG, _registry(**{"ci-gate": _ci("echo boom; exit 1")}))
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"], out["kind"]) == (1, "land-parked", "gate-inherited"), out
     rc, out = run_cli("land-ack", iso["plan_dir"], "--note", "accept it anyway")

@@ -1491,6 +1491,7 @@ LAUNCHD_SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "laun
 LAUNCHD_LABELS = {
     "reap": "com.gearbox.agent-janitor.reap",
     "prune": "com.gearbox.agent-janitor.prune",
+    "worktrees": "com.gearbox.agent-janitor.worktrees",  # report-only, scripts/worktree_report.py
 }
 
 
@@ -1534,15 +1535,15 @@ def cmd_install(args, out=None) -> int:
     """OWNER-run only -- see module docstring. Prints the paired uninstall
     command so a start is never handed over without its matching stop."""
     out = sys.stdout if out is None else out
-    ok = all([_install_one("reap", out), _install_one("prune", out)])
+    ok = all([_install_one(name, out) for name in LAUNCHD_LABELS])
     print(f"\nto reverse: python3 {os.path.abspath(__file__)} uninstall", file=out)
     return 0 if ok else 1
 
 
 def cmd_uninstall(args, out=None) -> int:
     out = sys.stdout if out is None else out
-    _uninstall_one("reap", out)
-    _uninstall_one("prune", out)
+    for name in LAUNCHD_LABELS:
+        _uninstall_one(name, out)
     return 0
 
 
@@ -1576,11 +1577,11 @@ def main(argv=None) -> int:
                             "launchd never passes this)")
     prune.set_defaults(func=cmd_prune)
 
-    install = sub.add_parser("install", help="OWNER-run only: install both launchd jobs "
+    install = sub.add_parser("install", help="OWNER-run only: install the janitor's launchd jobs "
                              "(never invoked by an agent session)")
     install.set_defaults(func=cmd_install)
 
-    uninstall = sub.add_parser("uninstall", help="remove both launchd jobs")
+    uninstall = sub.add_parser("uninstall", help="remove the janitor's launchd jobs")
     uninstall.set_defaults(func=cmd_uninstall)
 
     args = ap.parse_args(argv)

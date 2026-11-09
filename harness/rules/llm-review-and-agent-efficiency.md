@@ -24,10 +24,16 @@ in one or two commands; the failure is never measuring.
   an earlier attempt already died and you are watching a silent retry — which
   doubles the wall time before anything is learned. No log will say so.
 - **NEVER make a dispatched subagent run a multi-minute quiet command.** A
-  stream watchdog kills an agent after ~600s with no OUTPUT — liveness does not
-  count. This kills it in the foreground and in the background alike. Run test
-  suites in the orchestrator, or as a gate; give the agent targeted files only,
-  and tell it to keep gaps between tool calls short.
+  stream watchdog kills an agent after ~600s with no OUTPUT while its turn stays
+  open — liveness does not count. Run a long command with `run_in_background`
+  and read the Bash reply (measured, Claude Code 2.1.319): on a
+  single Agent dispatch it says "You will be notified when it completes" — end
+  your turn with no closeout and return it after you wake (a silent 660 s
+  command survived this way). On the Workflow route it says the command "is
+  terminated when you give your final response" — the member returns without
+  waking, so stay in your turn and wait with Monitor or short polls. Codex is
+  not tested. Otherwise run test suites in the orchestrator, or as a gate, and
+  keep gaps between tool calls short.
 - **Resume a stalled agent ONCE.** If the resume produces little or nothing,
   dispatch a FRESH agent with the on-disk state named in the prompt ("X and Y
   already exist; verify, do not rebuild"). Successive resumes degrade — measured

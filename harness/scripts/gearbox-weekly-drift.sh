@@ -40,3 +40,19 @@ if [ "$doc_rc" != "0" ]; then
   printf '%s\n' "$doc_out" | sed 's/^/    /' >> "$LOG"
   osascript -e "display notification \"${doc_failed:-some} doc_check claim(s) failed\" with title \"gearbox: doc_check drift\" subtitle \"run: python3 ~/.claude/scripts/doc_check.py --strict\"" 2>/dev/null || true
 fi
+
+# Vendored third-party skills (each skills/<name>/vendor.json): has upstream
+# released new content since our pin? rc 1 = an update to review, rc 2 = could
+# not look (no gh, offline), which is NOT a clean result. Cron's PATH has no
+# Homebrew, where gh lives. Same `|| true` posture as above.
+for vj in "$CD"/skills/*/vendor.json; do
+  [ -f "$vj" ] || continue
+  sk="$(basename "$(dirname "$vj")")"
+  v_out="$(PATH="${HOMEBREW_PREFIX:-/usr/local}/bin:/usr/local/bin:$PATH" python3 "$CD/skills/repo-health/scripts/vendor.py" --skill-dir "$(dirname "$vj")" check 2>&1)" && v_rc=0 || v_rc=$?
+  printf '[%s] vendor %s: rc=%s\n' "$ts" "$sk" "$v_rc" >> "$LOG"
+  if [ "$v_rc" != "0" ]; then
+    printf '%s\n' "$v_out" | sed 's/^/    /' >> "$LOG"
+    if [ "$v_rc" = "1" ]; then msg="upstream update to review"; else msg="could not check upstream"; fi
+    osascript -e "display notification \"$sk: $msg\" with title \"gearbox: vendored skill\" subtitle \"see $LOG\"" 2>/dev/null || true
+  fi
+done

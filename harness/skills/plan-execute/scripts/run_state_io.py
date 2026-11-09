@@ -453,7 +453,8 @@ def release_lock(plan_dir):
 # token already do.
 # --------------------------------------------------------------------------
 def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="claude",
-                   attested=None, generation=None, attempt=None, usage=None):
+                   attested=None, generation=None, attempt=None, usage=None, usage_base=None,
+                   inline_fix=None):
     """Persist one dispatch's correlation receipt. `usage` is the rule-6 token
     and cost block read off `transcript` (None without one). `attested` is
     `{"model": ..., "reasoning": ...}` when served-model evidence was found in
@@ -476,6 +477,8 @@ def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="
         "backend": backend,
         "attested": attested,
         "usage": usage,
+        "usage_base": usage_base,
+        "inline_fix": inline_fix,
         "generation": generation,
         "attempt": attempt,
         "recorded_at": _now(),
@@ -483,7 +486,8 @@ def record_receipt(plan_dir, session_id, *, agent_id, transcript=None, backend="
     receipts[session_id] = rec
     save_state(plan_dir, state)
     log_event(plan_dir, "receipt_recorded", session_ids=[session_id], agent_id=agent_id,
-              backend=backend, attested=bool(attested), generation=generation, attempt=attempt)
+              backend=backend, attested=bool(attested), generation=generation, attempt=attempt,
+              inline_fix=inline_fix)
     return rec
 
 

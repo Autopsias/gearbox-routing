@@ -2321,7 +2321,7 @@ def gen_scope_section(spec):
     oos = spec.get("out_of_scope") or []
     oq = spec.get("open_questions") or []
     if not oos and not oq:
-        return ""
+        return "", ""
 
     def block(title, blurb, entries, pill):
         if not entries:
@@ -2343,12 +2343,14 @@ def gen_scope_section(spec):
 </section>
 '''
 
+    # Two parts: open decisions sit near the top of the page (they need the
+    # owner), out of scope sits below the session plan (reference only).
     return block(
         "Open decisions",
         "not yet sharp enough to assign — resolve before the sessions that consume them",
         oq,
         "medium",
-    ) + block(
+    ), block(
         "Out of scope",
         "consciously ruled beyond this plan — returns only as a fresh plan, never graduates",
         oos,
@@ -2833,9 +2835,7 @@ def gen_session_article(session, sessions_list, idx, items_by_id=None, v8=False)
     actions_html = f"""    <div class="session-actions">
       <span class="actions-label">Run this session</span>
       <code class="invoke-cmd">/plan-execute &lt;plan-dir&gt; --session {esc(sid)}</code>
-      <a href="#{sid}" class="btn-secondary">Jump to card</a>
       {next_btn}
-      <span style="color:var(--text-subtle);font-size:14.5px;margin-left:auto;">orchestrator dispatches subagent →</span>
     </div>"""
 
     agent_pieces = []
@@ -3159,14 +3159,15 @@ def render_html(spec, plan_dir):
     infographic_full_js = info_data_js + "\n" + renderers_local + "\n" + RENDER_DISPATCH_JS
 
     decision_hotspots = gen_decision_hotspots_section(spec["items"])
-    scope_section = gen_scope_section(spec)
+    open_decisions, out_of_scope = gen_scope_section(spec)
 
     template = template.replace("<!-- INSERT_SESSION_STRIP -->", session_strip)
     template = template.replace("<!-- INSERT_PLAN_ACHIEVEMENT -->", plan_achievement)
     template = template.replace("<!-- INSERT_EXPLAINER -->", expl.render_explainer_section(spec))
     template = template.replace(
-        "<!-- INSERT_DECISION_HOTSPOTS -->", decision_hotspots + scope_section
+        "<!-- INSERT_DECISION_HOTSPOTS -->", open_decisions + decision_hotspots
     )
+    template = template.replace("<!-- INSERT_OUT_OF_SCOPE -->", out_of_scope)
     template = template.replace("<!-- INSERT_CATEGORY_FILTER_CHIPS -->", cat_chips)
     template = template.replace("<!-- INSERT_SESSIONS -->", sessions_html)
     template = template.replace("<!-- INSERT_CATEGORY_SECTIONS -->", cat_sections)

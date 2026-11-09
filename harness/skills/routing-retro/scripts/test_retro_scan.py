@@ -245,3 +245,23 @@ def test_a_split_response_is_counted_once_but_every_dispatch_is_kept(tmp_path):
     assert s["models"]["sonnet"]["in"] == 2000
     assert s["agent_dispatches"] == [{"agent": "Explore", "model": "sonnet"}]   # the second line's block survives
     assert "_seen_ids" not in s
+
+
+def test_a_transcript_deleted_mid_scan_is_skipped_not_fatal(tmp_path, monkeypatch, capsys):
+    # Retro 2026-11-07: another session deleted a transcript between the glob
+    # and the mtime sort, and the whole scan died with FileNotFoundError.
+    proj = tmp_path / "-proj"
+    proj.mkdir()
+    _write_transcript(str(proj / "alive.jsonl"),
+                      [("claude-sonnet-5", {"input_tokens": 10, "output_tokens": 5})])
+    ssot = tmp_path / "model-routing.yaml"
+    ssot.write_text(SSOT)
+    real_glob = retro_scan.glob.glob
+    monkeypatch.setattr(retro_scan.glob, "glob",
+                        lambda p: real_glob(p) + [str(proj / "gone.jsonl")])
+    monkeypatch.setattr("sys.argv", ["retro_scan.py", "--projects-dir", str(tmp_path), "--ssot", str(ssot),
+                                     "--policy-dir", str(tmp_path / "nopolicy"),
+                                     "--settings", str(tmp_path / "nosettings.json")])
+    retro_scan.main()
+    out = json.loads(capsys.readouterr().out)
+    assert [s["session_id"] for s in out["sessions"]] == ["alive"]

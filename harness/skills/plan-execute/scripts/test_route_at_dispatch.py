@@ -86,7 +86,7 @@ V7 = [
      "prompt": "work"},
 ]
 GOLDEN_V7 = {
-    "claude": "4b7d78283a69dadd3c984690656546c6bef94390328eac204fcb38abf9ac2e0b",
+    "claude": "56f1ec8a667d084f659795ff9f5cd828ade43d1e9c4c5f8a7a4dd2beac9c20d3",
     "codex": "a17f95af7ce8093a3fedec0f08fa020b903ef667b7c93515cff6b3c580f7018f",
 }
 

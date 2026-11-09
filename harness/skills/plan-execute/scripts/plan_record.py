@@ -20,6 +20,7 @@ caller (``land_push``, ``land_steps``, the CLI) is unchanged.
 import shutil
 from pathlib import Path
 
+import finish_repair as frp
 import plan_scope as ps
 import worktree as wt
 
@@ -54,6 +55,16 @@ def _names(args, cwd, what):
 # §8.c — WHO commits the plan record, and WHEN
 # --------------------------------------------------------------------------
 def record_plan(target, plan_dir, message=None):
+    """Copy, repair and commit the plan record, one process of this plan at a time."""
+    plan_dir = Path(plan_dir).resolve()
+    root = wt.repo_root(plan_dir)
+    if root is None:
+        raise wt.WorktreeError(f"{plan_dir} is not inside a git checkout")
+    with frp.record_lock(root, plan_dir.name):
+        return _record_plan(target, plan_dir, message)
+
+
+def _record_plan(target, plan_dir, message=None):
     """Copy the LIVE outer plan directory into ``target`` and commit just it.
 
     §8.b removes ``/commit-orchestrate``'s ``git add -A`` from this job, and a
@@ -92,6 +103,7 @@ def record_plan(target, plan_dir, message=None):
     pathspec = rel.as_posix()
     _keep_runtime_local(target, dest, pathspec)
     dropped = _drop_ignored(target, dest, pathspec)
+    _repair(target, plan_dir, pathspec)
     _git(["add", "--", pathspec], target, check=True)
     _assert_only(target, pathspec)
     if _git(["diff", "--cached", "--quiet", "--", pathspec], target)[0] == 0:
@@ -109,7 +121,7 @@ def record_plan(target, plan_dir, message=None):
                     "dropped_ignored": dropped}
         rc, out, err = _git(["commit", "-m", msg], target)
     if rc != 0:
-        raise wt.WorktreeError(f"record-plan commit failed in {target}: {(err or out).strip()}")
+        raise wt.WorktreeError(f"record-plan commit failed in {target}: {(err or out).strip()}{frp.note()}")
     _, sha, _ = _git(["rev-parse", "HEAD"], target, check=True)
     names = _names(["show", "--name-only", "--format=", sha], target, sha)
     return {"status": "recorded", "pathspec": pathspec, "sha": sha, "files": names,
@@ -216,3 +228,13 @@ def _assert_only(target, pathspec):
             "`_plans_index.md`, never a sibling plan's (probe 3 scenario 3 measured a "
             "regenerated index resolving `--theirs` and silently deleting another "
             "plan's entry, exit 0). Unstage them and re-run.")
+
+
+def _repair(target, plan_dir, pathspec):
+    """Run the repo's whitespace fixers on the changed record files (see finish_repair)."""
+    names = _names(["diff", "--name-only", "-z", "HEAD", "--", pathspec], target, pathspec) \
+        + _names(["ls-files", "-o", "-z", "--exclude-standard", "--", pathspec], target, pathspec)
+    try:
+        frp.repair_record(target, plan_dir, pathspec, names)
+    except frp.Park as p:
+        raise wt.WorktreeError(f"record repair refused: {p.detail} {p.paths}") from None

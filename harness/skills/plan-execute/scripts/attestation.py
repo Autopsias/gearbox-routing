@@ -28,6 +28,7 @@ off a real file on this machine (s07):
 """
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import safe_json as sj
@@ -183,6 +184,20 @@ def read_transcript(backend, transcript_path):
         return None, None
 
 
+def last_request_epoch(transcript_path):
+    """When this JSONL transcript's last model request ran, or None when it cannot say:
+    a missing file, a `claude -p` result file, or no timestamped request. Never raises."""
+    try:
+        data, events = _load(transcript_path)
+        return max((datetime.fromisoformat(ev["timestamp"].replace("Z", "+00:00")).timestamp()
+                    for ev in (events if events is not None else [data])
+                    if ev.get("type") == "assistant" and ev.get("timestamp")
+                    and sj.get_dict(ev, "message", {}).get("model") not in (None, "<synthetic>")),
+                   default=None)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
 # --------------------------------------------------------------------------
 # Served-model attestation from a dispatch transcript — PER BACKEND, per the
 # plan's explicit finding: a codex member is a Claude Agent wrapper around an
@@ -243,12 +258,44 @@ def price(usage, served_model, table, rates):
     return dict(usage, cost_usd=round(cost, 6), cost_source="model_prices")
 
 
+def usage_base(prior, agent_id, generation, attempt):
+    """What a new receipt must subtract from its transcript's usage, or None.
+
+    A resumed Agent-tool builder keeps one transcript, so its usage is cumulative:
+    the prior receipt's total is already charged. Only `subagent-transcript` qualifies,
+    because a codex receipt's agent id is the session id and repeats across separate
+    streams. Re-recording one dispatch keeps that dispatch's own base."""
+    prior = prior if isinstance(prior, dict) else {}
+    usage = sj.get_dict(prior, "usage")
+    if prior.get("agent_id") != agent_id or sj.get_str(usage, "source") != "subagent-transcript":
+        return None
+    if (prior.get("generation"), prior.get("attempt")) == (generation, attempt):
+        return sj.get_dict(prior, "usage_base")
+    return usage
+
+
+def _since(usage, base):
+    """`usage` less `base`. A count that cannot be subtracted is null, never a guess."""
+    if not base:
+        return usage
+    out = dict(usage)
+    for key in _TOKENS:
+        now, before = _count(usage.get(key)), _count(base.get(key))
+        out[key] = now - before if None not in (now, before) and now >= before else None
+    h1 = (_count(usage.get("cache_creation_1h_tokens")) or 0) - (_count(base.get("cache_creation_1h_tokens")) or 0)
+    out.pop("cache_creation_1h_tokens", None)
+    if h1 > 0:
+        out["cache_creation_1h_tokens"] = h1
+    return out
+
+
 def ledger_usage(receipt):
     """The rule-6 usage block for one outcome record, from THIS dispatch's
     receipt (None when there is none or it is stale). Never raises."""
     usage = sj.get_dict(receipt, "usage")
     if usage is None or usage.get("source") in (None, "unavailable"):
         return dict(UNAVAILABLE)
+    usage = _since(usage, sj.get_dict(receipt, "usage_base"))
     served = sj.get_str(sj.get_dict(receipt, "attested"), "model")
     try:
         if usage.get("cost_source") == "reported":

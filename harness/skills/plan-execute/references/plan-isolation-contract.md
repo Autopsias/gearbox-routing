@@ -570,7 +570,9 @@ of verify gates **plus every gate the candidate merged tree's registry
 (`finish-contract.md`). Those gates enter the gate digest (§5.1) like any
 other. When every non-passing gate is an `at_land`, `kind: "argv"` gate whose
 outcome is `fail`, `land` runs each once on the base (`expected`). A gate that
-also fails there parks `gate-inherited`: the plan did not break it. Otherwise
+also fails there with the same failures parks `gate-inherited`: the plan did not
+break it. With other failures it parks `gate-base-differs`, which shows both
+excerpts and does not say who broke it. Otherwise
 `land` returns the `land-repair` directive instead of `land-parked`. The plan
 branch is fast-forwarded to the candidate's `HEAD`, a repair session is added
 with new items `add-session` accepts, and `land` runs again. `land` first

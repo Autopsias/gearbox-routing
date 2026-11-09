@@ -135,7 +135,10 @@ Body word count of the example: 262.
 
 ## Rendering
 
-`brief.html` is one A4 page: 20 mm margins, Verdana or the system sans at
-10.5 pt body, the title at 18 pt, the table with hairline rules, no colour the
-content does not need. No external fonts or scripts; `render.sh` loads the file
-from disk. If the PDF spills to page two, cut words; never shrink below 10 pt.
+`brief.html` is one A4 page, styled by `assets/brief.css` inlined verbatim
+(18 mm margins, 10.5 pt body, the title at 18 pt, light table headers with an
+accent rule, "The ask" as the one tinted block). Add only brand tokens after
+it. The same file reads on a screen and a phone: a 820 px column with a 16 px
+gutter, and the repeated A4 page headers hidden. No external fonts or scripts;
+`render.sh` loads the file from disk. If the PDF spills to page two, cut
+words; never shrink below 10 pt (9.5 pt in tables).

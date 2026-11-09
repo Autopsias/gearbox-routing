@@ -160,7 +160,12 @@ and the two-pass review; do not restate them here. The page closes on the
 sources block from `sources.md`.
 
 **Brief as PDF and DOCX.** Write `brief.html` (one A4 page, the template's
-layout, system fonts, no external assets) and render:
+layout, system fonts, no external assets). Its `<style>` starts with
+`assets/brief.css` inlined verbatim, then only brand tokens (for your-workspace:
+`--accent:#FF5A00; --accent-ink:#B83F00` and the font). Never write the brief's
+CSS from scratch: four hand-written briefs all failed the 2026-11-08 ui-craft
+review on screen (no margin, mid-screen page headers, 3.1:1 table headers).
+Follow the markup contract in the stylesheet's header. Then render:
 
 ```bash
 bash scripts/render.sh pdf  tldr-out/<slug>/brief.html tldr-out/<slug>/brief.pdf

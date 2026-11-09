@@ -361,7 +361,7 @@ def _opt_in(monkeypatch, tmp_path, value):
 def _excerpt_lines(plan_dir):
     """The gate's own stdout, as the feedback file recorded it."""
     text = _feedback_path(plan_dir, SID).read_text()
-    body = text.split("```", 2)[1] if "```" in text else text
+    body = (text.split("UNTRUSTED GATE OUTPUT") + [text])[1].split("\n", 1)[-1].rsplit("\n", 1)[0]
     return [ln for ln in body.splitlines() if ln.strip()]
 
 

@@ -34,9 +34,14 @@ ONCE per run.
    update the note, and also list the problem in the run's final report under
    'Remove the cause candidates': the note's name, the two occurrences, and the
    exact change that would make the mistake impossible (a check, a pinned
-   default, a code change). Append `Remove-the-cause candidate (open): <change>
-   -- <plan slug> <date>` as the last line of that note so `/improve` can find
-   it. 'Remove the cause' is defined in `commands/improve.md` section 4a. Only
+   default, a code change). Write the candidate line in the grammar of
+   `references/improve/evidence-ledger.md` ("The candidate line"). If an open
+   line for the same change exists, rewrite it with the new count (for example
+   `(open, 3rd time)`), keeping any `started` mark, with the count after the mark:
+   `(open, started <date>: <name>, 3rd time)`. If a closed line exists, or
+   the change differs, add a new `Remove-the-cause candidate (open): <change> --
+   <plan slug> <date>` line as the last line of the note, saying in it what the
+   closed line said: a repeat is new evidence and the owner is asked again. 'Remove the cause' is defined in `commands/improve.md` section 4a. Only
    propose; never apply a candidate outside the plan's scope without the owner's yes.
 
 ## Memory maintenance (when capture touches existing memories)

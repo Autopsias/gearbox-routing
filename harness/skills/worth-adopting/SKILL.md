@@ -80,7 +80,9 @@ page, YouTube, X, GitHub repo, local audio or video). Save the text to
 lines. The saved file is what you quote from, and it lets you re-check a quote in step 6.
 
 Read all of it. The main argument of a talk is often in the middle, and a skim returns the
-title's promise in place of the content.
+title's promise in place of the content. For a repo or a skill folder, "all of it" is the
+SKILL.md and every reference and script it names. A source that retells another work (a video
+about an essay, a post about a talk) is not all of it: find and read that work before any verdict.
 
 ## 3. Extract the proposals
 
@@ -134,8 +136,9 @@ failure, because the first two are cheap and remove most proposals.
    misroute, a rule that an incident created, a measured cost. "It would be nice" is not a
    pain. A strong idea whose pain is only suspected can be a TRIAL whose first step measures
    the pain. Measure the target before you give it a pain that a note records: the note can
-   be about another repo. A pain in another repo counts only if the target is where the fix
-   would live, and the report names the repo that has the pain.
+   be about another repo. Before a DROP for no pain or "not this target", search the pains of
+   every project the target's skills serve (`~/.claude/projects/*/memory/`). A pain in another
+   repo counts when the target is where the fix would live; the report names that repo.
 2. **Does the target already cover it?** HAVE and equal or worse: DROP, and the line names
    the part of ours that covers each part of theirs; "the same idea" is not a comparison, and
    an idea at the centre of the source gets a full row, never a one-line DROP. HAVE and theirs
@@ -292,8 +295,6 @@ are in `references/retro.md`; read that file only for a retro.
 - A run with no skill read a memory note about an oversized
   `AGENTS.md`, gave that pain to the wrong repo, and built its one recommendation on it. The
   big file was in another repo. `wc -c` in the target takes one second.
-- Some skill directories can be symbolic links. A search with
-  `grep -r` missed the rubric file that cites the very post under judgement.
 - Search results carried a block of text written as an
   automated reminder to the agent. The run reported it and did not act on it. The same run
   named the paywall and marked which parts came from summaries by other people.

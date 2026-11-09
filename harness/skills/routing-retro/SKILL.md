@@ -113,7 +113,9 @@ two-stage, explicit-tag experiment (grill 2026-08-13):
    `excluded.effort_unbound` (v25). Before authoring a canary, confirm
    `agents/tier-<model>-<effort>.md` exists.
 3. **Judge at the next retro.** Read `canaries[]` for the proposal's `proposal_id`:
-   `smoke-failed` → report the abort and drop the proposal; `smoke-in-progress` /
+   `smoke-failed` → report the abort and drop the proposal (the aggregator marks that
+   cell `downgrade-dropped` and never offers the same smoke again — the id is epoch-free,
+   so a re-run could never pass); `smoke-in-progress` /
    `smoke-passed-awaiting-adoption-evidence` → report progress toward N=10, no action;
    `adoption-ready` → recommend `/routing-update` to adopt (which also writes the
    `evals/routing/adoptions.ndjson` boundary the aggregator reads back for did-it-help

@@ -30,11 +30,45 @@ cp harness/scripts/improve_ask_classes.py ~/.claude/scripts/
 cp harness/agents/pr-workflow-manager.md ~/.claude/agents/      # for /pr create and /pr merge
 ```
 
+Optional: the `/improve` nudge. `harness/hooks/improve-nudge.py` tells Claude
+to offer `/improve` at three moments: at your third pushback prompt in a
+session, at session start when the last run is old, and once after a session
+pushes, merges or deploys. At that last moment it writes a short digest of the
+session (`harness/scripts/improve_digest.py`) and asks Claude to have a Sonnet
+subagent read it with `references/improve/triage-prompt.md`, then show the
+hints. It never runs `/improve` by itself. State goes to
+`~/.gearbox-state/improve/`; set `IMPROVE_NUDGE=off` to silence it.
+
+```bash optional
+mkdir -p ~/.claude/hooks ~/.claude/scripts
+cp harness/hooks/improve-nudge.py ~/.claude/hooks/
+cp harness/scripts/improve_digest.py ~/.claude/scripts/
+```
+
+```json optional
+{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "startup", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" session-start", "timeout": 10}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" prompt", "timeout": 10}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/improve-nudge.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\" finished", "timeout": 10}]}
+    ]
+  }
+}
+```
+
+`./install-module general-commands --with-optional` adds the nudge and its
+three entries; without `--with-optional` it is left out.
+
 ## Check it works
 
 Type `/wait-what` after any answer: you get a short plain-language version and
 no tool runs. In a repo with no pull request, `/pr status` prints
-`No PR for current branch`.
+`No PR for current branch`. For the nudge: `python3 -m pytest harness/hooks/test_improve_nudge.py`.
 
 ## Remove
 
@@ -43,7 +77,11 @@ rm ~/.claude/commands/{review,research,wait-what,nextsession,improve,pr}.md
 rm -r ~/.claude/references/improve
 rm ~/.claude/scripts/improve_ask_classes.py
 rm ~/.claude/agents/pr-workflow-manager.md
+rm -f ~/.claude/hooks/improve-nudge.py ~/.claude/scripts/improve_digest.py   # the nudge, if installed
 ```
+
+`./install-module --remove general-commands` also takes the nudge's three
+entries out of `settings.json`.
 
 ## Archived
 

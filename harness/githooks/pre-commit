@@ -64,6 +64,40 @@ if [[ -n "$_ratchet_root" ]] && git diff --cached --name-only \
 fi
 
 # ============================================================================
+# Lint, staged Python files only. `make lint` runs only at CI and at land, so an
+# E401 cost a 31-minute rerun and two F401s a 15-minute land run
+#. Reads each blob from the index, so a partly staged file is judged
+# as it will be committed. --force-exclude: an explicit path otherwise bypasses
+# [tool.ruff].exclude. The mode check skips deletions (mode 000000) and symlinks,
+# whose blob is a path, not Python.
+# Missing ruff warns and passes, like gitleaks above; CI's `make lint` still runs.
+# shortcut: the ruff config comes from the working copy, not the index; a staged
+# pyproject.toml edit takes effect only if it is also on disk.
+if command -v ruff >/dev/null 2>&1; then
+  _lint_failed=0
+  # Every file is checked before stopping, so one attempt lists every error.
+  while IFS= read -r -d '' _meta && IFS= read -r -d '' _path; do
+    [[ "$_path" == *.py || "$_path" == *.pyi ]] || continue
+    read -r _ _mode _ _blob _ <<< "$_meta"
+    [[ "$_mode" == 100* ]] || continue
+    # No pipe: ruff exits on an excluded path without reading its input, and a
+    # writer killed by SIGPIPE would then read as a failure under pipefail.
+    if ! ruff check --quiet --force-exclude --stdin-filename "$_path" - \
+        < <(git cat-file blob "$_blob"); then
+      _lint_failed=1
+    fi
+  done < <(git diff --cached --raw --no-abbrev --no-renames -z)
+  if [[ $_lint_failed -ne 0 ]]; then
+    echo "" >&2
+    echo "COMMIT BLOCKED: ruff found errors in the staged content (listed above)." >&2
+    echo "Fix them and stage the fix. CI's \`make lint\` would refuse them too." >&2
+    exit 1
+  fi
+else
+  echo "WARNING: ruff not installed — committing without a lint check." >&2
+fi
+
+# ============================================================================
 # Routing drift guard (s02, GRD-01/example-routing-plan-2026-07-02). Fires on
 # EVERY ~/.claude commit, running verify-routing.sh's BARE/DEFAULT mode — today
 # that's --core; when s04 flips DEFAULT_MODE inside verify-routing.sh to "full",

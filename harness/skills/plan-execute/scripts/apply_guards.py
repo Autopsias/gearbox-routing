@@ -5,9 +5,85 @@ run.py so the orchestrator's apply path stays one screen: which harness last
 dispatched the session, whether a codex dispatch left its receipt, and — in
 `escalation.undispatched_rework` — whether `begin` ran since the last failure.
 """
+import sys
 from pathlib import Path
 
+import attestation
 import safe_json as sj
+import transcript_find
+
+# The two sentences the app writes when an agent stops while its own background
+# command still runs. The notification OPENS with one of them, so only the opening
+# is matched: a final message can quote a sentence later in its prose without
+# becoming an interim stop. The hook's INTERIM string must sit inside one (test I6).
+INTERIM_OPENINGS = (
+    "This agent has not reported yet: it is waiting on its own background work",
+    "This agent stopped with background work of its own still running",
+)
+
+
+def is_interim_stop(raw):
+    """True when `raw` has no closeout block and OPENS with an app interim sentence."""
+    return "<plan-execute-closeout" not in raw and raw.lstrip().startswith(INTERIM_OPENINGS)
+
+
+def refuse_if_interim(raw, plan_dir, session_id, log_event, out):
+    """An interim notification is not a return: log it, change nothing (no BLOCKED,
+    no halt) and exit 1. The agent's final message re-applies. Otherwise, return."""
+    if is_interim_stop(raw):
+        log_event(plan_dir, "apply_interim_refused", session_ids=[session_id])
+        out({"applied": False, "failure": "agent-not-finished",
+             "reason": "This agent stopped to wait for its own background work and has not "
+                       "reported yet. Nothing was changed; apply its final message when it arrives."},
+            plan_dir=plan_dir)
+        sys.exit(1)
+
+
+def inline_fix_refusal(plan_dir, session_id, agent_id, transcript, backend):
+    """Why this receipt cannot stand without a stated reason, or None to accept it.
+
+    The agent's transcript shows no request after this attempt's `begin`, so an agent
+    did not do this attempt's work. Replay 2026-11-07 over 277 real Claude receipts:
+    it fires on 16, in one plan: 15 inline or environment fixes, 1 agent run before `begin`."""
+    if backend != "claude":  # a codex stream has no per-request timestamps to compare
+        return None
+    try:
+        window = transcript_find._window(plan_dir, session_id)  # noqa: SLF001 — same module family
+    except OSError:
+        return None
+    # shortcut: no readable transcript is accepted, so an unknown id passes; refuse it if that is ever seen.
+    last = attestation.last_request_epoch(transcript or transcript_find.by_agent(agent_id))
+    if window is None or last is None or last >= window[0]:
+        return None
+    return (f"Agent {agent_id} made no request after the last `begin` for {session_id}, so no agent "
+            "did this attempt's work. Dispatch what `begin` returned, then record that agent. If "
+            "you did this fix yourself, record it with --inline-fix '<reason>'.")
+
+
+def unlabelled_inline_fix(plan_dir, session_id):
+    """The reason of a refused receipt that no later receipt or `begin` replaced, or None."""
+    try:
+        lines = (Path(plan_dir) / "run.ndjson").read_text().splitlines()
+    except OSError:
+        return None
+    refused = None
+    for ln in lines:
+        rec = sj.load_dict(ln)
+        if rec is None or session_id not in sj.get_list(rec, "session_ids", []):
+            continue
+        if rec.get("event") == "receipt_refused":
+            refused = rec.get("reason")
+        elif rec.get("event") in ("receipt_recorded", "dispatch_started"):
+            refused = None
+    return refused
+
+
+def refuse_if_unlabelled_inline_fix(plan_dir, session_id, out):
+    """A refused receipt can go unread (its output is often discarded), so `apply` repeats it."""
+    reason = unlabelled_inline_fix(plan_dir, session_id)
+    if reason:
+        out({"applied": False, "failure": "inline-fix-unlabelled", "reason": reason}, plan_dir=plan_dir)
+        sys.exit(1)
 
 
 def last_dispatch_harness(plan_dir, session_id):

@@ -22,6 +22,7 @@ import sys
 import uuid
 from pathlib import Path
 
+import finish_repair as frp
 import land_brief as lb
 import worktree as wt
 from finish_paths import (Linked, Park, _exe, end_with_newline,  # noqa: F401
@@ -84,7 +85,8 @@ def apply_index(origin_text, ours, mark):
 
 
 def _other_lines(text, mark):
-    return [ln for ln in (text or "").splitlines() if mark not in ln]
+    """Other plans' rows, without the line ends and file end the two fixers may change."""
+    return "\n".join(ln.rstrip() for ln in (text or "").splitlines() if mark not in ln).rstrip()
 
 
 def _append_only(old, new):
@@ -159,7 +161,7 @@ def _copy_record(tmp, plan_dir, files, ignored, apply):
     return touched
 
 
-def stage_record(tmp, plan_dir, root, rel, apply=False):
+def stage_record(tmp, plan_dir, root, rel, apply=False, lease_ok=None):
     """Stage the record in ``tmp``; return ``{path: bytes}`` of what is staged."""
     slug = Path(rel).name
     touched = [GITIGNORE] if _gitignore(tmp) else []
@@ -172,7 +174,8 @@ def stage_record(tmp, plan_dir, root, rel, apply=False):
     for path in files:
         lstat_inside(tmp, path)       # a link in origin's tree parks before git reads it
     ignored = _ignored(tmp, list(files), "--no-index")   # tracked runtime too
-    touched += _copy_record(tmp, plan_dir, files, ignored, apply)
+    copied = _copy_record(tmp, plan_dir, files, ignored, apply)
+    touched += copied
     # A tracked record file gone from the plan dir is removed; runtime-local and
     # ignored files are never part of the record, so their absence changes nothing.
     tracked = git(["ls-files", "-z", "--", rel + "/"], tmp, strip=False)[1].split("\0")
@@ -195,10 +198,11 @@ def stage_record(tmp, plan_dir, root, rel, apply=False):
     after = apply_index(before, ours, mark)
     if after != before:
         if _other_lines(before, mark) != _other_lines(after, mark):
-            raise Park("outside-record", "the index change touches another plan's line",
-                       [INDEX])
+            raise Park("outside-record", "the index change touches another plan's line", [INDEX])
         idx.write_bytes(after.encode("utf-8"))
         touched.append(INDEX)
+    if apply:
+        frp.repair_record(tmp, plan_dir, rel, copied, lease_ok, sorted(set(touched) - set(copied)))
     if touched:
         git(["add", "--", *touched], tmp, check=True)
     return _bytes(tmp, _staged(tmp, rel))
@@ -241,7 +245,7 @@ def _commit(tmp, rel, message, parent, staged):
     tree = _proved_tree(tmp, rel, parent, staged)
     rc, out, err = git(["commit", "-q", "-m", message], tmp)
     if rc != 0:
-        raise Park("push-failed", f"the record commit failed: {(err or out).strip()}")
+        raise Park("push-failed", f"the record commit failed: {(err or out).strip()}{frp.note()}")
     count = git(["rev-list", "--count", f"{parent}..HEAD"], tmp)[1]
     if count != "1" or rev(tmp, "HEAD^") != parent or rev(tmp, "HEAD^2"):
         raise Park("outside-record", "a commit hook changed the record commit: it is "
@@ -283,7 +287,7 @@ def record(plan_dir, ctx, origin_sha, *, apply, lease_ok):
         tmp = None
         try:
             tmp = _temp_tree(root, slug, expected)
-            staged = stage_record(tmp, plan_dir, root, rel, apply)
+            staged = stage_record(tmp, plan_dir, root, rel, apply, lease_ok)
             res["paths"] = sorted(staged)
             if not staged:
                 return {**res, "status": "already-recorded"}, expected, {}
@@ -396,7 +400,8 @@ def _old_amend(owner, work, want):
 def _restorable(owner, target_sha, path, work, want):
     """Same bytes and mode as the target, or (``.gitignore`` only) the old
     plan-builder amendment of HEAD's copy that the target already carries."""
-    if work != want and not (path == GITIGNORE and _old_amend(owner, work, want)):
+    if work != want and not (path == GITIGNORE and _old_amend(owner, work, want)
+                             or path == INDEX and frp.only_ends_differ(work, want)):
         return False
     return _same_mode(owner, target_sha, path)
 

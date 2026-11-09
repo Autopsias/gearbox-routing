@@ -44,6 +44,8 @@ import re
 from pathlib import Path
 
 import safe_json as sj
+from latest_by_key import latest_then_filter
+from llm_review_prior_section import prompt_section  # noqa: F401 -- also re-exported
 
 #: THE SEVERITY FLOOR. A finding at or above this blocks; anything below is
 #: recorded `noted` -- visible, carried forward, never a reason to re-dispatch.
@@ -218,22 +220,19 @@ def open_priors(records, floor=None):
     stops blocking on its recorded mediums instead of pinning a live session to
     a rule it was never judged under. They stay in the file and stay printed.
     """
-    by, status = {}, {}
-    for r in sorted((r for r in records if r.get("kind") == "finding"),
-                    key=lambda r: r.get("attempt", 0)):
-        by[r["fid"]] = r
-        status[r["fid"]] = r.get("status", "open")
-    return [by[f] for f, s in status.items()
-            if s in ("open", "unverifiable") and blocks(by[f].get("severity"), floor)]
+    return _latest_findings(records, lambda r: r.get("status", "open") in ("open", "unverifiable")
+                            and blocks(r.get("severity"), floor))
 
 
 def latest_by_id(records):
     """Every finding ever recorded, latest record per id -- advisory ones too."""
-    out = {}
-    for r in sorted((r for r in records if r.get("kind") == "finding"),
-                    key=lambda r: r.get("attempt", 0)):
-        out[r["fid"]] = r
-    return out
+    return {r["fid"]: r for r in _latest_findings(records)}
+
+
+def _latest_findings(records, keep=None):
+    rows = sorted((r for r in records if r.get("kind") == "finding"),
+                  key=lambda r: r.get("attempt", 0))
+    return latest_then_filter(rows, lambda r: r["fid"], keep)
 
 
 def review_focus(ctx):
@@ -258,33 +257,6 @@ def review_focus(ctx):
     if not delta:
         return delta
     return delta | {_norm(p.get("file") or "") for p in ctx.priors if p.get("file")}
-
-
-def prompt_section(attempt, priors, delta, unchanged_n):
-    """What the reviewer is told about the previous attempt. Empty on the first."""
-    if attempt <= 1:
-        return ""
-    lines = [f"===PRIOR REVIEW (attempt {attempt - 1}) -- VERIFY, DO NOT RE-DISCOVER==="]
-    if priors:
-        lines += [
-            "These findings were raised on the previous attempt. For EACH ONE, emit exactly "
-            "one object in the findings array carrying `\"prior_id\": \"<id>\"` and "
-            "`\"prior\": \"fixed\"` or `\"prior\": \"open\"`, with one line of evidence in "
-            "`summary`. A prior you OMIT is treated as OPEN -- silence is not a fix.",
-        ] + [f"  - {p['fid']}  {p.get('file')}:{p.get('line')}  [{p.get('severity')}]  "
-             f"{p.get('summary')}" for p in priors]
-    else:
-        lines.append("No prior finding is open.")
-    lines.append("FILES CHANGED SINCE THAT ATTEMPT -- the fix delta. Review these as NEW code; "
-                 "a fix is new code and can carry a fresh defect:")
-    lines += [f"  - {p}" for p in sorted(delta)] or ["  (none)"]
-    lines.append(f"FILES UNCHANGED SINCE THAT ATTEMPT: {unchanged_n}. You MAY report a new "
-                 "finding in one; tag it `\"new_in\": \"outside\"`. The gate records those as a "
-                 "convergence signal, blocks only on high severity, and carries the rest forward.")
-    lines.append("Every NEW finding (no prior_id) carries `\"new_in\": \"delta\"` or "
-                 "`\"new_in\": \"outside\"`.")
-    lines.append("===END PRIOR REVIEW===")
-    return "\n".join(lines)
 
 
 class Context:

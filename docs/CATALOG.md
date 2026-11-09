@@ -15,7 +15,7 @@ lists every file the part needs, and how to check and remove it.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 28 skills · 69 commands · 41 subagents · 9 hooks.
+Counts: 29 skills · 69 commands · 41 subagents · 12 hooks.
 
 ## Skills
 
@@ -47,6 +47,7 @@ Counts: 28 skills · 69 commands · 41 subagents · 9 hooks.
 | `setup-matt-pocock-skills` | `/setup-matt-pocock-skills` only | Sets up an `## Agent skills` block in AGENTS.md (legacy fallback: CLAUDE.md) and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local … | [Engineering skills](modules/engineering-skills.md) |
 | `tdd` | `/tdd`, or Claude starts it | Test-driven development with red-green-refactor loop. | [Engineering skills](modules/engineering-skills.md) |
 | `tldr` | `/tldr`, or Claude starts it | Turn one or many long, complex sources (a report, a paper, a contract, a folder of documents, URLs, transcripts, a codebase, knowledge-base notes) into a decision-ready … | [Executive summaries](modules/tldr.md) |
+| `ui-craft` | `/ui-craft`, or Claude starts it | Designs, builds and reviews user interfaces of every kind — web apps, sites, landing pages, dashboards, HTML reports and artifacts, the pages eli5 and plan-builder … | [UI design and review](modules/ui-craft.md) |
 | `worth-adopting` | `/worth-adopting`, or Claude starts it | Judges what an outside source (a video transcript, an X post or thread, a blog post, a GitHub repo, a newsletter, pasted text) proposes against what the current repo … | [Outside-idea triage](modules/outside-ideas.md) |
 | `write-a-skill` | `/write-a-skill`, or Claude starts it | Author new USER-LEVEL agent skills in ~/.claude/skills with proper structure, progressive disclosure, and bundled resources. | [Skill authoring](modules/skill-authoring.md) |
 
@@ -179,7 +180,10 @@ Counts: 28 skills · 69 commands · 41 subagents · 9 hooks.
 | `dispatch-audit.py` | PreToolUse (Agent) | Record what model + effort every subagent dispatch actually asked for, so tier drift is VISIBLE instead of silent. | [Routing skills](modules/routing-skills.md) |
 | `git-tree-guard.py` | PreToolUse (Bash) | Refuse a tree-wide destructive git command while the working tree carries tracked modifications. | [Git safety guard](modules/git-safety.md) |
 | `governor-hook.py` | PreToolUse (Bash) | Refuse a heavy command that skipped govrun. | [Machine governor](modules/govrun.md) |
+| `improve-nudge.py` | SessionStart (startup), UserPromptSubmit, PostToolUse (Bash) | Nudge the agent to offer /improve at the right moments (NUDGE-01). | [General commands](modules/general-commands.md) |
+| `instructions-inventory.py` | InstructionsLoaded | BD-01 — measure which instruction files actually load, per project. | [Small hooks](modules/small-hooks.md) |
 | `routing-cadence-check.py` | SessionStart | Nudge when routing outcomes have piled up unanalyzed. | [Small hooks](modules/small-hooks.md) |
 | `safe-refactor-advisory.sh` | PreToolUse (Write) | Safe Refactor Advisory Hook (Interactive) Detects potential file splitting/refactoring and lets user choose to use the safe-refactor agent | [Safe refactor](modules/safe-refactor.md) |
+| `skill-usage-log.py` | PreToolUse (Skill) | Record every skill invocation, so popularity and undertriggering are MEASURABLE instead of guessed. | [Small hooks](modules/small-hooks.md) |
 | `turnend-guard.py` | Stop | No turn ends blind on a plan this session runs. | [Plan pipeline](modules/plan-pipeline.md) |
 | `verify-state-guard.py` | PreToolUse (Bash\|Write\|Edit\|MultiEdit\|NotebookEdit) | A DISPATCHED AGENT may read a plan's `_verify_state/`, never write it. | [Plan pipeline](modules/plan-pipeline.md) |

@@ -259,7 +259,10 @@ decision card for everything that ran, including the health check.
    with at most three options, a marked recommendation, and what happens if
    the user does nothing; the path of `REVIEW.md`; the dashboard URL when the
    health check published one.
-3. Fix nothing without a go-ahead. After it, send health findings through
+3. When the findings need more than one round of fixes, one card option is
+   "Build a fix plan" ([`--plan`](../SKILL.md#--plan)); it takes the health rows
+   and these review findings into one plan.
+4. Fix nothing without a go-ahead. After it, send health findings through
    [fix routing](../SKILL.md#fix-routing--reuse-never-rebuild), refactoring
    candidates to step 3 of `improve-codebase-architecture`, performance to
    `diagnose`, over-engineering to `/declutter --plan` (the user types

@@ -72,7 +72,8 @@ revisions R1–R5 in that file (v2).
   gate" would need a classifier, and a hand-kept list of reviewer names decays.
   `land-repair` fires only when EVERY non-passing gate is repairable. A
   `skipped` (timeout), `blocked`, on-box or skill result anywhere keeps today's
-  park. A gate already red on the base parks as `gate-inherited`.
+  park. A gate already red on the base with the same failures parks as
+  `gate-inherited`; with other failures it parks as `gate-base-differs`.
 - **(c) Finish state lives at `$GIT_COMMON_DIR/plan-state/<slug>/finish.json`**,
   beside `land.json` (via `plan_worktree.plan_state_dir`). Never under
   `_plans/`: a state file in the tracked record would make finish dirty the
@@ -309,8 +310,11 @@ are about the plan's diff, and on the base that diff is empty. The result is cac
 key `<base sha>:<gate id>:<definition digest>`. The digest is sha256 over that
 one gate's resolved definition, with the fields `land_gate._gate_set_digest`
 uses (kind, argv, cwd, skill, indeterminate_exit, timeout, env_allowlist), so a
-changed gate is a cache miss. A gate that fails there parks
-`gate-inherited`. `land.json` counts rounds. Round 3 failing, or two rounds in a
+changed gate is a cache miss. The entry keeps a failing run's output, and a fail
+cached without it runs again. A gate that fails there with the same failures
+(every failing test id also fails there, or the same non-empty output when no ids
+parse) parks `gate-inherited`. A gate that fails there with other failures parks
+`gate-base-differs`. `land.json` counts rounds. Round 3 failing, or two rounds in a
 row with the same failing set, parks with the failing tests named.
 
 **Re-run before blame (LND-12).** Before the base run, `land` re-runs each red
@@ -328,7 +332,8 @@ The repair parks, one row each:
 | `gate-flaky` | Every red gate passed on its re-run, or the gates are green while a held check is unresolved. Only failures in files the plan changed are held (a test id, or a file a collection error names), plus a whole gate whose failure named neither; a repair round's failure that went green with nothing changed goes through the same hold | Fix or quarantine the named test on the plan branch, or run `land` again. A held check (in a file the plan changed, or a whole gate): fix or quarantine only |
 | `repair-not-needed` | The re-gate is green, but the repair session land directed is still TODO | Run the `retire-session` command the brief names, then run `land` |
 | `repair-in-progress` | The re-gate is green, but the repair session land directed is still open (DOING, AWAITS_REVIEW, ...) | Wait for that session to finish, then run `land` |
-| `gate-inherited` | A gate red twice is red on the base too | Fix the default branch, then run `land` |
+| `gate-inherited` | A gate red twice is red on the base too, with the same failures | Fix the default branch, then run `land` |
+| `gate-base-differs` | A gate red twice is red on the base too, with other failures. The brief shows both excerpts and does not say who broke it | Compare the excerpts, fix the side they point to, then run `land` |
 | `repair-gate-unresolvable` | The repair session's gate does not resolve in `add-session`'s registry | Pull the registry into the named root, then run `land` |
 | `repair-session-invalid` | `add-session`'s dry run refused the session | Fix the plan, then run `land` |
 | `repair-exhausted` | Red after round 3 | A person fixes the named tests |
@@ -533,7 +538,7 @@ that session is already in the plan, the directive adds
   attempted code is kept for a later plan in this plan's
   `_evidence/s04/accept-inherited-fix-round-5.patch`. Review findings still
   open at the stop: direct-run JUnit ids were checked by count only, and a
-  failing id whose file path contains a space escaped the log checks. The repair round for a failure only the plan caused was part of the same deferred work: today, when a red gate also fails on the base, land parks it as `gate-inherited` at gate level, even if the plan added a new failing test inside that gate. That park brief says "The plan did not break them", which can be false in that case; the later plan that ships `--accept-inherited` fixes the wording.
+  failing id whose file path contains a space escaped the log checks. The repair round for a failure only the plan caused was part of the same deferred work: today, when a red gate also fails on the base, land parks it as `gate-inherited` at gate level, even if the plan added a new failing test inside that gate. That park brief said "The plan did not break them", which could be false in that case. Fixed 2026-11-06: land compares the failures, and a failure the base does not have parks `gate-base-differs`.
 - **2026-10-03 (example-follow-up-plan s05, FIN-12 and FIN-13; additive shape change).**
   `finish.json` gains `steps_done_at`, `steps` (the record, leftovers and
   checkout results) and `generation`. Each finish cycle writes a fresh

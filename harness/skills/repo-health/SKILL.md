@@ -1,6 +1,6 @@
 ---
 name: repo-health
-description: The one front door for whole-repo reviews. Scores repo health — security, code quality, tests, CI workflow, AI readiness, hygiene — on a persistent dashboard with run history at .claude/health/HEALTH.html, split into BLOCKING (fix now) vs ADVISORY; on request also reviews refactoring (module design), over-engineering (a quick scan that names /declutter for the deep audit), performance (measured hot paths) and the trust ladder (which of the repo's own rules and lessons could become a lint, test or code change), and ends with one summary and one decision card. Routes each fix to the existing specialist skill. Use when the user says "repo health", "review this repo", "health check on this repo", "does this repo need refactoring", "is this repo over-engineered", "make this repo more secure or faster", or "run repo-health". Not for reviewing a diff (/review) or fixing one known-failing area — route those directly (/code-quality, /test-orchestrate, /ci-orchestrate, security-scanner agent).
+description: The one front door for whole-repo reviews. Scores repo health — security, code quality, tests, CI workflow, AI readiness, hygiene — on a persistent dashboard with run history at .claude/health/HEALTH.html, split into BLOCKING (fix now) vs ADVISORY; on request also reviews refactoring (module design), over-engineering (a quick scan that names /declutter for the deep audit), performance (measured hot paths) and the trust ladder (which of the repo's own rules and lessons could become a lint, test or code change), and ends with one summary and one decision card. Routes each fix to the existing specialist skill. Use when the user says "repo health", "review this repo", "health check on this repo", "does this repo need refactoring", "is this repo over-engineered", "make this repo more secure or faster", "run repo-health", or "turn the health report into a fix plan" (`--plan`, which reuses a saved report). Not for reviewing a diff (/review) or fixing one known-failing area — route those directly (/code-quality, /test-orchestrate, /ci-orchestrate, security-scanner agent).
 disable-model-invocation: true
 ---
 
@@ -52,6 +52,8 @@ tool is available (a headless run), run `health` only.
 | `all` | every row above | — |
 
 `--deep` and `--fix-blocking` keep their meaning, and both imply `health`.
+`--plan` implies `health` only when the repo has no `.claude/health/scorecard.json`;
+when it has one, `--plan` reuses it ([`--plan`](#--plan)).
 
 **Only the user can start `/declutter`.** Claude Code blocks a model call to a
 skill that sets `disable-model-invocation: true`, and tells the model not to
@@ -98,10 +100,10 @@ and tick it as you go:
    | Probe | Command | pass / fail rule |
    |---|---|---|
    | `sec.secrets-history` | `gitleaks git . --no-banner --redact` (older CLI: `gitleaks detect --source .`) | exit 0 → pass; leaks → **fail**, name count only — never paste a secret |
-   | `sec.dep-vulns` | `pip-audit` (or `uvx pip-audit`) / `npm audit --audit-level=high` | high/critical with a fix → **fail**; lower only → warn |
+   | `sec.dep-vulns` | the command the row prints: `pip-audit --path <project venv site-packages>` (found from the Python manifest's directory; `python3 <skill>/scripts/health.py project --repo <repo>` prints it) / `npm audit --audit-level=high`. Never bare `pip-audit` or `uvx pip-audit` — that audits the tool's own environment | high/critical with a fix → **fail**; lower only → warn. Findings listed in `.claude/health/accepted-risks.json` ([Accepted risks](#accepted-risks)) do not fail the row |
    | `sec.diff-review` | dispatch scoped reviewer agents — [Reviewing the diff without the operator](#reviewing-the-diff-without-the-operator) | confirmed exploitable finding → **fail**; else pass with "N code files across M scopes reviewed" |
    | `sec.sast` | `semgrep scan --config p/default --config p/python --error` (drop `p/python` on a JS/TS repo; fallback: bandit) | triage findings in context: confirmed high → **fail**; noise/annotated → warn |
-   | `sec.supply-chain` | Trail of Bits' `supply-chain-risk-auditor` from [trailofbits/skills](https://github.com/trailofbits/skills), installed by you (it is not vendored here: CC-BY-SA-4.0 is share-alike): its `scripts/collect.py . --json <findings>` then its `scripts/render.py <findings>` — take `<findings>` from the row, which names a **fresh per-run file**; never a shared path, or a second run on another repo renders these findings as its own | advisory finding or abandoned upstream → warn; unfixed critical in the tree → **fail**. Minutes for ~50 deps; `--offline` skips the network |
+   | `sec.supply-chain` | from the directory holding the Python manifest (`health.py project` prints it; the row's command already has the `cd`): `python3 <skill>/vendor/supply-chain-risk-auditor/scripts/collect.py . --json <findings>` then that directory's `scripts/render.py <findings>` — take `<findings>` from the row, which names a **fresh per-run file**; never a shared path, or a second run on another repo renders these findings as its own | advisory finding or abandoned upstream → warn (accepted maintenance rows excepted, see [Accepted risks](#accepted-risks)); unfixed critical in the tree → **fail**. Minutes for ~50 deps; `--offline` skips the network |
    | `sec.vendor-pins` | `python3 <skill>/scripts/vendor.py verify` then `python3 <skill>/scripts/vendor.py check` | exit 0 → pass; verify red, exit 1 (a vendored file was edited) → **fail**; upstream moved → warn. **Exit 2 is `REFUSED`, never a pass**: the manifest could not be read, or does not cover every tree in `vendor/`, or `gh` could not reach upstream. Some tree was NOT compared, so LEAVE the check `pending` (never `na` — that reads as "does not apply here" and clears it off the fix list), fix the cause, and re-run |
    | `cq.lint` | `ruff check .` on a Python repo, `npx eslint .` on a JS/TS one (both when it is both) | exit 0 → pass; else fail with count (apply `--fix` safe fixes first) |
    | `cq.complexity` | `ruff check --select C901 .` | same |
@@ -113,7 +115,7 @@ and tick it as you go:
    | `test.runtime` | wall clock of the suite run | < 300 s → pass; else warn with seconds |
    | `test.collection-cost` | `time pytest --collect-only -q` | < 10 s **and** < 15% of the suite's wall clock → pass; over either → warn; over 25% → **fail**. Record both numbers, not a verdict |
    | `test.parallel-safety` | `pytest -p randomly` and `pytest -n 2`, twice each | both green twice → pass; any disagreement → warn naming the shared state it exposed; xdist/randomly not installed → `na` with that reason (the collector cannot see whether they are) |
-   | `ci.wall-clock` | `gh run list --limit 20 --json durationMs,conclusion,workflowName` | median of successful runs ≤ 10 min → pass; else warn with the median; `gh` missing or unauthenticated → `na` with that reason |
+   | `ci.wall-clock` | `gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName \| python3 <skill>/scripts/health.py ci-median` (gh has no duration field; duration = updatedAt − startedAt) | median of successful runs ≤ 10 min → pass; else warn with the median; `gh` missing or unauthenticated → `na` with that reason |
 
    A tool that is not installed and not worth installing now: set `na` with
    the reason. Never leave a probe `pending` when the tool ran.
@@ -126,7 +128,8 @@ and tick it as you go:
 5. **Report and decide.** Lead with the verdict. List blocking items with their
    fix routes (from `fix-routes`, below). End with the dashboard's decision card
    (max 3 options); when a review also ran, fold it into the summary's one
-   decision card instead. Fix nothing without a go-ahead — except under
+   decision card instead. Whenever `fix-routes` has a row, one option is
+   "Build a fix plan" ([`--plan`](#--plan)). Fix nothing without a go-ahead — except under
    [`--fix-blocking`](#--fix-blocking). **Once the go-ahead comes**, run
    `fix-routes --repo <repo> --advisory` and dispatch those rows the same way
    (steps 3–5 of `--fix-blocking`); never hand-write a dispatch prompt the tool
@@ -261,6 +264,24 @@ a repo you do not trust.
    which is exactly how `hyg.todo-density` used to read as an unfinished route.
 7. Afterwards re-run `collect` (the fixes changed the tree, so the preserved
    probe results are gone) and `render`.
+
+## `--plan`
+
+Turns every finding into one `plan-builder` plan instead of a round of
+dispatches. It has two entry points, so a user who forgot the flag loses
+nothing: the "Build a fix plan" option in the step-5 card, and `/repo-health
+--plan` at any time later. When a scorecard exists, the flag runs `collect` only
+and reuses the probe results already recorded for this tree; when none exists,
+it runs the health check first.
+Procedure and mapping rules: [references/fix-plan.md](references/fix-plan.md).
+
+## Accepted risks
+
+`sec.dep-vulns` and `sec.supply-chain` read an optional
+`.claude/health/accepted-risks.json`; a matching, unexpired row reports as
+accepted and does not fail the row. Run
+`python3 <skill>/scripts/health.py accepted --repo <repo> advisory:<id> maintenance:<package> …`
+after the tool; schema and matching rules: [references/accepted-risks.md](references/accepted-risks.md).
 
 ## Reviewing the diff without the operator
 

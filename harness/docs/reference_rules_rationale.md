@@ -73,6 +73,17 @@ declared correct from 47 balanced anchor comments while the user could see only 
 sessions rendered, and — in the retrospective for those two — a verb-extraction check
 that returned zero verbs and so emitted 68 false "missing verb" findings.
 
+The eval clause was added (worth-adopting run on pstack, whose hillclimb
+playbook builds a harness, "prove its sensitivity, then freeze it", and makes it print
+error and work counts). Eight notes record a score that measured the instrument: a usage
+limit that errored 53 of 75 runs, an output cap that cut 51 of 77 graded answers, a step
+mapping that erased the difference a test consumed, a citation scorer that broke on
+parentheses, the DeepSWE public set that could not separate effort levels, the routing
+battery v3 pilot that could not separate opus low from medium, example-project nightly rulers, and
+a judge that followed prompt order. A sensitivity proof plus the counts would have shown
+4 fully and 3 partly. The owner on the routing pilot: "I actually want something that
+works and is measurable with efficient costs, that was the objective all along".
+
 ## RE-MEASURE every number you are about to state in a final report
 
 Wrong numbers inside a substantially CORRECT report are the most reproducible failure of
@@ -157,3 +168,25 @@ repo got no update, fix that", and "the other session still got shit".
 
 The mechanism exists and is cheap: `ListAgents` names every addressable peer,
 `SendMessage` reaches one. Neither needs the operator's involvement.
+
+## ALWAYS write a deliverable for its named audience
+
+Two sessions, same complaint. Kuzushi 2026-10-24, on a guide text: "I still can't
+get what we're trying to achieve here, and this is particularly confusing and
+meaningless?" your-workspace 2026-10-31, on a 30-slide deck for the technical team and the AWS
+support team: "We're talking about gearbox and none of these stakeholders know
+gearbox, only I know gearbox." Both artifacts stated the what and skipped the why and
+the definitions, because the agent wrote for the one reader who had been in the
+conversation. The deck needed a full content round to add "what gearbox is", "what
+LiteLLM is" and "why we are doing this" as its opening slides.
+
+## ALWAYS restate the goal before you design
+
+your-workspace 2026-10-31: the brief asked for one harness so gearbox could route tasks across
+every Bedrock model. The research found that only Claude speaks the Anthropic request
+shape and proposed two harnesses, one for Claude and one for the rest: "in the setup
+that you're doing you're separating Claude from the rest so that's not gonna happen."
+The bridge (a translator behind one gateway) existed and became the design once the
+goal was put back first. Kuzushi 2026-10-18, same shape: "Okay the outputs are much
+better but you focused on the wrong problem."
+

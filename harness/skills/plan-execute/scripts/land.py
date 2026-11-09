@@ -63,6 +63,7 @@ import sys
 from pathlib import Path
 
 import plan_teardown as pt
+import land_env as lev
 import land_gate as lgt
 import land_start as lsg
 import land_state as lst
@@ -161,6 +162,10 @@ def land(plan_dir):
         return {"action": "landed", "merge_sha": st.get("landed_sha"),
                 "landed_on": st.get("landed_on"), "brief": st.get("brief"),
                 "cleanup": cleanup, "message": msg}
+    # After the push the gates are over, so a wrong interpreter must not stop the record.
+    guard = None if steps.already_landed(ctx, st) else lev.check(plan_dir, ctx)
+    if guard is not None:
+        return guard
     try:
         # §4.1 — LOCKS FIRST, worktree second. Acquired before anything is
         # created, so the lease (not a filesystem collision) is the single

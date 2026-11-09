@@ -47,11 +47,14 @@ window.render_before_after = function (svg, itemsArr) {
   if (fillW > 0) {
     html += `<rect x="${arrowX0}" y="${aY + 8}" width="${fillW}" height="12" fill="var(--accent)" rx="6"/>`;
   }
-  // Pct label above arrow
-  html += `<text x="${arrowX0 + arrowW/2}" y="${aY}" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="800" fill="var(--accent)">${Math.round(pct * 100)}%</text>`;
-  html += `<text x="${arrowX0 + arrowW/2}" y="${aY + 44}" text-anchor="middle" font-family="var(--font-sans)" font-size="10" font-weight="700" letter-spacing="0.12em" fill="var(--text-subtle)">${WORKSTREAMS.length} WORKSTREAMS · ${totalDone}/${totalAll}</text>`;
+  // Pct label above arrow — only when workstreams bind items; with none, a
+  // "0% · 0/0" label contradicts the page's real progress, so draw the bare arrow.
+  if (totalAll > 0) {
+    html += `<text x="${arrowX0 + arrowW/2}" y="${aY}" text-anchor="middle" font-family="var(--font-mono)" font-size="14" font-weight="800" fill="var(--accent)">${Math.round(pct * 100)}%</text>`;
+    html += `<text x="${arrowX0 + arrowW/2}" y="${aY + 44}" text-anchor="middle" font-family="var(--font-sans)" font-size="10" font-weight="700" letter-spacing="0.12em" fill="var(--text-subtle)">${WORKSTREAMS.length} WORKSTREAMS · ${totalDone}/${totalAll}</text>`;
+  }
 
   svg.innerHTML = html;
   const ovEl = document.getElementById('ach-overall-pct');
-  if (ovEl) ovEl.textContent = Math.round(pct * 100) + '%';
+  if (ovEl && totalAll > 0) ovEl.textContent = Math.round(pct * 100) + '%';
 };

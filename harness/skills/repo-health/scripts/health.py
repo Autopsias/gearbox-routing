@@ -38,6 +38,7 @@ from common import (JUNK_PARTS, LAYERS, STATUSES, check,  # noqa: F401  (LAYERS 
                     typed_items, unmeasured, pending_if_unread, read_or_unread)
 from probes import pending_checks, suite_command
 from quality_checks import cq_file_size, cq_function_length
+import accepted
 from routes import fix_rows
 from shape import (MANIFEST_LOOKED_FOR, detect_shape, tracked_files,
                    unpinned_requirements)
@@ -235,18 +236,24 @@ def hyg_unmerged_work(repo):
     """
     rc, head = run(["git", "symbolic-ref", "--short", "HEAD"], repo)
     rcb, out = run(["git", "branch", "--no-merged", head if rc == 0 else "main"], repo)
-    branches = [b.strip() for b in out.splitlines() if b.strip()] if rcb == 0 else []
+    # git prefixes "* " (current) and "+ " (checked out in a linked worktree)
+    branches = [b.strip().lstrip("*+ ") for b in out.splitlines() if b.strip()] if rcb == 0 else []
+    live = accepted.live_worktree_branches(repo)
+    skipped = [b for b in branches if b in live]
+    branches = [b for b in branches if b not in live]
     rcs, out = run(["git", "stash", "list"], repo)
     stashes = len(out.splitlines()) if rcs == 0 and out else 0
     asked = [q for q, ok in (("unmerged branches", rcb == 0),
                              ("stashes", rcs == 0)) if ok]
     missed = [q for q in ("unmerged branches", "stashes") if q not in asked]
     bad = bool(branches or stashes)
+    note = (f" ({len(skipped)} branches skipped: live plan worktrees: "
+            + ", ".join(skipped[:5]) + ")") if skipped else ""
     return unmeasured(
         check("hyg.unmerged-work", "hygiene", "advisory", "No forgotten work",
               "warn" if bad else "pass",
-              (f"unmerged branches: {', '.join(branches[:5])}; stashes: {stashes}")
-              if bad else "no unmerged local branches, no stashes",
+              (f"unmerged branches: {', '.join(branches[:5])}; stashes: {stashes}" + note)
+              if bad else "no unmerged local branches, no stashes" + note,
               "merge or delete the branch; pop or drop the stash" if bad else ""),
         asked, missed,
         f" (git could not list {' or '.join(missed)} here — NOT looked for)")
@@ -426,7 +433,8 @@ def set_result(repo, cid, status, detail):
 def main(argv):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("cmd", choices=["collect", "set", "render", "fix-routes"])
+    ap.add_argument("cmd", choices=["collect", "set", "render", "fix-routes", "accepted", "project",
+                                       "ci-median"])
     ap.add_argument("args", nargs="*")
     ap.add_argument("--repo", default=".", help="target repo (default: cwd)")
     ap.add_argument("--fresh", action="store_true",
@@ -462,6 +470,8 @@ def main(argv):
         stale = staleness(repo, card)
         for row in fix_rows(card, advisory=ns.advisory):
             print(json.dumps({**row, "stale": stale} if stale else row))
+    elif ns.cmd in ("accepted", "project", "ci-median"):
+        print(json.dumps(accepted.helper_command(ns.cmd, repo, ns.args)))
     else:
         import health_render as render
         render.render(repo)

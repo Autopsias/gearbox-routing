@@ -33,6 +33,7 @@ import re
 
 import llm_review_gate as lrg
 import run_state_io as rsi
+import untrusted_block as ub
 
 # Consecutive same-signature failures that arm the protocol.
 TRIGGER_AT = 2
@@ -307,8 +308,8 @@ def research_prompt(rec):
     # The FULL locus always ships — it is what the agent has to act on. The
     # carry-over line only says WHY this counts as a repeat when the two attempts
     # were not byte-identical, which is the case that armed nothing before.
-    why = (("**survived your last rework** — still present after the fix:\n\n    "
-            + "\n    ".join(carried))
+    why = (("**survived your last rework** — still present after the fix:\n\n"
+            + ub.gate_block("\n".join(carried)))
            if carried else
            f"**repeated exactly** (`{rec['sig']}`, class `{rec['class']}`).")
     return f"""
@@ -318,7 +319,7 @@ That is **consecutive failure #{rec['consecutive']}**. The root cause {why}
 
 This attempt's failure, class `{rec['class']}`:
 
-    {rec['locus']}
+{ub.gate_block(rec['locus'], max_chars=_LOCUS_MAX)}
 
 Retrying the same approach a third time is the failure mode this protocol exists
 to stop. Before you touch the code again:

@@ -352,8 +352,13 @@ def _proposal_id(task_class, model, reasoning, backend, kind):
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
 
 
-def cell_proposal(key, agg, epoch, existing_canary_pids):
-    """(proposal | None, status). status is always set, proposal only on fire."""
+def cell_proposal(key, agg, epoch, existing_canary_pids, dropped_pids=frozenset()):
+    """(proposal | None, status). status is always set, proposal only on fire.
+
+    dropped_pids: downgrade proposal_ids whose canary smoke-FAILED. The id is
+    epoch-free, so re-opening one reuses the failed id: new tagged records join
+    the failed cohorts and the canary can never leave smoke-failed. A dropped
+    downgrade therefore stays closed (status "downgrade-dropped", no proposal)."""
     task_class, model, reasoning, backend = key
     if agg["proposal_pool_n"] == 0:
         return None, "below_min_n"
@@ -380,6 +385,8 @@ def cell_proposal(key, agg, epoch, existing_canary_pids):
     if (n >= MIN_N_DOWNGRADE_OPEN and pass_rate >= DOWNGRADE_OPEN_PASS_MIN
             and esc_rate <= DOWNGRADE_OPEN_ESCALATION_MAX):
         pid = _proposal_id(task_class, model, reasoning, backend, "downgrade")
+        if pid in dropped_pids:
+            return None, "downgrade-dropped"
         already = pid in existing_canary_pids
         return {
             "proposal_id": pid, "kind": "downgrade", "stage": "smoke-in-progress" if already else "open",

@@ -162,6 +162,28 @@ def test_nested_exposure_file_is_recorded_pending(exposure_repo, exposure_node):
     assert card["status"] == "pending" and "not readable JSON (nested too deeply)" in card["detail"]
 
 
+# Deep nesting is refused by OUR scan before the C parser runs, on the default stack and
+# with no help from the recursion limit. On the old code a document this deep killed the
+# interpreter (SIGILL, rc=132 on 3.13), so this test cannot pass by being skipped.
+def test_hundred_thousand_deep_json_is_refused_without_crashing(exposure_repo):
+    from common import loads, parse_json
+    import runlog
+    deep = "[" * 100_000 + "]" * 100_000
+    for fn in (loads, runlog.loads):
+        with pytest.raises(runlog.TooDeep, match="nested too deeply"):
+            fn(deep)
+        # the 1 MiB thread stack is where the old code killed the process (rc=132/138)
+        res = _small_stack(lambda: fn(deep))
+        assert isinstance(res.get("error"), runlog.TooDeep), res
+    assert parse_json(deep, want=list, default="refused") == "refused"
+    # exposure.json is size-capped (64 KiB), so the deepest file it can hold is shorter
+    (exposure_repo / exposure.EXPOSURE).write_text("[" * 32_000 + "]" * 32_000)
+    err = exposure.read_exposure(exposure_repo)["error"]
+    assert err and "not readable JSON (nested too deeply)" in err
+    # brackets inside strings do not count, and ordinary nesting still parses
+    assert loads('{"a": "[[[[", "b": ' + "[" * 150 + "]" * 150 + "}")["a"] == "[[[["
+
+
 # S8R3-H1: the crash handler records a fixed detail and never re-reads exposure.json
 def test_crash_handler_never_reads_the_exposure_file(exposure_repo, exposure_node, monkeypatch):
     _older_pass(exposure_repo)
