@@ -32,8 +32,12 @@ From the approved changeset, collect every **superseded literal** (old price, ol
 model id, old effort rung, old tier name) and run:
 
 ```bash
-python3 ~/.claude/skills/routing-update/scripts/check_stale_values.py '$4.95' '$3.03' 'v12'
+cd ~/your-private-harness
+CLAUDE_DIR=$PWD python3 skills/routing-update/scripts/check_stale_values.py '$4.95' '$3.03' 'v12'
 ```
+
+Without `CLAUDE_DIR` the scan reads the DEPLOYED `~/.claude`, not your edits, and lists
+values you already fixed (2026-11-09, v41).
 
 It scans the live consumer surfaces (SSOT `consumers:` + the carve-outs), skips the
 append-only historical record (`DECISION HISTORY` blocks, `evals/routing/results/**`,

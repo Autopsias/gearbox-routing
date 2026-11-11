@@ -1,0 +1,5 @@
+metric,value,unit,period,note
+revenue,47.5,EUR_m,Q3-FY26,forecast model v2 (mid-quarter, pre-close)
+ebitda_margin,17,pct,Q3-FY26,conservative
+headcount,1180,fte,Q3-FY26,plan number
+revenue,52,EUR_m,Q4-FY26,stretch forecast

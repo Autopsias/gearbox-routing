@@ -1,0 +1,279 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "2026-05-31T1730_s06-internal-verification",
+  "created": "2026-05-31T17:30:00Z",
+  "artifact": {
+    "path": "harbor_board_note.docx",
+    "kind": "document"
+  },
+  "travel_class": {
+    "effective": "board-regulatory"
+  },
+  "sensitivity": {
+    "run_max": "internal",
+    "sources": [
+      {
+        "source_id": "S1",
+        "sensitivity": "internal"
+      }
+    ]
+  },
+  "routing": {
+    "policy": "board-regulatory/internal",
+    "local_only": false
+  },
+  "verification": {
+    "_doc": "SV-01 pipeline output (conventions.md \u00a72.2/\u00a72.3/\u00a72.4; internal \u00a72.1). Each result folded into the same \u00a72 provenance record; provider is metadata only.",
+    "travel_class": "board-regulatory",
+    "passes": {
+      "external": true,
+      "internal": true
+    },
+    "caps": {
+      "internal": 0,
+      "travels": 8,
+      "board-regulatory": 20
+    },
+    "timeouts": {
+      "per_call_s": null,
+      "per_run_s": null,
+      "timed_out_claims": []
+    },
+    "claims_checked": 3,
+    "budget_used": 3,
+    "results": [
+      {
+        "claim": "The Harbor programme completes in 2027",
+        "verdict": "not-found",
+        "materiality": [
+          "headline",
+          "date"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [],
+        "new_review_status": "needs-review",
+        "confidence": 0.0,
+        "note": "external verification unavailable: no external_search provider resolved by the registry",
+        "promoted_to_verified": false,
+        "egress": {
+          "raw_claim_sha256": "81e6ebd8db23dac37e45276d50fbde8fda251f5c609c13ef3cce9c9dabaf8979",
+          "egressed_query": "The Harbor programme completes in 2027",
+          "sensitivity": "internal",
+          "mode": "allow-light",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [],
+            "coarsened_buckets": [],
+            "removed_label_count": 0,
+            "banned_hit_count": 0
+          },
+          "diff": "no transformation needed"
+        }
+      },
+      {
+        "claim": "The Harbor programme completes in 2027",
+        "verdict": "corroborates",
+        "materiality": [
+          "headline",
+          "date"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [
+          "S2"
+        ],
+        "new_review_status": "verified",
+        "confidence": 0.83,
+        "note": "internal corroboration cleared the link-confidence bar (best=0.83 \u2265 0.60)",
+        "promoted_to_verified": true,
+        "egress": null
+      },
+      {
+        "claim": "Group headcount is 1195",
+        "verdict": "not-found",
+        "materiality": [
+          "numeric"
+        ],
+        "severity": "should-fix",
+        "admitted_source_ids": [],
+        "new_review_status": "needs-review",
+        "confidence": 0.0,
+        "note": "external verification unavailable: no external_search provider resolved by the registry",
+        "promoted_to_verified": false,
+        "egress": {
+          "raw_claim_sha256": "bd5e98541f34feb359a79285ecd27da5aa893218aea87bf1e5abe963f431aca4",
+          "egressed_query": "Group headcount is 1195",
+          "sensitivity": "internal",
+          "mode": "allow-light",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [],
+            "coarsened_buckets": [],
+            "removed_label_count": 0,
+            "banned_hit_count": 0
+          },
+          "diff": "no transformation needed"
+        }
+      },
+      {
+        "claim": "Group headcount is 1195",
+        "verdict": "corroborates",
+        "materiality": [
+          "numeric"
+        ],
+        "severity": "should-fix",
+        "admitted_source_ids": [
+          "S3"
+        ],
+        "new_review_status": "verified",
+        "confidence": 0.85,
+        "note": "internal corroboration cleared the link-confidence bar (best=0.88 \u2265 0.60)",
+        "promoted_to_verified": true,
+        "egress": null
+      },
+      {
+        "claim": "The Harbor programme completes in 2025",
+        "verdict": "not-found",
+        "materiality": [
+          "date"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [],
+        "new_review_status": "needs-review",
+        "confidence": 0.0,
+        "note": "external verification unavailable: no external_search provider resolved by the registry",
+        "promoted_to_verified": false,
+        "egress": {
+          "raw_claim_sha256": "9d139f571cb21c9e3f08f7478b42fe234cd454ba28084c4815b96feacc308e1c",
+          "egressed_query": "The Harbor programme completes in 2025",
+          "sensitivity": "internal",
+          "mode": "allow-light",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [],
+            "coarsened_buckets": [],
+            "removed_label_count": 0,
+            "banned_hit_count": 0
+          },
+          "diff": "no transformation needed"
+        }
+      },
+      {
+        "claim": "The Harbor programme completes in 2025",
+        "verdict": "contradicts",
+        "materiality": [
+          "date"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [
+          "S4"
+        ],
+        "new_review_status": "conflicting",
+        "confidence": 0.0,
+        "note": "internal internal-vault source (obsidian) disagrees with the claim \u2014 conflict opened, not blended",
+        "promoted_to_verified": false,
+        "egress": null
+      }
+    ],
+    "not_checked_budget": [],
+    "must_own": [],
+    "promoted_to_verified": [
+      "The Harbor programme completes in 2027",
+      "Group headcount is 1195"
+    ],
+    "_fingerprint": "8c33772d8766e33b1a716368c58a5281a4324d4670f3a42562cfc1104db00815",
+    "_stages": [
+      "source-packet",
+      "trust-review"
+    ],
+    "_recheck_noop": true,
+    "policy": {
+      "external": true,
+      "internal": true,
+      "reason": "board-regulatory travel class: external + internal verification run automatically (external egress-guarded)"
+    }
+  },
+  "egress": [
+    {
+      "raw_claim_sha256": "81e6ebd8db23dac37e45276d50fbde8fda251f5c609c13ef3cce9c9dabaf8979",
+      "egressed_query": "The Harbor programme completes in 2027",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "bd5e98541f34feb359a79285ecd27da5aa893218aea87bf1e5abe963f431aca4",
+      "egressed_query": "Group headcount is 1195",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "9d139f571cb21c9e3f08f7478b42fe234cd454ba28084c4815b96feacc308e1c",
+      "egressed_query": "The Harbor programme completes in 2025",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    }
+  ],
+  "adapter_bindings": {
+    "_doc": "F2-04 adapter registry \u2014 which provider backed each operation this run. provider is metadata only (conventions.md \u00a72.2); resolution is runtime + degrades gracefully (capability-inventory.md). 'tool@version' = a live MCP tool; 'fallback:<id>' = a local/builtin fallback; 'unbound' = no provider, the operation's documented degradation applies (NEVER a fabricated verdict).",
+    "probed_tool_count": 2,
+    "local_caps": [],
+    "bindings": {
+      "external_search": "unbound",
+      "external_fetch": "unbound",
+      "internal_search": "mcp__obsidian-connector__obsidian_search@unknown",
+      "internal_semantic_search": "mcp__obsidian-connector__obsidian_search@unknown",
+      "internal_read": "fallback:packet_excerpt",
+      "docx_read": "fallback:raw_xml_strip",
+      "pdf_read": "unbound",
+      "html_read": "fallback:raw_tag_strip",
+      "md_read": "fallback:plain_text",
+      "docx_comment_write": "fallback:appendix_sidecar"
+    },
+    "degraded_operations": [
+      "external_search",
+      "external_fetch",
+      "internal_semantic_search",
+      "internal_read",
+      "docx_read",
+      "pdf_read",
+      "html_read",
+      "md_read",
+      "docx_comment_write"
+    ]
+  }
+}

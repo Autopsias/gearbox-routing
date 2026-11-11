@@ -533,3 +533,21 @@ def test_a_commit_prefixed_pin_is_honoured_and_repeats_count_once(tmp_path, caps
     for text in (f"{rel}:{rule}:5\n{sha_a}:{rel}:{rule}:5\n", f"{sha_a}:{rel}:{rule}:5\n{rel}:{rule}:5\n"):
         ignore.write_text(text)
         assert egress._gitleaks_pin_budget(egress_root) == {(str(rel), rule): 1}, text
+
+
+def test_a_gitleaks_timeout_is_retried_then_reported_busy_not_restricted(monkeypatch, tmp_path):
+    """2026-11-10: a timeout under load 50 read as 'RESTRICTED' and asked for a human."""
+    import subprocess
+
+    import egress
+    calls = []
+
+    def boom(*a, **k):
+        calls.append(1)
+        raise subprocess.TimeoutExpired("gitleaks", 1)
+    monkeypatch.setattr(egress.subprocess, "run", boom)
+    hit = egress._gitleaks_pass("gitleaks", str(tmp_path), tmp_path, None, None, frozenset())
+    assert len(calls) == 2 and hit.startswith(egress.SCANNER_BUSY)
+    import codex_review_egress as cre
+    assert cre.retry_when_idle(hit) == 2
+    assert cre.retry_when_idle("a real .env file") is None

@@ -1,0 +1,80 @@
+{
+  "manifest_version": "1",
+  "run_id": "pmo-dogfood",
+  "created": "2026-05-30T00:37:53Z",
+  "artifact": {
+    "path": "20260512 Harbor Team Extension Requirements_PMO_Preliminary_v3.xlsx",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "kind": "workbook"
+  },
+  "travel_class": {
+    "effective": "internal"
+  },
+  "sensitivity": {
+    "run_max": "confidential",
+    "sources": [
+      {
+        "source_id": "S1",
+        "sensitivity": "confidential"
+      }
+    ]
+  },
+  "routing": {
+    "policy": "two-context hostile review (trust-review)",
+    "two_context": true,
+    "builder_model": {
+      "name": "Opus",
+      "version": "4.8",
+      "context": "builder",
+      "independent": true
+    },
+    "reviewer_model": {
+      "name": "Sonnet",
+      "version": "4.6",
+      "context": "reviewer",
+      "independent": true
+    },
+    "independence_note": "builder=Opus 4.8 / reviewer=Sonnet 4.6 via Agent model override; reviewer runs in a fresh context with no builder reasoning"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "role": "reviewer",
+      "model": {
+        "name": "Sonnet",
+        "version": "4.6",
+        "context": "reviewer",
+        "independent": true
+      },
+      "timestamp": "2026-05-30T00:37:53Z",
+      "inputs_seen": [
+        {
+          "source_id": "S1",
+          "exposure": "excerpt",
+          "locator": "/sessions/sweet-eloquent-newton/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-30T1200_pmo-dogfood/workbook-verdict.json",
+          "sha256": "3696ad59777e09d5f2daacb544022d435e7cd053d87c5781241fabd8fdf2a90d"
+        }
+      ],
+      "prompt_hashes": {
+        "reviewer_prompt_sha256": "95f8d2dd812ab87b57036b04d4d79ba358f2a1710dc130ca0c336efef4e1a946",
+        "source_packet_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_artifact_sha256": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc",
+        "provenance_record_sha256": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc"
+      },
+      "manifest": {
+        "artifact_hash": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc",
+        "provenance_hash": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc",
+        "reviewer_prompt_hash": "95f8d2dd812ab87b57036b04d4d79ba358f2a1710dc130ca0c336efef4e1a946",
+        "model": "Sonnet 4.6",
+        "ts": "2026-05-30T00:37:53Z"
+      }
+    }
+  ],
+  "human_gate": {
+    "travel_class": "internal",
+    "signoff_required": false,
+    "records": [],
+    "limitations": [],
+    "problems": []
+  }
+}

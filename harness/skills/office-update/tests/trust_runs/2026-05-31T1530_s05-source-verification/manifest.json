@@ -1,0 +1,239 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "2026-05-31T1530_s05-source-verification",
+  "created": "2026-05-31T15:30:00Z",
+  "artifact": {
+    "path": "verification-worked-run",
+    "sha256": "5e4f150aea3a7369c8b05af8d1dbc5f71d8c534691710e5af3c402418960053f",
+    "kind": "other"
+  },
+  "travel_class": {
+    "effective": "travels",
+    "value": "travels",
+    "source": "declared"
+  },
+  "sensitivity": {
+    "run_max": "restricted",
+    "sources": [
+      {
+        "source_id": "S1",
+        "sensitivity": "internal",
+        "redaction": "excerpt"
+      }
+    ],
+    "redaction_default": "mask",
+    "mask_map_sha256": null
+  },
+  "routing": {
+    "policy": "travels/restricted",
+    "local_only": true,
+    "two_context": false
+  },
+  "retention": {
+    "purge_after": "2026-06-07",
+    "retain_excerpts": false
+  },
+  "verification": {
+    "_doc": "SV-01 pipeline output (conventions.md \u00a72.2/\u00a72.3/\u00a72.4). Each result folded into the same \u00a72 provenance record; provider is metadata only.",
+    "travel_class": "travels",
+    "caps": {
+      "internal": 0,
+      "travels": 8,
+      "board-regulatory": 20
+    },
+    "budget_used": 3,
+    "results": [
+      {
+        "claim": "The speed of light is 299792458 m/s",
+        "verdict": "corroborates",
+        "materiality": [
+          "headline",
+          "numeric"
+        ],
+        "severity": "should-fix",
+        "admitted_source_ids": [
+          "S2"
+        ],
+        "new_review_status": "verified",
+        "confidence": 0.9,
+        "note": "cleared by 1 primary/official source",
+        "promoted_to_verified": true,
+        "egress": {
+          "raw_claim_sha256": "e3c513340e5e6cc18f937bf70174e08b0865ba83eda4a079ebc9ee171cc012cb",
+          "egressed_query": "The speed of light is 299792458 m/s",
+          "sensitivity": "public",
+          "mode": "allow-light",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [],
+            "coarsened_buckets": [],
+            "removed_label_count": 0,
+            "banned_hit_count": 0
+          },
+          "diff": "no transformation needed"
+        }
+      },
+      {
+        "claim": "Project Harbor will cost Acme \u20ac21B",
+        "verdict": "not-found",
+        "materiality": [
+          "headline",
+          "numeric"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [],
+        "new_review_status": "needs-review",
+        "confidence": 0.0,
+        "note": "external verification returned no usable sources; claim stays needs-review",
+        "promoted_to_verified": false,
+        "egress": {
+          "raw_claim_sha256": "1fb37a4771704023ddd628ec9f9be699502157f66100736f8284f5cf4d0f1d13",
+          "egressed_query": "Project <BANNED_1> will cost <ENTITY_1> tens-of-EUR-billions",
+          "sensitivity": "restricted",
+          "mode": "mask-required",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [
+              "<BANNED_1>",
+              "<ENTITY_1>"
+            ],
+            "coarsened_buckets": [
+              "tens-of-EUR-billions"
+            ],
+            "removed_label_count": 0,
+            "banned_hit_count": 1
+          },
+          "diff": "masked 2 entities (<BANNED_1>, <ENTITY_1>); coarsened 1 magnitude(s) -> tens-of-EUR-billions; banned tokens present + masked: 1"
+        }
+      },
+      {
+        "claim": "Operating margin was 6% last quarter",
+        "verdict": "contradicts",
+        "materiality": [
+          "numeric"
+        ],
+        "severity": "must-fix",
+        "admitted_source_ids": [
+          "S3"
+        ],
+        "new_review_status": "conflicting",
+        "confidence": 0.0,
+        "note": "external primary source disagrees with the claim (www.reuters.com) \u2014 conflict opened, not blended",
+        "promoted_to_verified": false,
+        "egress": {
+          "raw_claim_sha256": "aac925bc26be6bfaeb27658d8dedc975f53ea86055501dcd4adcc8eb64e39f5e",
+          "egressed_query": "Operating margin was 6% last quarter",
+          "sensitivity": "internal",
+          "mode": "allow-light",
+          "egress_allowed": true,
+          "blocked": false,
+          "block_reason": "",
+          "transform": {
+            "masked_placeholders": [],
+            "coarsened_buckets": [],
+            "removed_label_count": 0,
+            "banned_hit_count": 0
+          },
+          "diff": "no transformation needed"
+        }
+      }
+    ],
+    "not_checked_budget": [],
+    "promoted_to_verified": [
+      "The speed of light is 299792458 m/s"
+    ]
+  },
+  "egress": [
+    {
+      "raw_claim_sha256": "e3c513340e5e6cc18f937bf70174e08b0865ba83eda4a079ebc9ee171cc012cb",
+      "egressed_query": "The speed of light is 299792458 m/s",
+      "sensitivity": "public",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "1fb37a4771704023ddd628ec9f9be699502157f66100736f8284f5cf4d0f1d13",
+      "egressed_query": "Project <BANNED_1> will cost <ENTITY_1> tens-of-EUR-billions",
+      "sensitivity": "restricted",
+      "mode": "mask-required",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [
+          "<BANNED_1>",
+          "<ENTITY_1>"
+        ],
+        "coarsened_buckets": [
+          "tens-of-EUR-billions"
+        ],
+        "removed_label_count": 0,
+        "banned_hit_count": 1
+      },
+      "diff": "masked 2 entities (<BANNED_1>, <ENTITY_1>); coarsened 1 magnitude(s) -> tens-of-EUR-billions; banned tokens present + masked: 1"
+    },
+    {
+      "raw_claim_sha256": "aac925bc26be6bfaeb27658d8dedc975f53ea86055501dcd4adcc8eb64e39f5e",
+      "egressed_query": "Operating margin was 6% last quarter",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    }
+  ],
+  "adapter_bindings": {
+    "_doc": "F2-04 adapter registry \u2014 which provider backed each operation this run. provider is metadata only (conventions.md \u00a72.2); resolution is runtime + degrades gracefully (capability-inventory.md). 'tool@version' = a live MCP tool; 'fallback:<id>' = a local/builtin fallback; 'unbound' = no provider, the operation's documented degradation applies (NEVER a fabricated verdict).",
+    "probed_tool_count": 2,
+    "local_caps": [],
+    "bindings": {
+      "external_search": "mcp__67c72af1-30eb-4017-9b56-b43df03f817d__web_search_exa@unknown",
+      "external_fetch": "mcp__67c72af1-30eb-4017-9b56-b43df03f817d__web_fetch_exa@unknown",
+      "internal_search": "fallback:source_packet",
+      "internal_semantic_search": "fallback:lexical_fallback",
+      "internal_read": "fallback:packet_excerpt",
+      "docx_read": "fallback:raw_xml_strip",
+      "pdf_read": "unbound",
+      "html_read": "fallback:raw_tag_strip",
+      "md_read": "fallback:plain_text",
+      "docx_comment_write": "fallback:appendix_sidecar"
+    },
+    "degraded_operations": [
+      "internal_search",
+      "internal_semantic_search",
+      "internal_read",
+      "docx_read",
+      "pdf_read",
+      "html_read",
+      "md_read",
+      "docx_comment_write"
+    ]
+  },
+  "gate": {
+    "sensitivity_recorded": true,
+    "routing_recorded": true,
+    "status": "ok",
+    "missing": [],
+    "checked_at": "2026-05-31T00:32:19Z"
+  }
+}

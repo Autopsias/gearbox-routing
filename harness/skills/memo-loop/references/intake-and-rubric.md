@@ -74,7 +74,7 @@ follows treats it exactly as it treats a human draft.
 One mechanical pass over the frozen text. It is orchestrator-side and is never shown to the critic.
 
 **Claim→section map** → `dependency-map.json`. Built here; consumed by `critique.md` to locate
-findings and by `trust-handoff.json` to carry per-claim `review_status` into pre-send review.
+findings and by `trust-handoff.json` to carry per-claim `review_status` into `trust-run`.
 
 ```json
 { "sections": [{"id":"S3","heading":"Cost","span":[120,180],"sha256":"…"}],

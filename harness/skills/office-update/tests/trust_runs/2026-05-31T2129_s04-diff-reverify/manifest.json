@@ -1,0 +1,5030 @@
+{
+  "manifest_version": "1.0",
+  "schema_version": "3",
+  "run_id": "2026-05-31T2129_s04-diff-reverify",
+  "created": "2026-05-31T00:00:00Z",
+  "travel_class": {
+    "effective": "board-regulatory",
+    "value": "board-regulatory",
+    "source": "declared"
+  },
+  "sensitivity": {
+    "run_max": "internal",
+    "sources": [
+      {
+        "source_id": "PRIOR",
+        "sensitivity": "internal"
+      }
+    ]
+  },
+  "routing": {
+    "policy": "diff-aware re-verification (up-02); verify changed set only",
+    "local_only": true,
+    "two_context": false,
+    "reviewer_independence": "same-model"
+  },
+  "degraded_status": [],
+  "migration_notes": "up-02 re-verification consumed the prior run .trust/2026-05-30T0900_prev-refresh READ-ONLY; the office-update change-set was diffed by the fd-02 identity; only the changed/new set + the matrix-invalidated carries were re-verified.",
+  "reverification": {
+    "_doc": "UP-02 diff-aware re-verification (codex v3 finding #2): verify only the changed/new set, carry identity-stable unchanged verdicts forward THROUGH the explicit invalidation matrix (with a prior-run pointer), re-open/re-source on any trigger; the SV-07 budget covers the changed set only.",
+    "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+    "travel_class": "board-regulatory",
+    "prior_travel_class": null,
+    "travel_class_escalated": false,
+    "policy": {
+      "external": true,
+      "internal": true,
+      "reason": "board-regulatory travel class: external + internal verification run automatically (external egress-guarded)"
+    },
+    "matrix": {
+      "locator": "carry",
+      "text": "re-open",
+      "unit-period": "re-open",
+      "waiver-owner": "re-open",
+      "travel-class-escalation": "re-open",
+      "source": "re-source",
+      "source-age": "re-source"
+    },
+    "counts": {
+      "prior_total": 300,
+      "current_total": 300,
+      "changed": 12,
+      "reverified_from_change": 12,
+      "reverified_from_invalidation": 2,
+      "reverified_total": 14,
+      "carried": 286
+    },
+    "changed_claim_ids": [
+      "C-1c39d4f0f3df",
+      "C-3459df4bf6c5",
+      "C-3873efae0202",
+      "C-697555431771",
+      "C-75e82ccf7726",
+      "C-861607259952",
+      "C-a3133b4f0396",
+      "C-b257ccae3c1f",
+      "C-dc64738f296b",
+      "C-e2ab1090f09b",
+      "C-ebab779346e9",
+      "C-ff07b49a425e"
+    ],
+    "carried": [
+      {
+        "claim_id": "C-0182c1ff71fe",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0186069aefb5",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0538e7c66c39",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-05ed1c532396",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-067579d98832",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-071e4c0b1426",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-07e5f83695af",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-08a3cb0da0a7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0ba1ccd12607",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0cdc8bf78163",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0d111781c959",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0d44ea38c613",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0d5f65caafcf",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0d6d1f191069",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0e19f2d3c0e1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0e5a337e4dbe",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0ed02a0dc902",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-0fd8ea6c0ce7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1151b28f8a20",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-11e87f10dc64",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-124871f7dda3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-15fa59d1f784",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-178635efa7a0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1882802b853a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1a3ebb39a45c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1a71a0e2482c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1aaeba74040b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1b3fcecaff7d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1bff2145b28b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1c6c5cc115f8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1d6c3223531e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1ef0b52b0be3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-1f1b8e7b3d06",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-204bad0859fa",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-20e6e00c1c96",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-210a78c7260d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-22850b96dab0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-26bbc97c8348",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-27b6e8e680ea",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2b0794fe3e3e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2b184dbdba8a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2b35b8be75ea",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2d11b33b0054",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2d7a5d55cd9c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2d954c6b53af",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2ef425667dd3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2f2d886ae580",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-2fd67140bbc9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-30b2d1b7cacf",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-318e57858fa8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-31c35a742559",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3232a294dfa7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-32344bfb9574",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-325bc43fce66",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-334b27dec364",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-35817b0608fe",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3626877506e5",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3ad0943a8486",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3aef3254edcf",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3b7c800e34bd",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3bb3b48aab69",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3be73f781db8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3d53e7ce0618",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-3ec7c80fe02f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-419150ec34ab",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-427520693c32",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-43e896e71a75",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-441640860d32",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-44507e8f6550",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-48f9fb99571c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-49081ce38297",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-496091f8568d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4a01803de84a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4a874a1c8b17",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4b320b18aca9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4b862f6e8d8c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4b9de82e2069",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4c336c5482b9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4d03b6fc6eb3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4d3cf6e5e890",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4d43983a8d25",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-4f57bcc73c5f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-522770a40aaf",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-524539df53a5",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5419a7e3b7fc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-545ab35b16a9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-559f06798adb",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-55caf4d8845c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-564aec17b5d0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-58604855f2e9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5c603f56b676",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5c657fd12c9c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5cb1905f7ba4",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5d69a388cdf9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-5f2baac16010",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-639a19b59190",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6405a1d595dc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-64cf3fc05b1e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6568144ac18d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-65c5bd1ba816",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-66216a688bf2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6694b7ce6a5d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-66ac8c6cb3e1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-66f6d20c36ab",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-677caca6e3f1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-681777543323",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6861b0425365",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-68deb9347519",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-69bed72a4a46",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6ad449518fef",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6b3c6c7e40bc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6ccf40a2b427",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6e64138a478a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6fa5571ddb60",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6fc91c81c69d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-6fd8b00d25a9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-70c1f48c2a07",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-733c1445a0df",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-750f745f5200",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-75464e45573f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-75dbfa2cc0fd",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-765b67187607",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-766a827da840",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-77fe86c97d0d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-78defdbd8594",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-78e9f5212b15",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7968c5036f0b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7b065e61d270",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7b0da35c7866",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7b215c6e9c0d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7bfba76f6480",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7d4137550ae7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7dcd81ebf5fa",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7ef1a7fd347c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-7fa56a9a30bc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-80605284cd67",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-80c31781763a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-832e07f98228",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-86379a264683",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8706016f650e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-87792281ccaf",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-878abed47583",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-894e4cdb843f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8a3b2e13ff63",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8afefe3c0358",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8b0405cac4df",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8b3d7b8e3910",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8cddf5069ceb",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8de327aff647",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-8e1ac9ee1727",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-91e940f974b2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9422934b0751",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9570c03f8509",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-95c70866c3b1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-969cdfd2248b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-96c07c735992",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-987a9379f538",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-987c0b00cbc7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-990d8e9cfdd2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-99247c454a7e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-99da2bda9f4d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-99f488cb3f8d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9a76a6f30e39",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9a7a2191b101",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9c3d3a9ddf22",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9c5a160eac9e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9d2a35cd00a0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9de7432f33f9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9e08a72a4cb4",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-9fa56d8d979f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a0b3f2aa83b9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a213d834c150",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a2c90e6d1ac8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a39871009808",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a3a420778700",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a65c670c5b55",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a6a046c3bd75",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a7347fc88f46",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a7ba5739c4f0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-a90678adf0ed",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-aa219da09770",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-aa8294846f5d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-adc166129289",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-aec11498f10f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b1193ee75f60",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b2a014258bc3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b3b4c114a370",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b4fc805569fe",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b62f6ed1f928",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b69437d73899",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b6c8c884fbd8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-b9120067a862",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bb983a3a0bc9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bbd2fdf47507",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bbfcedeac720",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bcd8ab4c8b50",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-be8fcaf3fa5d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-be9994ab6272",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bed975339ab2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bf6dfbadd093",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-bfc0cd6ec2b2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c000155723d6",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c093027da8b6",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c1e03ec53720",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c2483a1dad28",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c28697cdd577",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c29d5e5b8b9a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c2e3cbaa1a26",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c2efb8c0b404",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c33e6b5d71fa",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c39fa06d851e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c3b25ba15624",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c4105304dc1d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c4f170085cb4",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c6106f4321c8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c7a806b298dc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c8adcc6f9d90",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c918a60289ca",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-c9894b316bd5",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ca35c64413f2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-cbd6d067a441",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-cc97952366d2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ccfc4eb6c782",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-cd04b4d31cfa",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ce9b3510ddbc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-cf466668467b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d02bb994d86d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d087ec90f016",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d461326886e2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d4dc32d3cafb",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d51790a23a84",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d5841ac7e1cc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d5e8ba66b588",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d713aa8ffc51",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d77fe804a547",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d785c4f70993",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d85e459f8942",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d8ca905554f4",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d94d62e1bd60",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-d9652ebfa248",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-db037665bbd2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-dcc7e3a56ab2",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-dcfe80f019d1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-de064653924d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-de41bfa9c23e",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-de729b07e0b3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-dfcb9742e5be",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-dfe0d0660fbd",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e031c498159b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e08962dbffed",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e1223ccfed2c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e189bc6a53c8",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e2c51edc2c6c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e2d4032c6e0d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e4658101c48a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e50394f6ad9c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e53d1ebbef59",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e556f5664a3c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e57a6310b8c1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e5ee6cb8fa3b",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e5fef2775000",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e71e861a01c3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e930cdfa6b5a",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-e9d007395efb",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ea0e6f15e1eb",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-eb5693daaf4c",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ee3fb6f8a7f3",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ee72b3ac0692",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ef082fdd5b90",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-efab696e6b75",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-efd6c3afebf0",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f1756dd2c8c4",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f1d7830abdd1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f3463f8c209d",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f3738debe8d9",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f671a375552f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f801fd7612e6",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f89df26262e1",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-f9a4233c6645",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-faab3a489bdc",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-fbcba7eba0a5",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-fd39f3e5679f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-fd9f0b83fee7",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-fe9119247b6f",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-fecfd6e0fb22",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      },
+      {
+        "claim_id": "C-ff52dd08ac56",
+        "verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "triggered": []
+      }
+    ],
+    "invalidated": [
+      {
+        "claim_id": "C-265f847b0ea9",
+        "action": "re-open",
+        "triggered": [
+          {
+            "change_class": "waiver-owner",
+            "action": "re-open"
+          }
+        ],
+        "invalidated_verdict": "ready-with-limitations"
+      },
+      {
+        "claim_id": "C-bf35bdccc7f5",
+        "action": "re-source",
+        "triggered": [
+          {
+            "change_class": "source-age",
+            "action": "re-source"
+          }
+        ],
+        "invalidated_verdict": "verified"
+      }
+    ],
+    "decisions": [
+      {
+        "claim_id": "C-0182c1ff71fe",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0186069aefb5",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0538e7c66c39",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-05ed1c532396",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-067579d98832",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-071e4c0b1426",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-07e5f83695af",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-08a3cb0da0a7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0ba1ccd12607",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0cdc8bf78163",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0d111781c959",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0d44ea38c613",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0d5f65caafcf",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0d6d1f191069",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0e19f2d3c0e1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0e5a337e4dbe",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0ed02a0dc902",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-0fd8ea6c0ce7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1151b28f8a20",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-11e87f10dc64",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-124871f7dda3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-15fa59d1f784",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-178635efa7a0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1882802b853a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1a3ebb39a45c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1a71a0e2482c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1aaeba74040b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1b3fcecaff7d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1bff2145b28b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1c6c5cc115f8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1d6c3223531e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1ef0b52b0be3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-1f1b8e7b3d06",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-204bad0859fa",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-20e6e00c1c96",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-210a78c7260d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-22850b96dab0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-265f847b0ea9",
+        "action": "re-open",
+        "triggered": [
+          {
+            "change_class": "waiver-owner",
+            "action": "re-open"
+          }
+        ],
+        "carried_verdict": null,
+        "prior_run": null,
+        "reverify": true
+      },
+      {
+        "claim_id": "C-26bbc97c8348",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-27b6e8e680ea",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2b0794fe3e3e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2b184dbdba8a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2b35b8be75ea",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2d11b33b0054",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2d7a5d55cd9c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2d954c6b53af",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2ef425667dd3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2f2d886ae580",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-2fd67140bbc9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-30b2d1b7cacf",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-318e57858fa8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-31c35a742559",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3232a294dfa7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-32344bfb9574",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-325bc43fce66",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-334b27dec364",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-35817b0608fe",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3626877506e5",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3ad0943a8486",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3aef3254edcf",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3b7c800e34bd",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3bb3b48aab69",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3be73f781db8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3d53e7ce0618",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-3ec7c80fe02f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-419150ec34ab",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-427520693c32",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-43e896e71a75",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-441640860d32",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-44507e8f6550",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-48f9fb99571c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-49081ce38297",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-496091f8568d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4a01803de84a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4a874a1c8b17",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4b320b18aca9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4b862f6e8d8c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4b9de82e2069",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4c336c5482b9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4d03b6fc6eb3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4d3cf6e5e890",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4d43983a8d25",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-4f57bcc73c5f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-522770a40aaf",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-524539df53a5",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5419a7e3b7fc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-545ab35b16a9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-559f06798adb",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-55caf4d8845c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-564aec17b5d0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-58604855f2e9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5c603f56b676",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5c657fd12c9c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5cb1905f7ba4",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5d69a388cdf9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-5f2baac16010",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-639a19b59190",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6405a1d595dc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-64cf3fc05b1e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6568144ac18d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-65c5bd1ba816",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-66216a688bf2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6694b7ce6a5d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-66ac8c6cb3e1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-66f6d20c36ab",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-677caca6e3f1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-681777543323",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6861b0425365",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-68deb9347519",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-69bed72a4a46",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6ad449518fef",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6b3c6c7e40bc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6ccf40a2b427",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6e64138a478a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6fa5571ddb60",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6fc91c81c69d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-6fd8b00d25a9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-70c1f48c2a07",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-733c1445a0df",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-750f745f5200",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-75464e45573f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-75dbfa2cc0fd",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-765b67187607",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-766a827da840",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-77fe86c97d0d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-78defdbd8594",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-78e9f5212b15",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7968c5036f0b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7b065e61d270",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7b0da35c7866",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7b215c6e9c0d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7bfba76f6480",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7d4137550ae7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7dcd81ebf5fa",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7ef1a7fd347c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-7fa56a9a30bc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-80605284cd67",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-80c31781763a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-832e07f98228",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-86379a264683",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8706016f650e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-87792281ccaf",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-878abed47583",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-894e4cdb843f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8a3b2e13ff63",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8afefe3c0358",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8b0405cac4df",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8b3d7b8e3910",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8cddf5069ceb",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8de327aff647",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-8e1ac9ee1727",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-91e940f974b2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9422934b0751",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9570c03f8509",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-95c70866c3b1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-969cdfd2248b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-96c07c735992",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-987a9379f538",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-987c0b00cbc7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-990d8e9cfdd2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-99247c454a7e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-99da2bda9f4d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-99f488cb3f8d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9a76a6f30e39",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9a7a2191b101",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9c3d3a9ddf22",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9c5a160eac9e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9d2a35cd00a0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9de7432f33f9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9e08a72a4cb4",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-9fa56d8d979f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a0b3f2aa83b9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a213d834c150",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a2c90e6d1ac8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a39871009808",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a3a420778700",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a65c670c5b55",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a6a046c3bd75",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a7347fc88f46",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a7ba5739c4f0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-a90678adf0ed",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-aa219da09770",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-aa8294846f5d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-adc166129289",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-aec11498f10f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b1193ee75f60",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b2a014258bc3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b3b4c114a370",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b4fc805569fe",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b62f6ed1f928",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b69437d73899",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b6c8c884fbd8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-b9120067a862",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bb983a3a0bc9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bbd2fdf47507",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bbfcedeac720",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bcd8ab4c8b50",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-be8fcaf3fa5d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-be9994ab6272",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bed975339ab2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bf35bdccc7f5",
+        "action": "re-source",
+        "triggered": [
+          {
+            "change_class": "source-age",
+            "action": "re-source"
+          }
+        ],
+        "carried_verdict": null,
+        "prior_run": null,
+        "reverify": true
+      },
+      {
+        "claim_id": "C-bf6dfbadd093",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-bfc0cd6ec2b2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c000155723d6",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c093027da8b6",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c1e03ec53720",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c2483a1dad28",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c28697cdd577",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c29d5e5b8b9a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c2e3cbaa1a26",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c2efb8c0b404",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c33e6b5d71fa",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c39fa06d851e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c3b25ba15624",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c4105304dc1d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c4f170085cb4",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c6106f4321c8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c7a806b298dc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c8adcc6f9d90",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c918a60289ca",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-c9894b316bd5",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ca35c64413f2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-cbd6d067a441",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-cc97952366d2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ccfc4eb6c782",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-cd04b4d31cfa",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ce9b3510ddbc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-cf466668467b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d02bb994d86d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d087ec90f016",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d461326886e2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d4dc32d3cafb",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d51790a23a84",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d5841ac7e1cc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d5e8ba66b588",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d713aa8ffc51",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d77fe804a547",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d785c4f70993",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d85e459f8942",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d8ca905554f4",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d94d62e1bd60",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-d9652ebfa248",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-db037665bbd2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-dcc7e3a56ab2",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-dcfe80f019d1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-de064653924d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-de41bfa9c23e",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-de729b07e0b3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-dfcb9742e5be",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-dfe0d0660fbd",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e031c498159b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e08962dbffed",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e1223ccfed2c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e189bc6a53c8",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e2c51edc2c6c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e2d4032c6e0d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e4658101c48a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e50394f6ad9c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e53d1ebbef59",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e556f5664a3c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e57a6310b8c1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e5ee6cb8fa3b",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e5fef2775000",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e71e861a01c3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e930cdfa6b5a",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-e9d007395efb",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ea0e6f15e1eb",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-eb5693daaf4c",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ee3fb6f8a7f3",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ee72b3ac0692",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ef082fdd5b90",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-efab696e6b75",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-efd6c3afebf0",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f1756dd2c8c4",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f1d7830abdd1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f3463f8c209d",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f3738debe8d9",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f671a375552f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f801fd7612e6",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f89df26262e1",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-f9a4233c6645",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-faab3a489bdc",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-fbcba7eba0a5",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-fd39f3e5679f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-fd9f0b83fee7",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-fe9119247b6f",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-fecfd6e0fb22",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      },
+      {
+        "claim_id": "C-ff52dd08ac56",
+        "action": "carry",
+        "triggered": [],
+        "carried_verdict": "verified",
+        "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+        "reverify": false
+      }
+    ],
+    "missing_records": [],
+    "verification": {
+      "_doc": "SV-01 pipeline output (conventions.md \u00a72.2/\u00a72.3/\u00a72.4; internal \u00a72.1). Each result folded into the same \u00a72 provenance record; provider is metadata only.",
+      "travel_class": "board-regulatory",
+      "passes": {
+        "external": true,
+        "internal": true
+      },
+      "caps": {
+        "internal": 0,
+        "travels": 8,
+        "board-regulatory": 20
+      },
+      "timeouts": {
+        "per_call_s": null,
+        "per_run_s": null,
+        "timed_out_claims": []
+      },
+      "claims_checked": 14,
+      "budget_used": 14,
+      "results": [
+        {
+          "claim": "Metric 120 equals 840 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "22e22cd5ec542926c148f9bb1412870de1be3c72b3937c9a65f32a7392ba6319",
+            "egressed_query": "Metric 120 equals 840 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 120 equals 840 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 50 equals 350 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "84ef0af87e2c4ddfa2a2e5ee4fed07d3d5543b1bd05cfb029b41bc8d60dc84f8",
+            "egressed_query": "Metric 50 equals 350 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 50 equals 350 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 11 equals 77 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "85d27c0d3d93c4022b25023eaeb1f83b5707515cee6470912019c79f40bffa63",
+            "egressed_query": "Metric 11 equals 77 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 11 equals 77 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 6 equals 42 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "c5255252c7ccaaa8f5c39157f11f28e1fd9d69d08afcd71f91ab72de2630dac8",
+            "egressed_query": "Metric 6 equals 42 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 6 equals 42 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 3 equals 21 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "3c6dacbcfd1639a00ef2773be5b2208692c74b51dfff4072d00aee3a26268f33",
+            "egressed_query": "Metric 3 equals 21 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 3 equals 21 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 0 equals 0 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "a3710122297c398c27b688d5435bbb406105b962a75f0f16da5496e15ba30826",
+            "egressed_query": "Metric 0 equals 0 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 0 equals 0 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 9 equals 63 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "443612d40d8978f6595fa27b4149a541209bce0c01ef582865e6fce4d0d7650a",
+            "egressed_query": "Metric 9 equals 63 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 9 equals 63 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 7 equals 49 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "1c838f296a9eff0877385e1fc97fff7b7cd74d51c8f7c40196ccbe9a0345da72",
+            "egressed_query": "Metric 7 equals 49 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 7 equals 49 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 2 equals 14 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "aa9d130f3bdaddef386da82a71bddaffbaac23805674c8355f7437fdf3ca99a6",
+            "egressed_query": "Metric 2 equals 14 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 2 equals 14 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 8 equals 56 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "6af8d6abf4792aace752bda066da8aa21625236f2b0f49c1ffbba2ce69bf2451",
+            "egressed_query": "Metric 8 equals 56 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 8 equals 56 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 1 equals 7 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "17126f7706eae026a808c33e02cc9f4fdd60265d8c2ae0283d4ad1c2eea89d68",
+            "egressed_query": "Metric 1 equals 7 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 1 equals 7 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 5 equals 35 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "b1f482ca1f2debbeed638152a7956607fecdfa8bc70b37fc16c86bf963307fa0",
+            "egressed_query": "Metric 5 equals 35 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 5 equals 35 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 10 equals 70 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "de079597f7f14fab2bfb629d3d8a509d0906203b0be07716634db4b46c25cdfa",
+            "egressed_query": "Metric 10 equals 70 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 10 equals 70 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        },
+        {
+          "claim": "Metric 4 equals 28 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "external verification returned no usable sources; claim stays needs-review",
+          "promoted_to_verified": false,
+          "egress": {
+            "raw_claim_sha256": "069ad4c8128f1972ac8b1d98c9958a3842c43cd1adba45f106cb7a0d1e71e30c",
+            "egressed_query": "Metric 4 equals 28 basis points in FY25",
+            "sensitivity": "internal",
+            "mode": "allow-light",
+            "egress_allowed": true,
+            "blocked": false,
+            "block_reason": "",
+            "transform": {
+              "masked_placeholders": [],
+              "coarsened_buckets": [],
+              "removed_label_count": 0,
+              "banned_hit_count": 0
+            },
+            "diff": "no transformation needed"
+          }
+        },
+        {
+          "claim": "Metric 4 equals 28 basis points in FY25",
+          "verdict": "not-found",
+          "materiality": [
+            "numeric"
+          ],
+          "severity": "should-fix",
+          "admitted_source_ids": [],
+          "new_review_status": "needs-review",
+          "confidence": 0.0,
+          "note": "internal verification found no addressing note (chain tried: session_memory); claim stays needs-review \u2014 no source fabricated",
+          "promoted_to_verified": false,
+          "egress": null
+        }
+      ],
+      "not_checked_budget": [],
+      "must_own": [],
+      "promoted_to_verified": []
+    },
+    "_stage": "refresh"
+  },
+  "egress": [
+    {
+      "raw_claim_sha256": "22e22cd5ec542926c148f9bb1412870de1be3c72b3937c9a65f32a7392ba6319",
+      "egressed_query": "Metric 120 equals 840 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "84ef0af87e2c4ddfa2a2e5ee4fed07d3d5543b1bd05cfb029b41bc8d60dc84f8",
+      "egressed_query": "Metric 50 equals 350 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "85d27c0d3d93c4022b25023eaeb1f83b5707515cee6470912019c79f40bffa63",
+      "egressed_query": "Metric 11 equals 77 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "c5255252c7ccaaa8f5c39157f11f28e1fd9d69d08afcd71f91ab72de2630dac8",
+      "egressed_query": "Metric 6 equals 42 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "3c6dacbcfd1639a00ef2773be5b2208692c74b51dfff4072d00aee3a26268f33",
+      "egressed_query": "Metric 3 equals 21 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "a3710122297c398c27b688d5435bbb406105b962a75f0f16da5496e15ba30826",
+      "egressed_query": "Metric 0 equals 0 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "443612d40d8978f6595fa27b4149a541209bce0c01ef582865e6fce4d0d7650a",
+      "egressed_query": "Metric 9 equals 63 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "1c838f296a9eff0877385e1fc97fff7b7cd74d51c8f7c40196ccbe9a0345da72",
+      "egressed_query": "Metric 7 equals 49 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "aa9d130f3bdaddef386da82a71bddaffbaac23805674c8355f7437fdf3ca99a6",
+      "egressed_query": "Metric 2 equals 14 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "6af8d6abf4792aace752bda066da8aa21625236f2b0f49c1ffbba2ce69bf2451",
+      "egressed_query": "Metric 8 equals 56 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "17126f7706eae026a808c33e02cc9f4fdd60265d8c2ae0283d4ad1c2eea89d68",
+      "egressed_query": "Metric 1 equals 7 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "b1f482ca1f2debbeed638152a7956607fecdfa8bc70b37fc16c86bf963307fa0",
+      "egressed_query": "Metric 5 equals 35 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "de079597f7f14fab2bfb629d3d8a509d0906203b0be07716634db4b46c25cdfa",
+      "egressed_query": "Metric 10 equals 70 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    },
+    {
+      "raw_claim_sha256": "069ad4c8128f1972ac8b1d98c9958a3842c43cd1adba45f106cb7a0d1e71e30c",
+      "egressed_query": "Metric 4 equals 28 basis points in FY25",
+      "sensitivity": "internal",
+      "mode": "allow-light",
+      "egress_allowed": true,
+      "blocked": false,
+      "block_reason": "",
+      "transform": {
+        "masked_placeholders": [],
+        "coarsened_buckets": [],
+        "removed_label_count": 0,
+        "banned_hit_count": 0
+      },
+      "diff": "no transformation needed"
+    }
+  ],
+  "adapter_bindings": {
+    "_doc": "F2-04 adapter registry \u2014 which provider backed each operation this run. provider is metadata only (conventions.md \u00a72.2); resolution is runtime + degrades gracefully (capability-inventory.md). 'tool@version' = a live MCP tool; 'fallback:<id>' = a local/builtin fallback; 'unbound' = no provider, the operation's documented degradation applies (NEVER a fabricated verdict).",
+    "probed_tool_count": 1,
+    "local_caps": [],
+    "bindings": {
+      "external_search": "mcp__x__web_search_exa@unknown",
+      "external_fetch": "unbound",
+      "internal_search": "fallback:source_packet",
+      "internal_semantic_search": "fallback:lexical_fallback",
+      "internal_read": "fallback:packet_excerpt",
+      "docx_read": "fallback:raw_xml_strip",
+      "pdf_read": "unbound",
+      "html_read": "fallback:raw_tag_strip",
+      "md_read": "fallback:plain_text",
+      "docx_comment_write": "fallback:appendix_sidecar",
+      "vault_write": "fallback:trust_quarantine",
+      "external_reviewer": "fallback:same_family_agent"
+    },
+    "degraded_operations": [
+      "external_fetch",
+      "internal_search",
+      "internal_semantic_search",
+      "internal_read",
+      "docx_read",
+      "pdf_read",
+      "html_read",
+      "md_read",
+      "docx_comment_write",
+      "vault_write",
+      "external_reviewer"
+    ]
+  },
+  "artifact": {
+    "path": "reverification-report.json",
+    "sha256": "c30880094914f37fb4036ef3d13e64a544d2640c137ecaa8e8a8fbf93e664a86",
+    "kind": "other"
+  },
+  "gate": {
+    "ok": true,
+    "checks": [
+      "schema_version=3",
+      "prior-run-read-only",
+      "changed-set-only-budget"
+    ]
+  }
+}

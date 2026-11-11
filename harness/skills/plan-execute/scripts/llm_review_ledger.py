@@ -259,6 +259,17 @@ def review_focus(ctx):
     return delta | {_norm(p.get("file") or "") for p in ctx.priors if p.get("file")}
 
 
+def accept_note(plan_dir, session, accepted):
+    """Always say what the accept file did: a misnamed file was ignored in silence."""
+    d = Path(plan_dir) / "_verify_state"
+    strays = sorted(f.name for f in d.glob(f"{session.split('.')[0]}*.accepted.json")
+                    if f != accepted_path(plan_dir, session)) if d.is_dir() else []
+    note = f"accept_file={accepted_path(plan_dir, session).name} entries={len(accepted)}"
+    if strays:
+        note += f" WARNING other accept file(s) NOT read: {', '.join(strays)}"
+    return note
+
+
 class Context:
     """Everything the gate needs from the ledger for ONE run, computed once."""
 
@@ -273,7 +284,13 @@ class Context:
                          if p not in self.hashes and os.path.lexists(Path(cwd, p))]
         self.delta = fix_delta(self.records, self.hashes) if self.attempt > 1 else set()
         self.priors = open_priors(self.records, self.floor)
+        # A prior whose file left the surface (removed, reverted) is moot: retire it
+        # so it neither blocks nor is listed to the reviewer (2026-11-10, s02).
+        inside = {_norm(x) for x in surface_paths}
+        self.retired = [p for p in self.priors if inside and _norm(p.get("file") or "") not in inside]
+        self.priors = [p for p in self.priors if p not in self.retired]
         self.accepted = load_accepted(plan_dir, session)
+        self.accept_note = accept_note(plan_dir, session, self.accepted)
         unchanged = len([p for p in self.hashes if p not in self.delta])
         self.section = prompt_section(self.attempt, self.priors, self.delta, unchanged)
 
@@ -426,6 +443,10 @@ def judge(ctx, parsed, floor=None):
         counts["prior_open"] += 1                # omission IS not a fix, in surface
         recs.append({**p, "kind": "finding", "attempt": a, "status": "open",
                      "evidence": "not addressed by the reviewer; treated as OPEN"})
+    for p in getattr(ctx, "retired", ()):
+        recs.append({**p, "kind": "finding", "attempt": a, "status": "retired",
+                     "evidence": "its file left the reviewed surface; kept in the ledger, not judged"})
+    counts["accept_note"] = getattr(ctx, "accept_note", "")
     return any(r["status"] == "open" for r in recs), counts, recs
 
 
@@ -455,6 +476,8 @@ def convergence_line(counts):
     line = (f"[llm-review-gate] convergence: attempt={c['attempt']} prior_fixed={c['prior_fixed']} "
             f"prior_open={c['prior_open']} new_in_delta={c['new_in_delta']} "
             f"new_outside={c['new_outside']} noted={c['noted']}")
+    if c.get("accept_note"):
+        line += " " + c["accept_note"]
     if c.get("accepted"):
         line += (f" accepted={c['accepted']} (declared in the accept file by file and "
                  "phrase, each with a reason -- recorded and printed, not blocking)")

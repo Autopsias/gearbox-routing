@@ -11,23 +11,18 @@ Task shape maps to a cheap class (per `task_classes:`) but the session ran predo
 on a higher tier than that class's default — e.g. mechanical/standard-build-shaped work on
 the main session's advisory tier with no escalation justification in the transcript.
 - **Evidence bar**: task shape inferable from prompt/title with reasonable confidence AND
-  ≥70% of assistant messages on the higher tier AND no receipt/switch justifying it.
+  ≥70% of assistant messages on the higher tier AND no `/model` switch justifying it.
 - **Caveat**: the MAIN SESSION cannot switch its own model (SSOT SCOPE (b)) — a
   main-session mismatch is a *missed /model-recommendation* finding (advisory failure),
   not an agent-pin bug. Say which it is.
 
 ### under-modeled
 Escalation-ladder signature: repeated failures at the same root cause (tool errors /
-re-attempts clustered), then a `/model` switch or a receipt showing late escalation — the
+re-attempts clustered), then a `/model` switch showing late escalation — the
 task should have STARTED higher per its class default, or escalated after 2 failures per
 `escalation:` and didn't.
 - **Evidence bar**: the failure→switch sequence visible in the scan (error counts + switch
-  commands); quote the receipt or switch line from the transcript for the ledger entry.
-
-### receipt-vs-actual mismatch
-A routing receipt claims `class -> tier` but the transcript's model mix disagrees with
-that tier, or the claimed class is implausible for the task shape.
-- **Evidence bar**: the receipt line verbatim + the session's model-mix row.
+  commands); quote the switch line from the transcript for the ledger entry.
 
 ### cost outlier
 Session cost far above peers with similar shape/duration in the same scan window (rule of
@@ -77,7 +72,7 @@ literally as `peer-gate-miss` — the runbook's promotion owner-gate greps for t
 2. **Recurring** over/under-modeling on one task shape (calibration signal → /routing-update).
 3. One-off misroutes (ledger entries).
 4. Cost outliers with a named mechanism.
-5. Hygiene: missing receipts, settings/env drift, fan-out policy adherence, context-bloat
+5. Hygiene: settings/env drift, fan-out policy adherence, context-bloat
    (dispatch hygiene — no SSOT change; it never routes to `/routing-update`).
 
 ## Honesty rules

@@ -1,0 +1,74 @@
+{
+  "round": 1,
+  "verify_prior": [],
+  "fresh_full_findings": [
+    {
+      "id": "R-01",
+      "location": "Board!B5",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "new": true
+    },
+    {
+      "id": "R-02",
+      "location": "Board!B7",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "new": true
+    },
+    {
+      "id": "R-03",
+      "location": "Board!B5",
+      "type": "source_packet_link",
+      "severity": "must-fix",
+      "new": true
+    },
+    {
+      "id": "R-04",
+      "location": "Board!B7",
+      "type": "source_packet_link",
+      "severity": "should-fix",
+      "new": true
+    }
+  ],
+  "new_findings": [
+    {
+      "id": "R-01",
+      "location": "Board!B5",
+      "severity": "must-fix"
+    },
+    {
+      "id": "R-02",
+      "location": "Board!B7",
+      "severity": "must-fix"
+    },
+    {
+      "id": "R-03",
+      "location": "Board!B5",
+      "severity": "must-fix"
+    },
+    {
+      "id": "R-04",
+      "location": "Board!B7",
+      "severity": "should-fix"
+    }
+  ],
+  "new_must_fix": [
+    "R-01",
+    "R-02",
+    "R-03"
+  ],
+  "unresolved_must_fix": [
+    "R-01",
+    "R-02",
+    "R-03"
+  ],
+  "safe_stop": false,
+  "naive_stop": true,
+  "regression_caught": true,
+  "model": {
+    "name": "Sonnet",
+    "version": "4.6"
+  },
+  "timestamp": "2026-05-29T23:00:10Z"
+}

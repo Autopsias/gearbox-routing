@@ -1,0 +1,6 @@
+metric,value,unit,period,note
+revenue,48.2,EUR_m,Q3-FY26,FP&A close pack (final)
+ebitda_margin,18.5,pct,Q3-FY26,final
+headcount,1195,fte,Q3-FY26,final
+cloud_migration_spend,2.1,EUR_m,Q3-FY26,final
+gross_margin,61,pct,Q3-FY26,final

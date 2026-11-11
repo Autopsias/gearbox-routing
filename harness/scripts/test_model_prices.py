@@ -90,10 +90,11 @@ def test_the_live_ssot_haiku_55_has_the_vendor_long_prompt_row():
 def test_the_live_ssot_prices_every_model_the_harness_runs():
     root = pathlib.Path(__file__).resolve().parents[1]
     t = model_prices.load(str(root / "model-routing.yaml"))
-    for mid in ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5",
-                "claude-haiku-4-5-20251001"):
+    for mid in ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-2", "claude-fable-5-1",
+                "claude-sonnet-5", "claude-haiku-4-5-20251001"):
         assert model_prices.rates(t, mid), mid
     assert model_prices.rates(t, "claude-fable-5-1")[2] == 0.25   # the 4x cache-read error, once
+    assert model_prices.rates(t, "claude-fable-5-2")[:3] == (8.0, 40.0, 0.20)   # v41, pricing page 2026-11-09
 
 
 @pytest.mark.skipif(

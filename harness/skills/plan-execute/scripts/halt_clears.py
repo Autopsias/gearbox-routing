@@ -14,8 +14,9 @@ class HaltClearRefused(Exception):
     pass
 
 
-def clear_halt(plan_dir, cost_report=None):
+def clear_halt(plan_dir, cost_report=None, decision=None):
     import run_state_io as rsi
+    import stuck_protocol as sp
     state = rsi.load_state(plan_dir)
     sid = (state.get("halt") or {}).get("by_session") or ""
     clears = state.setdefault("halt_clears", {})
@@ -26,6 +27,13 @@ def clear_halt(plan_dir, cost_report=None):
             "Post the cost line to the owner first, then re-run with it: "
             f"clear-halt {plan_dir} --cost-report "
             "'<elapsed, passes so far, what changed, the cut you propose>'")
+    if sp.armed((state.get("stuck") or {}).get(sid)) and not (decision or "").strip():
+        # The stuck protocol said "same root cause, repeated" and the loop went on
+        # anyway (s02, 2026-11-10: 8 rounds). A clear is now a choice, on the record.
+        raise HaltClearRefused(
+            f"{sid or '(unknown)'} is stuck: the same failure repeated. Choose how to cut it "
+            f"(simplify, accept the finding on record, or stop), then re-run: clear-halt "
+            f"{plan_dir} --decision '<the option you chose and why>'")
     clears[sid] = n + 1
     state["halt"] = {"set": False, "reason": None, "by_session": None, "at": None, "kind": None}
     rsi.save_state(plan_dir, state)
@@ -33,14 +41,14 @@ def clear_halt(plan_dir, cost_report=None):
     if notice.exists():
         notice.unlink()
     rsi.log_event(plan_dir, "halt_cleared", session=sid or None, clears=n + 1,
-                  cost_report=cost_report)
+                  cost_report=cost_report, decision=decision)
     return state
 
 
-def clear_halt_cli(plan_dir, cost_report, out):
+def clear_halt_cli(plan_dir, cost_report, out, decision=None):
     """run.py's `clear-halt`: print through `out`, exit 1 on a refusal."""
     try:
-        state = clear_halt(plan_dir, cost_report=cost_report)
+        state = clear_halt(plan_dir, cost_report=cost_report, decision=decision)
     except HaltClearRefused as e:
         out({"refused": str(e)})
         raise SystemExit(1)

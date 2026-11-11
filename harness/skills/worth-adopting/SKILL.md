@@ -84,6 +84,12 @@ title's promise in place of the content. For a repo or a skill folder, "all of i
 SKILL.md and every reference and script it names. A source that retells another work (a video
 about an essay, a post about a talk) is not all of it: find and read that work before any verdict.
 
+While a file the source names is unread, the result is provisional: the result line says
+"provisional: read X of Y named files", and the run never closes with "nothing here" or
+"none passes". Read the rest first, or name each unread file with the reason it cannot matter
+(a platform the target does not use). On 2026-11-09 a pstack run read 1 of 23 named playbooks,
+said none passed, and the owner's re-check found the changes in the 22 it skipped.
+
 ## 3. Extract the proposals
 
 Write one row per proposal: a plain title, one line on what they do, a short quote with its
@@ -139,6 +145,10 @@ failure, because the first two are cheap and remove most proposals.
    be about another repo. Before a DROP for no pain or "not this target", search the pains of
    every project the target's skills serve (`~/.claude/projects/*/memory/`). A pain in another
    repo counts when the target is where the fix would live; the report names that repo.
+   A cost proposal (a cheaper model, effort or tier) is never dropped for "no pain on
+   record": its pain is a number, so measure the spend it would cut (`retro_scan.py --last
+   20`) before the verdict. 2026-11-09: a model-choice article lost its main table this way,
+   and the owner's re-check found Opus at 82% of spend.
 2. **Does the target already cover it?** HAVE and equal or worse: DROP, and the line names
    the part of ours that covers each part of theirs; "the same idea" is not a comparison, and
    an idea at the centre of the source gets a full row, never a one-line DROP. HAVE and theirs
@@ -204,7 +214,12 @@ Spend verification only on ADOPT, TRIAL and PARK. A DROP needs none.
 - **An outside repo or package.** Run `gh repo view <owner>/<repo> --json
   stargazerCount,pushedAt,licenseInfo,isArchived` and read the licence and any terms of service.
 - **The target side.** Re-open every `file:line` you cite, and re-run every command behind a
-  number. A pain that a later change already fixed is not a pain.
+  number. A pain that a later change already fixed is not a pain: run
+  `git -C <target> log --since=<the note's date> --oneline` and `ls <target>/scripts <target>/skills`,
+  filtered by the pain's noun, because a fix often lands the day the note is written
+  (2026-11-09: an ADOPT for a worktree audit that `scripts/worktree_report.py` already did).
+  Open the file the smallest form names and the code that reads it, and state the real number
+  of files: a catalog row can need a collector, a route and tests.
 
 ## 7. Report, ledger row, decision card
 

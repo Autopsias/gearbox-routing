@@ -1,0 +1,438 @@
+{
+  "run_id": "2026-05-31T2010_s02-office-update",
+  "skill": "office-update",
+  "phase": "refresh",
+  "schema_version": "3",
+  "produced_at": "2026-05-31T00:00:00Z",
+  "prev_run_id": "2026-05-29T1615_q3-boardpack",
+  "prev_schema_version": "1",
+  "prev_dir": "/sessions/exciting-charming-tesla/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-29T1615_q3-boardpack",
+  "consumes": [
+    "/sessions/exciting-charming-tesla/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-29T1615_q3-boardpack",
+    "current claim-set"
+  ],
+  "status": "ok-with-warnings",
+  "status_reason": "8 unchanged, 0 updated, 1 new, 1 dropped (tombstoned), 1 superseded (linked).",
+  "read_only_verified": true,
+  "travel_class": "internal",
+  "counts": {
+    "unchanged": 8,
+    "updated": 0,
+    "new": 1,
+    "dropped": 1,
+    "superseded": 1
+  },
+  "prior_total": 10,
+  "current_total": 9,
+  "carried_forward": {
+    "verdicts": 8,
+    "waivers": 0
+  },
+  "changes": [
+    {
+      "claim_id": "C-11345560da0d",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "q3_actuals.csv#headcount",
+      "locator": "q3_actuals.csv#headcount",
+      "claim_text": "Q3-FY26 headcount = 1,195"
+    },
+    {
+      "claim_id": "C-3c0bdb5c1485",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "q3_forecast_v2.csv#Q4",
+      "locator": "q3_forecast_v2.csv#Q4",
+      "claim_text": "Q4-FY26 revenue ≈ €52M"
+    },
+    {
+      "claim_id": "C-3dc4e395c021",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "strategy_offsite_notes.md#lighthouse",
+      "locator": "strategy_offsite_notes.md#lighthouse",
+      "claim_text": "Considering acquisition of a smaller competitor (Project Lighthouse), ~€15M"
+    },
+    {
+      "claim_id": "C-45c7b241bb4d",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "strategy_offsite_notes.md#headcount",
+      "locator": "strategy_offsite_notes.md#headcount",
+      "claim_text": "Grow headcount to ~1,250 by end FY27"
+    },
+    {
+      "claim_id": "C-5d24efff1840",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "q3_actuals.csv#ebitda_margin",
+      "locator": "q3_actuals.csv#ebitda_margin",
+      "claim_text": "Q3-FY26 EBITDA margin = 18.5%"
+    },
+    {
+      "claim_id": "C-8cf0e3f92287",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "verified",
+      "carried_waiver": null,
+      "status": "verified",
+      "prev_locator": "q3_actuals.csv#cloud_migration_spend",
+      "locator": "q3_actuals.csv#cloud_migration_spend",
+      "claim_text": "Cloud-migration spend = €2.1M"
+    },
+    {
+      "claim_id": "C-92bfc298353c",
+      "classification": "unchanged",
+      "relation": "moved",
+      "moved": true,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "",
+      "locator": "#moved-to-board-summary",
+      "claim_text": "Q3 revenue up 12% YoY"
+    },
+    {
+      "claim_id": "C-d05483e8c6f4",
+      "classification": "unchanged",
+      "relation": "unchanged",
+      "moved": false,
+      "identity_stable": true,
+      "can_carry_verdict": true,
+      "invalidation": [],
+      "carried_verdict": "needs-review",
+      "carried_waiver": null,
+      "status": "needs-review",
+      "prev_locator": "q3_actuals.csv#revenue",
+      "locator": "q3_actuals.csv#revenue",
+      "claim_text": "Q3-FY26 revenue = €48.2M"
+    },
+    {
+      "claim_id": "C-754523db5ed6",
+      "classification": "new",
+      "relation": "changed-identity",
+      "supersedes": [
+        "C-985ac65c1101"
+      ],
+      "carried_verdict": null,
+      "carried_waiver": null,
+      "status": "needs-review",
+      "locator": "cfo_email_thread.md#10:30#restated",
+      "claim_text": "Present EBITDA margin as 18% flat to the board, footnote the detail (restated post-close)"
+    },
+    {
+      "claim_id": "C-7c65eea5c0d2",
+      "classification": "dropped",
+      "relation": "dropped",
+      "supersession_state": "tombstoned",
+      "carried_verdict": null,
+      "carried_waiver": null,
+      "status": "tombstoned",
+      "locator": "strategy_offsite_notes.md#emea",
+      "claim_text": "Possible reorg of EMEA sales team"
+    },
+    {
+      "claim_id": "C-985ac65c1101",
+      "classification": "superseded",
+      "relation": "superseded",
+      "supersession_state": "superseded",
+      "superseded_by": "C-754523db5ed6",
+      "carried_verdict": null,
+      "carried_waiver": null,
+      "status": "superseded",
+      "locator": "cfo_email_thread.md#10:30",
+      "claim_text": "Present EBITDA margin as 18% flat to the board, footnote the detail"
+    }
+  ],
+  "tombstones": [
+    {
+      "claim_id": "C-7c65eea5c0d2",
+      "claim_text": "Possible reorg of EMEA sales team",
+      "last_locator": "strategy_offsite_notes.md#emea",
+      "last_sources": [
+        {
+          "source_id": "S5",
+          "source_status": "current",
+          "as_of": ""
+        }
+      ],
+      "supersession_state": "tombstoned",
+      "reason": "present in prior run, absent from current claim-set"
+    }
+  ],
+  "supersessions": [
+    {
+      "superseded_claim_id": "C-985ac65c1101",
+      "superseded_by": "C-754523db5ed6",
+      "prior_value": "18% (board display)",
+      "prior_sources": [
+        {
+          "source_id": "S3",
+          "source_status": "current",
+          "as_of": ""
+        }
+      ],
+      "new_value": "Present EBITDA margin as 18% flat to the board, footnote the detail (restated post-close)",
+      "new_sources": [
+        {
+          "source_id": "S9",
+          "source_status": "current",
+          "as_of": "2026-06-30"
+        }
+      ],
+      "blended": false,
+      "note": "superseded source linked to its replacement; both values preserved, never blended or averaged"
+    }
+  ],
+  "migration_notes": "office-update consumed prior run 2026-05-29T1615_q3-boardpack (schema_version 1) READ-ONLY via the fd-03 reader (whole-dir byte-hash unchanged before/after). Diffed by fd-02 claim identity. Carried forward 8 prior verdict(s) + 0 valid waiver(s) on identity-stable UNCHANGED claims only; 0 identity-stable-but-invalidated claim(s) re-enter needs-review; 1 dropped claim(s) tombstoned (never deleted); 1 superseded source(s) linked, not blended. New output stamped schema_version=3.",
+  "next_claim_set": {
+    "schema_version": "3",
+    "run_id": "2026-05-31T2010_s02-office-update",
+    "claims": [
+      {
+        "claim_text": "Cloud-migration spend = €2.1M",
+        "locator": "q3_actuals.csv#cloud_migration_spend",
+        "sources": [
+          {
+            "source_id": "S1",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q3-FY26",
+        "value": "€2.1M",
+        "slot": "C9",
+        "verdict": "verified",
+        "claim_id": "C-8cf0e3f92287",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Grow headcount to ~1,250 by end FY27",
+        "locator": "strategy_offsite_notes.md#headcount",
+        "sources": [
+          {
+            "source_id": "S5",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "FY27",
+        "value": "~1,250",
+        "slot": "C8",
+        "verdict": "needs-review",
+        "claim_id": "C-45c7b241bb4d",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Considering acquisition of a smaller competitor (Project Lighthouse), ~€15M",
+        "locator": "strategy_offsite_notes.md#lighthouse",
+        "sources": [
+          {
+            "source_id": "S5",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "FY26/27",
+        "value": "Project Lighthouse, ~€15M",
+        "slot": "C7",
+        "verdict": "needs-review",
+        "claim_id": "C-3dc4e395c021",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Q3 revenue up 12% YoY",
+        "locator": "#moved-to-board-summary",
+        "sources": [],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q3-FY26",
+        "value": "+12% YoY",
+        "slot": "C6",
+        "verdict": "needs-review",
+        "claim_id": "C-92bfc298353c",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Q4-FY26 revenue ≈ €52M",
+        "locator": "q3_forecast_v2.csv#Q4",
+        "sources": [
+          {
+            "source_id": "S2",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q4-FY26",
+        "value": "€52M",
+        "slot": "C5",
+        "verdict": "needs-review",
+        "claim_id": "C-3c0bdb5c1485",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Q3-FY26 headcount = 1,195",
+        "locator": "q3_actuals.csv#headcount",
+        "sources": [
+          {
+            "source_id": "S1",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q3-FY26",
+        "value": "1195",
+        "slot": "C4",
+        "verdict": "needs-review",
+        "claim_id": "C-11345560da0d",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Q3-FY26 EBITDA margin = 18.5%",
+        "locator": "q3_actuals.csv#ebitda_margin",
+        "sources": [
+          {
+            "source_id": "S1",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q3-FY26",
+        "value": "18.5%",
+        "slot": "C2",
+        "verdict": "needs-review",
+        "claim_id": "C-5d24efff1840",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Q3-FY26 revenue = €48.2M",
+        "locator": "q3_actuals.csv#revenue",
+        "sources": [
+          {
+            "source_id": "S1",
+            "source_status": "current",
+            "content_hash": "",
+            "as_of": ""
+          }
+        ],
+        "retrieval_timestamp": "",
+        "materiality_class": "numeric",
+        "unit": null,
+        "period": "Q3-FY26",
+        "value": "€48.2M",
+        "slot": "C1",
+        "verdict": "needs-review",
+        "claim_id": "C-d05483e8c6f4",
+        "supersession_state": "active"
+      },
+      {
+        "claim_text": "Present EBITDA margin as 18% flat to the board, footnote the detail (restated post-close)",
+        "locator": "cfo_email_thread.md#10:30#restated",
+        "surface": "csv",
+        "fmt": "csv",
+        "sources": [
+          {
+            "source_id": "S9",
+            "source_status": "current",
+            "content_hash": "post-close-restatement",
+            "as_of": "2026-06-30"
+          }
+        ],
+        "retrieval_timestamp": "2026-06-30T00:00:00Z",
+        "materiality_class": "numeric",
+        "slot": "C3",
+        "supersedes": [
+          "C-985ac65c1101"
+        ],
+        "claim_id": "C-754523db5ed6",
+        "supersession_state": "active",
+        "verdict": "needs-review"
+      },
+      {
+        "claim_id": "C-7c65eea5c0d2",
+        "claim_text": "Possible reorg of EMEA sales team",
+        "locator": "strategy_offsite_notes.md#emea",
+        "supersession_state": "tombstoned",
+        "verdict": null,
+        "sources": [],
+        "materiality_class": "numeric"
+      },
+      {
+        "claim_id": "C-985ac65c1101",
+        "claim_text": "18% (board display)",
+        "supersession_state": "superseded",
+        "superseded_by": "C-754523db5ed6",
+        "verdict": null,
+        "sources": [],
+        "materiality_class": "numeric"
+      }
+    ]
+  }
+}

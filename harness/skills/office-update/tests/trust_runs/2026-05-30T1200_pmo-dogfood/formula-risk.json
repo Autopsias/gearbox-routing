@@ -1,0 +1,210 @@
+{
+  "run_id": "pmo-dogfood",
+  "skill": "workbook-doctor",
+  "phase": "formula-risk",
+  "status": "ok-with-warnings",
+  "status_reason": "9 formula risk(s) found; RECALC UNVERIFIED (recalc unverified \u2014 Traceback (most recent call last):\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 184, in <module>\n    main()\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 179, in main\n    result = recalc(filename, timeout)\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 76, in recalc\n    if not setup_libreoffice_macro():\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 55, in setup_libreoffice_macro\n    subprocess.run(\n  File \"/usr/lib/python3.10/subprocess.py\", line 505, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1154, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 2022, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1198, in _check_timeout\n    raise TimeoutExpired(\nsubprocess.TimeoutExpired: Command '['soffice', '--headless', '--terminate_after_init']' timed out after 10 seconds\n).",
+  "inputs": {
+    "workbook": "pmo_dogfood.xlsx",
+    "workbook_map": null,
+    "source_packet": "source-packet.json"
+  },
+  "recalc": {
+    "ran": false,
+    "note": "recalc unverified \u2014 Traceback (most recent call last):\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 184, in <module>\n    main()\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 179, in main\n    result = recalc(filename, timeout)\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 76, in recalc\n    if not setup_libreoffice_macro():\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 55, in setup_libreoffice_macro\n    subprocess.run(\n  File \"/usr/lib/python3.10/subprocess.py\", line 505, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1154, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 2022, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1198, in _check_timeout\n    raise TimeoutExpired(\nsubprocess.TimeoutExpired: Command '['soffice', '--headless', '--terminate_after_init']' timed out after 10 seconds\n"
+  },
+  "period_bands": [],
+  "named_ranges": [],
+  "dependency_graph": {
+    "node_count": 18,
+    "edge_count": 9,
+    "edges_sample": [
+      [
+        "DDs review!F3",
+        "DDs review!E3"
+      ],
+      [
+        "DDs review!F4",
+        "DDs review!E4"
+      ],
+      [
+        "DDs review!F5",
+        "DDs review!E5"
+      ],
+      [
+        "DDs review!F7",
+        "DDs review!E7"
+      ],
+      [
+        "DDs review!F10",
+        "DDs review!E10"
+      ],
+      [
+        "DDs review!F11",
+        "DDs review!E11"
+      ],
+      [
+        "DDs review!F12",
+        "DDs review!E12"
+      ],
+      [
+        "DDs review!F13",
+        "DDs review!E13"
+      ],
+      [
+        "DDs review!F14",
+        "DDs review!E14"
+      ]
+    ],
+    "dangling": [],
+    "dangling_count": 0,
+    "cycles": []
+  },
+  "source_link": {
+    "claims_indexed": 0,
+    "cells_linked": 0
+  },
+  "checks_run": [
+    "shape_consistency",
+    "roll_forward",
+    "repeated_literal_ref",
+    "hardcode_in_calc_zone",
+    "hardcode_in_formula",
+    "ref_error",
+    "named_range",
+    "dangling_reference",
+    "circular_reference",
+    "recalc_error",
+    "source_packet_link"
+  ],
+  "findings": [
+    {
+      "id": "FR-001",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F3",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E3+21"
+      }
+    },
+    {
+      "id": "FR-002",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F4",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E4+21"
+      }
+    },
+    {
+      "id": "FR-003",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F5",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=+E5+21"
+      }
+    },
+    {
+      "id": "FR-004",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F7",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=+E7+21"
+      }
+    },
+    {
+      "id": "FR-005",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F10",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E10+21"
+      }
+    },
+    {
+      "id": "FR-006",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F11",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E11+21"
+      }
+    },
+    {
+      "id": "FR-007",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F12",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E12+21"
+      }
+    },
+    {
+      "id": "FR-008",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F13",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E13+21"
+      }
+    },
+    {
+      "id": "FR-009",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F14",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Magic constant 21 embedded in a formula \u2014 an undocumented assumption that won't show up as an input cell. Move it to a labelled, sourced assumption cell.",
+      "detail": {
+        "formula": "=E14+21"
+      }
+    }
+  ],
+  "summary": {
+    "finding_count": 9,
+    "by_severity": {
+      "must-fix": 0,
+      "should-fix": 9,
+      "polish": 0
+    },
+    "by_check": {
+      "hardcode_in_formula": 9
+    }
+  }
+}

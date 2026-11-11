@@ -189,7 +189,7 @@ diagnosis; or close `BLOCKED` carrying the `decision_brief` above, whose
 `findings` are that pass's sources.
 
 **Where it sits on the escalation ladder.** The standing ladder is *retry →
-raise reasoning → advisor → raise model → Codex*. The research pass is the rung
+raise reasoning → raise model → Codex*. The research pass is the rung
 between **retry** and **raise model**: a second identical failure is evidence
 about the problem, not about the model, and paying for a bigger model to repeat a
 wrong diagnosis is the expensive version of retrying blind. Escalate the model

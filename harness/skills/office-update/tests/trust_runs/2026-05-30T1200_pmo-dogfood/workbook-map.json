@@ -1,0 +1,296 @@
+{
+  "run_id": "pmo-dogfood",
+  "skill": "workbook-doctor",
+  "phase": "workbook-map",
+  "status": "ok-with-warnings",
+  "status_reason": "20 structural flag(s): 0 must-fix, 12 should-fix, 8 polish",
+  "inputs": {
+    "workbook": "pmo_dogfood.xlsx",
+    "source_packet": "/sessions/sweet-eloquent-newton/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-30T1200_pmo-dogfood/source-packet.json"
+  },
+  "sheets": [
+    {
+      "name": "Carve-out",
+      "index": 0,
+      "state": "visible",
+      "dimensions": {
+        "rows": 66,
+        "cols": 13,
+        "used_range": "A1:M66"
+      },
+      "cell_counts": {
+        "total": 858,
+        "formula": 0,
+        "numeric": 0,
+        "text": 288,
+        "date": 20,
+        "blank": 550,
+        "bool": 0
+      },
+      "formula_density": 0.0,
+      "header_row": 2,
+      "classification": {
+        "type": "data/raw",
+        "status": "current",
+        "rationale": "literals only, no formulas \u2014 looks like an input/export table"
+      }
+    },
+    {
+      "name": "DDs review",
+      "index": 1,
+      "state": "visible",
+      "dimensions": {
+        "rows": 17,
+        "cols": 12,
+        "used_range": "A1:L17"
+      },
+      "cell_counts": {
+        "total": 204,
+        "formula": 9,
+        "numeric": 0,
+        "text": 96,
+        "date": 9,
+        "blank": 90,
+        "bool": 0
+      },
+      "formula_density": 0.079,
+      "header_row": 2,
+      "classification": {
+        "type": "mixed",
+        "status": "current",
+        "rationale": "mix of literals and formulas"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "id": "WM-001",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M13:M19",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-002",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M21:M24",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-003",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M28:M37",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-004",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M40:M43",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-005",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M4:M10",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-006",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M50:M54",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-007",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M56:M61",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-008",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M63:M65",
+      "severity": "polish",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Merged cells break row/column parsing and hide which cell actually holds the value.",
+      "detail": null
+    },
+    {
+      "id": "WM-009",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 11",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-010",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 19",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-011",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 25",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-012",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 37",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-013",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 44",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-014",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 48",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-015",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 54",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-016",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 61",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-017",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 65",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Fully blank row inside a populated table \u2014 splits the range and breaks fills/sorts.",
+      "detail": null
+    },
+    {
+      "id": "WM-018",
+      "check": "duplicate_rows",
+      "sheet": "Carve-out",
+      "locator": "row 66 (== row 62)",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Duplicate data row \u2014 double-counts in any aggregation over this table.",
+      "detail": null
+    },
+    {
+      "id": "WM-019",
+      "check": "date_as_text",
+      "sheet": "Carve-out",
+      "locator": "E52",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Date(s) stored as text \u2014 not comparable/sortable as dates.",
+      "detail": null
+    },
+    {
+      "id": "WM-020",
+      "check": "source_without_id_date",
+      "sheet": "Carve-out",
+      "locator": "header row 2",
+      "severity": "should-fix",
+      "review_status": "needs-review",
+      "issue_lifecycle": "open",
+      "message": "Raw/data sheet has no source ID or date/period column \u2014 values can't be traced to a source per conventions.md.",
+      "detail": null
+    }
+  ],
+  "summary": {
+    "sheet_count": 2,
+    "finding_count": 20,
+    "by_severity": {
+      "must-fix": 0,
+      "should-fix": 12,
+      "polish": 8
+    }
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "run_id": "2026-05-30T1015_q3-humangate",
+  "skill": "trust-review",
+  "phase": "review-result",
+  "status": "ok-with-warnings",
+  "status_reason": "round cap (3) reached with unresolved findings",
+  "readiness": "ready-with-limitations",
+  "readiness_reason": "3 must-fix waived by a human (\u00a74) \u2014 named limitations travel with the file.",
+  "converged": false,
+  "stop_round": null,
+  "rounds_run": 1,
+  "max_rounds": 3,
+  "routing": {
+    "policy": "two-context hostile review (trust-review)",
+    "two_context": true,
+    "builder_model": {
+      "name": "Opus",
+      "version": "4.8",
+      "context": "builder",
+      "independent": true
+    },
+    "reviewer_model": {
+      "name": "Sonnet",
+      "version": "4.6",
+      "context": "reviewer",
+      "independent": true
+    },
+    "independence_note": "builder=Opus 4.8 / reviewer=Sonnet 4.6 via Agent model override; reviewer runs in a fresh context with no builder reasoning"
+  },
+  "findings": [
+    {
+      "id": "R-01",
+      "location": "Board!B5",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "waived-by-human",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 3,
+          "lifecycle": "waived-by-human"
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "location": "Board!B7",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "waived-by-human",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 3,
+          "lifecycle": "waived-by-human"
+        }
+      ]
+    },
+    {
+      "id": "R-03",
+      "location": "Board!B5",
+      "type": "source_packet_link",
+      "severity": "must-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "waived-by-human",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 3,
+          "lifecycle": "waived-by-human"
+        }
+      ]
+    },
+    {
+      "id": "R-04",
+      "location": "Board!B7",
+      "type": "source_packet_link",
+      "severity": "should-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "still-open",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 3,
+          "lifecycle": "still-open"
+        }
+      ]
+    }
+  ],
+  "must_own": [
+    {
+      "kind": "waived",
+      "ref": "R-01",
+      "what": "hardcode_in_calc_zone @ Board!B5 (risk accepted by human)"
+    },
+    {
+      "kind": "waived",
+      "ref": "R-02",
+      "what": "hardcode_in_calc_zone @ Board!B7 (risk accepted by human)"
+    },
+    {
+      "kind": "waived",
+      "ref": "R-03",
+      "what": "source_packet_link @ Board!B5 (risk accepted by human)"
+    },
+    {
+      "kind": "human-review",
+      "ref": "R-04",
+      "what": "source_packet_link @ Board!B7 needs a human decision"
+    }
+  ],
+  "regression_caught_in_rounds": [
+    1
+  ],
+  "summary": {
+    "must_fix_total": 3,
+    "must_fix_blocking": [],
+    "verified_fixed": [],
+    "waived": [
+      "R-01",
+      "R-02",
+      "R-03"
+    ],
+    "still_open": [
+      "R-04"
+    ]
+  },
+  "waiver_problems": [],
+  "human_gate": {
+    "travel_class": "board-regulatory",
+    "signoff_required": true,
+    "records": [
+      {
+        "finding_id": "R-01",
+        "resolution": "waived-by-human",
+        "owner": "Alex Example (CDO)",
+        "required_decision": "accept residual sourcing risk for the Q3 board pack",
+        "due_date": "2026-06-15",
+        "signoff": "approved",
+        "rationale": "the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+        "travel_class": "board-regulatory",
+        "applied": true,
+        "limitation": "LIMITATION [R-01] \u2014 hardcode_in_calc_zone @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes."
+      },
+      {
+        "finding_id": "R-02",
+        "resolution": "waived-by-human",
+        "owner": "Alex Example (CDO)",
+        "required_decision": "accept residual sourcing risk for the Q3 board pack",
+        "due_date": "2026-06-15",
+        "signoff": "approved",
+        "rationale": "the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+        "travel_class": "board-regulatory",
+        "applied": true,
+        "limitation": "LIMITATION [R-02] \u2014 hardcode_in_calc_zone @ Board!B7: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes."
+      },
+      {
+        "finding_id": "R-03",
+        "resolution": "waived-by-human",
+        "owner": "Alex Example (CDO)",
+        "required_decision": "accept residual sourcing risk for the Q3 board pack",
+        "due_date": "2026-06-15",
+        "signoff": "approved",
+        "rationale": "the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+        "travel_class": "board-regulatory",
+        "applied": true,
+        "limitation": "LIMITATION [R-03] \u2014 source_packet_link @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes."
+      }
+    ],
+    "limitations": [
+      "LIMITATION [R-01] \u2014 hardcode_in_calc_zone @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+      "LIMITATION [R-02] \u2014 hardcode_in_calc_zone @ Board!B7: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+      "LIMITATION [R-03] \u2014 source_packet_link @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes."
+    ],
+    "problems": []
+  },
+  "limitations": [
+    "LIMITATION [R-01] \u2014 hardcode_in_calc_zone @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+    "LIMITATION [R-02] \u2014 hardcode_in_calc_zone @ Board!B7: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes.",
+    "LIMITATION [R-03] \u2014 source_packet_link @ Board!B5: accept residual sourcing risk for the Q3 board pack. Risk accepted by Alex Example (CDO) (decision: accept residual sourcing risk for the Q3 board pack; due 2026-06-15; signoff: approved). Rationale: the missing source arrives post-close; the figure is directional and is flagged as a named limitation in the board notes."
+  ]
+}

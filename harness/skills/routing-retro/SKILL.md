@@ -1,7 +1,7 @@
 ---
 name: routing-retro
 description: >-
-  Retrospective over recent session transcripts + the misroute ledger to judge whether model/effort routing is actually working — over-modeled, under-modeled, cost outliers, receipt mismatches. Use when the user says "routing retro", "is our model selection working", "analyze model/effort fit", "review routing performance", "are we over/under-modeled", "how much are sessions costing", or after ~1 week / ~30 sessions on a new routing mapping. READ-ONLY analysis - it proposes; the only write it ever offers is an operator-confirmed append to MISROUTES.md. Calibration changes route to /routing-update — this skill never edits the SSOT.
+  Retrospective over recent session transcripts + the misroute ledger to judge whether model/effort routing is actually working — over-modeled, under-modeled, cost outliers. Use when the user says "routing retro", "is our model selection working", "analyze model/effort fit", "review routing performance", "are we over/under-modeled", "how much are sessions costing", or after ~1 week / ~30 sessions on a new routing mapping. READ-ONLY analysis - it proposes; the only write it ever offers is an operator-confirmed append to MISROUTES.md. Calibration changes route to /routing-update — this skill never edits the SSOT.
 allowed-tools: [Read, Bash, Glob, Grep, Edit, AskUserQuestion]
 effort: medium  # judgment over pre-digested per-session stats (the deterministic scanner does the heavy lifting); findings are proposals reviewed by the operator, not applied state.
 ---
@@ -11,7 +11,7 @@ effort: medium  # judgment over pre-digested per-session stats (the deterministi
 Manual, nudged retrospective. The routing system is automatic-by-construction for
 dispatched work and advisory-with-observability for the main session — this skill is the
 **observability half exercised deliberately**: scan recent sessions, compare what SHOULD
-have run (SSOT `task_classes:`) against what DID run (transcript model mix + receipts),
+have run (SSOT `task_classes:`) against what DID run (transcript model mix + switches + dispatches),
 and turn mismatches into ledger entries and calibration proposals.
 
 **Read-only posture.** This skill writes NOTHING except (after explicit per-entry operator
@@ -53,14 +53,18 @@ python3 ~/.claude/skills/routing-retro/scripts/retro_scan.py \
   `--last N`.
 - Output per session: model mix %, token breakdown, **cost against SSOT `prices:`**,
   `context_peak_tokens` + `reread_cost_usd`/`reread_cost_pct` (context carried forward),
-  duration, tool/API error counts, `max_tokens` truncations, routing receipts
-  (`class -> tier` lines), `/model`·`/effort` switch commands, first prompt, AI title.
+  duration, tool/API error counts, `max_tokens` truncations, Task/Agent dispatches
+  (`agent_dispatches`), `/model`·`/effort` switch commands, first prompt, AI title.
 - Read the JSON output, not the transcripts. Only open a raw transcript when a specific
-  finding needs verbatim evidence (quote a receipt, confirm an escalation sequence).
+  finding needs verbatim evidence (quote a switch line, confirm an escalation sequence).
+- Do not count prose routing receipts (`class -> tier` lines): that rule was retired in
+  `model-routing.yaml` DECISION HISTORY v1.18, and a missing one is NOT a misroute signal.
+  Since v1.18 `hooks/dispatch-audit.py` is the dispatch record (log
+  `~/.gearbox-state/routing/dispatch-audit.ndjson`).
 
 ### 1b. Aggregation (cohort-level facts + threshold proposals)
 
-`retro_scan.py` reads TRANSCRIPTS (cost, context, receipts — the dispatch-hygiene half).
+`retro_scan.py` reads TRANSCRIPTS (cost, context, dispatches — the dispatch-hygiene half).
 `aggregate_outcomes.py` reads the separate outcome LEDGER
 (`evals/routing/outcomes.ndjson`, written by `/plan-execute` at every verify/rework
 resolution) and turns it into per-cell success-rate facts and, only past minimum sample
@@ -129,9 +133,9 @@ Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_p
 1. **Infer task shape** from `first_prompt` + `ai_title` (and `~/.claude/history.jsonl`
    prompts if the first prompt is a bare slash command).
 2. **Expected class** per SSOT `task_classes:` → expected (model, effort) pair.
-3. **Compare vs actual** model mix + receipts + switches. Flag per the rubric:
+3. **Compare vs actual** model mix + switches + dispatches. Flag per the rubric:
    over-modeled, under-modeled (escalation-ladder signatures: repeated failures then a
-   model switch), receipt-vs-actual mismatch, cost outlier, degradation-ladder activation,
+   model switch), cost outlier, degradation-ladder activation,
    context-bloat. The last one is a *dispatch-hygiene* flag, not a routing one — it needs
    cited evidence that the session's work DIVERGED, never a token count alone (a long hard
    single task with a big context is correct behaviour), and its remedy is a clean worker,
@@ -146,7 +150,7 @@ Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_p
 
 **Effort blind spot — handle explicitly.** Transcripts do NOT record effort. Report effort
 as *inferred* (settings.json `effortLevel`, `CLAUDE_CODE_EFFORT_LEVEL` env, `/effort`
-switches seen in transcripts, receipts) and label it "inferred" in every finding — never
+switches seen in transcripts) and label it "inferred" in every finding — never
 claim effort as measured. (`verify-routing.sh` check (g) shows current env overrides.)
 
 ### 3. Report — one rendered one-pager + a decision card, every retro, the house way
@@ -275,7 +279,7 @@ dates and `evals/routing/results/*/ROUTING-*-CHANGESET.md`), verify they're stil
 - Guard-covered surfaces: `bash ~/.claude/scripts/verify-routing.sh --full` (read-only) —
   green means SSOT/agents/digest/stamps still agree.
 - NOT guard-blocking: `settings.json` `model`/`effortLevel` vs `main_session:` (the guard
-  only warns) and *behavioral* adherence (are receipts actually being emitted? are fan-outs
+  only warns) and *behavioral* adherence (are fan-outs
   pinning non-Fable models per `fanout_policy:`?) — check both here, from the scan data.
 
 ### 5. Close

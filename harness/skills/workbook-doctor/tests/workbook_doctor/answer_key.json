@@ -1,0 +1,58 @@
+{
+  "description": "Ground-truth defects seeded into each Workbook Doctor fixture. The acceptance gate (fixture_workbook_doctor.py) asserts the scanner flags every 'must_detect' entry with the stated check + severity, and — critically — that the roll-forward trap is caught while a shape/consistency check passes the same row.",
+  "fixtures": {
+    "roll_forward": {
+      "workbook": "roll_forward.xlsx",
+      "scanner": "formula_risk",
+      "must_detect": [
+        {"check": "roll_forward", "sheet": "Model", "cells": ["D7", "E7"], "severity": "must-fix",
+         "why": "=$C$5/$B$5-1 filled across years — refs never advance; D7/E7 compute the 2024 ratio for every later year."}
+      ],
+      "trap_assertions": [
+        {"assert": "shape_consistent_true_for_row", "sheet": "Model", "row": 7,
+         "why": "every cell in row 7 is structurally identical (R1C1), so a sibling-shape/consistency check PASSES the bug."},
+        {"assert": "no_roll_forward_flag", "sheet": "Model", "cells": ["C8", "D8", "E8"],
+         "why": "the correct contrast row (refs advance one period each step) must NOT be flagged — keeps false positives down."}
+      ]
+    },
+    "hardcoded_output": {
+      "workbook": "hardcoded_output.xlsx",
+      "scanner": "formula_risk",
+      "must_detect": [
+        {"check": "hardcode_in_calc_zone", "sheet": "Summary", "cells": ["E6"], "severity": "must-fix",
+         "why": "E6 is a typed number in the Total column where E4/E5/E7 are =SUM formulas — won't recompute and is wrong (32 vs 21)."},
+        {"check": "hardcode_in_formula", "sheet": "Summary", "cells": ["E8"], "severity": "should-fix",
+         "why": "=E7*1.15 bakes a 1.15 magic constant into a calc — an undocumented assumption."}
+      ]
+    },
+    "stale_reference": {
+      "workbook": "stale_reference.xlsx",
+      "scanner": "formula_risk",
+      "must_detect": [
+        {"check": "dangling_reference", "sheet": "Report", "cells": ["B2"], "severity": "should-fix",
+         "why": "=Data!C10 points at an empty cell — a moved/deleted precedent the result silently carries."},
+        {"check": "ref_error", "sheet": "Report", "cells": ["B3"], "severity": "must-fix",
+         "why": "=Data!#REF!+1 carries a broken-reference token."}
+      ]
+    },
+    "mixed_unit": {
+      "workbook": "mixed_unit.xlsx",
+      "scanner": "workbook_map",
+      "must_detect": [
+        {"check": "mixed_units", "sheet": "Mixed", "column": "B", "severity": "must-fix",
+         "why": "column B mixes € (millions), % and a bare number — not comparable/addable."}
+      ]
+    },
+    "q3_board_model": {
+      "workbook": "q3_board_model.xlsx",
+      "scanner": "formula_risk",
+      "requires_source_packet": true,
+      "must_detect": [
+        {"check": "source_packet_link", "sheet": "Board", "cells": ["B5"], "severity": "must-fix",
+         "why": "Revenue YoY % (0.12) traces to packet claim C6 (+12% YoY), which is UNSUPPORTED — no prior-year base in any source."},
+        {"check": "source_packet_link", "sheet": "Board", "cells": ["B7"], "severity": "should-fix",
+         "why": "Headcount 1,180 traces to claim C4 / CONFLICT-003 — conflicting; the authoritative actual is 1,195."}
+      ]
+    }
+  }
+}

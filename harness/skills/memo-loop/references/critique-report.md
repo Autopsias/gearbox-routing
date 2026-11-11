@@ -5,7 +5,7 @@ The author rewrites — or hands the findings to a single-pass rewriter of their
 
 `intake-and-rubric.md` owns the compiled rubric and the anchor score; `critique.md` owns the critic, the
 transport ladder and the findings. This file owns what is *done* with them: the deliverable, the typed
-terminal state, the handoff to pre-send review, and the lessons append.
+terminal state, the handoff to `trust-run`, and the lessons append.
 
 > **Why this file replaced a revision loop — read once, then never re-litigate it.**
 > An earlier version of this skill ran an automated multi-round revise-and-converge loop. Blind
@@ -102,7 +102,7 @@ rung 2).
 
 **`CLEAN` does not mean the memo is good, and must never be reported as if it did.** It means this
 rubric, checked by this critic, found nothing material. The memo has not been rewritten, verified for
-sending, or endorsed. pre-send review is what decides whether it may leave the building.
+sending, or endorsed. `trust-run` is what decides whether it may leave the building.
 
 ## The critique report
 
@@ -167,7 +167,7 @@ claim says "over the last year".
 
 ## Handoff
 `trust-handoff.json` written. Critique exemplar archived to `<calibration_dir>/<slug>/<run_id>/`.
-Board-bound? Rewrite first, then pre-send review decides whether it may be sent.
+Board-bound? Rewrite first, then `trust-run` decides whether it may be sent.
 ```
 
 ## The abort report

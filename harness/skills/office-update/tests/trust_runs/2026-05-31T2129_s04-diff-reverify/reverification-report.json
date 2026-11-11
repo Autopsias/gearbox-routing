@@ -1,0 +1,87 @@
+{
+  "carried_sample": [
+    {
+      "claim_id": "C-0182c1ff71fe",
+      "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+      "triggered": [],
+      "verdict": "verified"
+    },
+    {
+      "claim_id": "C-0186069aefb5",
+      "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+      "triggered": [],
+      "verdict": "verified"
+    },
+    {
+      "claim_id": "C-0538e7c66c39",
+      "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+      "triggered": [],
+      "verdict": "verified"
+    }
+  ],
+  "changed_claim_ids": [
+    "C-1c39d4f0f3df",
+    "C-3459df4bf6c5",
+    "C-3873efae0202",
+    "C-697555431771",
+    "C-75e82ccf7726",
+    "C-861607259952",
+    "C-a3133b4f0396",
+    "C-b257ccae3c1f",
+    "C-dc64738f296b",
+    "C-e2ab1090f09b",
+    "C-ebab779346e9",
+    "C-ff07b49a425e"
+  ],
+  "counts": {
+    "carried": 286,
+    "changed": 12,
+    "current_total": 300,
+    "prior_total": 300,
+    "reverified_from_change": 12,
+    "reverified_from_invalidation": 2,
+    "reverified_total": 14
+  },
+  "invalidated": [
+    {
+      "action": "re-open",
+      "claim_id": "C-265f847b0ea9",
+      "invalidated_verdict": "ready-with-limitations",
+      "triggered": [
+        {
+          "action": "re-open",
+          "change_class": "waiver-owner"
+        }
+      ]
+    },
+    {
+      "action": "re-source",
+      "claim_id": "C-bf35bdccc7f5",
+      "invalidated_verdict": "verified",
+      "triggered": [
+        {
+          "action": "re-source",
+          "change_class": "source-age"
+        }
+      ]
+    }
+  ],
+  "matrix": {
+    "locator": "carry",
+    "source": "re-source",
+    "source-age": "re-source",
+    "text": "re-open",
+    "travel-class-escalation": "re-open",
+    "unit-period": "re-open",
+    "waiver-owner": "re-open"
+  },
+  "prior_run": ".trust/2026-05-30T0900_prev-refresh",
+  "run_id": "2026-05-31T2129_s04-diff-reverify",
+  "stale_claim_id": "C-bf35bdccc7f5",
+  "verification_summary": {
+    "cap": 20,
+    "claims_checked": 14,
+    "distinct_claims": 14
+  },
+  "waiver_claim_id": "C-265f847b0ea9"
+}

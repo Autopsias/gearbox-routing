@@ -1,0 +1,73 @@
+{
+  "manifest_version": "1",
+  "run_id": "2026-05-29T1740_q3-workbook",
+  "created": "2026-05-29T23:00:10Z",
+  "artifact": {
+    "path": "q3_board_model.xlsx",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "kind": "workbook"
+  },
+  "travel_class": {
+    "effective": "board-regulatory"
+  },
+  "sensitivity": {
+    "run_max": "confidential",
+    "sources": [
+      {
+        "source_id": "S1",
+        "sensitivity": "confidential"
+      }
+    ]
+  },
+  "routing": {
+    "policy": "two-context hostile review (trust-review)",
+    "two_context": true,
+    "builder_model": {
+      "name": "Opus",
+      "version": "4.8",
+      "context": "builder",
+      "independent": true
+    },
+    "reviewer_model": {
+      "name": "Sonnet",
+      "version": "4.6",
+      "context": "reviewer",
+      "independent": true
+    },
+    "independence_note": "builder=Opus 4.8 / reviewer=Sonnet 4.6 via Agent model override; reviewer runs in a fresh context with no builder reasoning"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "role": "reviewer",
+      "model": {
+        "name": "Sonnet",
+        "version": "4.6",
+        "context": "reviewer",
+        "independent": true
+      },
+      "timestamp": "2026-05-29T23:00:10Z",
+      "inputs_seen": [
+        {
+          "source_id": "S1",
+          "exposure": "excerpt",
+          "locator": ".trust/2026-05-29T1740_q3-workbook/workbook-verdict.json",
+          "sha256": "3696ad59777e09d5f2daacb544022d435e7cd053d87c5781241fabd8fdf2a90d"
+        }
+      ],
+      "prompt_hashes": {
+        "reviewer_prompt_sha256": "ea391b91bcebe7f68ad449f741d9967c287d8905bf7f4a4990e816189e2dcc57",
+        "source_packet_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "input_artifact_sha256": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228",
+        "provenance_record_sha256": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228"
+      },
+      "manifest": {
+        "artifact_hash": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228",
+        "provenance_hash": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228",
+        "reviewer_prompt_hash": "ea391b91bcebe7f68ad449f741d9967c287d8905bf7f4a4990e816189e2dcc57",
+        "model": "Sonnet 4.6",
+        "ts": "2026-05-29T23:00:10Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+ "run_id": "pmo-dogfood",
+ "generated": "2026-05-30T00:27:08.151119",
+ "sources": [
+  {
+   "id": "S1",
+   "kind": "workbook",
+   "status": "current",
+   "name": "20260512 Harbor Team Extension Requirements_PMO_Preliminary_v3.xlsx",
+   "note": "Single source \u2014 no external corroboration; every figure rests on this one workbook."
+  }
+ ],
+ "claims": []
+}

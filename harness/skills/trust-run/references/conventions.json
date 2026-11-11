@@ -1,0 +1,194 @@
+{
+  "_doc": "Machine-readable mirror of references/conventions.md. The contract hub for the Office Trust Layer plugin. Components read these values; they never redefine them.",
+  "version": "0.1.0",
+  "source_id_scheme": "S<n> (S1, S2, ...) assigned in the source packet; stable and never reused for the life of the artifact",
+  "source_status": ["current", "superseded", "estimate", "raw"],
+  "severity": ["must-fix", "should-fix", "polish"],
+  "review_status": ["verified", "needs-review", "unsupported", "conflicting"],
+  "readiness": ["not-ready", "ready-with-limitations", "ready"],
+  "issue_lifecycle": ["open", "fixed-claimed", "verified-fixed", "waived-by-human", "still-open"],
+  "loop_stop_condition": "each round runs verify-prior AND fresh-full passes; stop only when no open/fixed-claimed/still-open finding AND no new must-fix this round; round-cap with anything unresolved => survivors still-open => not-ready",
+  "provenance_record": {
+    "claim": "...",
+    "supporting": [
+      {
+        "source_id": "S1",
+        "locator": "Model.xlsx#Outputs!B14",
+        "confidence": 0.0,
+        "rationale": "why this source backs the claim"
+      }
+    ],
+    "conflict": null,
+    "_conflict_shape": {"with": ["S2"], "note": "S1 says 12%, S2 says 9%"},
+    "_rules": {
+      "zero_supporting": "review_status = unsupported (must-fix once it travels)",
+      "non_null_conflict": "review_status = conflicting",
+      "confidence": "0.0-1.0 link confidence (source supports claim); sub-threshold links held for human approval, never auto-asserted"
+    }
+  },
+  "speaker_note_template": {
+    "Claim": "the claim, plain English",
+    "Source IDs": "S1, S3 ...",
+    "Calculation": "formula/derivation, or 'direct from source'",
+    "Assumptions": "load-bearing assumptions with source/owner/status",
+    "Needs review": "what a human must confirm, or 'none'"
+  },
+  "command_io": {
+    "inputs": ["declared artifact paths"],
+    "out_dir": ".trust/<run_id>/",
+    "run_id_scheme": "<ISO-timestamp>_<short-slug> e.g. 2026-05-29T1430_boardpack",
+    "outputs": ["<skill>.json", "<skill>.md"],
+    "manifest": "manifest.json in out_dir; for model-run loops records input/source-packet/reviewer-prompt hashes, model+version, timestamp per round (full policy in sensitivity-routing-policy.md, S02)",
+    "status": ["ok", "ok-with-warnings", "blocked", "failed"],
+    "status_notes": {
+      "ok": "ran fully; nothing beyond the normal verdict",
+      "ok-with-warnings": "ran fully with caveats (e.g. capability fell back: 'recalc unverified')",
+      "blocked": "precondition unmet / gated (e.g. sensitivity+routing not recorded before a model-run loop); work is well-defined but gated",
+      "failed": "attempted and errored (tool crash, unreadable file)"
+    }
+  },
+  "waiver_rule": "any waived must-fix caps the verdict at ready-with-limitations (never plain ready); a waiver requires named owner + required decision + due date + signoff status + written rationale persisted in the manifest; a Board/Regulatory waived must-fix additionally requires named-owner signoff recorded before the verdict may be returned (else not-ready)",
+  "release_thresholds": {
+    "recall_must_fix": 0.90,
+    "false_positive_rate_max": 0.10,
+    "severity_accuracy": 0.80,
+    "runtime_max_min": 10,
+    "note": "placeholder targets - revisable",
+    "soft_criterion_removed": "ship-if-green-or-gaps-listed is NOT a release criterion; the four numbers above are hard gates at hr-00 (M1) and hr-04 (M2)"
+  },
+  "threshold_change_rule": "thresholds may change ONLY via a logged rationale recorded BEFORE the release benchmark runs; never relaxed after seeing failures; a post-hoc change blocks release",
+  "_v2_additive": "Everything below is a v2 additive extension (document surface + source verification), mirroring conventions.md §1.6-§1.7 and §2.2-§2.5. The v1 keys above (source_status, severity, review_status, readiness, issue_lifecycle, provenance_record, command_io, waiver_rule, release_thresholds, threshold_change_rule) are FROZEN and unchanged.",
+  "surface": ["excel", "ppt", "doc"],
+  "format": ["docx", "pdf", "md", "html"],
+  "doc_format_required": "every doc-surface record (map/locator/claim/evidence/review/benchmark/dogfood) MUST carry a format; reported per-format AND combined; a single 'doc' verdict never hides a per-format extraction/mutation limit (review finding #6)",
+  "doc_locator": "page:N | heading:'A>B>C' | para:N | table:R{r}C{c} | figure:ID",
+  "verification": {
+    "_doc": "v2 verify-against-the-world layer (conventions.md §2.2-§2.5). A verification result becomes a new S<n> source and joins the §2 provenance record; provider is metadata only and never part of the schema.",
+    "source_types": ["external-web", "internal-vault", "internal-memory"],
+    "provider": "metadata only, e.g. exa / a knowledge MCP / obsidian / local-vault — never part of source_type; bound at runtime by the adapter registry (F2-04)",
+    "verdict": ["corroborates", "contradicts", "not-found", "not-checked-budget"],
+    "result_becomes_source": "a corroborates/contradicts source is admitted as a new S<n> (URL or note-path locator) with its own source_status + sensitivity and enters supporting[]/conflict normally",
+    "contradiction_rule": "contradicts => review_status conflicting + a §2 conflict object; never averaged, blended, or silently overwritten",
+    "materiality_tiers": ["numeric", "date", "named-entity", "regulatory", "market", "assumption-as-fact", "headline"],
+    "per_travel_class_caps": {
+      "internal": "opt-in; 0 by default",
+      "travels": "bounded cap over the top material claims",
+      "board-regulatory": "higher cap; headline + executive-summary set always in scope",
+      "_rule": "the contract fixes the ordering + the existence of a cap, NOT the number; N/timeout/dedupe are tuneable per run and recorded in the manifest; eligible-but-skipped => not-checked-budget, never silently dropped"
+    },
+    "external_source_quality": {
+      "authority_order": ["official/regulatory/primary-filings", "reputable-primary", "reputable-secondary"],
+      "reject_low_authority_for_must_fix": true,
+      "retrieval_date_required": true,
+      "high_confidence": ">=2 independent sources OR 1 primary/official; a lone secondary is needs-review, not verified",
+      "stale_or_contradictory": "preserved as conflicts (§2.2), never discarded"
+    },
+    "egress_rule": "confidential/restricted claim text is never egressed; only a sanitised/abstracted query may leave (named-entity masking, magnitude coarsening, source-label removal) with a raw-vs-egressed manifest diff; restricted Board/Regulatory => skipped-egress (recorded not-checked-budget) unless a named-owner waiver permits a sanitised query; internal-vault/internal-memory verification has no egress and still runs; mechanism lives in sensitivity-routing-policy.md"
+  },
+  "doc_pretty_but_wrong": {
+    "_doc": "doc-surface defect taxonomy (conventions.md §1.7); severities use the §1.2 enum verbatim; the 'both'-surface v1 PRETTY_BUT_WRONG items also apply to doc; machine-readable doc rows are added to skills/trust-review/scripts/review_contract.py PRETTY_BUT_WRONG when the doc reviewer is built (contract precedes implementation); the canonical v1 list is unchanged",
+    "items": [
+      {"id": "DOC-PBW-01", "type": "extraction-loss", "default": "must-fix"},
+      {"id": "DOC-PBW-02", "type": "untraceable-figure-or-table", "default": "must-fix"},
+      {"id": "DOC-PBW-03", "type": "quote-or-citation-misattribution", "default": "must-fix"},
+      {"id": "DOC-PBW-04", "type": "contradiction-across-sections", "default": "should-fix"},
+      {"id": "DOC-PBW-05", "type": "hidden-or-agent-only-content", "default": "should-fix"},
+      {"id": "DOC-PBW-06", "type": "verification-contradiction-unresolved", "default": "must-fix"},
+      {"id": "DOC-PBW-07", "type": "per-format-limit-hidden", "default": "should-fix"}
+    ]
+  },
+  "_v3_additive": "Everything below is a v3 additive extension (recurring-update primitive on a stable claim identity + degraded-status caps + backward-compat). It mirrors conventions.md §7. The v1 keys (source_status..threshold_change_rule) AND the v2 keys (surface..doc_pretty_but_wrong) above are FROZEN and unchanged; the §5 release_thresholds + threshold_change_rule are NOT touched. A v3 cap can only make a verdict worse, never better — it is never a relaxation. Findings refer to office-trust-layer-v3-review-disposition.md.",
+  "degraded_status_caps": {
+    "_doc": "conventions.md §7.1 (findings 3/4/5). A named condition that CAPS readiness — never yields plain 'ready'. Recorded in manifest.degraded_status[] = {cap, condition, capped_at, surface, note}; absent => [] => v1/v2 behaviour. Strictest cap governs; orthogonal to and stacks with the §4 waiver (a cap can only lower, never raise).",
+    "caps": ["sidecar-only-pdf", "recalc-unverified", "same-family-reviewer", "embed-unavailable"],
+    "cap_to_readiness": {
+      "sidecar-only-pdf": "ready-with-limitations; not-ready-for-forwarding for the survives-the-forward property (evidence does not travel inside the file)",
+      "recalc-unverified": "ready-with-limitations; the checks-tab readiness CLAIM is blocked (smoke alarm unpowered, ab-01)",
+      "same-family-reviewer": "by travel class (§7.2): internal/travels => ready-with-limitations; board-regulatory => blocked unless named-owner signoff => then ready-with-limitations",
+      "embed-unavailable": "ready-with-limitations"
+    },
+    "forwarding_qualifier": "not-ready-for-forwarding",
+    "strictness_order": ["not-ready-for-forwarding", "blocked", "ready-with-limitations"],
+    "rule": "a cap NEVER produces plain 'ready'; multiple caps => strictest governs; never a relaxation of §5"
+  },
+  "reviewer_independence_by_travel_class": {
+    "_doc": "conventions.md §7.2 (finding 5). Independence is a value gated by travel class (order internal<travels<board-regulatory). Recorded in manifest.routing.reviewer_independence.",
+    "levels": ["cross-vendor", "named-human-SME", "same-family", "same-model"],
+    "by_travel_class": {
+      "internal": "same-family accepted (record same-family-reviewer cap note; not gated beyond it)",
+      "travels": "same-family accepted (record same-family-reviewer cap note; not gated beyond it)",
+      "board-regulatory": "requires cross-vendor OR named-human-SME; a same-family/same-model fallback => blocked, or ready-with-limitations ONLY after a named-owner signoff (the §4 waiver shape) recorded in the manifest"
+    }
+  },
+  "checks_tab_spec": {
+    "_doc": "conventions.md §7.3 (finding 4 / ab-01). Controlled enum of workbook checks-tab categories (the smoke alarm). The checks-tab readiness CLAIM is valid only when a live recalc was verified; recalc-unverified => the recalc-unverified cap applies and the claim is blocked (static formula assertions are a fallback, NOT equivalent to recalc).",
+    "categories": ["tie-outs", "formula-consistency", "error-scan", "stale-date", "scenario"],
+    "recalc_gated": true
+  },
+  "embedded_evidence": {
+    "_doc": "conventions.md §7.4 (finding 3 / ab-02). In-PDF embedded-evidence channel so a forwarded PDF carries its own proof; extends the v2 per-format evidence channels and the §1.6 doc locator grammar (additive — §1.6 text unchanged).",
+    "channels": {
+      "embedded-pdf": "doc/pdf — evidence embedded as PDF annotations/attachments; preserves author pages, does not break signatures/forms/tagged-PDF; travels inside the file",
+      "sidecar": "any — evidence in .trust/<run_id>/ only; triggers the sidecar-only-pdf cap (§7.1)"
+    },
+    "pdf_locator_addition": "annot:ID | attachment:'NAME'",
+    "degradation": "embedded-pdf unavailable => degrade to sidecar + record the sidecar-only-pdf cap; NEVER a silent survives-the-forward claim"
+  },
+  "claim_identity": {
+    "_doc": "conventions.md §7.5 (finding 2). Canonical per-claim identity computed by references/scripts/claim_identity.py (pure stdlib); consumed by office-update (S02/S03) + verification. Lets a refresh distinguish 'same claim, moved' from 'meaning changed'.",
+    "fields": ["claim_id", "normalized_text_hash", "locator_hash", "source_fingerprint", "retrieval_timestamp", "materiality_class", "waiver_scope_hash", "supersession_state"],
+    "claim_id": "C-<first12 hex of sha256(normalized_text_hash + ':' + source_fingerprint)>; stable for the life of the claim; persists across moves; locator excluded so a move does not change identity",
+    "normalized_text_hash": "sha256 of text after normalization: lowercase, NFKC, collapse whitespace, strip surrounding punctuation, normalize number formatting WITHOUT changing magnitudes/units",
+    "locator_hash": "sha256 of the canonical locator string; surface+format specific (tab!cell / slide N/shape / §1.6 doc grammar incl. §7.4 anchors)",
+    "source_fingerprint": "sha256 over sorted backing-source tuples (source_id, source_status, content_or_excerpt_hash, as_of_date)",
+    "supersession_state": ["active", "superseded", "tombstoned"],
+    "moved_claim_diff": "same normalized_text_hash AND same source_fingerprint AND different locator_hash => 'moved', identity STABLE (claim_id carried, locator/retrieval updated, a prior verdict MAY carry); same on text+source+locator => 'unchanged'; any change to normalized_text_hash or source_fingerprint => a NEW identity (new claim_id) that starts needs-review and CANNOT inherit a prior verdict",
+    "invalidation_classes": ["text-changed", "source-changed", "unit-or-period-changed", "source-stale", "waiver-scope-changed", "superseded-or-tombstoned", "materiality-escalated"],
+    "invalidation_rule": "ANY invalidation class forces re-review (the carried verified/ready does not transfer); a 'moved' claim with NONE of them is the only case that carries a verdict"
+  },
+  "human_gate_digest_invariants": {
+    "_doc": "conventions.md §7.6 (finding 7 / av-01). Non-negotiable invariants so a prioritised digest never hides an unresolved must-fix. A digest that cannot satisfy all four returns not-ready (the safe default).",
+    "schema": {
+      "full_set_readiness": "not-ready | ready-with-limitations | ready",
+      "must_fix_total": 0,
+      "must_fix_open": 0,
+      "displayed": ["finding-id"],
+      "hidden_tail_count": 0,
+      "owner_ack": {"owner": "name", "ack_at": "ISO-8601", "ack_scope": "full-set"},
+      "invariants": {"readiness_from_full_set": true, "no_digest_action_auto_resolves": true, "hidden_tail_visible": true, "tail_acknowledged": true}
+    },
+    "invariants": ["readiness_from_full_set", "no_digest_action_auto_resolves", "hidden_tail_visible", "tail_acknowledged"]
+  },
+  "vault_writeback_record": {
+    "_doc": "conventions.md §7.7 (finding 8 / av-02). Two-phase write-back so a derived note never poisons the corpus: quarantine -> promoted ONLY after explicit human approval. Until promoted, the verifier treats it as audit metadata, not a primary fact.",
+    "phases": ["quarantine", "promoted"],
+    "schema": {
+      "phase": "quarantine | promoted",
+      "source_authority": "derived-provenance",
+      "schema_version": "3",
+      "supersedes": ["note-id"],
+      "expiry": "ISO-8601 | staleness-policy",
+      "run_hash": "sha256 of the producing run",
+      "rollback_pointer": ".trust/<run_id>/ or a prior note revision",
+      "dedupe_key": "artifact:<id>|run:<id>|claim:<claim_id>",
+      "approved_by": "name | null",
+      "approved_at": "ISO-8601 | null"
+    },
+    "rules": "quarantine->promoted requires a named human approval (approved_by+approved_at); source_authority is always derived-provenance (never masquerades as primary); supersedes/dedupe_key prevent stale/duplicate entries; rollback_pointer+run_hash make every promotion reversible"
+  },
+  "schema_version": {
+    "_doc": "conventions.md §7.8 (finding 10 / fd-03). The .trust/<run_id>/ run-schema lineage, additive at each step. Distinct from the contract-doc 'version' above. Backward-compat proven by eval/compat_harness.py.",
+    "current": "3",
+    "lineage": {
+      "1": "base manifest: artifact, travel_class, sensitivity, routing, rounds, gate",
+      "2": "adds verification, egress, adapter_bindings, retention (document + source-verification surfaces)",
+      "3": "adds degraded_status (§7.1), reviewer_independence (§7.2), human-gate-digest invariants (§7.6), two-phase vault-writeback (§7.7), claim-identity stamps (§7.5)"
+    },
+    "backward_compat_rule": "a v3 reader MUST load every committed v1/v2 run; new v3 optional fields default safely (absent => v1/v2 behaviour, never a crash); a v3 refresh consuming a prior run is READ-ONLY (never mutates prior artifacts) and stamps schema_version + migration_notes onto its OWN new output only"
+  },
+  "v3_operations": {
+    "_doc": "conventions.md §7 — new operations registered in capability-inventory.md + references/scripts/adapter_registry.py. DEFERRED-FUNCTIONAL until the session that first depends on each proves it live (vault_write: av-02/S09; external_reviewer: pt-02/S08), per the 'fixtures ship per feature session' rule.",
+    "vault_write": "two-phase quarantine->promoted write-back (§7.7); candidate providers a provider-pack capture/write -> Obsidian write/create -> local-vault file write -> .trust quarantine sidecar (builtin terminal); absent => the derived note stays in .trust quarantine and is NEVER auto-promoted (the av-02 safety property)",
+    "external_reviewer": "an independent cross-vendor reviewer (§7.2); candidate providers a cross-vendor model via Agent -> same-family Agent model-split (capped) -> named-human-SME signoff (builtin terminal); same-family terminal triggers the same-family-reviewer cap; Board/Regulatory needs cross-vendor or named-human-SME (else blocked)"
+  }
+}

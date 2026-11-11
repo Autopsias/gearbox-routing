@@ -15,7 +15,7 @@ lists every file the part needs, and how to check and remove it.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 29 skills · 69 commands · 41 subagents · 12 hooks.
+Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 ## Skills
 
@@ -24,10 +24,13 @@ Counts: 29 skills · 69 commands · 41 subagents · 12 hooks.
 | `blindspot` | `/blindspot`, or Claude starts it | Runs a "blindspot pass" over an unfamiliar code/vault area before you touch it — digs through git history and current files to surface unknown unknowns (landmines, … | [Investigation](modules/investigation.md) |
 | `codex-skill-sync` | `/codex-skill-sync` only | Mirror the canonical Claude skills, agents, commands and enabled-plugin skills into ~/.agents/skills so Codex loads the same set. | [Skill authoring](modules/skill-authoring.md) |
 | `cost-audit` | `/cost-audit`, or Claude starts it | Measures what Claude Code sessions actually cost and why, from the local transcripts — prompt-cache hit rate, what caused each cache rewrite, the effort level used per … | [Cost and usage](modules/cost-and-usage.md) |
+| `deck-architect` | `/deck-architect`, or Claude starts it | The Office Trust Layer's PowerPoint front door — it builds the deck's ARGUMENT before any slide exists, then renders and validates it. | [Office trust layer](modules/trust-layer.md) |
 | `declutter` | `/declutter` only | Deep, evidence-gated overengineering audit of a whole repository: deterministic dead-code recon, then area-sharded read-only auditors that classify every finding … | [Code quality](modules/code-quality.md) |
 | `diagnose` | `/diagnose`, or Claude starts it | Disciplined diagnosis loop for hard bugs and performance regressions. | [Investigation](modules/investigation.md) |
+| `document-doctor` | `/document-doctor`, or Claude starts it | The Office Trust Layer's prose-document inspector, run before anyone trusts an inherited or AI-written document (.docx / .pdf / .md / .html). | [Office trust layer](modules/trust-layer.md) |
 | `eli5` | `/eli5`, or Claude starts it | Explain a complex subject as an engaging, story-driven HTML artifact — big visuals, few words, real names kept and defined — adapted to a named audience, from executives … | [Explainers](modules/eli5.md) |
 | `epic-dev-conductor` | `/epic-dev-conductor`, or Claude starts it | Conducts a BMAD /epic-dev build for any project. | [BMAD method and epic builds](modules/bmad.md) |
+| `evidence-map` | `/evidence-map`, or Claude starts it | The Office Trust Layer's cross-app evidence layer for decks — it ties every slide claim to the workbook cell and source that back it and writes the proof into the … | [Office trust layer](modules/trust-layer.md) |
 | `flake-detective` | `/flake-detective`, or Claude starts it | Statistically confirms then root-causes flaky pytest tests under xdist parallelism and CI drift. | [Flake detective](modules/flake-detective.md) |
 | `grill-me` | `/grill-me`, or Claude starts it | Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. | [Grilling](modules/grilling.md) |
 | `grill-with-docs` | `/grill-with-docs`, or Claude starts it | Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions … | [Grilling](modules/grilling.md) |
@@ -39,6 +42,8 @@ Counts: 29 skills · 69 commands · 41 subagents · 12 hooks.
 | `mods` | `/mods`, or Claude starts it | Manages Claude Code mods for the harness: decides whether a mod is due, creates one, reviews one for trust and quality, improves one, and lists what is loaded. | [Skill authoring](modules/skill-authoring.md) |
 | `myusage-self-assessment` | `/myusage-self-assessment` only | Mine your own Claude Code session history to decide what to actually improve in your setup. | [Cost and usage](modules/cost-and-usage.md) |
 | `nlm-skill` | `/nlm-skill` only | Expert guide for the NotebookLM CLI (`nlm`) and MCP server - interfaces for Google NotebookLM. | [NotebookLM](modules/notebooklm.md) |
+| `office-source-packet` | `/office-source-packet`, or Claude starts it | The Office Trust Layer's truth layer, built before any file. | [Office trust layer](modules/trust-layer.md) |
+| `office-update` | `/office-update`, or Claude starts it | The Office Trust Layer's recurring-refresh primitive. | [Office trust layer](modules/trust-layer.md) |
 | `plan-builder` | `/plan-builder`, or Claude starts it | Build an executable multi-session plan — interview the user, compile a JSON spec, and emit a plan directory (self-contained PLAN.html dashboard + manifest.json dispatch … | [Plan pipeline](modules/plan-pipeline.md) |
 | `plan-execute` | `/plan-execute`, or Claude starts it | The plan already exists — now run it. | [Plan pipeline](modules/plan-pipeline.md) |
 | `repo-health` | `/repo-health` only | The one front door for whole-repo reviews. | [Repo health](modules/repo-health.md) |
@@ -47,7 +52,11 @@ Counts: 29 skills · 69 commands · 41 subagents · 12 hooks.
 | `setup-matt-pocock-skills` | `/setup-matt-pocock-skills` only | Sets up an `## Agent skills` block in AGENTS.md (legacy fallback: CLAUDE.md) and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local … | [Engineering skills](modules/engineering-skills.md) |
 | `tdd` | `/tdd`, or Claude starts it | Test-driven development with red-green-refactor loop. | [Engineering skills](modules/engineering-skills.md) |
 | `tldr` | `/tldr`, or Claude starts it | Turn one or many long, complex sources (a report, a paper, a contract, a folder of documents, URLs, transcripts, a codebase, knowledge-base notes) into a decision-ready … | [Executive summaries](modules/tldr.md) |
+| `travel-class-router` | `/travel-class-router`, or Claude starts it | The Office Trust Layer's front door — classifies how far a file will travel (Internal / Travels / Board-or-Regulatory), auto-escalates the class when the content itself … | [Office trust layer](modules/trust-layer.md) |
+| `trust-review` | `/trust-review`, or Claude starts it | The Office Trust Layer's two-context build-then-review loop. | [Office trust layer](modules/trust-layer.md) |
+| `trust-run` | `/trust-run` only | One-command orchestrator for the whole Office Trust Layer. | [Office trust layer](modules/trust-layer.md) |
 | `ui-craft` | `/ui-craft`, or Claude starts it | Designs, builds and reviews user interfaces of every kind — web apps, sites, landing pages, dashboards, HTML reports and artifacts, the pages eli5 and plan-builder … | [UI design and review](modules/ui-craft.md) |
+| `workbook-doctor` | `/workbook-doctor`, or Claude starts it | The Office Trust Layer's Excel inspector, run before anyone trusts an inherited or AI-built workbook. | [Office trust layer](modules/trust-layer.md) |
 | `worth-adopting` | `/worth-adopting`, or Claude starts it | Judges what an outside source (a video transcript, an X post or thread, a blog post, a GitHub repo, a newsletter, pasted text) proposes against what the current repo … | [Outside-idea triage](modules/outside-ideas.md) |
 | `write-a-skill` | `/write-a-skill`, or Claude starts it | Author new USER-LEVEL agent skills in ~/.claude/skills with proper structure, progressive disclosure, and bundled resources. | [Skill authoring](modules/skill-authoring.md) |
 

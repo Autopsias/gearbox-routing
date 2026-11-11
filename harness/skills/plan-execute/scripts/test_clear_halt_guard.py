@@ -32,3 +32,18 @@ def test_the_count_is_per_session(tmp_path):
     rsi.set_halt(d, "y", "s06")
     rsi.clear_halt(d)      # a different session: free
     assert not rsi.is_halted(d)
+
+
+def test_a_stuck_session_needs_a_decision_to_clear(tmp_path):
+    d = _plan(tmp_path)
+    st = json.loads((d / "run_state.json").read_text())
+    st["stuck"] = {"s05": {"consecutive": 2, "attempts": 8, "armable": True}}
+    (d / "run_state.json").write_text(json.dumps(st))
+    rsi.set_halt(d, "gate failed", "s05")
+    with pytest.raises(rsi.HaltClearRefused, match="stuck"):
+        rsi.clear_halt(d)                               # even the FIRST clear
+    assert rsi.is_halted(d)
+    rsi.clear_halt(d, decision="accept the finding on record")
+    assert not rsi.is_halted(d)
+    ev = [json.loads(ln) for ln in (d / "run.ndjson").read_text().splitlines()]
+    assert [e["decision"] for e in ev if e["event"] == "halt_cleared"] == ["accept the finding on record"]

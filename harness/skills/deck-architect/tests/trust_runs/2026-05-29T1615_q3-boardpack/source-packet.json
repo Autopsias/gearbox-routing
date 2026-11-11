@@ -1,0 +1,59 @@
+{
+  "run_id": "2026-05-29T1615_q3-boardpack",
+  "skill": "office-source-packet",
+  "phase": "source-packet",
+  "status": "ok-with-warnings",
+  "status_reason": "1 unsupported claim and 3 unresolved conflicts (1 human-decision) — normal for a messy intake; surfaced for the file spec / human gate.",
+  "task_context": "Q3 FY26 board deck + supporting financial workbook",
+  "sources": [
+    {"id": "S1", "name": "q3_actuals.csv", "type": "data export (CSV)", "date": "end Q3-FY26", "owner": "FP&A (close pack)", "source_status": "current", "sensitivity": "internal", "can_support": "Authoritative Q3 actuals: revenue, EBITDA margin, headcount, cloud-migration spend, gross margin.", "cannot_support": "Q4 outlook; YoY comparison (no prior-year base); strategy/M&A."},
+    {"id": "S2", "name": "q3_forecast_v2.csv", "type": "forecast model export", "date": "mid Q3-FY26", "owner": "FP&A (forecast)", "source_status": "estimate", "sensitivity": "internal", "can_support": "Q4 revenue outlook (only source); pre-close planning assumptions.", "cannot_support": "Q3 actuals — its Q3 figures are superseded by S1 (see CONFLICT-001/002/003)."},
+    {"id": "S3", "name": "cfo_email_thread.md", "type": "email thread (informal)", "date": "Q3 close week (Mon)", "owner": "CFO", "source_status": "current", "sensitivity": "restricted", "can_support": "CFO intent and board-display directives; confirms €48.2M; instruction that Project Lighthouse is board-only.", "cannot_support": "Authoritative figures — the 09:14 prelim was superseded within the thread; a display directive is not an actual."},
+    {"id": "S4", "name": "board_deck_draft_v3.md", "type": "prior deliverable (draft, partly unsourced)", "date": "Q3 close week", "owner": "deck author (unattributed)", "source_status": "current", "sensitivity": "restricted", "can_support": "Prior framing/structure of the deck.", "cannot_support": "Any figure as fact — contains unsourced claims (+12% YoY, headcount 1,180) and placeholders."},
+    {"id": "S5", "name": "strategy_offsite_notes.md", "type": "rough notes", "date": "unknown", "owner": "strategy / CEO", "source_status": "estimate", "sensitivity": "restricted", "can_support": "Strategic intent and assumptions: Project Lighthouse, FY27 headcount ambition, new-product upside, EMEA reorg, CEO messaging.", "cannot_support": "Any financial actual; anything as confirmed — speculative and partly sensitive."}
+  ],
+  "claims": [
+    {"id": "C1", "class": "fact", "review_status": "conflicting", "metric": "revenue", "period": "Q3-FY26", "value": "€48.2M", "sensitivity": "internal",
+      "provenance": {"claim": "Q3-FY26 revenue = €48.2M", "supporting": [{"source_id": "S1", "locator": "q3_actuals.csv#revenue", "confidence": 1.0, "rationale": "Final FP&A close-pack actual; also confirmed by CFO at 10:30 (S3) and used in deck draft (S4)."}], "conflict": {"with": ["S2", "S3"], "note": "S2 forecast and S3 09:14 prelim both say €47.5M; S3 corrected to €48.2M at 10:30."}}},
+    {"id": "C2", "class": "fact", "review_status": "conflicting", "metric": "ebitda_margin", "period": "Q3-FY26", "value": "18.5%", "sensitivity": "internal",
+      "provenance": {"claim": "Q3-FY26 EBITDA margin = 18.5%", "supporting": [{"source_id": "S1", "locator": "q3_actuals.csv#ebitda_margin", "confidence": 1.0, "rationale": "Final actual."}], "conflict": {"with": ["S3", "S2"], "note": "S3 directs 18% flat for board display; S2 forecast 17%."}}},
+    {"id": "C3", "class": "interpretation", "review_status": "needs-review", "metric": "ebitda_margin_display", "period": "Q3-FY26", "value": "18% (board display)", "sensitivity": "internal",
+      "provenance": {"claim": "Present EBITDA margin as 18% flat to the board, footnote the detail", "supporting": [{"source_id": "S3", "locator": "cfo_email_thread.md#10:30", "confidence": 0.9, "rationale": "Explicit CFO directive — a presentation choice, not a competing actual."}], "conflict": null}},
+    {"id": "C4", "class": "fact", "review_status": "conflicting", "metric": "headcount", "period": "Q3-FY26", "value": "1195", "sensitivity": "internal",
+      "provenance": {"claim": "Q3-FY26 headcount = 1,195", "supporting": [{"source_id": "S1", "locator": "q3_actuals.csv#headcount", "confidence": 1.0, "rationale": "Final actual."}], "conflict": {"with": ["S2", "S4"], "note": "S2 plan number and S4 deck draft both say 1,180."}}},
+    {"id": "C5", "class": "estimate", "review_status": "needs-review", "metric": "revenue", "period": "Q4-FY26", "value": "€52M", "sensitivity": "internal",
+      "provenance": {"claim": "Q4-FY26 revenue ≈ €52M", "supporting": [{"source_id": "S2", "locator": "q3_forecast_v2.csv#Q4", "confidence": 0.7, "rationale": "Forecast 'stretch'; CFO frames as 'above €52M' (S3). Estimate, not an actual."}], "conflict": null}},
+    {"id": "C6", "class": "open-question", "review_status": "unsupported", "metric": "revenue_yoy", "period": "Q3-FY26", "value": "+12% YoY", "sensitivity": "internal",
+      "provenance": {"claim": "Q3 revenue up 12% YoY", "supporting": [], "conflict": null}, "note": "No prior-year base exists in any source. Source it or drop."},
+    {"id": "C7", "class": "interpretation", "review_status": "needs-review", "metric": "ma_target", "period": "FY26/27", "value": "Project Lighthouse, ~€15M", "sensitivity": "restricted",
+      "provenance": {"claim": "Considering acquisition of a smaller competitor (Project Lighthouse), ~€15M", "supporting": [{"source_id": "S5", "locator": "strategy_offsite_notes.md#lighthouse", "confidence": 0.6, "rationale": "Offsite notes; corroborated board-only by S3; placeholder in S4 slide 5."}], "conflict": null}},
+    {"id": "C8", "class": "assumption", "review_status": "needs-review", "metric": "headcount", "period": "FY27", "value": "~1,250", "sensitivity": "internal",
+      "provenance": {"claim": "Grow headcount to ~1,250 by end FY27", "supporting": [{"source_id": "S5", "locator": "strategy_offsite_notes.md#headcount", "confidence": 0.6, "rationale": "Planning ambition in offsite notes."}], "conflict": null}},
+    {"id": "C9", "class": "fact", "review_status": "verified", "metric": "cloud_migration_spend", "period": "Q3-FY26", "value": "€2.1M", "sensitivity": "internal",
+      "provenance": {"claim": "Cloud-migration spend = €2.1M", "supporting": [{"source_id": "S1", "locator": "q3_actuals.csv#cloud_migration_spend", "confidence": 1.0, "rationale": "Final actual; supports margin-pressure commentary."}], "conflict": null}},
+    {"id": "C10", "class": "open-question", "review_status": "needs-review", "metric": "emea_reorg", "period": "FY27", "value": "possible reorg", "sensitivity": "restricted",
+      "provenance": {"claim": "Possible reorg of EMEA sales team", "supporting": [{"source_id": "S5", "locator": "strategy_offsite_notes.md#emea", "confidence": 0.4, "rationale": "Flagged sensitive in offsite notes; status unknown."}], "conflict": null}}
+  ],
+  "conflicts": [
+    {"id": "CONFLICT-001", "topic": "Q3-FY26 revenue", "competing": [
+      {"value": "€48.2M", "source_id": "S1", "source_status": "current"},
+      {"value": "€47.5M", "source_id": "S2", "source_status": "estimate", "note": "forecast, superseded for Q3"},
+      {"value": "€47.5M", "source_id": "S3", "source_status": "current", "note": "09:14 prelim; corrected to €48.2M at 10:30"}],
+      "where_truth_lives": "S1 (FP&A close-pack actual).", "resolution": "authoritative", "note": "Losing values preserved, not blended."},
+    {"id": "CONFLICT-002", "topic": "Q3-FY26 EBITDA margin", "competing": [
+      {"value": "18.5%", "source_id": "S1", "source_status": "current", "note": "actual"},
+      {"value": "18% (board display)", "source_id": "S3", "source_status": "current", "note": "CFO directive to round + footnote"},
+      {"value": "17%", "source_id": "S2", "source_status": "estimate", "note": "forecast"}],
+      "where_truth_lives": "S1 actual = 18.5%; the 18% is a presentation choice, not a competing actual.", "resolution": "human-decision", "note": "Present 18.5% or 18%+footnote is a human call → Phase-2 gate. All values preserved."},
+    {"id": "CONFLICT-003", "topic": "Q3-FY26 headcount", "competing": [
+      {"value": "1195", "source_id": "S1", "source_status": "current", "note": "actual"},
+      {"value": "1180", "source_id": "S2", "source_status": "estimate", "note": "plan number"},
+      {"value": "1180", "source_id": "S4", "source_status": "current", "note": "deck draft, unsourced"}],
+      "where_truth_lives": "S1 actual = 1,195.", "resolution": "authoritative", "note": "Deck draft must be corrected 1,180 → 1,195. Plan figure preserved."}
+  ],
+  "open_questions": [
+    {"claim_id": "C6", "question": "Prior-year Q3 revenue base for the +12% YoY claim — absent from all sources. Source or drop."},
+    {"ref": "CONFLICT-002", "question": "Present EBITDA margin as 18.5% (actual) or 18% flat + footnote (CFO directive)?"},
+    {"claim_id": "C10", "question": "Is the EMEA sales reorg proceeding? Personnel-sensitive; status unknown."}
+  ]
+}

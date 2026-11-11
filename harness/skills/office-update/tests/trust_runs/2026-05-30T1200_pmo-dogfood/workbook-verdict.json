@@ -1,0 +1,547 @@
+{
+  "run_id": "pmo-dogfood",
+  "skill": "workbook-doctor",
+  "phase": "workbook-verdict",
+  "status": "ok-with-warnings",
+  "status_reason": "assessed; recalc unverified (recalc unverified \u2014 Traceback (most recent call last):\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 184, in <module>\n    main()\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 179, in main\n    result = recalc(filename, timeout)\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 76, in recalc\n    if not setup_libreoffice_macro():\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 55, in setup_libreoffice_macro\n    subprocess.run(\n  File \"/usr/lib/python3.10/subprocess.py\", line 505, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1154, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 2022, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1198, in _check_timeout\n    raise TimeoutExpired(\nsubprocess.TimeoutExpired: Command '['soffice', '--headless', '--terminate_after_init']' timed out after 10 seconds\n)",
+  "inputs": {
+    "workbook": "pmo_dogfood.xlsx",
+    "workbook_map": "workbook-map.json",
+    "formula_risk": "formula-risk.json",
+    "source_packet": "source-packet.json",
+    "resolutions": null,
+    "travel_class": "Internal"
+  },
+  "readiness": "ready",
+  "readiness_reason": "no must-fix findings; structural/should-fix items (if any) are limitations to own, not blockers.",
+  "verdict_detail": {
+    "readiness": "ready",
+    "readiness_reason": "no must-fix findings; structural/should-fix items (if any) are limitations to own, not blockers.",
+    "must_fix_total": 0,
+    "must_fix_blocking": [],
+    "must_fix_waived": [],
+    "signoff_gap": [],
+    "travel_class": "Internal"
+  },
+  "must_own": [
+    {
+      "kind": "assumption",
+      "ref": "FR-001",
+      "what": "Hardcoded value at DDs review!F3 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-002",
+      "what": "Hardcoded value at DDs review!F4 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-003",
+      "what": "Hardcoded value at DDs review!F5 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-004",
+      "what": "Hardcoded value at DDs review!F7 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-005",
+      "what": "Hardcoded value at DDs review!F10 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-006",
+      "what": "Hardcoded value at DDs review!F11 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-007",
+      "what": "Hardcoded value at DDs review!F12 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-008",
+      "what": "Hardcoded value at DDs review!F13 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    },
+    {
+      "kind": "assumption",
+      "ref": "FR-009",
+      "what": "Hardcoded value at DDs review!F14 = '21' [unsupported] \u2014 source (in-cell, no source), owner unknown"
+    }
+  ],
+  "assumptions": [
+    {
+      "name": "Hardcoded value at DDs review!F3",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-001",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F4",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-002",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F5",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-003",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F7",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-004",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F10",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-005",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F11",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-006",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F12",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-007",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F13",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-008",
+      "class": "assumption"
+    },
+    {
+      "name": "Hardcoded value at DDs review!F14",
+      "value": "21",
+      "unit": "number/text",
+      "source": "(in-cell, no source)",
+      "owner": "unknown",
+      "date": "\u2014",
+      "status": "unsupported",
+      "origin": "workbook-hardcode",
+      "finding_id": "FR-009",
+      "class": "assumption"
+    }
+  ],
+  "repair_plan": [
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-001",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F3",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-002",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F4",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-003",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F5",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-004",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F7",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-005",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F10",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-006",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F11",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-007",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F12",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-008",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F13",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "FR-009",
+      "check": "hardcode_in_formula",
+      "sheet": "DDs review",
+      "locator": "F14",
+      "lifecycle": "open",
+      "action": "Move the magic constant to a labelled, sourced assumption cell and reference it."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-009",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 11",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-010",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 19",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-011",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 25",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-012",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 37",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-013",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 44",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-014",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 48",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-015",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 54",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-016",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 61",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-017",
+      "check": "blank_rows_in_table",
+      "sheet": "Carve-out",
+      "locator": "row 65",
+      "lifecycle": "open",
+      "action": "Remove the blank row inside the table so ranges/fills/sorts are intact."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-018",
+      "check": "duplicate_rows",
+      "sheet": "Carve-out",
+      "locator": "row 66 (== row 62)",
+      "lifecycle": "open",
+      "action": "Remove the duplicate data row so aggregations don't double-count."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-019",
+      "check": "date_as_text",
+      "sheet": "Carve-out",
+      "locator": "E52",
+      "lifecycle": "open",
+      "action": "Convert the text to a real date so it compares and sorts."
+    },
+    {
+      "severity": "should-fix",
+      "finding_id": "WM-020",
+      "check": "source_without_id_date",
+      "sheet": "Carve-out",
+      "locator": "header row 2",
+      "lifecycle": "open",
+      "action": "Add a source-ID and date/period column so rows trace to a source."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-001",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M13:M19",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-002",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M21:M24",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-003",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M28:M37",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-004",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M40:M43",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-005",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M4:M10",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-006",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M50:M54",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-007",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M56:M61",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    },
+    {
+      "severity": "polish",
+      "finding_id": "WM-008",
+      "check": "merged_cells",
+      "sheet": "Carve-out",
+      "locator": "M63:M65",
+      "lifecycle": "open",
+      "action": "Unmerge the range; keep the value in a single addressable cell."
+    }
+  ],
+  "verification_memo": [
+    {
+      "check": "tie_outs",
+      "label": "Tie-outs (numbers reconcile / recompute to the right value)",
+      "result": "pass",
+      "note": "clean.",
+      "drivers": [],
+      "concerns": []
+    },
+    {
+      "check": "formula_consistency",
+      "label": "Formula consistency (references behave across the model)",
+      "result": "pass",
+      "note": "no must-fix; 9 should-fix/polish to own.",
+      "drivers": [],
+      "concerns": [
+        "FR-001",
+        "FR-002",
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "FR-006",
+        "FR-007",
+        "FR-008",
+        "FR-009"
+      ]
+    },
+    {
+      "check": "source_traceability",
+      "label": "Source traceability (every number traces to a current source)",
+      "result": "pass",
+      "note": "no must-fix; 1 should-fix/polish to own.",
+      "drivers": [],
+      "concerns": [
+        "WM-020"
+      ]
+    },
+    {
+      "check": "stale_data",
+      "label": "Stale data (no broken / moved / hidden / superseded inputs)",
+      "result": "pass",
+      "note": "clean.",
+      "drivers": [],
+      "concerns": []
+    },
+    {
+      "check": "recalculation",
+      "label": "Recalculation (the workbook recomputes clean)",
+      "result": "unverified",
+      "note": "recalc not run \u2014 recalc unverified \u2014 Traceback (most recent call last):\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 184, in <module>\n    main()\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 179, in main\n    result = recalc(filename, timeout)\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 76, in recalc\n    if not setup_libreoffice_macro():\n  File \"/sessions/sweet-eloquent-newton/mnt/.claude/skills/xlsx/scripts/recalc.py\", line 55, in setup_libreoffice_macro\n    subprocess.run(\n  File \"/usr/lib/python3.10/subprocess.py\", line 505, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1154, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n  File \"/usr/lib/python3.10/subprocess.py\", line 2022, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n  File \"/usr/lib/python3.10/subprocess.py\", line 1198, in _check_timeout\n    raise TimeoutExpired(\nsubprocess.TimeoutExpired: Command '['soffice', '--headless', '--terminate_after_init']' timed out after 10 seconds\n",
+      "drivers": []
+    },
+    {
+      "check": "data_structure",
+      "label": "Data structure (no parsing landmines)",
+      "result": "pass",
+      "note": "no must-fix; 19 should-fix/polish to own.",
+      "drivers": [],
+      "concerns": [
+        "WM-001",
+        "WM-002",
+        "WM-003",
+        "WM-004",
+        "WM-005",
+        "WM-006",
+        "WM-007",
+        "WM-008",
+        "WM-009",
+        "WM-010",
+        "WM-011",
+        "WM-012",
+        "WM-013",
+        "WM-014",
+        "WM-015",
+        "WM-016",
+        "WM-017",
+        "WM-018",
+        "WM-019"
+      ]
+    }
+  ],
+  "waivers": [],
+  "waiver_problems": [],
+  "domain": {
+    "enabled": true,
+    "is_financial": false,
+    "score": 0,
+    "signals": [],
+    "finance_hooks": [],
+    "note": "not a financial model \u2014 generic, domain-agnostic checks only."
+  },
+  "summary": {
+    "finding_count": 29,
+    "by_severity": {
+      "must-fix": 0,
+      "should-fix": 21,
+      "polish": 8
+    },
+    "unresolved": 29,
+    "assumption_count": 9
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "manifest_version": "1.0",
+  "schema_version": "3",
+  "run_id": "2026-05-31T1937_s01-foundation",
+  "created": "2026-05-31T19:37:04Z",
+  "artifact": {
+    "path": "references/conventions.md + conventions.json + scripts/claim_identity.py + eval/compat_harness.py",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "kind": "other"
+  },
+  "travel_class": { "effective": "internal", "value": "internal", "source": "declared" },
+  "sensitivity": {
+    "run_max": "internal",
+    "sources": [ { "source_id": "S1", "sensitivity": "internal" } ]
+  },
+  "routing": {
+    "policy": "local-only (contract authoring; no model-run loop)",
+    "local_only": true,
+    "two_context": false,
+    "reviewer_independence": "same-family"
+  },
+  "degraded_status": [],
+  "migration_notes": "S01 v3 Foundation: additive contract extensions (conventions.md §7 + conventions.json _v3_additive), the canonical claim-identity module (references/scripts/claim_identity.py), and the backward-compat migration gate (eval/compat_harness.py) which loaded all 9 committed v1/v2 runs read-only. Frozen v1/v2 enums + §5 thresholds unchanged. This run is itself a schema_version=3 exemplar.",
+  "gate": {
+    "sensitivity_recorded": true,
+    "routing_recorded": true,
+    "status": "ok",
+    "missing": [],
+    "checked_at": "2026-05-31T19:37:04Z"
+  }
+}

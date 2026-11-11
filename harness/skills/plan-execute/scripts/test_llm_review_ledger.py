@@ -431,6 +431,41 @@ def test_an_unchanged_surface_after_a_clean_review_keeps_its_pass(tmp_path):
     assert "INDETERMINATE" in note and "not a pass" in note
 
 
+def _prior(d, fid, file):
+    L.record(L.context(str(d), "s01", str(d.parent), ["a.py", "b.py"]), [
+        {"kind": "finding", "attempt": 1, "fid": fid, "file": file, "line": 1,
+         "severity": "high", "summary": "bad " + fid, "status": "open"}])
+
+
+def test_a_prior_whose_file_left_the_surface_is_retired_not_carried(tmp_path):
+    """2026-11-10 (s02): a removed file's findings blocked 3 more rounds and were
+    listed to the reviewer for a file it could not see."""
+    d = tmp_path / "p"
+    (d / "_verify_state").mkdir(parents=True)
+    (tmp_path / "a.py").write_text("1")
+    (tmp_path / "b.py").write_text("2")
+    _prior(d, "f1", "b.py")
+    (tmp_path / "b.py").unlink()
+    ctx = L.context(str(d), "s01", str(tmp_path), ["a.py"])
+    assert ctx.priors == [] and [p["fid"] for p in ctx.retired] == ["f1"]
+    assert "f1" not in ctx.section
+    fail, counts, recs = L.judge(ctx, [])
+    assert not fail and recs[-1]["status"] == "retired" and recs[-1]["fid"] == "f1"
+    L.record(ctx, recs)
+    assert L.open_priors(L.load(str(d), "s01")) == []      # kept in the ledger, no longer open
+
+
+def test_the_convergence_line_always_names_the_accept_file(tmp_path):
+    d = tmp_path / "p"
+    (d / "_verify_state").mkdir(parents=True)
+    (d / "_verify_state" / "s01.accepted.json").write_text("{}")   # wrong name for ledger session s01.medium
+    (tmp_path / "a.py").write_text("1")
+    ctx = L.context(str(d), "s01.medium.codex", str(tmp_path), ["a.py"])
+    line = L.convergence_line(L.judge(ctx, [])[1])
+    assert "accept_file=s01.medium.codex.accepted.json entries=0" in line
+    assert "NOT read: s01.accepted.json" in line
+
+
 def test_an_open_priors_file_rides_along_even_when_the_fix_never_touched_it(tmp_path):
     """Otherwise the gate asks "did you fix b.py?" while handing over only a.py,
     and the honest `unverifiable` answer does not block -- so an unfixed HIGH

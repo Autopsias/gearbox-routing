@@ -118,6 +118,16 @@ def _seg(token):
     return str(token).strip('"').rsplit("/", 1)[-1].strip('"').lower()
 
 
+def retry_when_idle(reason):
+    """INDETERMINATE (2) for a scanner timeout, None otherwise. No `VERIFIER` marker is
+    printed, so no human park and no degraded.json: the gate's own retry runs it again."""
+    from egress import SCANNER_BUSY
+    if not str(reason).startswith(SCANNER_BUSY):
+        return None
+    print(f"[llm-review-gate] secret scan timed out (machine busy); NOT a finding. Retry when the machine is idle. {reason}")
+    return 2
+
+
 def egress_reason(cwd):
     """The data_sensitivity_guard's reason to keep this tree off Codex, or None.
 

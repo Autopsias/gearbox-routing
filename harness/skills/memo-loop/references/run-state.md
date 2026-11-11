@@ -41,7 +41,7 @@ neither ever meets the other's files.
     drafts/  rankings/  label-map.json  blinded-scores.json  merge.md
   cross-vendor-review-request.md   # rung 2 only                    -> critique.md
   critique-report.md        # the human-facing deliverable          -> critique-report.md
-  trust-handoff.json        # pre-send-review-compatible finding set
+  trust-handoff.json        # trust-run-compatible finding set
   lessons-entries.jsonl     # this run's entries, as appended       -> reflect.md
 ```
 
@@ -160,7 +160,7 @@ carry no model verdict; the block describes the grader of the `[judgment]` items
 
 ## `trust-handoff.json`
 
-Written in Phase 3, in trust's own vocabulary, so a board-bound memo enters pre-send review without
+Written in Phase 3, in trust's own vocabulary, so a board-bound memo enters `trust-run` without
 translation. The impact → severity mapping is in `critique.md` and is applied here, never left to the
 reader.
 
@@ -185,7 +185,7 @@ reader.
 `readiness` is always **`critiqued-not-remediated`** under a critic-only skill. The old value
 `improved-not-verified` was retired because it asserted the opposite of what happened: the
 memo was **not** improved — nothing edited it — and a trust consumer reading "improved" could treat an
-untouched, still-deficient memo as having been worked on. **pre-send review** is what decides whether a memo
+untouched, still-deficient memo as having been worked on. **trust-run** is what decides whether a memo
 may be sent, and memo-loop never asserts that verdict on its behalf.
 
 > **This handoff describes the PRE-REWRITE text, and the workflow guarantees it goes stale.** memo-loop

@@ -3,7 +3,7 @@
 
 Walks ~/.claude/projects/*/<session>.jsonl transcripts and emits per-session JSON:
 model mix, token breakdown, cost (computed against the SSOT `prices:` block),
-duration, error/truncation counts, routing receipts, and /model-/effort switch
+duration, error/truncation counts, Task/Agent dispatches, and /model-/effort switch
 commands — so the judgment layer never has to read raw megabyte JSONLs.
 
 stdlib-only (no PyYAML — regex parse of the SSOT, matching verify-routing.sh's
@@ -41,10 +41,6 @@ CACHE_READ_X = 0.10
 CACHE_W5M_X = 1.25
 CACHE_W1H_X = 2.00
 
-RECEIPT_RX = re.compile(
-    r"\b(mechanical|standard_build|agentic_build|deep_reasoning|linchpin)\b"
-    r"\s*(?:→|->)\s*([\w./·]+)"
-)
 SWITCH_RX = re.compile(r"(?:^|\s|>)(/model|/effort)\b\s*([\w.\-\[\]]*)")
 
 
@@ -114,7 +110,6 @@ def _empty_session(path):
         "tool_errors": 0,
         "api_errors": 0,
         "max_tokens_truncations": 0,
-        "routing_receipts": [],
         "agent_dispatches": [],
         "model_effort_switches": [],
         "_seen_ids": set(),    # message ids already counted; dropped in _finalize_session
@@ -146,7 +141,6 @@ def _finalize_session(s, ts_first, ts_last):
     )
     s["reread_cost_usd"] = round(s["reread_cost_usd"], 4)
     s["cost_usd"] = round(s["cost_usd"], 4)
-    s["routing_receipts"] = s["routing_receipts"][:20]
     s["agent_dispatches"] = s["agent_dispatches"][:40]
     s["model_effort_switches"] = s["model_effort_switches"][:20]
     return s
@@ -167,7 +161,7 @@ def _scan_user_turn(d, msg, s):
 
 
 def _scan_assistant_turn(d, msg, prices, s, model_rates=None):
-    """An assistant turn: model attribution, token accounting, cost, and the receipts it carries."""
+    """An assistant turn: model attribution, token accounting, cost, and the dispatches it carries."""
     # Claude Code writes ONE line per content block of an API response, and every
     # line repeats the same message.id and the same usage. Count usage once per id
     # (measured: 9207 lines, 4434 ids, cost reported 2.4x too high).
@@ -238,13 +232,9 @@ def _scan_assistant_turn(d, msg, prices, s, model_rates=None):
 
 
 def _scan_assistant_content(msg, s):
-    """The receipts and dispatches ONE transcript line carries — runs on every line,
+    """The dispatches ONE transcript line carries — runs on every line,
     because each line of a split API response holds a different content block."""
-    for text in iter_text_blocks(msg.get("content")):
-        for mo in RECEIPT_RX.finditer(text):
-            s["routing_receipts"].append(f"{mo.group(1)} -> {mo.group(2)}")
-    # Mechanical dispatch record — the half of a routing receipt a
-    # transcript can prove (2026-08-18 retro decision #3): every
+    # Mechanical dispatch record (2026-08-18 retro decision #3): every
     # Task/Agent tool_use carries subagent_type + model params.
     # Class judgment stays with the retro's judgment layer.
     content = msg.get("content")
@@ -259,7 +249,7 @@ def _scan_assistant_content(msg, s):
 
 
 def _scan_assistant_message(d, msg, prices, rtype, s, model_rates=None):
-    """One assistant message: model attribution, token accounting, cost, and the routing/dispatch receipts it carries."""
+    """One assistant message: model attribution, token accounting, cost, and the dispatches it carries."""
     if rtype == "user":
         _scan_user_turn(d, msg, s)
 
@@ -402,7 +392,7 @@ def main():
             "An id with no row falls back to its prices: family row with a "
             f"{CACHE_READ_X}x-in read and is counted in family_priced_models. "
             "Effort is NOT recorded in transcripts — it must be INFERRED "
-            "(settings.json effortLevel + env overrides + receipts), never claimed as measured."
+            "(settings.json effortLevel + env overrides + /effort switches), never claimed as measured."
         ),
         "params": {"last": args.last, "since": args.since, "project": args.project,
                    "excluded": args.exclude_session},
@@ -418,7 +408,6 @@ def main():
             "tool_errors": sum(s["tool_errors"] for s in sessions),
             "api_errors": sum(s["api_errors"] for s in sessions),
             "max_tokens_truncations": sum(s["max_tokens_truncations"] for s in sessions),
-            "receipts_found": sum(len(s["routing_receipts"]) for s in sessions),
             "compactions": sum(s["compactions"] for s in sessions),
             "typed_sessions": sum(1 for s in sessions if s["session_type"]),
         },

@@ -1,0 +1,18 @@
+{
+  "skill": "trust-review",
+  "phase": "language-pass",
+  "status": "ok",
+  "readiness": "ready-with-limitations",
+  "mode": "CHECK",
+  "prose_chars": 2199,
+  "tells": [],
+  "tell_count": 0,
+  "rewrite_recommended": false,
+  "offer": "No AI tells found in the review prose \u2014 it reads clean; no REWRITE needed.",
+  "voice_skill": {
+    "name": "voice",
+    "check_mode": "CHECK",
+    "rewrite_mode": "REWRITE",
+    "note": "live CHECK/REWRITE carries the full owner voice profile + samples; this scanner is the deterministic gate."
+  }
+}

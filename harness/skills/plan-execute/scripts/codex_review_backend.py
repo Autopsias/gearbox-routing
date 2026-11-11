@@ -46,7 +46,7 @@ from pathlib import Path
 import llm_review_ledger as ledger
 from codex_review_events import quota_hit
 from codex_review_egress import (_read, clean_copy, egress_reason, env_change_reason,  # noqa: F401
-                                 text_egress_reason)
+                                 retry_when_idle, text_egress_reason)
 from codex_review_prompt import _norm, contract, prepared_paths  # noqa: F401
 
 #: Mirrors ``llm_review_gate.INDETERMINATE``; duplicated rather than imported
@@ -493,7 +493,7 @@ def backend(args, prepared_surface):
     root = clean_copy(args.cwd) or args.cwd       # what Codex sees: no `.env*`, no links
     reason = env_change_reason(list(changed) + list(new_files), diff_file) or egress_reason(root)
     if reason:
-        return degrade(args, led, "cross_family", reason)
+        return retry_when_idle(reason) or degrade(args, led, "cross_family", reason)
     ok, why = availability()
     if not ok:
         return degrade(args, led, "cross_family_unavailable", why)

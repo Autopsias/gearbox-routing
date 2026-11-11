@@ -1,0 +1,158 @@
+{
+  "run_id": "2026-05-29T1820_q3-review",
+  "skill": "trust-review",
+  "phase": "review-result",
+  "status": "ok-with-warnings",
+  "status_reason": "round cap (5) reached with unresolved findings",
+  "readiness": "not-ready",
+  "readiness_reason": "3 must-fix unresolved (open/fixed-claimed/still-open) \u2014 do not let it travel.",
+  "converged": false,
+  "stop_round": null,
+  "rounds_run": 1,
+  "max_rounds": 5,
+  "routing": {
+    "policy": "two-context hostile review (trust-review)",
+    "two_context": true,
+    "builder_model": {
+      "name": "Opus",
+      "version": "4.8",
+      "context": "builder",
+      "independent": true
+    },
+    "reviewer_model": {
+      "name": "Sonnet",
+      "version": "4.6",
+      "context": "reviewer",
+      "independent": true
+    },
+    "independence_note": "builder=Opus 4.8 / reviewer=Sonnet 4.6 via Agent model override; reviewer runs in a fresh context with no builder reasoning"
+  },
+  "findings": [
+    {
+      "id": "R-01",
+      "location": "Board!B5",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "still-open",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 5,
+          "lifecycle": "still-open"
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "location": "Board!B7",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "still-open",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 5,
+          "lifecycle": "still-open"
+        }
+      ]
+    },
+    {
+      "id": "R-03",
+      "location": "Board!B5",
+      "type": "source_packet_link",
+      "severity": "must-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "still-open",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 5,
+          "lifecycle": "still-open"
+        }
+      ]
+    },
+    {
+      "id": "R-04",
+      "location": "Board!B7",
+      "type": "source_packet_link",
+      "severity": "should-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "still-open",
+      "first_round": 1,
+      "history": [
+        {
+          "round": 1,
+          "lifecycle": "open"
+        },
+        {
+          "round": 5,
+          "lifecycle": "still-open"
+        }
+      ]
+    }
+  ],
+  "must_own": [
+    {
+      "kind": "open-must-fix",
+      "ref": "R-01",
+      "what": "hardcode_in_calc_zone @ Board!B5"
+    },
+    {
+      "kind": "open-must-fix",
+      "ref": "R-02",
+      "what": "hardcode_in_calc_zone @ Board!B7"
+    },
+    {
+      "kind": "open-must-fix",
+      "ref": "R-03",
+      "what": "source_packet_link @ Board!B5"
+    },
+    {
+      "kind": "human-review",
+      "ref": "R-04",
+      "what": "source_packet_link @ Board!B7 needs a human decision"
+    }
+  ],
+  "regression_caught_in_rounds": [
+    1
+  ],
+  "summary": {
+    "must_fix_total": 3,
+    "must_fix_blocking": [
+      "R-01",
+      "R-02",
+      "R-03"
+    ],
+    "verified_fixed": [],
+    "waived": [],
+    "still_open": [
+      "R-01",
+      "R-02",
+      "R-03",
+      "R-04"
+    ]
+  },
+  "waiver_problems": []
+}

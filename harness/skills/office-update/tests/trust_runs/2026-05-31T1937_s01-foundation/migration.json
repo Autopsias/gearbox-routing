@@ -1,0 +1,179 @@
+{
+  "trust_root": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust",
+  "checked_at": "2026-05-31T19:37:12Z",
+  "schema_version": "3",
+  "runs_total": 9,
+  "by_schema_version": {
+    "1": 7,
+    "2": 2,
+    "3": 0
+  },
+  "range_covered_v1_and_v2": true,
+  "prior_runs_mutated": [],
+  "read_only_verified": true,
+  "all_runs_load_under_v3": true,
+  "rows": [
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-29T1820_q3-review/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "gate"
+      ],
+      "travel_class_effective": "board-regulatory",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-30T1015_q3-humangate/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "gate"
+      ],
+      "travel_class_effective": "board-regulatory",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-30T1200_pmo-dogfood/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "gate"
+      ],
+      "travel_class_effective": "internal",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T0724_dr04-t2d-fcst-xlsx/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "gate"
+      ],
+      "travel_class_effective": "travels",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T0801_dr10-strategy-pdf/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "manifest_version",
+        "created",
+        "artifact",
+        "gate"
+      ],
+      "travel_class_effective": "board-regulatory",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T0813_dr11-t2d-reorg-md/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "manifest_version",
+        "created",
+        "artifact",
+        "gate"
+      ],
+      "travel_class_effective": "travels",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T0816_dr13-nate-substack-pdf/manifest.json",
+      "parse_ok": true,
+      "schema_version": "1",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "manifest_version",
+        "created",
+        "artifact",
+        "gate"
+      ],
+      "travel_class_effective": "travels",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-family",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T1530_s05-source-verification/manifest.json",
+      "parse_ok": true,
+      "schema_version": "2",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [],
+      "travel_class_effective": "travels",
+      "gate_status": "ok",
+      "v3_reviewer_independence": "same-model",
+      "ok": true
+    },
+    {
+      "path": "/sessions/trusting-vigilant-ritchie/mnt/Downloads/office-trust-layer/office-trust-layer/.trust/2026-05-31T1730_s06-internal-verification/manifest.json",
+      "parse_ok": true,
+      "schema_version": "2",
+      "missing_required": [],
+      "gate_ran": true,
+      "v3_view_ok": true,
+      "no_mutation": true,
+      "errors": [],
+      "defaulted": [
+        "gate"
+      ],
+      "travel_class_effective": "board-regulatory",
+      "gate_status": "blocked",
+      "v3_reviewer_independence": "same-model",
+      "ok": true
+    }
+  ],
+  "migration_notes": "v3 reader loaded every committed v1/v2 run; new v3 optional fields (degraded_status, reviewer_independence, human_gate_digest, vault_writeback) defaulted safely (absent \u21d2 v1/v2 behaviour); reviewer_independence inferred without overstating; a v3 refresh consumed each prior run READ-ONLY (whole-tree byte-hash unchanged). New outputs stamp schema_version=3.",
+  "pass": true
+}

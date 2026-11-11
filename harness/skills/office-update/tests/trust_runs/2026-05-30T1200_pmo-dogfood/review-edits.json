@@ -1,0 +1,304 @@
+{
+  "run_id": "pmo-dogfood",
+  "skill": "trust-review",
+  "phase": "review-edits",
+  "manifest": {
+    "artifact_hash": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc",
+    "provenance_hash": "ed5797f0bba79ebb4635f2b2778f2c34346cb9617bac729a84e414e374d495cc",
+    "reviewer_prompt_hash": "95f8d2dd812ab87b57036b04d4d79ba358f2a1710dc130ca0c336efef4e1a946",
+    "model": "Sonnet 4.6",
+    "ts": "2026-05-30T00:37:53Z"
+  },
+  "edits": [
+    {
+      "id": "R-01",
+      "location": "DDs review!F3",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-02",
+      "location": "DDs review!F4",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-03",
+      "location": "DDs review!F5",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-04",
+      "location": "DDs review!F7",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-05",
+      "location": "DDs review!F10",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-06",
+      "location": "DDs review!F11",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-07",
+      "location": "DDs review!F12",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-08",
+      "location": "DDs review!F13",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-09",
+      "location": "DDs review!F14",
+      "type": "hardcode_in_formula",
+      "severity": "should-fix",
+      "evidence": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "suggested_repair": "Move the magic constant to a labelled, sourced assumption cell and reference it.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-10",
+      "location": "Carve-out!row 11",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-11",
+      "location": "Carve-out!row 19",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-12",
+      "location": "Carve-out!row 25",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-13",
+      "location": "Carve-out!row 37",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-14",
+      "location": "Carve-out!row 44",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-15",
+      "location": "Carve-out!row 48",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-16",
+      "location": "Carve-out!row 54",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-17",
+      "location": "Carve-out!row 61",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-18",
+      "location": "Carve-out!row 65",
+      "type": "blank_rows_in_table",
+      "severity": "should-fix",
+      "evidence": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "suggested_repair": "Remove the blank row inside the table so ranges/fills/sorts are intact.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-19",
+      "location": "Carve-out!row 66 (== row 62)",
+      "type": "duplicate_rows",
+      "severity": "should-fix",
+      "evidence": "Remove the duplicate data row so aggregations don't double-count.",
+      "suggested_repair": "Remove the duplicate data row so aggregations don't double-count.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-20",
+      "location": "Carve-out!E52",
+      "type": "date_as_text",
+      "severity": "should-fix",
+      "evidence": "Convert the text to a real date so it compares and sorts.",
+      "suggested_repair": "Convert the text to a real date so it compares and sorts.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-21",
+      "location": "Carve-out!header row 2",
+      "type": "source_without_id_date",
+      "severity": "should-fix",
+      "evidence": "Add a source-ID and date/period column so rows trace to a source.",
+      "suggested_repair": "Add a source-ID and date/period column so rows trace to a source.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-22",
+      "location": "Carve-out!M13:M19",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-23",
+      "location": "Carve-out!M21:M24",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-24",
+      "location": "Carve-out!M28:M37",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-25",
+      "location": "Carve-out!M40:M43",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-26",
+      "location": "Carve-out!M4:M10",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-27",
+      "location": "Carve-out!M50:M54",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-28",
+      "location": "Carve-out!M56:M61",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-29",
+      "location": "Carve-out!M63:M65",
+      "type": "merged_cells",
+      "severity": "polish",
+      "evidence": "Unmerge the range; keep the value in a single addressable cell.",
+      "suggested_repair": "Unmerge the range; keep the value in a single addressable cell.",
+      "human_review": false,
+      "status": "open"
+    }
+  ]
+}

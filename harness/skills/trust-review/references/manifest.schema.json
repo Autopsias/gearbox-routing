@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Trust Layer per-run artifact manifest",
+  "_doc": "Machine-readable schema for .trust/<run_id>/manifest.json. Full prose: sensitivity-routing-policy.md §8. Reserved keys: conventions.md §3.2. The required-key set below is exactly what the acceptance gate (scripts/manifest_gate.py) enforces before any model-run loop may start.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["manifest_version", "run_id", "created", "artifact", "travel_class", "sensitivity", "routing", "gate"],
+  "properties": {
+    "manifest_version": { "type": "string" },
+    "run_id": { "type": "string", "description": "<ISO-timestamp>_<short-slug>" },
+    "created": { "type": "string", "description": "ISO-8601 timestamp" },
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["workbook", "deck", "document", "other"] }
+      }
+    },
+    "travel_class": {
+      "type": "object",
+      "required": ["effective"],
+      "properties": {
+        "value": { "type": "string", "enum": ["internal", "travels", "board-regulatory"] },
+        "declared": { "type": "string", "enum": ["internal", "travels", "board-regulatory"] },
+        "effective": { "type": "string", "enum": ["internal", "travels", "board-regulatory"] },
+        "source": { "type": "string", "enum": ["declared", "escalated", "waived-down"] },
+        "escalation_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["formula", "financial-metric", "legal-regulatory", "investor-board-client-term", "external-recipient", "stale-source-conflict", "unsupported-number"]
+          }
+        },
+        "waiver": { "type": ["object", "null"] }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "required": ["run_max", "sources"],
+      "properties": {
+        "run_max": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["source_id", "sensitivity"],
+            "properties": {
+              "source_id": { "type": "string", "pattern": "^S[0-9]+$" },
+              "sensitivity": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] },
+              "redaction": { "type": "string", "enum": ["none", "excerpt", "mask", "local-only"] }
+            }
+          }
+        },
+        "redaction_default": { "type": "string", "enum": ["none", "excerpt", "mask", "local-only"] },
+        "mask_map_sha256": { "type": ["string", "null"] }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "required": ["policy"],
+      "description": "Routing is recorded when policy is set AND (local_only is true OR at least one of builder_model/reviewer_model is populated).",
+      "properties": {
+        "policy": { "type": "string", "minLength": 1 },
+        "local_only": { "type": "boolean" },
+        "two_context": { "type": "boolean" },
+        "builder_model": { "$ref": "#/definitions/model_ref" },
+        "reviewer_model": { "$ref": "#/definitions/model_ref" },
+        "independence_note": { "type": ["string", "null"] }
+      }
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["round", "model", "timestamp", "inputs_seen", "prompt_hashes"],
+        "properties": {
+          "round": { "type": "integer", "minimum": 1 },
+          "role": { "type": "string", "enum": ["builder", "reviewer"] },
+          "model": { "$ref": "#/definitions/model_ref" },
+          "timestamp": { "type": "string" },
+          "inputs_seen": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source_id", "exposure", "sha256"],
+              "properties": {
+                "source_id": { "type": "string", "pattern": "^S[0-9]+$" },
+                "exposure": { "type": "string", "enum": ["full", "excerpt", "masked-excerpt", "redacted"] },
+                "locator": { "type": "string" },
+                "sha256": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "prompt_hashes": {
+            "type": "object",
+            "required": ["reviewer_prompt_sha256", "source_packet_sha256", "input_artifact_sha256"],
+            "properties": {
+              "reviewer_prompt_sha256": { "type": "string", "minLength": 1 },
+              "source_packet_sha256": { "type": "string", "minLength": 1 },
+              "input_artifact_sha256": { "type": "string", "minLength": 1 },
+              "provenance_record_sha256": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "human_gate": {
+      "type": "object",
+      "_doc": "TR-06 human-gate record (conventions.md §4). Persists every waiver/verified resolution so the named limitations travel with the file.",
+      "properties": {
+        "travel_class": { "type": "string" },
+        "signoff_required": { "type": "boolean" },
+        "limitations": { "type": "array", "items": { "type": "string" } },
+        "problems": { "type": "array", "items": { "type": "string" } },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["finding_id", "resolution", "applied"],
+            "properties": {
+              "finding_id": { "type": "string" },
+              "resolution": { "type": "string", "enum": ["verified-fixed", "waived-by-human"] },
+              "owner": { "type": ["string", "null"] },
+              "required_decision": { "type": ["string", "null"] },
+              "due_date": { "type": ["string", "null"] },
+              "signoff": { "type": ["string", "null"], "enum": ["approved", "pending", "rejected", null] },
+              "rationale": { "type": ["string", "null"] },
+              "travel_class": { "type": "string" },
+              "applied": { "type": "boolean" },
+              "limitation": { "type": "string" },
+              "rejected_reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "adapter_bindings": {
+      "type": "object",
+      "_doc": "F2-04 (v2 additive, optional): the adapter registry's resolved provider per operation for this run (references/scripts/adapter_registry.py; sensitivity-routing-policy.md §9). provider is metadata only (conventions.md §2.2) — recorded so every run states what backed each verification/reader operation. Absent on v1 (workbook/deck) runs.",
+      "properties": {
+        "probed_tool_count": { "type": "integer", "minimum": 0 },
+        "local_caps": { "type": "array", "items": { "type": "string" } },
+        "bindings": {
+          "type": "object",
+          "description": "operation -> 'tool@version' (a live MCP tool) | 'fallback:<id>' (a local/builtin fallback) | 'unbound' (no provider; the operation's documented degradation applies)",
+          "additionalProperties": { "type": "string" }
+        },
+        "degraded_operations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "_doc": "SV-01 (v2 additive, optional): the source-verification pipeline's output for this run (references/scripts/verification.py; conventions.md §2.2/§2.3/§2.4). One result per checked claim, folded back into the SAME §2 provenance record. provider is metadata only (conventions.md §2.2). Absent on runs with no verification pass.",
+      "properties": {
+        "travel_class": { "type": "string", "enum": ["internal", "travels", "board-regulatory"] },
+        "caps": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "budget_used": { "type": "integer", "minimum": 0 },
+        "not_checked_budget": { "type": "array", "items": { "type": "string" } },
+        "promoted_to_verified": { "type": "array", "items": { "type": "string" } },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["claim", "verdict"],
+            "properties": {
+              "claim": { "type": "string" },
+              "verdict": { "type": "string", "enum": ["corroborates", "contradicts", "not-found", "not-checked-budget"] },
+              "materiality": { "type": "array", "items": { "type": "string" } },
+              "severity": { "type": "string", "enum": ["must-fix", "should-fix", "polish"] },
+              "admitted_source_ids": { "type": "array", "items": { "type": "string", "pattern": "^S[0-9]+$" } },
+              "new_review_status": { "type": "string", "enum": ["verified", "needs-review", "unsupported", "conflicting", ""] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "note": { "type": "string" },
+              "promoted_to_verified": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "egress": {
+      "type": "array",
+      "_doc": "SV-03 (v2 additive, optional): the deterministic web-egress sanitizer's record per egress decision (sensitivity-routing-policy.md §2.5/§5.1/§5.2). Carries the raw-claim sha256 (NEVER the raw text), the exact egressed (sanitised) query, and a transformation diff — so 'what left the machine' is auditable. The reverse mask map is local-only and never recorded here. A skipped-egress entry has an empty egressed_query.",
+      "items": {
+        "type": "object",
+        "required": ["raw_claim_sha256", "egressed_query", "mode"],
+        "properties": {
+          "raw_claim_sha256": { "type": "string", "minLength": 1 },
+          "egressed_query": { "type": "string" },
+          "sensitivity": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] },
+          "mode": { "type": "string", "enum": ["allow-light", "mask-required", "skipped-egress"] },
+          "egress_allowed": { "type": "boolean" },
+          "blocked": { "type": "boolean" },
+          "block_reason": { "type": "string" },
+          "diff": { "type": "string" },
+          "transform": {
+            "type": "object",
+            "properties": {
+              "masked_placeholders": { "type": "array", "items": { "type": "string" } },
+              "coarsened_buckets": { "type": "array", "items": { "type": "string" } },
+              "removed_label_count": { "type": "integer", "minimum": 0 },
+              "banned_hit_count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "purge_after": { "type": "string" },
+        "retain_excerpts": { "type": "boolean" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "required": ["sensitivity_recorded", "routing_recorded", "status"],
+      "properties": {
+        "sensitivity_recorded": { "type": "boolean" },
+        "routing_recorded": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ok", "blocked"] },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "checked_at": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "model_ref": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "enum": ["builder", "reviewer"] },
+        "independent": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ import re
 import shutil
 import stat as statmod
 import subprocess
+from gitleaks_run import SCANNER_BUSY, run_gitleaks  # noqa: F401
 import tempfile
 from pathlib import Path
 
@@ -303,12 +304,9 @@ def _gitleaks_pass(exe, target, ignore_root, expected_bytes, link_root, allow,
         "--gitleaks-ignore-path", str(ignore_root),
         "--exit-code", str(_GITLEAKS_LEAK_EXIT),
     ]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=_GITLEAKS_TIMEOUT_S)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return (f"gitleaks could not scan {target} ({type(e).__name__}) — this tree "
-                "cannot be cleared for egress (fail-closed)")
+    proc, err = run_gitleaks(cmd, target, _GITLEAKS_TIMEOUT_S)
+    if err:
+        return err
     if proc.returncode not in (0, _GITLEAKS_LEAK_EXIT):
         tail = (proc.stderr or "").strip().splitlines()[-1:] or ["(no stderr)"]
         return (f"gitleaks failed on {target} (exit {proc.returncode}: {tail[0]}) — "

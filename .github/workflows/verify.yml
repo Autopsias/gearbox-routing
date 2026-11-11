@@ -63,16 +63,17 @@ jobs:
           mkdir -p "$HOME"
           python -m pytest -q -p no:cacheprovider claude scripts
 
-      # harness/ is a synced copy of a private deployment. Only its two fast
+      # harness/ is a synced copy of a private deployment. Only its three fast
       # suites run here (~20s); the rest (plan-execute takes ~35 min) expect
       # macOS or tools a runner lacks, so run them locally if you change harness/.
-      - name: Harness tests (plan-builder, routing-retro)
+      - name: Harness tests (plan-builder, routing-retro, trust-review)
         run: |
           set -euo pipefail
           export HOME="$RUNNER_TEMP/empty-home"
           mkdir -p "$HOME"
           python -m pytest -q -p no:cacheprovider \
-            harness/skills/plan-builder/scripts harness/skills/routing-retro/scripts
+            harness/skills/plan-builder/scripts harness/skills/routing-retro/scripts \
+            harness/skills/trust-review/scripts harness/skills/trust-review/references/scripts
 
       - name: Install throwaway target + run install.sh
         run: |

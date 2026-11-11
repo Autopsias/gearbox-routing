@@ -71,12 +71,10 @@ except Exception as _exc:  # pragma: no cover - exercised by a dedicated test
 
 ORCHESTRATOR_COMMANDS = ("/plan-execute", "/epic-dev", "/repo-health")
 PLANNING_COMMANDS = (
-    "/plan-harden",
-    "/plan-builder",
-    "/grill-with-docs",
-    "/grill-me",
-    "/adversarial-review",
-    "/routing-retro",
+    "/plan-harden", "/plan-builder", "/grill-with-docs", "/grill-me",
+    "/adversarial-review", "/routing-retro",
+    # analysis skills: docs/jev-fit-your-private-harness-2026-11-10.md
+    "/worth-adopting", "/improve", "/cost-audit", "/jev-fit-scan",
     "/research",  # the explicit override for a research/analysis session
 )
 # A WORD, not a prefix. `startswith` on the whole prompt classified

@@ -397,6 +397,17 @@ do_deploy() {
   fi
   say ""
 
+  # (a2) re-classify. The quiesce window is ~60 s, and a live session can dirty a
+  # tracked runtime file inside it; harvesting from the FIRST snapshot left that file
+  # unstaged, and the rebase below refused (exit 5: 2026-09-11, twice).
+  # shortcut: a write after THIS snapshot can still race; the window is now seconds, not a minute.
+  rm -f "$SNAP" "$SNAP".*
+  snapshot
+  if [ "$(snap_count harness,triage_untracked)" != "0" ]; then
+    report
+    die 3 "harness source or an unclassified new path appeared during the quiesce window. Run \`$CD/scripts/gearbox harvest\`, then re-run deploy."
+  fi
+
   # (e, first pass) the guard hooks must be live BEFORE we make any commit here.
   say "-- hooks --"
   bash "$CD/scripts/install-hooks.sh" || die 1 "install-hooks.sh failed"

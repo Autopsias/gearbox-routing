@@ -6,6 +6,18 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Office trust layer:** new module `modules/trust-layer.md`. It ships `trust-run`,
+  `trust-review` and the seven office sub-skills (`travel-class-router`,
+  `office-source-packet`, `office-update`, `document-doctor`, `deck-architect`,
+  `evidence-map`, `workbook-doctor`) together. Experimental. A second model reviews
+  the file in a fresh context. Provider packs let you bind your own notes tool;
+  the owner's private pack is not published.
+
+### Changed
+- **memo-loop:** its hand-off to `trust-run` now works, because `trust-run` is in the
+  harness. It still works without it.
+
 ### Changed (harness sync of 2026-11-09)
 This sync carries the private harness changes from 2026-10-31 to 2026-11-09.
 The routing policy (`claude/model-routing.yaml`) does not change.

@@ -1,0 +1,40 @@
+{
+  "manifest_version": "1.0",
+  "schema_version": "3",
+  "run_id": "2026-05-31T2010_s02-office-update",
+  "created": "2026-05-31T00:00:00Z",
+  "artifact": {
+    "path": "refresh-report.json",
+    "sha256": "4826dc5f41413b573d9438cbb1136e075cf03828a68a0c96d56d7ea2c83585cf",
+    "kind": "other"
+  },
+  "travel_class": {
+    "effective": "internal",
+    "value": "internal",
+    "source": "declared"
+  },
+  "sensitivity": {
+    "run_max": "internal",
+    "sources": [
+      {
+        "source_id": "PRIOR",
+        "sensitivity": "internal"
+      }
+    ]
+  },
+  "routing": {
+    "policy": "local-only (claim-identity diff; no model-run loop)",
+    "local_only": true,
+    "two_context": false,
+    "reviewer_independence": "same-model"
+  },
+  "degraded_status": [],
+  "migration_notes": "office-update consumed prior run 2026-05-29T1615_q3-boardpack (schema_version 1) READ-ONLY via the fd-03 reader (whole-dir byte-hash unchanged before/after). Diffed by fd-02 claim identity. Carried forward 8 prior verdict(s) + 0 valid waiver(s) on identity-stable UNCHANGED claims only; 0 identity-stable-but-invalidated claim(s) re-enter needs-review; 1 dropped claim(s) tombstoned (never deleted); 1 superseded source(s) linked, not blended. New output stamped schema_version=3.",
+  "gate": {
+    "status": "ok",
+    "sensitivity_recorded": true,
+    "routing_recorded": true,
+    "missing": [],
+    "checked_at": "2026-05-31T20:06:29Z"
+  }
+}

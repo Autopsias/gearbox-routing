@@ -1,0 +1,54 @@
+{
+  "run_id": "2026-05-29T1820_q3-review",
+  "skill": "trust-review",
+  "phase": "review-edits",
+  "manifest": {
+    "artifact_hash": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228",
+    "provenance_hash": "8588899dab24567deb94da2e7fb900ceb99f1f4ad542cc6c713508e1faf90228",
+    "reviewer_prompt_hash": "ea391b91bcebe7f68ad449f741d9967c287d8905bf7f4a4990e816189e2dcc57",
+    "model": "Sonnet 4.6",
+    "ts": "2026-05-29T23:00:10Z"
+  },
+  "edits": [
+    {
+      "id": "R-01",
+      "location": "Board!B5",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-02",
+      "location": "Board!B7",
+      "type": "hardcode_in_calc_zone",
+      "severity": "must-fix",
+      "evidence": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "suggested_repair": "Replace the typed number with the formula its neighbours use, or move it to a labelled input.",
+      "human_review": false,
+      "status": "open"
+    },
+    {
+      "id": "R-03",
+      "location": "Board!B5",
+      "type": "source_packet_link",
+      "severity": "must-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "open"
+    },
+    {
+      "id": "R-04",
+      "location": "Board!B7",
+      "type": "source_packet_link",
+      "severity": "should-fix",
+      "evidence": "Source the number against a current claim, or correct it to the authoritative value.",
+      "suggested_repair": "Source the number against a current claim, or correct it to the authoritative value.",
+      "human_review": true,
+      "status": "open"
+    }
+  ]
+}

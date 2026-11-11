@@ -1,0 +1,64 @@
+{
+  "run_id": "2026-05-29T1615_q3-boardpack",
+  "skill": "office-source-packet",
+  "phase": "file-spec",
+  "status": "blocked",
+  "status_reason": "Pre-creation human gate — awaiting approval. No workbook/deck is created until the decisions below are recorded.",
+  "consumes": "source-packet.json",
+  "output_type": "both",
+  "audience": "board-only",
+  "where_truth_lives": {"q3_actuals": "S1", "q4_revenue": "S2 (estimate)", "strategy_ma": "S5 (restricted)"},
+  "deck_slide_map": [
+    {"slide": 1, "title": "Q3 FY26 Board Review", "headlines": []},
+    {"slide": 2, "title": "Financial Highlights", "headlines": [
+      {"text": "Revenue €48.2M", "claim_id": "C1", "source_id": "S1", "confidence": 1.0},
+      {"text": "EBITDA margin — GATE: 18.5% actual vs 18% board display", "claim_id": "C2/C3", "source_id": "S1/S3", "gate_ref": "CONFLICT-002"},
+      {"text": "Headcount 1,195 (corrects 1,180 in draft)", "claim_id": "C4", "source_id": "S1", "note": "CONFLICT-003"},
+      {"text": "Revenue +12% YoY", "claim_id": "C6", "source_id": null, "status": "EXCLUDE pending source", "note": "unsupported — no prior-year base"}
+    ]},
+    {"slide": 3, "title": "Commentary", "headlines": [
+      {"text": "Margin pressure: cloud-migration spend €2.1M", "claim_id": "C9", "source_id": "S1", "confidence": 1.0},
+      {"text": "Q4 outlook ≈ €52M (forecast/stretch)", "claim_id": "C5", "source_id": "S2", "note": "label as forecast, not actual"}
+    ]},
+    {"slide": 4, "title": "Strategic", "headlines": [
+      {"text": "Project Lighthouse (~€15M acquisition)", "claim_id": "C7", "source_id": "S5", "sensitivity": "restricted", "status": "BOARD-ONLY — owner sign-off; exclude from any wider version"}
+    ]},
+    {"slide": 5, "title": "Asks", "headlines": [
+      {"text": "Approve FY27 opex budget", "claim_id": null, "source_id": "S4"},
+      {"text": "Greenlight Project Lighthouse", "claim_id": "C7", "source_id": "S5", "sensitivity": "restricted", "status": "BOARD-ONLY — sign-off"}
+    ]}
+  ],
+  "workbook_tab_map": [
+    {"tab": "Q3 Actuals", "basis": "S1", "rows": [
+      {"metric": "Revenue", "value": "€48.2M", "claim_id": "C1", "source_id": "S1"},
+      {"metric": "EBITDA margin", "value": "18.5%", "claim_id": "C2", "source_id": "S1"},
+      {"metric": "Headcount", "value": "1195", "claim_id": "C4", "source_id": "S1"},
+      {"metric": "Cloud-migration spend", "value": "€2.1M", "claim_id": "C9", "source_id": "S1"},
+      {"metric": "Gross margin", "value": "61%", "claim_id": null, "source_id": "S1"}
+    ]},
+    {"tab": "Forecast vs Actual", "basis": "S1 vs S2", "rows": [
+      {"metric": "Revenue", "actual": "€48.2M (C1)", "forecast": "€47.5M (S2)", "variance": "+€0.7M", "conflict_ref": "CONFLICT-001"},
+      {"metric": "EBITDA margin", "actual": "18.5% (C2)", "forecast": "17% (S2)", "variance": "+1.5pp", "conflict_ref": "CONFLICT-002"},
+      {"metric": "Headcount", "actual": "1195 (C4)", "forecast": "1180 (S2)", "variance": "+15", "conflict_ref": "CONFLICT-003"}
+    ]},
+    {"tab": "Q4 Outlook", "basis": "S2", "rows": [
+      {"metric": "Q4 revenue", "value": "€52M", "claim_id": "C5", "source_id": "S2", "label": "forecast/stretch — estimate"}
+    ]},
+    {"tab": "Sources", "basis": "packet", "note": "Reproduces S1..S5 with source_status verbatim"},
+    {"tab": "Conflicts", "basis": "packet", "note": "Reproduces CONFLICT-001..003 verbatim; no blending"}
+  ],
+  "sensitivity_review": [
+    {"claim_id": "C7", "topic": "Project Lighthouse (M&A)", "tier": "restricted", "decision": "Exclude by default; board-only deck with owner sign-off; never in workbook or wider version.", "reason": "M&A / MNPI"},
+    {"claim_id": "C10", "topic": "EMEA sales reorg", "tier": "restricted", "decision": "Exclude from deck and workbook.", "reason": "personnel-sensitive"},
+    {"claim_id": "C6", "topic": "+12% YoY revenue", "tier": "internal", "decision": "Exclude pending a sourced prior-year base.", "reason": "unsupported (traceability)"}
+  ],
+  "decisions_required": [
+    {"id": "D-1", "ref": "CONFLICT-002", "decision": "Present EBITDA margin as 18.5% (actual) or 18% flat + footnote (CFO directive)?", "owner": "CFO"},
+    {"id": "D-2", "ref": "C6", "decision": "Source the +12% YoY (prior-year base) or drop it.", "owner": "FP&A"},
+    {"id": "D-3", "ref": "CONFLICT-003", "decision": "Confirm headcount 1,195 replaces 1,180 in the draft.", "owner": "FP&A"},
+    {"id": "D-4", "ref": "C7", "decision": "Sign-off to include Project Lighthouse in the board-only deck; confirm exclusion elsewhere.", "owner": "CFO / Deal sponsor"},
+    {"id": "D-5", "ref": "C10", "decision": "Confirm exclusion of the EMEA reorg.", "owner": "CFO / HR"},
+    {"id": "D-6", "ref": "audience", "decision": "Confirm audience = board-only (a public version also redacts C7 + slide 5 ask).", "owner": "CFO"}
+  ],
+  "human_gate": {"status": "blocked", "assertion": "No workbook or deck file is created until a human approves this spec and records the decisions above. Hard stop; Workbook Doctor / Deck Architect do not run until cleared."}
+}

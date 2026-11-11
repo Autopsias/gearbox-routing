@@ -85,6 +85,7 @@ path on the card, and read the cautions.
 |---|---|---|
 | [General commands](modules/general-commands.md) | `/review`, `/research`, `/wait-what`, `/nextsession`, `/improve`, `/pr`, and what is archived | Any |
 | [Reference docs](modules/reference-docs.md) | Background docs, a rule file, the original global instructions, key bindings | Any |
+| [Office trust layer](modules/trust-layer.md) | Checks a memo, deck or workbook before it travels: nine skills, one command (`trust-run`), one verdict, with a second model as hostile reviewer | Any — second model needed; web search optional |
 
 ## Not for general use
 

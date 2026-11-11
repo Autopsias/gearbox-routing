@@ -77,7 +77,7 @@ Subcommands (all take the plan directory as the first positional arg):
                                    retirement or drop the dependency (which also
                                    rewrites those dependents' prompts, same
                                    transaction).
-  clear-halt DIR [--cost-report S] Clear the halt flag; a 2nd clear of one session needs the cost line.
+  clear-halt DIR [--cost-report S] [--decision S] Clear the halt flag; a 2nd clear needs the cost line, a stuck session needs --decision.
   release DIR                      Release the lock (end of run).
   retire-plan DIR [--reason R]     §15's `abandon` row: end an UNLANDED,
                                    isolated plan without landing it. ALWAYS
@@ -3958,8 +3958,8 @@ def cmd_record_receipt(plan_dir, session_id, agent_id, transcript, backend, inli
     receipt_cmd.record_receipt(plan_dir, session_id, agent_id, transcript, backend, inline_fix, _out)
 
 
-def cmd_clear_halt(plan_dir, cost_report=None):
-    rsi.clear_halt_cli(plan_dir, cost_report, lambda p: _out(p, plan_dir=plan_dir))
+def cmd_clear_halt(plan_dir, cost_report=None, decision=None):
+    rsi.clear_halt_cli(plan_dir, cost_report, lambda p: _out(p, plan_dir=plan_dir), decision=decision)
 
 
 def cmd_release(plan_dir):
@@ -4422,6 +4422,7 @@ def _add_mutation_parsers(sub):
     s = sub.add_parser("clear-halt")
     add_dir(s)
     s.add_argument("--cost-report", default=None, help="Required from the SECOND clear of one session's halt on.")
+    s.add_argument("--decision", default=None, help="Required when the stuck protocol triggered for the session.")
     s = sub.add_parser("release")
     add_dir(s)
 
@@ -4522,7 +4523,7 @@ _COMMANDS = {
     "add-session": lambda plan_dir, args: cmd_add_session(plan_dir, args),
     "amend-session": lambda plan_dir, args: cmd_amend_session(plan_dir, args),
     "retire-session": lambda plan_dir, args: cmd_retire_session(plan_dir, args),
-    "clear-halt": lambda plan_dir, args: cmd_clear_halt(plan_dir, args.cost_report),
+    "clear-halt": lambda plan_dir, args: cmd_clear_halt(plan_dir, args.cost_report, args.decision),
     "release": lambda plan_dir, args: cmd_release(plan_dir),
     "retire-plan": lambda plan_dir, args: cmd_retire_plan(plan_dir, args.reason),
     "ship-begin": lambda plan_dir, args: (

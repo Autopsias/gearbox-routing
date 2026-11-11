@@ -1,0 +1,92 @@
+{
+  "description": "Ground-truth defects seeded into each Document Doctor fixture (DR-01) — the doc-surface analogue of fixtures/workbook_doctor/answer_key.json. The consolidated benchmark's score_document() runs document_map + prose_landmines + claim_audit (with the S03 q3 source packet) on each seeded format and asserts every 'must_detect' entry is flagged with the stated check + severity, PER FORMAT. A defect-class finding raised on the paired CLEAN control is a false positive. Keys differ per format BY DESIGN (Review #6: a single 'doc' score hides a weak format) — e.g. the PDF carries every prose sentence in one page-passage, so the date in the passage suppresses 'undated-number' there; that defect is therefore not in the pdf key.",
+  "scanners": {
+    "prose_landmines": "type -> check verbatim; severity read from the finding; matched by evidence substring (match.evidence_contains).",
+    "document_map": "DD-07 / DD-01 structural findings; finding 'id' is the check (e.g. DOC-PBW-01); the scanned PDF is mapped with OCR unavailable so an image-only scan BLOCKS.",
+    "claim_audit": "claim review_status/materiality -> a synthesized finding: review_status=='unsupported' (material) => check 'unsupported-claim' severity must-fix; review_status=='conflicting' => check 'conflicting-claim' severity must-fix; materiality=='assumption-as-fact' => check 'assumption-as-fact' severity should-fix. Matched by claim substring (match.claim_contains)."
+  },
+  "fixtures": {
+    "seeded_docx": {
+      "file": "seeded.docx", "format": "docx", "scored": true, "requires_source_packet": true,
+      "clean_control": "clean.docx",
+      "must_detect": [
+        {"check": "unsupported-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "+12% YoY"}, "why": "unsourced number: '+12% YoY' resolves to packet claim C6 (zero supporting) => unsupported."},
+        {"check": "conflicting-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "1,195"}, "why": "cross-section contradiction: People says 1,195, Outlook says 1,180; 1,195 resolves to packet C4 (CONFLICT-003) => conflicting."},
+        {"check": "stale-date", "scanner": "prose_landmines", "severity": "must-fix", "match": {"evidence_contains": "12/03/2019"}, "why": "an 'as of 12/03/2019' date years past the freshness window (> 2x) => must-fix."},
+        {"check": "assumption-as-fact", "scanner": "claim_audit", "severity": "should-fix", "match": {"claim_contains": "€52M next quarter"}, "why": "a forward, numeric assertion stated declaratively => materiality assumption-as-fact."},
+        {"check": "broken-cross-ref", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "table 9"}, "why": "'See Table 9' with only one table in the document map."},
+        {"check": "unattributed-quote", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "strongest"}, "why": "a headline quotation with no nearby attribution/citation."},
+        {"check": "undated-number", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "€1.1"}, "why": "'Net income rose to €1.1M' with no date in the same passage."}
+      ]
+    },
+    "seeded_md": {
+      "file": "seeded.md", "format": "md", "scored": true, "requires_source_packet": true,
+      "clean_control": "clean.md",
+      "must_detect": [
+        {"check": "unsupported-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "+12% YoY"}, "why": "unsourced number => packet C6 unsupported."},
+        {"check": "conflicting-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "1,195"}, "why": "cross-section contradiction => packet C4 conflict."},
+        {"check": "stale-date", "scanner": "prose_landmines", "severity": "must-fix", "match": {"evidence_contains": "12/03/2019"}, "why": "stale 'as of' date."},
+        {"check": "assumption-as-fact", "scanner": "claim_audit", "severity": "should-fix", "match": {"claim_contains": "€52M next quarter"}, "why": "assumption-as-fact materiality."},
+        {"check": "broken-cross-ref", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "table 9"}, "why": "broken Table 9 cross-reference."},
+        {"check": "unattributed-quote", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "strongest"}, "why": "unattributed quotation."},
+        {"check": "undated-number", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "€1.1"}, "why": "undated material figure."}
+      ]
+    },
+    "seeded_html": {
+      "file": "seeded.html", "format": "html", "scored": true, "requires_source_packet": true,
+      "clean_control": "clean.html",
+      "must_detect": [
+        {"check": "unsupported-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "+12% YoY"}, "why": "unsourced number => packet C6 unsupported."},
+        {"check": "conflicting-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "1,195"}, "why": "cross-section contradiction => packet C4 conflict."},
+        {"check": "stale-date", "scanner": "prose_landmines", "severity": "must-fix", "match": {"evidence_contains": "12/03/2019"}, "why": "stale 'as of' date."},
+        {"check": "assumption-as-fact", "scanner": "claim_audit", "severity": "should-fix", "match": {"claim_contains": "€52M next quarter"}, "why": "assumption-as-fact materiality."},
+        {"check": "broken-cross-ref", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "table 9"}, "why": "broken Table 9 cross-reference."},
+        {"check": "unattributed-quote", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "strongest"}, "why": "unattributed quotation."},
+        {"check": "undated-number", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "€1.1"}, "why": "undated material figure."}
+      ]
+    },
+    "seeded_pdf": {
+      "file": "seeded.pdf", "format": "pdf", "scored": true, "requires_source_packet": true,
+      "clean_control": "clean.pdf",
+      "must_detect": [
+        {"check": "unsupported-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "+12% YoY"}, "why": "unsourced number => packet C6 unsupported."},
+        {"check": "conflicting-claim", "scanner": "claim_audit", "severity": "must-fix", "match": {"claim_contains": "1,195"}, "why": "cross-section contradiction => packet C4 conflict."},
+        {"check": "stale-date", "scanner": "prose_landmines", "severity": "must-fix", "match": {"evidence_contains": "12/03/2019"}, "why": "stale 'as of' date (page-level locator)."},
+        {"check": "assumption-as-fact", "scanner": "claim_audit", "severity": "should-fix", "match": {"claim_contains": "€52M next quarter"}, "why": "assumption-as-fact materiality."},
+        {"check": "broken-cross-ref", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "table 9"}, "why": "broken Table 9 cross-reference."},
+        {"check": "unattributed-quote", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "strongest"}, "why": "unattributed quotation."}
+      ],
+      "format_note": "No 'undated-number' here: pdfplumber yields the page as one passage carrying the '12/03/2019' date, so the date is in-passage and suppresses undated-number. A genuine per-format difference, not a miss."
+    },
+    "scanned_pdf": {
+      "file": "scanned.pdf", "format": "pdf", "scored": true, "requires_source_packet": false,
+      "map_with_ocr_unavailable": true,
+      "must_detect": [
+        {"check": "DOC-PBW-01", "scanner": "document_map", "severity": "must-fix", "match": {"id": "DOC-PBW-01"}, "why": "DD-07: an image-only PDF with no OCR cannot be certified — extraction-loss must-fix."},
+        {"check": "table-as-image", "scanner": "prose_landmines", "severity": "must-fix", "match": {"evidence_contains": "image-only page"}, "why": "any table/figure on an image-only page is a picture, not extractable content."}
+      ],
+      "block_assertions": [
+        {"assert": "status", "equals": "blocked"},
+        {"assert": "readiness", "equals": "not-ready"},
+        {"assert": "human_review_nonempty"}
+      ]
+    },
+    "diverge_html": {
+      "file": "diverge.html", "format": "html", "scored": true, "requires_source_packet": false,
+      "must_detect": [
+        {"check": "rendered-vs-source-divergence", "scanner": "document_map", "severity": "should-fix", "match": {"divergent": true}, "why": "DD-01 #11: hidden / collapsed / agent-only content present in source but not in the visible render."},
+        {"check": "table-as-image", "scanner": "prose_landmines", "severity": "should-fix", "match": {"evidence_contains": "svg"}, "why": "an embedded SVG captioned as a chart — its numbers cannot be traced."}
+      ],
+      "structure_assertions": [
+        {"assert": "hidden_blocks_min", "value": 1},
+        {"assert": "agent_only_blocks_min", "value": 1},
+        {"assert": "nav_blocks_min", "value": 1},
+        {"assert": "no_hidden_token_in_visible", "tokens": ["confidentialfigure9999", "secrettoken8888", "agentsecretzzz"]}
+      ]
+    }
+  },
+  "clean_controls": {
+    "note": "Scored WITHOUT a source packet. ANY prose-landmine of severity must-fix/should-fix, or any claim_audit unsupported/conflicting/assumption-as-fact finding, raised on a clean control is a FALSE POSITIVE (the doc-surface analogue of the roll-forward must-NOT-flag contrast row).",
+    "files": ["clean.docx", "clean.pdf", "clean.md", "clean.html"]
+  }
+}
