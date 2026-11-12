@@ -18,6 +18,41 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 - **memo-loop:** its hand-off to `trust-run` now works, because `trust-run` is in the
   harness. It still works without it.
 
+### Changed (harness sync of 2026-11-12)
+This sync carries the private harness changes from 2026-11-09 to 2026-11-12.
+The routing policy (`claude/model-routing.yaml`) does not change.
+
+- **repo-health:** it is now the one front door for whole-repo reviews. Its design
+  reviews are `refactoring`, `over-engineering`, `trust-ladder` and a new
+  `test-value` review. `test-value` counts mocks and reach into private names per
+  test file, measures per-test coverage on one suite, and judges at most ten tests
+  that own no line of their own. A new `test.parallel-safety` check runs the suite
+  in random order and in two workers, twice each, before you parallelise it.
+- **declutter:** Claude can now start it, not only `/declutter`. It is the deep
+  tier of the repo-health over-engineering review.
+- **`/coverage`:** it ranks uncovered code by risk and covers the top gaps with the
+  fewest tests, extending an existing test first. A coverage percent is a reading,
+  not a target.
+- **Job-governor hook:** its message now says to run heavy tests with
+  `govrun --max-wait 0` in the background. Without `--max-wait 0`, an interactive
+  job gives up after 120 s and exits 75, which is a queue timeout, not a test failure.
+- **Git-safety rule:** a delete that is made reversible first (a saved patch, or a
+  move to a kept folder) needs only a normal confirmation.
+- **Export:** `scripts/sync-from-claude.py` now rebuilds `docs/CATALOG.md` after
+  each sync, so a changed skill description cannot leave the catalogue stale.
+- **Docs:** the catalogue now opens with every skill, command and hook grouped by
+  what you want to do, under each module with its `./install-module` line. The
+  README opens with a "Find what you need" table. The trust layer moves to
+  "Review and decisions" in the module index.
+
+### Fixed (trust layer, before release)
+- **evidence-map:** a packet source link under the confidence threshold is now held
+  as a candidate for approval, not asserted as support.
+- **evidence-map:** the gap review now sees a superseded packet source, not only a
+  superseded workbook source.
+- **office-update:** only an unchanged claim with a stable identity keeps its prior
+  verdict. A new claim always goes back to review.
+
 ### Changed (harness sync of 2026-11-09)
 This sync carries the private harness changes from 2026-10-31 to 2026-11-09.
 The routing policy (`claude/model-routing.yaml`) does not change.

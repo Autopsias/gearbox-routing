@@ -4,6 +4,20 @@ Scores a whole repo from 0 to 100 on security, code quality, tests, CI, AI
 readiness and hygiene. It keeps the history on an HTML dashboard and splits the
 findings into BLOCKING (fix now) and ADVISORY.
 
+It is the one front door for whole-repo reviews. Besides the score, you can pick
+four design reviews:
+
+- `refactoring` — shallow modules, one concept spread over many small modules,
+  coupling that leaks across seams, and code that is hard to test through its
+  interface. It adds the file-size and complexity rows when the score also ran.
+- `over-engineering` — a quick scan for what can go. The deep audit is the
+  `declutter` skill.
+- `trust-ladder` — counts the repo's rules against its checks, and names at most
+  five rules that could move to a stronger check.
+- `test-value` — which tests earn their place. It counts mocks and reach into
+  private names per test file, measures per-test coverage on one suite, and
+  judges at most ten tests that own no line of their own.
+
 | | |
 |---|---|
 | **Status** | Optional · stable — has its own tests |

@@ -11,6 +11,19 @@ It is not tied to one vendor: the routing policy ships profiles for Anthropic,
 OpenAI, Gemini and Z.ai, and the toolkit runs on Claude Code and on OpenAI's
 Codex CLI. You take only the parts you want.
 
+## Find what you need
+
+| To… | Go to |
+|---|---|
+| See every skill, command and hook, grouped by what you want to do | [The catalogue, by task](docs/CATALOG.md#by-what-you-want-to-do) |
+| Look up one part by name | [The catalogue, A to Z](docs/CATALOG.md#a-to-z) |
+| Install a group of parts with one command | [The module index](docs/MODULES.md), then `./install-module <name>` |
+| See what changed in each release | [The changelog](CHANGELOG.md) |
+
+Each part has a module card that says what it needs, and how to install, check
+and remove it. A script builds the catalogue from the files, so it always
+matches this repo.
+
 ## Is Gearbox for you?
 
 **A good fit if you:**
@@ -76,6 +89,13 @@ Codex CLI. You take only the parts you want.
 - `/grill-me` interviews you about a design until each decision is settled; `/blindspot` finds the traps in unfamiliar code; `/diagnose` takes a hard bug to a fix and a test.
 
 [Modules →](docs/MODULES.md#review-and-decisions)
+
+### Office file checks before they travel
+- `/trust-run` checks a memo, deck or workbook before it goes to a board, a client or an investor, and returns one readiness verdict with one fix list.
+- It sets how far the file will travel, lists every source behind its claims, inspects each file, and ties each slide claim to the workbook cell behind it.
+- A second model reviews the file in a fresh context and never edits it. The run stops at a human gate. Experimental.
+
+[The trust layer →](docs/modules/trust-layer.md)
 
 ### Repo health and quality
 - `/repo-health` scores a repo from 0 to 100 on a dashboard, splits findings into BLOCKING and ADVISORY, and keeps the history.
@@ -198,6 +218,7 @@ Codex. Good places to start:
 | A health check and quality pass on a repo | [`repo-health`](docs/modules/repo-health.md) [`code-quality`](docs/modules/code-quality.md) [`test-and-ci`](docs/modules/test-and-ci.md) [`support-agents`](docs/modules/support-agents.md) |
 | Second-model review of code and plans | [`adversarial-review`](docs/modules/adversarial-review.md) [`grilling`](docs/modules/grilling.md) [`investigation`](docs/modules/investigation.md) |
 | Large jobs run as checked sessions | [`plan-pipeline`](docs/modules/plan-pipeline.md), plus `adversarial-review` and `grilling` for `/plan-harden` |
+| A memo, deck or workbook checked before it travels | [`trust-layer`](docs/modules/trust-layer.md) |
 | Small, safe wins | [`git-safety`](docs/modules/git-safety.md) [`statusline`](docs/modules/statusline.md) |
 | To see what your sessions cost | [`cost-and-usage`](docs/modules/cost-and-usage.md) |
 | Long sources turned into a one-page brief for a decision | [`tldr`](docs/modules/tldr.md) [`eli5`](docs/modules/eli5.md) |

@@ -5,6 +5,11 @@ Everything in `harness/`, one line each. The line is the first sentence of the
 part's own description. To install a part, open its module card: the card
 lists every file the part needs, and how to check and remove it.
 
+The page has two halves. **By what you want to do** groups every skill,
+command and hook under the areas of [the module index](MODULES.md). **A to Z**
+lists every part by kind, subagents too. Use your browser's find (Ctrl+F or
+Cmd+F) to look for a word.
+
 **How you start each kind of part:**
 
 - **Skill** — type `/name`, or Claude starts it when your request matches its
@@ -17,11 +22,177 @@ lists every file the part needs, and how to check and remove it.
 
 Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
+## By what you want to do
+
+[Plan and build](#plan-and-build) · [Review and decisions](#review-and-decisions) · [Code quality and testing](#code-quality-and-testing) · [Session safety and context](#session-safety-and-context) · [Cost, routing and authoring](#cost-routing-and-authoring) · [Commands and reference](#commands-and-reference)
+
+### Plan and build
+
+**[Plan pipeline](modules/plan-pipeline.md)** · install: `./install-module plan-pipeline`
+
+- `/plan-builder` — Build an executable multi-session plan — interview the user, compile a JSON spec, and emit a plan directory …
+- `/plan-execute` — The plan already exists — now run it.
+- `/plan-harden` — Pre-flight harden plan before exit.
+- `turnend-guard.py` — No turn ends blind on a plan this session runs. *(hook, runs on Stop)*
+- `verify-state-guard.py` — A DISPATCHED AGENT may read a plan's `_verify_state/`, never write it. *(hook, runs on PreToolUse (Bash|Write|Edit|MultiEdit|NotebookEdit))*
+
+**[BMAD method and epic builds](modules/bmad.md)** · install: `./install-module bmad`
+
+- `/epic-dev-conductor` — Conducts a BMAD /epic-dev build for any project.
+- 55 commands, listed on the card
+
+### Review and decisions
+
+**[Adversarial review](modules/adversarial-review.md)** · install: `./install-module adversarial-review`
+
+- `/adversarial-review` — Dual-model adversarial review.
+
+**[Grilling](modules/grilling.md)** · install: `./install-module grilling`
+
+- `/grill-me` — Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each …
+- `/grill-with-docs` — Grilling session that challenges your plan against the existing domain model, sharpens terminology, and …
+
+**[Investigation](modules/investigation.md)** · install: `./install-module investigation`
+
+- `/blindspot` — Runs a "blindspot pass" over an unfamiliar code/vault area before you touch it — digs through git history and …
+- `/diagnose` — Disciplined diagnosis loop for hard bugs and performance regressions.
+
+**[Decision memos](modules/memo-loop.md)** · install: `./install-module memo-loop`
+
+- `/memo-loop` — Critique a decision memo against a rubric compiled for that memo, or draft one from scratch.
+
+**[Outside-idea triage](modules/outside-ideas.md)** · install: `./install-module outside-ideas`
+
+- `/jev-fit-scan` — Scans the current repo for every place where software makes a verdict (model calls with closed-set output …
+- `/worth-adopting` — Judges what an outside source (a video transcript, an X post or thread, a blog post, a GitHub repo, a …
+
+**[Explainers](modules/eli5.md)** · install: `./install-module eli5`
+
+- `/eli5` — Explain a complex subject as an engaging, story-driven HTML artifact — big visuals, few words, real names …
+
+**[Executive summaries](modules/tldr.md)** · install: `./install-module tldr`
+
+- `/tldr` — Turn one or many long, complex sources (a report, a paper, a contract, a folder of documents, URLs …
+
+**[UI design and review](modules/ui-craft.md)** · install: `./install-module ui-craft`
+
+- `/ui-craft` — Designs, builds and reviews user interfaces of every kind — web apps, sites, landing pages, dashboards, HTML …
+
+**[Office trust layer](modules/trust-layer.md)** · install: `./install-module trust-layer`
+
+- `/deck-architect` — The Office Trust Layer's PowerPoint front door — it builds the deck's ARGUMENT before any slide exists, then …
+- `/document-doctor` — The Office Trust Layer's prose-document inspector, run before anyone trusts an inherited or AI-written …
+- `/evidence-map` — The Office Trust Layer's cross-app evidence layer for decks — it ties every slide claim to the workbook cell …
+- `/office-source-packet` — The Office Trust Layer's truth layer, built before any file.
+- `/office-update` — The Office Trust Layer's recurring-refresh primitive.
+- `/travel-class-router` — The Office Trust Layer's front door — classifies how far a file will travel (Internal / Travels / …
+- `/trust-review` — The Office Trust Layer's two-context build-then-review loop.
+- `/trust-run` — One-command orchestrator for the whole Office Trust Layer.
+- `/workbook-doctor` — The Office Trust Layer's Excel inspector, run before anyone trusts an inherited or AI-built workbook.
+
+### Code quality and testing
+
+**[Repo health](modules/repo-health.md)** · install: `./install-module repo-health`
+
+- `/repo-health` — The one front door for whole-repo reviews.
+- `/coverage` — Analyzes test coverage gaps, prioritizes by risk, and orchestrates improvement.
+
+**[Code quality](modules/code-quality.md)** · install: `./install-module code-quality`
+
+- `/declutter` — Deep, evidence-gated overengineering audit of a whole repository: deterministic dead-code recon, then …
+- `/code-quality` — Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via …
+
+**[Engineering skills](modules/engineering-skills.md)** · install: `./install-module engineering-skills`
+
+- `/improve-codebase-architecture` — Find deepening opportunities in a codebase, informed by the domain language in CONTEXT.md and the decisions …
+- `/setup-matt-pocock-skills` — Sets up an `## Agent skills` block in AGENTS.md (legacy fallback: CLAUDE.md) and `docs/agents/` so the …
+- `/tdd` — Test-driven development with red-green-refactor loop.
+
+**[Flake detective](modules/flake-detective.md)** · install: `./install-module flake-detective`
+
+- `/flake-detective` — Statistically confirms then root-causes flaky pytest tests under xdist parallelism and CI drift.
+
+**[Test and CI commands](modules/test-and-ci.md)** · install: `./install-module test-and-ci`
+
+- `/commit-orchestrate` — Runs pre-commit quality checks (ruff, mypy, pytest) in parallel, stages changes intelligently, and commits …
+- `/create-test-plan` — Generates structured test plans from requirements: epics, stories, features, or custom functionality.
+- `/test-orchestrate` — Analyzes test failures and dispatches parallel specialist agents (unit-test-fixer, api-test-fixer …
+- `/usertestgates` — Discovers the next unrun test gate from epic/story definitions and executes it.
+
+**[Safe refactor](modules/safe-refactor.md)** · install: `./install-module safe-refactor`
+
+- `safe-refactor-advisory.sh` — Safe Refactor Advisory Hook (Interactive) Detects potential file splitting/refactoring and lets user choose … *(hook, runs on PreToolUse (Write))*
+
+### Session safety and context
+
+**[Git safety guard](modules/git-safety.md)** · install: `./install-module git-safety`
+
+- `git-tree-guard.py` — Refuse a tree-wide destructive git command while the working tree carries tracked modifications. *(hook, runs on PreToolUse (Bash))*
+
+**[Context compaction policy](modules/compaction.md)** · install: `./install-module compaction`
+
+- `compact-policy.py` — Compaction policy for Claude Code: classify the session, then decide whether an automatic compaction may … *(hook, runs on SessionStart (compact), UserPromptSubmit, PreCompact (auto), PostCompact)*
+
+**[Small hooks](modules/small-hooks.md)** · install: `./install-module small-hooks`
+
+- `agent-elapsed-nag.py` — Remind the orchestrator to report elapsed cost while a dispatch runs long. *(hook, runs on PreToolUse, SubagentStop)*
+- `instructions-inventory.py` — BD-01 — measure which instruction files actually load, per project. *(hook, runs on InstructionsLoaded)*
+- `routing-cadence-check.py` — Nudge when routing outcomes have piled up unanalyzed. *(hook, runs on SessionStart)*
+- `skill-usage-log.py` — Record every skill invocation, so popularity and undertriggering are MEASURABLE instead of guessed. *(hook, runs on PreToolUse (Skill))*
+
+**[Machine governor](modules/govrun.md)** · install: `./install-module govrun`
+
+- `governor-hook.py` — Refuse a heavy command that skipped govrun. *(hook, runs on PreToolUse (Bash))*
+
+**[Agent janitor](modules/agent-janitor.md)** · install: `./install-module agent-janitor`
+
+- `/janitor-status` — Health readout for the agent janitor (the background reaper/pruner installed with the agent janitor).
+- `/janitor-stop` — Immediately stop the agent janitor's unattended cleanup — unload both launchd jobs (reap + prune) and remove …
+
+### Cost, routing and authoring
+
+**[Cost and usage](modules/cost-and-usage.md)** · install: `./install-module cost-and-usage`
+
+- `/cost-audit` — Measures what Claude Code sessions actually cost and why, from the local transcripts — prompt-cache hit rate …
+- `/myusage-self-assessment` — Mine your own Claude Code session history to decide what to actually improve in your setup.
+
+**[Routing skills](modules/routing-skills.md)** · install: `./install-module routing-skills`
+
+- `/routing-retro` — Retrospective over recent session transcripts + the misroute ledger to judge whether model/effort routing is …
+- `/routing-update` — Research a model-landscape change and regenerate every routing surface through one operator-approved …
+- `dispatch-audit.py` — Record what model + effort every subagent dispatch actually asked for, so tier drift is VISIBLE instead of … *(hook, runs on PreToolUse (Agent))*
+
+**[Skill authoring](modules/skill-authoring.md)** · install: `./install-module skill-authoring`
+
+- `/codex-skill-sync` — Mirror the canonical Claude skills, agents, commands and enabled-plugin skills into ~/.agents/skills so Codex …
+- `/mods` — Manages Claude Code mods for the harness: decides whether a mod is due, creates one, reviews one for trust …
+- `/write-a-skill` — Author new USER-LEVEL agent skills in ~/.claude/skills with proper structure, progressive disclosure, and …
+
+**[NotebookLM](modules/notebooklm.md)** · install: `./install-module notebooklm`
+
+- `/nlm-skill` — Expert guide for the NotebookLM CLI (`nlm`) and MCP server - interfaces for Google NotebookLM.
+
+### Commands and reference
+
+**[General commands](modules/general-commands.md)** · install: `./install-module general-commands`
+
+- `/improve` — Review the current conversation and recent session history to suggest improvements to the project's …
+- `/nextsession` — Creates a self-contained continuation prompt capturing current context, progress, and next steps for seamless …
+- `/pr` — Manages Git PR workflows: stage, commit, push, create PRs, check status, sync branches, and merge.
+- `/research` — Mark this session as research/analysis so the compaction policy keeps the full 1M window (auto-compaction is …
+- `/review` — [ROUTING ALIAS — demoted s08] /review now routes to a canonical reviewer.
+- `/wait-what` — Re-explain your last reply in plain words, because it did not land.
+- `improve-nudge.py` — Nudge the agent to offer /improve at the right moments (NUDGE-01). *(hook, runs on SessionStart (startup), UserPromptSubmit, PostToolUse (Bash))*
+
+## A to Z
+
+[Skills](#skills) · [Commands](#commands) · [Subagents](#subagents) · [Hooks](#hooks)
+
 ## Skills
 
 | Skill | How you start it | What it does | Module card |
 |---|---|---|---|
-| `blindspot` | `/blindspot`, or Claude starts it | Runs a "blindspot pass" over an unfamiliar code/vault area before you touch it — digs through git history and current files to surface unknown unknowns (landmines, … | [Investigation](modules/investigation.md) |
+| `blindspot` | `/blindspot`, or Claude starts it | Runs a "blindspot pass" over an unfamiliar code/vault area before you touch it — digs through git history and current files to surface unknown unknowns (landmines … | [Investigation](modules/investigation.md) |
 | `codex-skill-sync` | `/codex-skill-sync` only | Mirror the canonical Claude skills, agents, commands and enabled-plugin skills into ~/.agents/skills so Codex loads the same set. | [Skill authoring](modules/skill-authoring.md) |
 | `cost-audit` | `/cost-audit`, or Claude starts it | Measures what Claude Code sessions actually cost and why, from the local transcripts — prompt-cache hit rate, what caused each cache rewrite, the effort level used per … | [Cost and usage](modules/cost-and-usage.md) |
 | `deck-architect` | `/deck-architect`, or Claude starts it | The Office Trust Layer's PowerPoint front door — it builds the deck's ARGUMENT before any slide exists, then renders and validates it. | [Office trust layer](modules/trust-layer.md) |
@@ -120,7 +291,7 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 | `ci-orchestrate` | `/ci-orchestrate` | Analyzes CI/CD pipeline failures, categorizes issues (lint, type, test, build), and dispatches parallel specialist agents to fix them. | [BMAD method and epic builds](modules/bmad.md) |
 | `code-quality` | `/code-quality` | Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via ruff C901, plus an advisory slop scan) and dispatches … | [Code quality](modules/code-quality.md) |
 | `commit-orchestrate` | `/commit-orchestrate` | Runs pre-commit quality checks (ruff, mypy, pytest) in parallel, stages changes intelligently, and commits with proper formatting — optionally pushing after. | [Test and CI commands](modules/test-and-ci.md) |
-| `coverage` | `/coverage` | Analyzes test coverage gaps, prioritizes by risk, and orchestrates improvement. | [Test and CI commands](modules/test-and-ci.md) |
+| `coverage` | `/coverage` | Analyzes test coverage gaps, prioritizes by risk, and orchestrates improvement. | [Repo health](modules/repo-health.md) |
 | `create-test-plan` | `/create-test-plan` | Generates structured test plans from requirements: epics, stories, features, or custom functionality. | [Test and CI commands](modules/test-and-ci.md) |
 | `epic-dev` | `/epic-dev` | Orchestrates BMAD development: standard, TDD/ATDD (--full), UAT (--uat), or end-of-epic validation (--end). | [BMAD method and epic builds](modules/bmad.md) |
 | `improve` | `/improve` | Review the current conversation and recent session history to suggest improvements to the project's configuration — CLAUDE.md, skills, frameworks, memory, agents (NOT … | [General commands](modules/general-commands.md) |
