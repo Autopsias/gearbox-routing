@@ -1438,6 +1438,15 @@ def main(argv: list[str] | None = None) -> int:
         # Console only — the SHA is deliberately absent from the exported tree.
         print(f"   source revision {private_sha} (pushed: {authoritative}) recorded in {ledger_path}")
         print(f"   harness/SYNCED-FROM stamps export date + pipeline_version {PIPELINE_VERSION} only")
+        # docs/CATALOG.md is generated from harness/; a synced skill description makes it
+        # stale and CI's test_catalog_is_current fails (v1.1.0, 2026-11-12). Rebuild it here.
+        catalog = repo_dir / "scripts" / "build_catalog.py"
+        if catalog.exists():
+            built = subprocess.run([sys.executable, str(catalog)], capture_output=True, text=True)
+            if built.returncode != 0:
+                print(f"FATAL: build_catalog.py failed: {built.stderr.strip()}", file=sys.stderr)
+                return 2
+            print(f"   {built.stdout.strip()}")
 
     # --- Scan layer 1: secrets, whole Gearbox tree ---
     secrets_green, scanner, scanner_ver, secrets_output, secret_findings = run_secret_scan(repo_dir, args.allow_missing_scanner)
