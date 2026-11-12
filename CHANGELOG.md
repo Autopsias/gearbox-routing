@@ -43,7 +43,9 @@ The routing policy (`claude/model-routing.yaml`) does not change.
 - **Docs:** the catalogue now opens with every skill, command and hook grouped by
   what you want to do, under each module with its `./install-module` line. The
   README opens with a "Find what you need" table. The trust layer moves to
-  "Review and decisions" in the module index.
+  "Review and decisions" in the module index. Short lines written for people
+  come from `docs/catalog-lines.json`, so the skill descriptions Claude reads
+  stay unchanged; the build fails if that file names a part that does not exist.
 
 ### Fixed (trust layer, before release)
 - **evidence-map:** a packet source link under the confidence threshold is now held

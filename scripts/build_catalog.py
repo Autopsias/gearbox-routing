@@ -163,6 +163,14 @@ def anchor(heading):
 
 
 SHORT = 110  # line length in the by-area view, so a reader can scan it
+LINES = ROOT / "docs" / "catalog-lines.json"  # optional lines for people; descriptions stay as Claude reads them
+
+
+def people_lines():
+    """{catalogue name: short line} from docs/catalog-lines.json, keys starting with _ skipped."""
+    if not LINES.exists():
+        return {}
+    return {k: v for k, v in json.loads(LINES.read_text(encoding="utf-8")).items() if not k.startswith("_")}
 
 
 def by_area(s, c, h):
@@ -173,6 +181,11 @@ def by_area(s, c, h):
     parts = [(f"/{r[0]}", r[2], r[3], "skill", "") for r in s] + \
             [(f"/{r[0]}", r[2], r[3], "command", "") for r in c] + \
             [(r[0], r[2], r[3], "hook", f" *(hook, runs on {r[1]})*") for r in h]
+    own = people_lines()
+    stale = sorted(set(own) - {p[0] for p in parts})
+    if stale:  # a renamed or removed part must not keep a line nobody shows
+        sys.exit(f"docs/catalog-lines.json names no part: {', '.join(stale)}")
+    parts = [(p[0], own.get(p[0], p[1]), *p[2:]) for p in parts]
     placed, out, jump = set(), [], []
     for heading, cards in areas():
         blocks = []

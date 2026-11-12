@@ -30,7 +30,7 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Plan pipeline](modules/plan-pipeline.md)** · install: `./install-module plan-pipeline`
 
-- `/plan-builder` — Build an executable multi-session plan — interview the user, compile a JSON spec, and emit a plan directory …
+- `/plan-builder` — Interviews you, then turns a large job into a plan of sessions with a dashboard.
 - `/plan-execute` — The plan already exists — now run it.
 - `/plan-harden` — Pre-flight harden plan before exit.
 - `turnend-guard.py` — No turn ends blind on a plan this session runs. *(hook, runs on Stop)*
@@ -49,12 +49,12 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Grilling](modules/grilling.md)** · install: `./install-module grilling`
 
-- `/grill-me` — Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each …
-- `/grill-with-docs` — Grilling session that challenges your plan against the existing domain model, sharpens terminology, and …
+- `/grill-me` — Interviews you about a plan or design until each decision is settled.
+- `/grill-with-docs` — Like /grill-me, but checks your plan against the domain docs and updates them as decisions settle.
 
 **[Investigation](modules/investigation.md)** · install: `./install-module investigation`
 
-- `/blindspot` — Runs a "blindspot pass" over an unfamiliar code/vault area before you touch it — digs through git history and …
+- `/blindspot` — Before you touch unfamiliar code, finds its traps from git history and the current files.
 - `/diagnose` — Disciplined diagnosis loop for hard bugs and performance regressions.
 
 **[Decision memos](modules/memo-loop.md)** · install: `./install-module memo-loop`
@@ -63,29 +63,29 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Outside-idea triage](modules/outside-ideas.md)** · install: `./install-module outside-ideas`
 
-- `/jev-fit-scan` — Scans the current repo for every place where software makes a verdict (model calls with closed-set output …
-- `/worth-adopting` — Judges what an outside source (a video transcript, an X post or thread, a blog post, a GitHub repo, a …
+- `/jev-fit-scan` — Finds each place where your software makes a verdict, and judges where Jev, a verdict-only model, would help.
+- `/worth-adopting` — Judges what an article, video, post or repo proposes against what your repo already has.
 
 **[Explainers](modules/eli5.md)** · install: `./install-module eli5`
 
-- `/eli5` — Explain a complex subject as an engaging, story-driven HTML artifact — big visuals, few words, real names …
+- `/eli5` — Explains a complex subject as a story-style HTML page with big visuals, for a named audience.
 
 **[Executive summaries](modules/tldr.md)** · install: `./install-module tldr`
 
-- `/tldr` — Turn one or many long, complex sources (a report, a paper, a contract, a folder of documents, URLs …
+- `/tldr` — Turns long sources into a one-page brief for a decision, plus a page, deck or video from the same claims.
 
 **[UI design and review](modules/ui-craft.md)** · install: `./install-module ui-craft`
 
-- `/ui-craft` — Designs, builds and reviews user interfaces of every kind — web apps, sites, landing pages, dashboards, HTML …
+- `/ui-craft` — Builds and reviews any user interface on a fixed set of design rules, with two blind reviewers.
 
 **[Office trust layer](modules/trust-layer.md)** · install: `./install-module trust-layer`
 
-- `/deck-architect` — The Office Trust Layer's PowerPoint front door — it builds the deck's ARGUMENT before any slide exists, then …
-- `/document-doctor` — The Office Trust Layer's prose-document inspector, run before anyone trusts an inherited or AI-written …
-- `/evidence-map` — The Office Trust Layer's cross-app evidence layer for decks — it ties every slide claim to the workbook cell …
+- `/deck-architect` — Builds a deck's argument before any slide exists, then renders and checks the deck.
+- `/document-doctor` — Inspects a Word, PDF, Markdown or HTML document for traps before anyone trusts it.
+- `/evidence-map` — Ties each slide claim to the workbook cell and source behind it, and lists the gaps.
 - `/office-source-packet` — The Office Trust Layer's truth layer, built before any file.
 - `/office-update` — The Office Trust Layer's recurring-refresh primitive.
-- `/travel-class-router` — The Office Trust Layer's front door — classifies how far a file will travel (Internal / Travels / …
+- `/travel-class-router` — Sets how far a file will travel, and so how deep its review must be.
 - `/trust-review` — The Office Trust Layer's two-context build-then-review loop.
 - `/trust-run` — One-command orchestrator for the whole Office Trust Layer.
 - `/workbook-doctor` — The Office Trust Layer's Excel inspector, run before anyone trusts an inherited or AI-built workbook.
@@ -99,13 +99,13 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Code quality](modules/code-quality.md)** · install: `./install-module code-quality`
 
-- `/declutter` — Deep, evidence-gated overengineering audit of a whole repository: deterministic dead-code recon, then …
-- `/code-quality` — Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via …
+- `/declutter` — Deep audit of a whole repo for code you can delete or simplify, each finding with proof.
+- `/code-quality` — Finds files, functions and complexity over the limits, and sends subagents to split them.
 
 **[Engineering skills](modules/engineering-skills.md)** · install: `./install-module engineering-skills`
 
-- `/improve-codebase-architecture` — Find deepening opportunities in a codebase, informed by the domain language in CONTEXT.md and the decisions …
-- `/setup-matt-pocock-skills` — Sets up an `## Agent skills` block in AGENTS.md (legacy fallback: CLAUDE.md) and `docs/agents/` so the …
+- `/improve-codebase-architecture` — Finds modules whose interface is nearly as complex as the code behind it, and how to deepen them.
+- `/setup-matt-pocock-skills` — Tells the engineering skills this repo's issue tracker, triage labels and domain doc layout.
 - `/tdd` — Test-driven development with red-green-refactor loop.
 
 **[Flake detective](modules/flake-detective.md)** · install: `./install-module flake-detective`
@@ -114,14 +114,14 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Test and CI commands](modules/test-and-ci.md)** · install: `./install-module test-and-ci`
 
-- `/commit-orchestrate` — Runs pre-commit quality checks (ruff, mypy, pytest) in parallel, stages changes intelligently, and commits …
+- `/commit-orchestrate` — Runs lint, type and test checks in parallel, then commits, and pushes if you ask.
 - `/create-test-plan` — Generates structured test plans from requirements: epics, stories, features, or custom functionality.
-- `/test-orchestrate` — Analyzes test failures and dispatches parallel specialist agents (unit-test-fixer, api-test-fixer …
+- `/test-orchestrate` — Sorts failing tests by kind and sends a specialist subagent to fix each kind.
 - `/usertestgates` — Discovers the next unrun test gate from epic/story definitions and executes it.
 
 **[Safe refactor](modules/safe-refactor.md)** · install: `./install-module safe-refactor`
 
-- `safe-refactor-advisory.sh` — Safe Refactor Advisory Hook (Interactive) Detects potential file splitting/refactoring and lets user choose … *(hook, runs on PreToolUse (Write))*
+- `safe-refactor-advisory.sh` — When a write looks like a file split, offers the safe-refactor agent instead. *(hook, runs on PreToolUse (Write))*
 
 ### Session safety and context
 
@@ -131,14 +131,14 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Context compaction policy](modules/compaction.md)** · install: `./install-module compaction`
 
-- `compact-policy.py` — Compaction policy for Claude Code: classify the session, then decide whether an automatic compaction may … *(hook, runs on SessionStart (compact), UserPromptSubmit, PreCompact (auto), PostCompact)*
+- `compact-policy.py` — Holds automatic compaction back until the session is at a safe moment. *(hook, runs on SessionStart (compact), UserPromptSubmit, PreCompact (auto), PostCompact)*
 
 **[Small hooks](modules/small-hooks.md)** · install: `./install-module small-hooks`
 
 - `agent-elapsed-nag.py` — Remind the orchestrator to report elapsed cost while a dispatch runs long. *(hook, runs on PreToolUse, SubagentStop)*
 - `instructions-inventory.py` — BD-01 — measure which instruction files actually load, per project. *(hook, runs on InstructionsLoaded)*
 - `routing-cadence-check.py` — Nudge when routing outcomes have piled up unanalyzed. *(hook, runs on SessionStart)*
-- `skill-usage-log.py` — Record every skill invocation, so popularity and undertriggering are MEASURABLE instead of guessed. *(hook, runs on PreToolUse (Skill))*
+- `skill-usage-log.py` — Logs each skill that starts, so you can see which skills are used and which never trigger. *(hook, runs on PreToolUse (Skill))*
 
 **[Machine governor](modules/govrun.md)** · install: `./install-module govrun`
 
@@ -147,26 +147,26 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 **[Agent janitor](modules/agent-janitor.md)** · install: `./install-module agent-janitor`
 
 - `/janitor-status` — Health readout for the agent janitor (the background reaper/pruner installed with the agent janitor).
-- `/janitor-stop` — Immediately stop the agent janitor's unattended cleanup — unload both launchd jobs (reap + prune) and remove …
+- `/janitor-stop` — Stops the agent janitor's background cleanup at once and removes its scheduled jobs.
 
 ### Cost, routing and authoring
 
 **[Cost and usage](modules/cost-and-usage.md)** · install: `./install-module cost-and-usage`
 
-- `/cost-audit` — Measures what Claude Code sessions actually cost and why, from the local transcripts — prompt-cache hit rate …
+- `/cost-audit` — Measures what your sessions cost from the local transcripts: cache hits, effort and dollars per model.
 - `/myusage-self-assessment` — Mine your own Claude Code session history to decide what to actually improve in your setup.
 
 **[Routing skills](modules/routing-skills.md)** · install: `./install-module routing-skills`
 
-- `/routing-retro` — Retrospective over recent session transcripts + the misroute ledger to judge whether model/effort routing is …
-- `/routing-update` — Research a model-landscape change and regenerate every routing surface through one operator-approved …
-- `dispatch-audit.py` — Record what model + effort every subagent dispatch actually asked for, so tier drift is VISIBLE instead of … *(hook, runs on PreToolUse (Agent))*
+- `/routing-retro` — Reads past sessions and reports where the model and effort choice did not fit the task.
+- `/routing-update` — Updates the routing policy when a model or a price changes, through one change you approve.
+- `dispatch-audit.py` — Logs the model and effort each subagent asked for, so a drift from the policy shows. *(hook, runs on PreToolUse (Agent))*
 
 **[Skill authoring](modules/skill-authoring.md)** · install: `./install-module skill-authoring`
 
-- `/codex-skill-sync` — Mirror the canonical Claude skills, agents, commands and enabled-plugin skills into ~/.agents/skills so Codex …
-- `/mods` — Manages Claude Code mods for the harness: decides whether a mod is due, creates one, reviews one for trust …
-- `/write-a-skill` — Author new USER-LEVEL agent skills in ~/.claude/skills with proper structure, progressive disclosure, and …
+- `/codex-skill-sync` — Copies your Claude skills, agents and commands to where the Codex CLI loads them.
+- `/mods` — Decides whether a change to Claude Code itself is due, then creates, reviews or improves it.
+- `/write-a-skill` — Helps you write a new skill with the right structure and files.
 
 **[NotebookLM](modules/notebooklm.md)** · install: `./install-module notebooklm`
 
@@ -176,10 +176,10 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[General commands](modules/general-commands.md)** · install: `./install-module general-commands`
 
-- `/improve` — Review the current conversation and recent session history to suggest improvements to the project's …
-- `/nextsession` — Creates a self-contained continuation prompt capturing current context, progress, and next steps for seamless …
+- `/improve` — Looks back over your sessions and proposes changes to rules, skills and memory.
+- `/nextsession` — Writes a prompt that lets a new session continue this one.
 - `/pr` — Manages Git PR workflows: stage, commit, push, create PRs, check status, sync branches, and merge.
-- `/research` — Mark this session as research/analysis so the compaction policy keeps the full 1M window (auto-compaction is …
+- `/research` — Marks a session as research, so automatic compaction waits much longer.
 - `/review` — [ROUTING ALIAS — demoted s08] /review now routes to a canonical reviewer.
 - `/wait-what` — Re-explain your last reply in plain words, because it did not land.
 - `improve-nudge.py` — Nudge the agent to offer /improve at the right moments (NUDGE-01). *(hook, runs on SessionStart (startup), UserPromptSubmit, PostToolUse (Bash))*
