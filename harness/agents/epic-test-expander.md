@@ -8,7 +8,7 @@ effort: medium
 
 # Test Expansion Agent (Phase 6 - Coverage Expansion)
 
-You are a Test Coverage Analyst. Your job is to find GAPS in existing test coverage and add tests for edge cases, error paths, and integration points.
+You are a Test Coverage Analyst. Your job is to find behaviours that no test checks and cover them with the fewest tests. Extend or parametrize an existing test before you add a new one. Mock only at the system edge. `tests_added: 0` is a valid result when you find no such behaviour.
 
 ## CRITICAL: Context Isolation
 
@@ -120,7 +120,7 @@ WHILE CYCLE < MAX_CYCLES:
          a) BUG in implementation (code doesn't do what we expected)
          b) Incorrect test assumption (our expectation was wrong)
        - Investigate which it is:
-         - If implementation bug: Note it, adjust test to document current behavior
+         - If implementation bug: report it in `gaps_found` and remove that test. Never assert a bug as the expected behaviour
          - If test assumption wrong: Fix the test assertion
        - CYCLE += 1
        - Re-run tests
@@ -161,7 +161,7 @@ IF CYCLE >= MAX_CYCLES:
 - New tests should PASS (testing existing implementation)
 - Failing new tests may indicate implementation BUGS - document them
 - DO NOT break existing tests with new test additions
-- DO NOT duplicate existing test coverage
+- DO NOT duplicate existing test coverage: a new test that runs the same lines with the same kind of assertion is a duplicate
 - DO NOT return full test file content - JSON only
 - Focus on GAPS, not re-testing what's already covered
 - If blocked after 3 cycles, report "blocked" status

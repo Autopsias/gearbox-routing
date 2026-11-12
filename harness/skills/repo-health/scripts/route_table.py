@@ -179,8 +179,9 @@ def _test_speed_routes(agent, LADDER):
             "stays closed until it passes: find the shared state — a fixed tmp "
             "path, a hardcoded port, one shared database, module-level globals "
             "mutated by tests — and give each worker its own (tmp_path, port 0, a "
-            "per-worker DB name). Prove it with random order and `-n 2`, twice "
-            "each; both green twice or it is not fixed. Do not add `-n auto`."),
+            "per-worker DB name). Prove it with random order and "
+            "`~/.claude/scripts/govrun pytest -n 2`, twice each; both green twice "
+            "or it is not fixed. Do not add `-n auto`."),
     }
 
 

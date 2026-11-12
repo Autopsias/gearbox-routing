@@ -259,10 +259,9 @@ def build_dependency_graph(wb):
                 for ref in R.parse_cell_refs(cell.value):
                     tgt_sheet = ref["sheet"] or sn
                     tgt = "%s!%s%d" % (tgt_sheet, ref["col"], ref["row"])
-                    # graph same-sheet precedents precisely (for cycle detection)
-                    if not ref["has_sheet"]:
-                        edges.append((src, tgt))
-                        adj.setdefault(src, set()).add(tgt)
+                    # graph every precedent, same-sheet and cross-sheet (for cycle detection)
+                    edges.append((src, tgt))
+                    adj.setdefault(src, set()).add(tgt)
                     # dangling check works for same-sheet AND cross-sheet refs,
                     # but only when we actually know the target sheet's cells.
                     if tgt_sheet in populated and (ref["row"], ref["col_idx"]) not in populated[tgt_sheet]:

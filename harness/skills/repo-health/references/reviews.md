@@ -1,7 +1,7 @@
 # Reviews beyond the health check
 
-The procedures behind the `refactoring`, `over-engineering`, `performance`
-and `trust-ladder` goals of [SKILL.md § Pick what to review](../SKILL.md#pick-what-to-review), and
+The procedures behind the `refactoring`, `over-engineering`, `performance`,
+`trust-ladder` and `test-value` goals of [SKILL.md § Pick what to review](../SKILL.md#pick-what-to-review), and
 the one summary every review run ends with. The health check scores what a
 tool can measure; these reviews judge what only a reader can see. They are
 read-only: they change nothing in the target repo except `.claude/health/REVIEW.md`.
@@ -14,6 +14,7 @@ read-only: they change nothing in the target repo except `.claude/health/REVIEW.
 - [Over-engineering](#over-engineering)
 - [Performance](#performance)
 - [Trust ladder](#trust-ladder)
+- [Test value](#test-value)
 - [Summary](#summary)
 
 ## Before any review
@@ -97,8 +98,8 @@ produces leads, not findings.
    expensive). Recommend it when three or more lines
    survive step 2, when the scan was not available, or when the scan says it
    covered only part of the first-party code: a clean sample of a large repo
-   is not evidence that the repo is lean. Only the user can start
-   `/declutter`, so the summary names the command to type.
+   is not evidence that the repo is lean. When the user picks it, start
+   `/declutter` with the Skill tool ([Summary](#summary), step 4).
 
 ## Performance
 
@@ -239,6 +240,67 @@ What this review does NOT do: it never designs the top-rung fix, and it changes
 nothing in the repo. A candidate is a proposal. It lands through a plan in that
 repo, which designs, builds and tests the new form.
 
+## Test value
+
+- **Lead** — a test the numbers point at. A lead is not a finding.
+- **Own line** — a source line that exactly one test runs.
+
+A test earns its place when it is the only thing that notices a defect. Agents
+add tests faster than they add behaviour, so a suite grows tests that run the
+same lines, assert on mocks, or name private functions and break on a refactor
+that changes no behaviour. This review counts those and judges a few. It never
+deletes a test.
+
+1. Pick ONE suite: a test directory and the source it tests. On a repo with
+   several, take the one with the most test lines and name the others as not
+   covered.
+2. Run the static half. It needs no install and takes seconds:
+   `python3 <skill>/scripts/testvalue.py <tests-dir> --json`. It gives, per test
+   file, the test functions, the mock or patch lines and the lines that reach a
+   private name (`module._name`).
+3. Measure per-test coverage when the suite is Python and runs. Write this file
+   in the scratchpad, never in the repo:
+
+   ```
+   [run]
+   dynamic_context = test_function
+   data_file = <scratchpad>/.coverage_ctx
+   source = <absolute source dir>
+   omit =
+       */test_*.py
+       */conftest.py
+   ```
+
+   Then run the suite once, serially, with the repo's own interpreter or a
+   throwaway one: `uv run --no-project --with coverage --with pytest coverage run
+   --rcfile=<scratchpad>/cov.rc -m pytest -q -p no:cacheprovider <tests-dir>`.
+   Coverage makes the suite slower, so run it from the main session with
+   `run_in_background`, not in a subagent. When the suite is not Python, does
+   not run, or needs services the session lacks, write "per-test coverage not
+   measured: <reason>" and judge from step 2 alone.
+4. Read the leads: `uv run --no-project --with coverage python
+   <skill>/scripts/testvalue.py <tests-dir> --data <scratchpad>/.coverage_ctx`.
+   It lists each test that owns no line, and the one test that contains all of
+   its lines when one exists.
+5. Judge at most ten leads, those with a containing test first, then the files
+   with the most mock and private lines. Open the test AND the test that
+   contains it, under the [evidence rule](#evidence-rule), and give one label:
+   - `duplicate` — same call, same kind of assertion as the containing test;
+   - `mock-only` — every assertion is on a mock (called, called-with), none on
+     a result or a state;
+   - `private` — it calls or patches a private name, so a refactor with no
+     change in behaviour breaks it;
+   - `keep` — same lines, different assertion (another input class, another
+     error). Move it to the dropped list.
+6. Report the numbers of steps 2 and 4 as measured, then at most five findings
+   with `path:line`. The card offers the removal as `/declutter` on the test
+   area, which removes a test only when coverage does not drop and the mutation
+   result on the touched files does not get worse.
+
+What this review does NOT do: it does not run mutation testing, and it does not
+turn a count into a verdict. "N tests own no line" is a size of the question,
+not a number of tests to delete.
+
 ## Summary
 
 Every run that includes a review ends here, and gives one summary and one
@@ -265,9 +327,13 @@ decision card for everything that ran, including the health check.
 4. Fix nothing without a go-ahead. After it, send health findings through
    [fix routing](../SKILL.md#fix-routing--reuse-never-rebuild), refactoring
    candidates to step 3 of `improve-codebase-architecture`, performance to
-   `diagnose`, over-engineering to `/declutter --plan` (the user types
-   it), and trust-ladder candidates to a plan in the target repo
+   `diagnose`, over-engineering to `/declutter --plan`, test-value findings
+   to `/declutter --plan` limited to the tests area (start both with the
+   Skill tool; the card showed the cost), and trust-ladder candidates to a plan in the target repo
    (`plan-builder`). Follow `improve-codebase-architecture` and `diagnose`
    through their `SKILL.md` files, as fix routing does for `flake-detective`. Claude cannot start a
    `user-invocable-only` skill itself, and the file works in every state.
+5. When this run or a skill it started wrote a plan folder, end with one more
+   card: run the plan now, or later. On "now", start `plan-execute` on that
+   folder with the Skill tool. On "later", give the folder path.
 

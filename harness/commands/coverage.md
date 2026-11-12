@@ -10,7 +10,7 @@ allowed-tools: ["Task", "Bash", "Read", "Grep", "Glob", "AskUserQuestion", "Task
 # Report directories are detected dynamically (workspace/reports/coverage, reports/coverage, coverage, .)
 # Override with COVERAGE_REPORTS_DIR environment variable if needed
 
-Systematically improve test coverage from any starting point (20-75%) to production-ready levels (75%+) through intelligent gap analysis and strategic orchestration.
+Find the uncovered code that carries risk and cover it with the fewest tests, through gap analysis and orchestration. A coverage percent is a reading, not a target.
 
 **MANDATORY:** Read `~/.claude/references/coverage/tasklist-integration.md` and follow its TaskList integration patterns for this run.
 
@@ -83,7 +83,7 @@ Orchestrate test-fixer agents based on gap analysis with pattern-aware fixes, in
 Generate new tests for identified coverage gaps with pattern-based safety and simplicity, in this order:
 1. **MANDATORY: Use learned patterns first** - Load patterns from previous `learn` mode execution
 2. **MANDATORY: Pre-flight Safety Check** - Verify existing tests pass before adding new ones
-3. Focus on test creation for uncovered critical paths
+3. Cover uncovered critical paths: extend or parametrize an existing test first, add a new test only for a behaviour no test checks
 4. Prioritize by business impact and implementation complexity
 5. **Template-based Generation**: Use existing test files as templates, follow exact patterns
 6. **Fixture Reuse Strategy**: Use existing fixtures (MockSupabaseClient, TestDataFactory) instead of creating new ones
@@ -110,7 +110,7 @@ Validate coverage improvements with integration safety and simplicity enforcemen
 - **Test Conflict Detection**: Identify overlapping mock patches or fixture collisions
 - Run regression testing to ensure no functionality breaks
 - Validate new tests follow project testing standards
-- Check coverage percentage improvements toward 75%+ target
+- Report the coverage change beside the count of tests added for it
 - **Generate comprehensive quality score report** with test improvement recommendations
 - **Simplicity Score Report**: Rate test simplicity and flag over-engineered patterns
 
@@ -136,12 +136,12 @@ Follow Epic 4.4 simplification patterns:
 - **Task Tool**: Use Task tool for parallel test-fixer agent coordination
 - **Reports Directory**: Generate reports in detected reports directory (defaults to `workspace/reports/coverage/` or fallback)
 
-## Target Coverage Goals
+## What to cover
 
-- Minimum target: 75% overall coverage  
-- New code target: 90% coverage
-- Critical path coverage: 100% for business logic
-- Quality over quantity: Focus on meaningful test coverage
+- No fixed percent. A fixed target makes an agent write tests for the number, not for a risk.
+- Cover the risk paths first: money, auth, data loss, and the parse of outside input.
+- A gap in trivial code (a getter, plain wiring) stays a gap. Name it in the report.
+- Zero new tests is a valid result. When the project's CI sets a threshold, meet that one and stop.
 
 > For argument processing and directory detection logic, `Read ~/.claude/references/coverage/argument-processing.md`
 
@@ -157,5 +157,5 @@ Follow Epic 4.4 simplification patterns:
 |---------|-------|-----|
 | `No coverage data found` | pytest-cov not installed or not configured | `cd apps/api && uv add pytest-cov --dev` |
 | Coverage report empty | Tests skipped or no test files matched | Check `pytest --co` to see collected tests |
-| Coverage below threshold | Untested code paths | Use `/coverage improve --target=80` to auto-generate tests |
+| Coverage below the project's CI threshold | Untested code paths | `/coverage analyze` ranks the gaps by risk; cover the top ones and stop at the threshold |
 | XML report missing | Wrong output path | Check `pyproject.toml` for `[tool.coverage.xml]` config |

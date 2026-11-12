@@ -162,12 +162,12 @@ def _findings_from_result(review_result: dict) -> list:
 
 
 def _findings_from_gaps(evidence_gaps) -> list:
-    """Accept an evidence-gaps payload (EM-03) as either {gaps:[...]} or a bare list.
+    """Accept an evidence-gaps payload (EM-03): {gaps_ranked:[...]} (what evidence_gaps.py emits), {gaps:[...]} or a bare list.
     Each gap already carries id/location/type/severity/evidence + risk_score; default
     its lifecycle to `open` (a gap is an unresolved finding)."""
     if not evidence_gaps:
         return []
-    gaps = evidence_gaps.get("gaps") if isinstance(evidence_gaps, dict) else evidence_gaps
+    gaps = (evidence_gaps.get("gaps_ranked") or evidence_gaps.get("gaps")) if isinstance(evidence_gaps, dict) else evidence_gaps
     out = []
     for g in (gaps or []):
         if not isinstance(g, dict):

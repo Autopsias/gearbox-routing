@@ -203,13 +203,12 @@ def review_gaps(emap, workbook_source=None):
 
 
 def _source_status(emap, sid):
-    # workbook source status lives on the map; packet source statuses are not
-    # re-carried into the map, so a superseded packet source must come from the
-    # locator's rationale. Here we read the workbook source + any per-record hint.
+    # workbook source status lives on `workbook_source`; packet source statuses on
+    # `source_statuses` (absent in maps built before 2026-11-12, which read as None).
     ws = emap.get("workbook_source") or {}
     if sid == ws.get("id"):
         return ws.get("status")
-    return None
+    return (emap.get("source_statuses") or {}).get(sid)
 
 
 def _count_by(items, key):

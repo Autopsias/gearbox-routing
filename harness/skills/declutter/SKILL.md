@@ -12,8 +12,7 @@ description: >
   (that is ponytail-audit), not size/complexity metrics (/code-quality), not diff
   review (/code-review), not interface deepening (improve-codebase-architecture).
   The deep tier of /repo-health's over-engineering review: /repo-health, the front door
-  for whole-repo reviews, runs the quick scan and names this audit when it is worth the cost.
-disable-model-invocation: true
+  for whole-repo reviews, runs the quick scan and starts this audit when the user picks it in the card.
 ---
 
 # Declutter — evidence-gated overengineering audit
@@ -28,6 +27,12 @@ do the deleting under gates.
 **Cost warning:** the fan-out phase dispatches one subagent per repo area
 and each one reads its whole area, so a large app is expensive. Scale the shard count down for small repos; do not skip the
 verification phase to save tokens — unverified findings are the failure mode.
+
+**Ask before the fan-out unless the user already agreed to this cost.** The
+user agreed when they typed `/declutter`, or when they picked a card option
+that showed the cost (the `/repo-health` card does). In every other start,
+run Phase 0, then ask one `AskUserQuestion` with the shard count and the token
+estimate, and stop on a no.
 
 ## Invariants (hold for the whole run)
 
@@ -53,7 +58,7 @@ verification phase to save tokens — unverified findings are the failure mode.
 - [ ] 1. Fan-out: area shards, read-only, taxonomy + evidence contract
 - [ ] 2. Verify: lead re-checks headline claims; false-positive ledger
 - [ ] 3. Deliver: one-pager + decision card + memory record
-- [ ] 4. `--plan` only: rulings interview → /plan-builder handoff
+- [ ] 4. `--plan` only: rulings interview → /plan-builder handoff → card: run the plan now
 
 ## Phase 0 — Recon (deterministic, cheap, before any agent)
 
@@ -76,13 +81,17 @@ Run the recipes in [references/recon-toolkit.md](references/recon-toolkit.md):
    in-flight work other sessions own. This brief is what prevents the two
    classic false positives: flagging operator-parked code as trash, and
    flagging just-fixed code as dead.
+7. **Test-value probe** — per test file: test functions, mock lines and
+   private-name reach; and, where the suite runs, the tests that own no
+   source line of their own. These are the candidates of the tests shard.
 
 ## Phase 1 — Fan-out (area shards)
 
 Partition the repo into shards of roughly 15–25k LOC along top-level package
 boundaries, capped at ~10 shards. Two shards are always separate regardless of
-size: **config/flags** and **test infrastructure** (suites, fixtures, CI
-wiring — not per-test correctness). Small repos may need only 2–3 shards.
+size: **config/flags** and **tests** (suites, fixtures, CI wiring, and the
+value of each test: duplicate, mock-only, bound to a private name — not
+whether its assertion is right). Small repos may need only 2–3 shards.
 
 Dispatch all shards in one message as background agents, each `model: sonnet`,
 each with the prompt template from
@@ -138,12 +147,21 @@ Before writing the report:
    (settings dumps, route-table diffs, collection counts) wherever a value
    could silently change. Deploys stay outside the plan unless the operator
    says otherwise.
+3. **End with one card: run the plan now, or later.** On "now", start
+   `plan-execute` on the plan folder with the Skill tool.
+4. **A session that removes or merges tests carries two more gates,** both
+   measured before and after in that session's worktree: total coverage does
+   not drop, and the mutation result on the source files those tests run does
+   not get worse. Recipe:
+   [recon-toolkit.md § Test removal gates](references/recon-toolkit.md#test-removal-gates).
+   A removal that fails a gate is reverted and recorded as "verified NOT
+   redundant".
 
 ## Boundaries and siblings
 
 | Intent | Skill |
 |---|---|
-| One review of the whole repo: health, security, refactoring, over-engineering, performance | `/repo-health` — the front door; its over-engineering review runs `ponytail-audit` as the quick scan and names this skill for the deep audit |
+| One review of the whole repo: health, security, refactoring, over-engineering, performance, test value | `/repo-health` — the front door; its over-engineering review runs `ponytail-audit` as the quick scan, its test-value review judges ten tests, and both start this skill when the user picks it in the card |
 | Cheap one-shot bloat scan, no evidence, no fan-out | `ponytail-audit` — run it first when unsure the deep audit is warranted |
 | File size / function length / complexity metrics + refactor dispatch | `/code-quality` — feeds Phase 0 |
 | Review a diff or PR for bugs | `/code-review` — reviews the cleanup diffs this skill causes |

@@ -49,6 +49,14 @@ functionality or performance. Hunt:
 4. Duplicated logic: parallel implementations of the same job.
 5. Hand-maintained registries or metadata that a framework generates.
 6. Wiring that contradicts documentation or intent (WIRING-BUG).
+7. Tests shard only — tests that add cost and catch nothing. Open each
+   candidate AND the test named as containing it. `duplicate`: same call and
+   same kind of assertion as another test (SAFE-DELETE, or SIMPLIFY into one
+   parametrized test). `mock-only`: every assertion is on a mock, none on a
+   result or a state (SIMPLIFY: assert the result, mock only at the system
+   edge). `private`: calls or patches a private name (SIMPLIFY: test through
+   the public function). Same lines with a different assertion is NOT a
+   duplicate. Never class the only test of a behaviour as SAFE-DELETE.
 
 CLASSES: SAFE-DELETE / SIMPLIFY / OPERATOR-GATED / WIRING-BUG
 {CLASS_DEFINITIONS}

@@ -432,7 +432,7 @@ class InternalCorpusAdapter(V.VerificationAdapter):
         terms = [t.lower() for t in (key_terms or []) if t]
         rows = []
         for c in self.packet_claims:
-            text = " ".join(str(c.get(k, "")) for k in ("claim", "snippet", "text", "locator"))
+            text = " ".join(str(c.get(k, "")) for k in ("claim", "snippet", "text"))
             low = text.lower()
             hits = sum(1 for t in terms if t in low)
             if hits:

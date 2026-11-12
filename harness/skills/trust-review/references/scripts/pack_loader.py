@@ -88,6 +88,8 @@ def load(R) -> None:
         seen.add(real)
         try:
             spec = importlib.util.spec_from_file_location("otl_pack_" + os.path.basename(path)[:-3], path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"cannot load {path}")
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             _caps_of(mod)   # a pack whose capability answer is malformed never goes active

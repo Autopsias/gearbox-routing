@@ -190,3 +190,14 @@ The bridge (a translator behind one gateway) existed and became the design once 
 goal was put back first. Kuzushi 2026-10-18, same shape: "Okay the outputs are much
 better but you focused on the wrong problem."
 
+## Before you add a test, extend or parametrize an existing one
+
+Agents add tests faster than they add behaviour, and each added test is cost on
+every later run and every later refactor. Measured on the
+`skills/repo-health/scripts` suite: 252 of 321 traced test functions ran no
+source line that another test did not also run, and the repo held 1,706 mock or
+patch lines in 293 test files. Three gearbox parts asked for more tests whatever
+the need: the coverage command had fixed percent targets, `epic-code-reviewer` had to
+report at least three issues, and `epic-test-expander` had to add edge cases.
+All three changed the same day. The rule covers the builders those edits do not
+reach. The test-value review of repo-health measures the result.

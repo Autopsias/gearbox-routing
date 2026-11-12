@@ -35,7 +35,7 @@ Context:
 
 CRITICAL: You did NOT write the original tests. Analyze the IMPLEMENTATION for gaps.
 Execute the bmad-tea-testarch-automate workflow.
-Add edge cases, error paths, integration tests with priority tagging.
+Cover only behaviours that no test checks, with priority tagging. Extend or parametrize an existing test first. tests_added 0 is a valid result.
 Return ONLY JSON: {tests_added, coverage_before, coverage_after, test_files, by_priority, gaps_found, status}"
 )
 

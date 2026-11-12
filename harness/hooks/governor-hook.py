@@ -141,9 +141,11 @@ else:
 SLOT_WORKERS = 4
 
 REMEDY = (
-    "machine worker budget: run via `~/.claude/scripts/govrun <your command>`, "
-    "and set this Bash call's timeout to 600000 — govrun may queue behind "
-    "another job. Exit 75 means queue timeout, not a test failure."
+    "machine worker budget: run via `~/.claude/scripts/govrun --max-wait 0 "
+    "<your command>` with run_in_background, and set this Bash call's timeout "
+    "to 600000 — govrun may queue behind another job. Without --max-wait 0 an "
+    "interactive job gives up after 120 s whatever the Bash timeout is: exit 75 "
+    "means queue timeout, not a test failure."
 )
 OVER_BUDGET = (
     "machine worker budget: govrun reserves {budget} workers per slot, so a "

@@ -206,6 +206,17 @@ def test_every_item_declares_touches_at_v8():
     bp.validate_spec(_v7(spec))                                     # control: v7 unchanged
 
 
+def test_a_list_of_paths_is_joined_into_the_touches_string(tmp_path):
+    spec = _spec()
+    spec["items"][0]["touches"] = ["src/a.py", "tests/test_a.py"]
+    bp.build(spec, tmp_path / "v8")
+    items = json.loads((tmp_path / "v8" / "manifest.json").read_text())["items"]
+    assert items[0]["touches"] == "src/a.py, tests/test_a.py"
+    spec = _spec()
+    spec["items"][0]["touches"] = ["src/a.py", ""]                  # control: a blank path is
+    _refused(spec, "Item it-1 must declare touches")                # still refused
+
+
 def test_an_empty_touches_declaration_reaches_the_manifest(tmp_path):
     bp.build(_spec(), tmp_path / "v8")
     items = json.loads((tmp_path / "v8" / "manifest.json").read_text())["items"]

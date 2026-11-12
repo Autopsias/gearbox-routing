@@ -130,7 +130,7 @@ user to type it.
 
 | Part | Kind | Role under `/repo-health` |
 |---|---|---|
-| `/declutter` | user skill (`skills/declutter`) | The **deep** over-engineering audit: evidence-gated, area-sharded, read-only. It costs about 150k–200k subagent tokens per area shard (about 1–1.5M for a 150k-line app). `/repo-health` never runs it: the decision card names it with its cost, and only the user can start it (`disable-model-invocation: true`). |
+| `/declutter` | user skill (`skills/declutter`) | The **deep** over-engineering audit: evidence-gated, area-sharded, read-only. It costs about 150k–200k subagent tokens per area shard (about 1–1.5M for a 150k-line app). `/repo-health` starts it with the Skill tool when the user picks it in the decision card, which shows the cost; any other model start makes `/declutter` ask about the cost first. It no longer sets `disable-model-invocation`. |
 | `/code-quality` | user command (`commands/code-quality.md`) | File size, function length and complexity. The fix route for the `cq.*` checks: an agent follows the command file with `--fix` or `--adopt`. The `--deep` pass runs it with `--check`. |
 | `improve-codebase-architecture` | vendored skill (a `skills/` symlink into `~/.agents/skills`) | The design half of the `refactoring` goal: it finds deepening opportunities. `settings.json` sets it to `user-invocable-only` (f4e56744), so `/repo-health` has an agent follow its `SKILL.md` (steps 1–2); a candidate the user picks goes to its step 3. |
 | `ponytail:ponytail-audit` | ponytail plugin skill | The **quick** over-engineering scan, run first. It gives leads, not findings. If the plugin is missing, the review says so and recommends `/declutter`. |

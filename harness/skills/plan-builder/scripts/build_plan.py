@@ -1871,6 +1871,12 @@ def validate_spec(spec):
         if k not in spec:
             raise ValueError(f"Missing required top-level field: {k!r}")
     rad.check_version(spec)
+    # `touches` is a comma-separated string; a non-empty list of paths is the same
+    # declaration written as JSON, so join it rather than refuse it.
+    for it in spec["items"] if isinstance(spec["items"], list) else []:
+        t = it.get("touches") if isinstance(it, dict) else None
+        if isinstance(t, list) and t and all(isinstance(x, str) and x.strip() for x in t):
+            it["touches"] = ", ".join(x.strip() for x in t)
 
     if not isinstance(spec["categories"], list) or not spec["categories"]:
         raise ValueError("'categories' must be a non-empty list")

@@ -5,6 +5,8 @@
 - [Dead-code tooling by language](#dead-code-tooling-by-language)
 - [Unreferenced-module scan](#unreferenced-module-scan)
 - [Flag cross-check](#flag-cross-check)
+- [Test-value probe](#test-value-probe)
+- [Test removal gates](#test-removal-gates)
 - [Reachability rules that decide dead vs alive](#reachability-rules-that-decide-dead-vs-alive)
 - [Output handling](#output-handling)
 
@@ -66,6 +68,45 @@ Piranha exists solely to delete stale-flag code). Recipe:
 4. Report three lists: dead flags, OFF-everywhere flags with the LOC they
    gate, ON-in-prod flags whose documentation says OFF (record-drift —
    WIRING-BUG class).
+
+## Test-value probe
+
+The probe and its procedure belong to `/repo-health`. Follow steps 2 to 4 of
+`~/.claude/skills/repo-health/references/reviews.md` § Test value, once per
+suite, and skip its ten-test limit: here every lead goes to the tests shard.
+The script is `~/.claude/skills/repo-health/scripts/testvalue.py`. A test that
+owns no line is a candidate, never a finding: two tests can run the same
+lines and assert different things.
+
+## Test removal gates
+
+For a cleanup session that removes or merges tests. Run both before the
+change and after it, in the session's worktree, and keep the two outputs as
+evidence.
+
+1. **Coverage does not drop.** Run the suite under the project's coverage
+   command and compare the total and the per-file numbers of the source files
+   the removed tests ran.
+2. **The mutation result does not get worse.** A mutation tool changes the
+   source in small ways and counts the changes no test notices (`survived`).
+   For Python use mutmut, limited to those source files, in `pyproject.toml`:
+
+   ```toml
+   [tool.mutmut]
+   source_paths = ["src/pkg/module.py"]
+   pytest_add_cli_args_test_selection = ["tests/"]
+   ```
+
+   Then `uv run --with mutmut mutmut run` and `mutmut results --all true`.
+   Count the `survived` lines. More after than before means a removed test
+   checked something: restore it. mutmut writes a `mutants/` folder in the
+   project; do not commit it or the config block.
+
+Measured on a three-test fixture with mutmut 3.8.1, 2026-11-10: with a
+duplicate test removed, 4 of 4 mutants stayed killed; with the real test
+removed too, 4 of 4 survived. For other languages use the project's own
+mutation tool (Stryker for JS/TS); with none, gate 1 alone is not enough for
+SAFE-DELETE, so class the removal OPERATOR-GATED.
 
 ## Reachability rules that decide dead vs alive
 

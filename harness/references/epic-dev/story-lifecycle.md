@@ -353,7 +353,7 @@ Context:
 - Story file: {sprint_artifacts}/stories/{story_key}.md
 
 Execute the BMAD code-review workflow.
-MUST find 3-10 specific issues.
+Report every real issue, at most 10. Zero issues is a valid result.
 Return ONLY JSON summary: {total_issues, high_issues, medium_issues, low_issues, auto_fixable}"
 )
 

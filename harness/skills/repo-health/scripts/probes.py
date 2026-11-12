@@ -221,7 +221,7 @@ def pending_checks(repo, shape, files=None):
                 "invocation and by every parallel worker; warn over ~10 s or 15% of the run"), suite_unread, "test-suite presence")
     yield pending_if_unread(probe("test.parallel-safety", "tests", "advisory",
                 "Suite is parallel-safe", no_suite,
-                "only if xdist is installed: pytest -p randomly (order) and pytest -n 2, "
+                "only if xdist is installed: pytest -p randomly (order) and ~/.claude/scripts/govrun pytest -n 2, "
                 "twice each — both green twice => safe; else record na with the reason"), suite_unread, "test-suite presence")
     yield probe("ci.wall-clock", "ci", "advisory", "CI wall-clock reasonable", no_workflows,
                 "run: gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName"

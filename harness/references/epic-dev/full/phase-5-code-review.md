@@ -2,7 +2,7 @@
 
 **Execute when:** `phase == "dev_complete"` OR `phase == "code_review"`
 
-This phase performs adversarial code/prose review finding 3-10 specific issues.
+This phase performs adversarial code/prose review that reports every real issue, at most 10.
 
 ```
 # For documentation stories, use prose review instead of code review
@@ -30,7 +30,7 @@ This is a DOCUMENTATION story. Review for:
 - Clarity: unambiguous language, correct terminology
 - Structure: logical flow, appropriate headers, consistent formatting
 - Accuracy: technical accuracy, no broken references
-MUST find 3-10 specific issues. NEVER report zero issues.
+Report every real issue, at most 10. Zero issues is a valid result.
 Return ONLY JSON: {total_issues, high_issues, medium_issues, low_issues, auto_fixable}"
   )
 
@@ -91,7 +91,7 @@ Context:
 - Implementation notes: {sprint_artifacts}/stories/{story_key}-implementation-notes.md (READ THIS FIRST, before the diff — it logs the implementer's design decisions, intentional deviations, tradeoffs, and open questions; a finding that only restates something already logged there is not a surprise, it's a confirmed tradeoff)
 
 Execute the bmad-bmm-code-review workflow.
-MUST find 3-10 specific issues. NEVER report zero issues.
+Report every real issue, at most 10. Zero issues is a valid result.
 A finding that merely restates a deviation already logged in implementation-notes.md classifies as ask-user, never a blocking (HIGH/MEDIUM) finding — file it under a new `ask_user_issues` bucket instead of high/medium.
 Return ONLY JSON: {total_issues, high_issues, medium_issues, low_issues, ask_user_issues, auto_fixable}"
   )

@@ -1,6 +1,6 @@
 ---
 name: repo-health
-description: The one front door for whole-repo reviews. Scores repo health — security, code quality, tests, CI workflow, AI readiness, hygiene — on a persistent dashboard with run history at .claude/health/HEALTH.html, split into BLOCKING (fix now) vs ADVISORY; on request also reviews refactoring (module design), over-engineering (a quick scan that names /declutter for the deep audit), performance (measured hot paths) and the trust ladder (which of the repo's own rules and lessons could become a lint, test or code change), and ends with one summary and one decision card. Routes each fix to the existing specialist skill. Use when the user says "repo health", "review this repo", "health check on this repo", "does this repo need refactoring", "is this repo over-engineered", "make this repo more secure or faster", "run repo-health", or "turn the health report into a fix plan" (`--plan`, which reuses a saved report). Not for reviewing a diff (/review) or fixing one known-failing area — route those directly (/code-quality, /test-orchestrate, /ci-orchestrate, security-scanner agent).
+description: The one front door for whole-repo reviews. Scores repo health — security, code quality, tests, CI workflow, AI readiness, hygiene — on a persistent dashboard with run history at .claude/health/HEALTH.html, split into BLOCKING (fix now) vs ADVISORY; on request also reviews refactoring (module design), over-engineering (a quick scan that names /declutter for the deep audit), performance (measured hot paths) the trust ladder (which of the repo's own rules and lessons could become a lint, test or code change) and test value (which tests own no line of their own, lean on mocks or name private functions), and ends with one summary and one decision card. Routes each fix to the existing specialist skill. Use when the user says "repo health", "review this repo", "health check on this repo", "does this repo need refactoring", "is this repo over-engineered", "do we have too many tests", "make this repo more secure or faster", "run repo-health", or "turn the health report into a fix plan" (`--plan`, which reuses a saved report). Not for reviewing a diff (/review) or fixing one known-failing area — route those directly (/code-quality, /test-orchestrate, /ci-orchestrate, security-scanner agent).
 disable-model-invocation: true
 ---
 
@@ -35,9 +35,9 @@ questions — the tool shows at most four options per question, so a single
 question silently drops goals:
 
 - **Checks:** `health` (first, marked recommended), `security`, `performance`.
-- **Design reviews:** `refactoring`, `over-engineering`, `trust-ladder`.
+- **Design reviews:** `refactoring`, `over-engineering`, `trust-ladder`, `test-value`.
 
-Every goal selected across both questions is the goal set; all six selected is
+Every goal selected across both questions is the goal set; all seven selected is
 `all`. Nothing selected in either question means `health`. When no question
 tool is available (a headless run), run `health` only.
 
@@ -49,17 +49,18 @@ tool is available (a headless run), run `health` only.
 | `over-engineering` | a quick scan; the deep audit stays `/declutter` | [reviews.md § Over-engineering](references/reviews.md#over-engineering) |
 | `performance` | measurements, then a hunt along at most five hot paths | [reviews.md § Performance](references/reviews.md#performance) |
 | `trust-ladder` | counts the repo's rules against its checks, then places each correction on the layer that enforces it and names at most five that could move to a stronger one | [reviews.md § Trust ladder](references/reviews.md#trust-ladder) |
+| `test-value` | counts mocks and private-name reach per test file, measures per-test coverage on one suite, then judges at most ten tests that own no line of their own | [reviews.md § Test value](references/reviews.md#test-value) |
 | `all` | every row above | — |
 
 `--deep` and `--fix-blocking` keep their meaning, and both imply `health`.
 `--plan` implies `health` only when the repo has no `.claude/health/scorecard.json`;
 when it has one, `--plan` reuses it ([`--plan`](#--plan)).
 
-**Only the user can start `/declutter`.** Claude Code blocks a model call to a
-skill that sets `disable-model-invocation: true`, and tells the model not to
-copy its steps another way (docs: skills, "Control who invokes a skill"). So
-this skill never runs it; the over-engineering review names it in the decision
-card, with its cost.
+**A picked card option starts the next skill.** The user types `/repo-health`
+and nothing else. When the user picks a card option that names another skill
+(`/declutter`, `plan-builder`, `plan-execute`), start that skill with the Skill
+tool in the same session; never answer with a command for the user to type.
+The card shows the cost of `/declutter`, so the pick is the go-ahead for it.
 
 **Render only when the health check ran.** `render` appends a line to
 `history.jsonl`, and a run that measured nothing would enter the trend as a
@@ -114,7 +115,7 @@ and tick it as you go:
    | `test.suite` | the printed suite command | green → pass; red → **fail** with failing-test names |
    | `test.runtime` | wall clock of the suite run | < 300 s → pass; else warn with seconds |
    | `test.collection-cost` | `time pytest --collect-only -q` | < 10 s **and** < 15% of the suite's wall clock → pass; over either → warn; over 25% → **fail**. Record both numbers, not a verdict |
-   | `test.parallel-safety` | `pytest -p randomly` and `pytest -n 2`, twice each | both green twice → pass; any disagreement → warn naming the shared state it exposed; xdist/randomly not installed → `na` with that reason (the collector cannot see whether they are) |
+   | `test.parallel-safety` | `pytest -p randomly` and `~/.claude/scripts/govrun pytest -n 2`, twice each | both green twice → pass; any disagreement → warn naming the shared state it exposed; xdist/randomly not installed → `na` with that reason (the collector cannot see whether they are) |
    | `ci.wall-clock` | `gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName \| python3 <skill>/scripts/health.py ci-median` (gh has no duration field; duration = updatedAt − startedAt) | median of successful runs ≤ 10 min → pass; else warn with the median; `gh` missing or unauthenticated → `na` with that reason |
 
    A tool that is not installed and not worth installing now: set `na` with
@@ -534,10 +535,10 @@ a faster suite that flakes is worse than a slow one.
    fix expensive module-level work in test files (it is paid on every import),
    set `testpaths`, disable plugin autoload in the fast profile, drop unused
    heavy imports.
-3. **Prove isolation before parallelising.** Random order and `-n 2`, twice each.
+3. **Prove isolation before parallelising.** Random order and `~/.claude/scripts/govrun pytest -n 2`, twice each.
    Both green twice, or the suite is not parallel-safe — fix the shared state
    (per-worker tmp dirs, port 0, per-worker DB) first.
-4. **Then parallelise** (`-n auto`), and only when serial runtime justifies it.
+4. **Then parallelise** (`-n auto`), and only when serial runtime justifies it. On this Mac, run any `-n` command through `~/.claude/scripts/govrun`.
 5. **Then shard** in CI, only when one parallel job still exceeds ~5 min.
 
 **Collection cost gates parallelism.** Every xdist worker re-imports every test

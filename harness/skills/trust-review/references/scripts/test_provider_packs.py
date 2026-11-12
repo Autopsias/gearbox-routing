@@ -51,6 +51,7 @@ def scratch(tmp_path, monkeypatch):
 def fresh(d):
     name = "ar_" + str(abs(hash(str(d))))
     spec = importlib.util.spec_from_file_location(name, d / "adapter_registry.py")
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod      # dataclasses resolves annotations through sys.modules
     spec.loader.exec_module(mod)

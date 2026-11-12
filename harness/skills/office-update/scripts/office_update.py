@@ -428,8 +428,9 @@ def build_next_claim_set(
         out = dict(rec)
         out["claim_id"] = cid
         out["supersession_state"] = "active"
-        out["verdict"] = ch.get("carried_verdict") if ch.get("classification") == "unchanged" else (
-            rec.get("verdict") if ch.get("classification") == "new" and rec.get("verdict") else "needs-review")
+        # only an identity-stable unchanged claim keeps a verdict; a new one re-enters review
+        out["verdict"] = (ch.get("carried_verdict") if ch.get("classification") == "unchanged"
+                          else "needs-review")
         if ch.get("carried_waiver") is not None:
             out["waiver"] = ch.get("carried_waiver")
         if ch.get("supersedes"):

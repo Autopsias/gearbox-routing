@@ -260,9 +260,10 @@ def link_claim(row, packet_claim, packet_sources, cell_index, wb_source_id):
         for s in prov.get("supporting", []):
             if not s.get("source_id"):
                 continue
-            supporting.append(ES.link(s["source_id"], s.get("locator", ""),
-                                      s.get("confidence", 0.0),
-                                      s.get("rationale", "from source packet")))
+            pl = ES.link(s["source_id"], s.get("locator", ""), s.get("confidence", 0.0),
+                         s.get("rationale", "from source packet"))
+            # a sub-threshold packet link is held for approval, like a weak cell match
+            (supporting if pl["confidence"] >= ES.LINK_THRESHOLD else candidates).append(pl)
         conflict = prov.get("conflict") or None
         if packet_claim.get("class") in JUDGEMENT_CLASSES:
             assumptions.append("%s is a %s (%s), not an observed actual" % (
@@ -458,6 +459,9 @@ def build_evidence_map(arch=None, packet=None, cell_index=None, pptx_rows=None,
         "link_threshold": ES.LINK_THRESHOLD,
         "workbook_source": {"id": wb_source_id, "status": wb_status,
                             "path": os.path.basename(workbook_path) if workbook_path else None},
+        # packet source statuses, so the gap review can flag a superseded packet source
+        "source_statuses": {s["id"]: s.get("source_status")
+                            for s in (packet or {}).get("sources", [])},
         "records": records,
         "gate": {
             "every_claim_traced_conflicted_or_unsupported": every_claim_accounted,

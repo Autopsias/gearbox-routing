@@ -824,7 +824,8 @@ def read_pdf(path, max_text, coverage_threshold, disable_ocr=False):
         "per_page": pages,
     }
     # DD-07 block rule (finding #5): below-threshold coverage AND no OCR ⇒ block
-    blocked = (text_coverage < coverage_threshold) and not ocr
+    # zero readable pages (every adapter failed) cannot be certified, even with OCR installed
+    blocked = (text_coverage < coverage_threshold) and (not ocr or total == 0)
     if blocked:
         quality["verdict"] = "blocked-low-coverage-no-ocr"
         out["status"] = "blocked"
@@ -833,7 +834,8 @@ def read_pdf(path, max_text, coverage_threshold, disable_ocr=False):
             "pdf", id="DOC-PBW-01", type="extraction-loss", severity="must-fix",
             review_status="needs-review", issue_lifecycle="open",
             evidence=("text_coverage=%.2f < %.2f over %d page(s), %d image-only, "
-                      "OCR unavailable" % (text_coverage, coverage_threshold, total, image_only_pages)),
+                      "%s" % (text_coverage, coverage_threshold, total, image_only_pages,
+                      "OCR unavailable" if not ocr else "no readable pages")),
             locator="page:1",
             human_review=("Document appears scanned/image-only and no OCR engine is "
                           "available. A human must supply an OCR'd copy or confirm the "

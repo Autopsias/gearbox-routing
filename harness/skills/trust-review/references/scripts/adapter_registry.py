@@ -42,7 +42,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # ---------------------------------------------------------------------------
 # Provider kinds
@@ -325,7 +325,7 @@ NO_TERMINAL_OPERATIONS = tuple(name for name, op in OPERATIONS.items() if not op
 # Provider packs (contract + loader: pack_loader.py). State lives here so callers read it off the registry.
 PACKS_LOADED: List[str] = []
 PACKS_FAILED: List[Tuple[str, str]] = []
-PACK_HOOKS: Dict[str, object] = {"parsers": {}, "labels": [], "theme": {}}
+PACK_HOOKS: Dict[str, Any] = {"parsers": {}, "labels": [], "theme": {}}
 _PACK_MODULES: list = []
 
 

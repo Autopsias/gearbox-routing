@@ -32,12 +32,16 @@ over-authorize.
 - **NEVER delete or `rm -rf` a pre-existing file/directory you did not create without
   explicit, unambiguous confirmation that names the target.** A one-letter menu pick
   (e.g. "b") or a terse "yes" to a multi-part question is NOT sufficient authorization
-  for an irreversible delete — re-confirm the specific path first.
+  for an irreversible delete — re-confirm the specific path first. A delete made
+  reversible FIRST (a saved patch, or a move to a kept folder whose restore you checked)
+  needs only a normal pick; say where the copy is.
 - **NEVER bundle `rm -rf` with `git rm` in one command.** Use `git rm` alone — tracked
   deletions stay recoverable from history; `rm -rf` on top also destroys the untracked
   working copy.
 - **Look before you delete.** Inspect the target first; if what you find contradicts how
-  it was described, or you didn't create it, surface that instead of proceeding.
+  it was described, or you didn't create it, surface that instead of proceeding. Check the
+  same set the command acts on: `git ls-files --exclude-standard` hides ignored files that
+  `mv` or `rm -r` on the folder still takes.
 - Prefer reversible paths (`git rm`, or move-to-quarantine) over outright `rm -rf`.
 
 *Why:* in one session a terse "b" was read as authorization for
@@ -51,6 +55,11 @@ confirmation is the bar for any destructive delete.
   code, compare against main, or start a branch.** A local `main` can be days behind
   (or diverged) and answers confidently from old code; nothing errors. Branch from
   `origin/main`, never from the bare local ref.
+- **ALWAYS fast-forward the primary checkout after you merge a PR**, or report how far
+  behind it is and which files block the fast-forward. After `gh pr merge` the
+  `merge-ff-main.py` hook reports the gap (it only reads; it runs no fetch or merge outside
+  the sandbox) — run the pull it names, never ignore it. (example-project 2026-11-11: two
+  merges left `main` 36 behind and the owner had to ask.)
 
 *Why:* example-project 2026-09-17 reported a deploy gap of 7 commits that was really 2;
 Kuzushi 2026-10-16 answered a reader-feedback question from a `main` 33 commits behind

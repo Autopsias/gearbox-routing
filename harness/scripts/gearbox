@@ -535,6 +535,16 @@ do_deploy() {
     git -C "$CD" diff --name-status "$before" HEAD | sed 's/^/   /'
   fi
   say ""
+  # (i) staged-but-uncommitted files in the edit clone = a commit that was refused
+  # (pre-commit hook) right before this deploy. They are NOT in what just deployed.
+  # Staged only: peer sessions leave unstaged plan files there all the time.
+  local edit="${GEARBOX_EDIT_CLONE:-$HOME/your-private-harness}" staged
+  if [ -d "$edit/.git" ] && staged=$(git -C "$edit" diff --cached --name-only) && [ -n "$staged" ]; then
+    warn "WARNING: $edit has $(printf '%s\n' "$staged" | wc -l | tr -d ' ') staged file(s) that are NOT committed,"
+    warn "         so they are NOT in this deploy. A commit was probably blocked by a hook:"
+    printf '%s\n' "$staged" | head -10 | sed 's/^/           /' >&2
+    warn ""
+  fi
   say "deploy OK — $CD is at $(git -C "$CD" rev-parse --short HEAD)"
 }
 

@@ -1,6 +1,6 @@
 ---
 name: 'code-review'
-description: '[DEMOTED s08 — typed front door routes to /adversarial-review] BMAD adversarial Senior-Developer code review that finds 3-10 specific problems per story (code quality, tests, architecture, security, performance). NEVER accepts `looks good`. Kept as the BMAD-specific workflow invoked by Lane-A workers; for a standalone deep review prefer /adversarial-review.'
+description: '[DEMOTED s08 — typed front door routes to /adversarial-review] BMAD adversarial Senior-Developer code review that reports the real problems of a story, at most 10 (code quality, tests, architecture, security, performance). NEVER accepts `looks good`. Kept as the BMAD-specific workflow invoked by Lane-A workers; for a standalone deep review prefer /adversarial-review.'
 disable-model-invocation: true
 ---
 

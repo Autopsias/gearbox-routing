@@ -157,7 +157,7 @@ The rule is "never report health you did not measure", not "prefer `pending`".
 | test.suite | blocking | probe: detected suite command (make test / npm test / pytest) | red suite blocks; no suite at all → na + verify-command finding |
 | test.runtime | advisory | probe: suite wall clock (`--durations=15` names the slow tests) | warn over 300 s; the trend matters more than the number. Wall clock is CPU-contention sensitive — record the idle-machine number |
 | test.collection-cost | advisory | probe: timed `pytest --collect-only -q` | warn over ~10 s or 15% of the run, fail over 25%. **Collection is paid by every invocation and by every parallel worker**, so an expensive import blocks parallelism rather than being cured by it |
-| test.parallel-safety | advisory | probe: random order + `-n 2`, twice each (the collector cannot see whether xdist is installed, so it asks — record `na` with the reason when it is absent) | the isolation proof that must pass BEFORE parallelism; guards against shared state, fixed ports, shared tmp dirs |
+| test.parallel-safety | advisory | probe: random order + `-n 2` (through govrun), twice each (the collector cannot see whether xdist is installed, so it asks — record `na` with the reason when it is absent) | the isolation proof that must pass BEFORE parallelism; guards against shared state, fixed ports, shared tmp dirs |
 
 Flakiness has no standing check id: on `--deep` a second suite run that
 disagrees with the first marks test.suite as warn and hands off to the
