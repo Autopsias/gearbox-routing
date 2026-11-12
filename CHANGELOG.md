@@ -4,7 +4,7 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 [Keep a Changelog](https://keepachangelog.com); versioning rules are in
 `docs/VERSIONING.md`.
 
-## [Unreleased]
+## [1.1.0] - 2026-11-12
 
 ### Added
 - **Office trust layer:** new module `modules/trust-layer.md`. It ships `trust-run`,
