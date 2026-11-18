@@ -100,7 +100,7 @@ and tick it as you go:
 
    | Probe | Command | pass / fail rule |
    |---|---|---|
-   | `sec.secrets-history` | `gitleaks git . --no-banner --redact` (older CLI: `gitleaks detect --source .`) | exit 0 → pass; leaks → **fail**, name count only — never paste a secret |
+   | `sec.secrets-history` | `python3 <skill>/scripts/health.py scan-secrets --repo <repo>` — runs `gitleaks git . --no-banner --redact` (older CLI: `gitleaks detect --source .`), records the check itself, and prints one JSON line. Scans only `<last-scanned-commit>..HEAD` when `history.jsonl` records one that is still an ancestor of HEAD; first run, or a rewritten history, is a full scan. Cap: `REPO_HEALTH_SECRETS_CAP_S` seconds (default 900) | exit 0 → pass and the marker moves to HEAD; leaks → **fail**, name count only — never paste a secret, and the marker stays so the leak keeps failing until purged; past the cap → `pending` with the reason (the old marker stays), and the run goes on |
    | `sec.dep-vulns` | the command the row prints: `pip-audit --path <project venv site-packages>` (found from the Python manifest's directory; `python3 <skill>/scripts/health.py project --repo <repo>` prints it) / `npm audit --audit-level=high`. Never bare `pip-audit` or `uvx pip-audit` — that audits the tool's own environment | high/critical with a fix → **fail**; lower only → warn. Findings listed in `.claude/health/accepted-risks.json` ([Accepted risks](#accepted-risks)) do not fail the row |
    | `sec.diff-review` | dispatch scoped reviewer agents — [Reviewing the diff without the operator](#reviewing-the-diff-without-the-operator) | confirmed exploitable finding → **fail**; else pass with "N code files across M scopes reviewed" |
    | `sec.sast` | `semgrep scan --config p/default --config p/python --error` (drop `p/python` on a JS/TS repo; fallback: bandit) | triage findings in context: confirmed high → **fail**; noise/annotated → warn |
@@ -112,10 +112,11 @@ and tick it as you go:
    | `cq.ratchet` | the repo's own quality checkers (when present) | red ratchet → fail; route it (see [Fix routing](#fix-routing--reuse-never-rebuild)) |
    | `hyg.dep-unused` | `deptry .` (or `uvx deptry .`) | findings → warn; na without manifests |
    | `hyg.dep-freshness` | `pip list --outdated` / `npm outdated` count | large/growing count → warn |
+   | `ai.verify-command` | the printed collect command (`<suite command> --collect-only -q`) with a 120 s limit; a make recipe with no pytest form reads `no collect form` and stays pending | exit 0 **and** 1+ test collected → pass; the command cannot start (missing module, no such file) → **fail** with the first error line; timeout → leave `pending` |
    | `test.suite` | the printed suite command | green → pass; red → **fail** with failing-test names |
    | `test.runtime` | wall clock of the suite run | < 300 s → pass; else warn with seconds |
    | `test.collection-cost` | `time pytest --collect-only -q` | < 10 s **and** < 15% of the suite's wall clock → pass; over either → warn; over 25% → **fail**. Record both numbers, not a verdict |
-   | `test.parallel-safety` | `pytest -p randomly` and `~/.claude/scripts/govrun pytest -n 2`, twice each | both green twice → pass; any disagreement → warn naming the shared state it exposed; xdist/randomly not installed → `na` with that reason (the collector cannot see whether they are) |
+   | `test.parallel-safety` | `pytest -p randomly` and `~/.claude/scripts/govrun --max-wait 0 pytest -n 2` (in a background Bash call), twice each | both green twice → pass; any disagreement → warn naming the shared state it exposed; xdist/randomly not installed → `na` with that reason (the collector cannot see whether they are) |
    | `ci.wall-clock` | `gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName \| python3 <skill>/scripts/health.py ci-median` (gh has no duration field; duration = updatedAt − startedAt) | median of successful runs ≤ 10 min → pass; else warn with the median; `gh` missing or unauthenticated → `na` with that reason |
 
    A tool that is not installed and not worth installing now: set `na` with
@@ -535,10 +536,10 @@ a faster suite that flakes is worse than a slow one.
    fix expensive module-level work in test files (it is paid on every import),
    set `testpaths`, disable plugin autoload in the fast profile, drop unused
    heavy imports.
-3. **Prove isolation before parallelising.** Random order and `~/.claude/scripts/govrun pytest -n 2`, twice each.
+3. **Prove isolation before parallelising.** Random order and `~/.claude/scripts/govrun --max-wait 0 pytest -n 2` in a background Bash call, twice each.
    Both green twice, or the suite is not parallel-safe — fix the shared state
    (per-worker tmp dirs, port 0, per-worker DB) first.
-4. **Then parallelise** (`-n auto`), and only when serial runtime justifies it. On this Mac, run any `-n` command through `~/.claude/scripts/govrun`.
+4. **Then parallelise** (`-n auto`), and only when serial runtime justifies it. On this Mac, run any `-n` command as `~/.claude/scripts/govrun --max-wait 0 <command>` in a background Bash call: without `--max-wait 0` a queued run gives up after 120 s (exit 75, not a test failure).
 5. **Then shard** in CI, only when one parallel job still exceeds ~5 min.
 
 **Collection cost gates parallelism.** Every xdist worker re-imports every test
@@ -640,11 +641,21 @@ aborts in the sandbox. Both need the network.
 
 ## Gotchas (observed)
 
-- A full-history gitleaks scan can take many minutes on a large repo — start
-  it in the background first, run the other probes while it works.
-- A suite's wall clock can grow several-fold from CPU contention alone. Record
-  the idle-machine number, or the trend measures the machine, not the repo.
-- An "intermittent" test was diagnosed as a TOCTOU race and
+- 2026-08-18: the full-history gitleaks scan took 8m36s on a 415-commit /
+  180 MB repo — start it in the background first, run the other probes while
+  it works. (2026-11-09: it passed 15 minutes and the weekly run died waiting
+  on it, so `scan-secrets` now scans only new commits and has a cap.)
+- 2026-11-10: a scheduled run ended its turn on "Semgrep runs now in the
+  background" and never rendered, so no history line was written. In a
+  scheduled or unattended run **never end your turn while a background command
+  runs**: keep polling in the same turn (a short `until` loop with its own
+  time limit), and at the command's cap record the check `pending` with the
+  reason, then go on to `render`. A pending check is a result; a missing history
+  line is not.
+- 2026-08-18: a suite's wall clock moved 202 s → 1513 s purely from CPU
+  contention with other work. Record the idle-machine number, or the trend
+  measures your laptop, not the repo.
+- 2026-08-18: an "intermittent" test was diagnosed as a TOCTOU race and
   "fixed" — it failed again on the next full run for a different reason
   (a derived path that was never created, not one that vanished). A test that
   passes in isolation proves nothing about why it failed; get the failing
@@ -658,8 +669,8 @@ Comparing layers across repos is valid — the checks are repo-shape-aware, so a
 repo without workflows, without a remote, or without dependencies gets `na`
 rather than a penalty.
 
-Two things make a re-run cheap enough to actually happen: start the full-history
-`gitleaks` scan in the background first and run the other probes while it works,
+Two things make a re-run cheap enough to actually happen: start the secrets scan
+(`scan-secrets`, which reads only new commits) in the background first and run the other probes while it works,
 and record the suite's wall clock from an **idle** machine — otherwise the trend
 line measures the machine, not the repo.
 

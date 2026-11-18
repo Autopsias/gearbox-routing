@@ -241,7 +241,7 @@ def _preflight(plan_dir, ctx):
 # --------------------------------------------------------------------------
 # The run
 # --------------------------------------------------------------------------
-def _done(plan_dir, ctx, out, notes, event):
+def _done(plan_dir, ctx, out, notes, event, **event_fields):
     if ctx["isolated"] and out["action"] in ("finished", "finish-superseded") \
             and out["mode"] == "apply":
         manual = pt.manual_remote_delete(plan_dir, ctx, lst.load(plan_dir, ctx))
@@ -252,7 +252,7 @@ def _done(plan_dir, ctx, out, notes, event):
                   action=out["action"],
                   record=(out.get("record") or {}).get("status"),
                   checkout=(out.get("checkout") or {}).get("status"),
-                  ci=(out.get("ci") or {}).get("verdict"))
+                  ci=(out.get("ci") or {}).get("verdict"), **event_fields)
     return out
 
 
@@ -319,6 +319,13 @@ def _new_cycle(ctx, pre, gen, read):
         return None
 
 
+def _carried(plan_dir, ctx):
+    """GAT-01: the ids of the non-review gates the land copied instead of running, so CI is their only check
+    ([] for none; a copied review pass never counts). Read from the land record."""
+    land = (lst.load(plan_dir, ctx) or {}) if ctx["isolated"] else {}
+    return list(land.get("ci_only_gates") or [])
+
+
 def _repoll(plan_dir, ctx, st, timeout_s):
     """The re-run rule: steps 1-3 are left alone. A finished state re-polls only a
     pending/unknown verdict; a state killed before its poll (``steps_done_at``, no
@@ -329,7 +336,8 @@ def _repoll(plan_dir, ctx, st, timeout_s):
     if st.get("ci_sha") and ctx["remote"] and (
             (ci and ci.get("verdict") in REPOLL) or (finishing and not ci)):
         ci = finish_ci.ci_verdict(ctx["root"], st["ci_sha"], branch=ctx["default"],
-                                  timeout_s=timeout_s, base_sha=st.get("base_sha"))
+                                  timeout_s=timeout_s, base_sha=st.get("base_sha"),
+                                  carried=_carried(plan_dir, ctx))
         fields.update(ci=ci, checked_at=now())
     if finishing:
         stamp = now()
@@ -352,7 +360,9 @@ def _repoll(plan_dir, ctx, st, timeout_s):
                          "park_reason": None},
            "record": steps.get("record"), "leftovers": steps.get("leftovers"),
            "checkout": steps.get("checkout"), "ci": ci}
-    return _done(plan_dir, ctx, out, [note], "plan_finish_ci")
+    carried = _carried(plan_dir, ctx)
+    return _done(plan_dir, ctx, out, [note], "plan_finish_ci",
+                 exact_only=bool(carried), carried=carried)
 
 
 def finish(plan_dir, *, timeout_s=DEFAULT_TIMEOUT_S, apply=False):
@@ -450,7 +460,8 @@ def _run(plan_dir, ctx, timeout_s, apply, release):
         return _done(plan_dir, ctx, out, [*notes, note], "plan_finish")
     if ctx["remote"]:
         out["ci"] = finish_ci.ci_verdict(ctx["root"], pre["ci_sha"], branch=ctx["default"],
-                                         timeout_s=timeout_s, base_sha=pre["base_sha"])
+                                         timeout_s=timeout_s, base_sha=pre["base_sha"],
+                                         carried=_carried(plan_dir, ctx))
     stamp = now()
     fields = {"finished_at": stamp, "ci": out["ci"], "checked_at": stamp}
     if mode == "report-only":

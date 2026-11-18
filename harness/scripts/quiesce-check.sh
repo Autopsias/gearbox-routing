@@ -147,9 +147,11 @@ deleted_tracked=$(git -C "$CD" ls-files -z --deleted \
 probe() {
   ( cd "$CD" && git ls-files -z \
       | python3 -c 'import os, sys
-paths = sys.stdin.buffer.read().split(b"\0")
-sys.stdout.buffer.write(b"\0".join(p for p in paths if p and os.path.lexists(p)))' \
-      | xargs -0 stat -f '%m %N' ) \
+# "<mtime seconds> <path>" per existing file. Python, not `stat -f`: that is BSD/macOS
+# syntax, and on GNU/Linux (CI) `-f` means "file system status", so the probe failed there.
+for p in sys.stdin.buffer.read().split(b"\0"):
+    if p and os.path.lexists(p):
+        sys.stdout.buffer.write(b"%d %s\n" % (int(os.lstat(p).st_mtime), p))' ) \
     | awk -v re="$RUNTIME_RE" -v mode="$MODE" '
         { p = substr($0, index($0, " ") + 1)
           if (mode == "narrow" && p ~ re) next

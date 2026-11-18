@@ -2,8 +2,9 @@
 
 This is the algorithm the ship-tail STEP 5 runs after the PR STAGE pushes. It
 watches CI to green and, on red, triggers `/ci-orchestrate` and re-pushes —
-looping until green or a bounded ceiling. **It NEVER auto-merges.** Merge is a
-human action, full stop.
+looping until green or a bounded ceiling. **It never uses `gh pr merge --auto`.** On green it runs
+`~/.claude/scripts/merge_when_green.py`, which merges only when every check is green. Deploy and
+release stay an explicit request.
 
 ## Contents
 
@@ -32,7 +33,7 @@ re-push against an unverified or stale failure.
 
 ## INVARIANTS (hard, non-negotiable)
 
-1. **Never auto-merge.** The loop ends at "green" or "escalate", never at "merged".
+1. **Never `--auto`.** The loop ends at "green" or "escalate"; only on green does `~/.claude/scripts/merge_when_green.py` merge.
 2. **Never `--no-verify`.** Re-pushes go through hooks like any other push.
 3. **Guarded re-push only.** `git push --force-with-lease=<ref>:<EXPECTED_SHA>`
    with the SHA pinned. Plain `--force-with-lease` (no value) silently degrades
@@ -111,7 +112,7 @@ while CYCLE < CI_MAX_CYCLES:
 
     if verdict == GREEN:
         emit [ship-tail][ci-loop] GREEN cycle=$CYCLE — CI passed. STOP (no merge).
-        STOP — success. (NEVER merge.)
+        STOP — success. (Then run ~/.claude/scripts/merge_when_green.py.)
 
     if verdict in {STALE, WRONG_RUN, UNKNOWN, UNREACHABLE}:
         emit [ship-tail][ci-loop] ESCALATE reason=$verdict cycle=$CYCLE

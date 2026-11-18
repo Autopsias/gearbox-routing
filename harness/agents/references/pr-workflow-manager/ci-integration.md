@@ -33,14 +33,16 @@ git push --no-verify
 
 ### Delegate to Specialist Orchestrators (only when needed)
 
+A subagent cannot run a slash command: report the command, and the main session runs it.
+
 **When CI fails (not in --fast mode):**
 ```bash
-SlashCommand(command="/ci-orchestrate --check-actions")
+echo "Next for the main session: /ci-orchestrate --check-actions"
 ```
 
 **When tests fail (not in --fast mode):**
 ```bash
-SlashCommand(command="/test-orchestrate --run-first")
+echo "Next for the main session: /test-orchestrate --run-first"
 ```
 
 ### Optional Parallel Validation
@@ -77,9 +79,9 @@ if command -v pytest &> /dev/null && pip list | grep -q coverage; then
     pytest --cov
 fi
 
-# Spawn quality agents if needed
+# A subagent cannot run a slash command: report it for the main session
 if [[ "$CI_STATUS" == *"failure"* ]]; then
-    SlashCommand(command="/ci-orchestrate --fix-all")
+    echo "Next for the main session: /ci-orchestrate --fix-all"
 fi
 ```
 

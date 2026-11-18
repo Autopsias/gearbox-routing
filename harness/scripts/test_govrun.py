@@ -112,21 +112,22 @@ def test_a_second_job_queues_behind_the_first(state, jobs):
 
 
 def test_two_jobs_do_not_queue_when_the_table_has_two_slots(state, jobs):
-    """KNOWN NEGATIVE for the test above. Same launch, same timing method, same
-    4-worker budget — but split across two slots, so this pair must NOT
-    serialise. Without it, the queueing test proves only that the second job was
-    slow for some unrelated reason."""
-    jobs(state, ["sleep", "2"], env=TWO_SLOTS)
+    """KNOWN NEGATIVE for the test above. Same launch, same 4-worker budget — but
+    split across two slots, so this pair must NOT serialise. Without it, the
+    queueing test proves only that the second job was slow for some unrelated
+    reason."""
+    # The first job outlives any launch delay; the fixture kills it afterwards.
+    first = jobs(state, ["sleep", "60"], env=TWO_SLOTS)
     wait_for_exec(state, "a", "sleep")
 
-    start = time.monotonic()
     second = jobs(state, ["echo", "SECOND"], max_wait=0, env=TWO_SLOTS)
     out, err = second.communicate(timeout=30)
-    waited = time.monotonic() - start
 
     assert second.returncode == 0
     assert "SECOND" in out
-    assert waited < 1.0, f"the second job queued despite a free slot ({waited:.2f}s)"
+    # Structural, not a stopwatch: `waited < 1.0` reddened at load 27 in the
+    # background QoS band, where an interpreter start alone is ~3x slower.
+    assert first.poll() is None, "the second job ran only after the first ended"
     assert "govrun: queued" not in err  # no wait, no queue notice
 
 

@@ -7,6 +7,12 @@
         "ctrl+enter": "chat:submit",
         "alt+p": "chat:modelPicker"
       }
+    },
+    {
+      "context": "Chat",
+      "bindings": {
+        "ctrl+alt+g": "command:orca-agent-view"
+      }
     }
   ]
 }

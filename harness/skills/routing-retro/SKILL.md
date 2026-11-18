@@ -143,7 +143,7 @@ Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_p
 4. **Prescriptive-prompt friction (fable-pinned agents only).** Anthropic's Fable-5
    prompting guide warns that skills/agent prompts written for prior models are often too
    prescriptive for Fable and can DEGRADE output. For sessions that dispatched a
-   fable-pinned agent (per SSOT `agents:` — currently digdeep, ci-strategy-analyst), check
+   fable-pinned agent (any agent whose SSOT `agents:` row pins a Fable model; today only the tier-fable-* agents), check
    the transcript for the agent fighting its instructions: skipping mandated procedure
    steps, restating why a step doesn't apply, or output quality complaints. If seen,
    propose trimming that agent's .md prescription via `/routing-update` — never edit here.
@@ -281,6 +281,10 @@ dates and `evals/routing/results/*/ROUTING-*-CHANGESET.md`), verify they're stil
 - NOT guard-blocking: `settings.json` `model`/`effortLevel` vs `main_session:` (the guard
   only warns) and *behavioral* adherence (are fan-outs
   pinning non-Fable models per `fanout_policy:`?) — check both here, from the scan data.
+
+### 4b. Follow-up fixes (trial, report only — not a signal)
+
+`python3 ~/.claude/skills/routing-retro/scripts/followup_fix.py <repo> [--days 60] [--ref origin/main]` pairs each plan-session commit (`feat(<slug>): sNN session work`, older than 7 days) with fix, revert or hotfix commits within 7 days that change or delete lines the session commit added (`git blame` on the fix's parent). Trial 2026-11-13: only 12 of 20 labelled pairs were real defects (bar 15), so the rate is NOT a retro signal. Use it as a prompt to read pairs, never to score a model or effort cell.
 
 ### 5. Close
 

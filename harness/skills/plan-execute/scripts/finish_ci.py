@@ -24,7 +24,7 @@ MATCHES = ("exact", "descendant")
 REASONS = ("gh-missing", "gh-unauthenticated", "no-workflows", "no-run-for-sha", "timeout")
 
 
-def ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None):
+def ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None, carried=()):
     """Return the CI verdict for ``sha`` on ``branch`` in the repo at ``root``.
 
     ``sha`` is pinned by the caller (``finish.json``'s ``ci_sha``) and never
@@ -99,23 +99,48 @@ def ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None):
     ``match`` is ``"descendant"`` when any deciding run is one, even when the reported
     run (``run_id``/``run_sha``) is an exact red one. Only ``push`` runs count, so
     the weekly ``schedule`` run never decides anything.
+
+    ``carried`` (GAT-01): the land copied a recorded pass instead of running a gate,
+    so CI on the pushed sha is the only check of that tree. Only an EXACT run on
+    ``sha`` counts: a descendant run may be green for a corrected tree and must not
+    stand in for a broken one. A missing, pending, cancelled or unknown result, and
+    a red one, adds ``follow_up``: a brief with the owner's action. Nothing is
+    reverted or re-run here.
     """
     start, deadline = _clock(timeout_s)  # before auth: timeout_s bounds the whole call
     gh_path, res = _preflight(root, gh)
     if res is not None:
-        return res
+        return _carried(res, sha, carried)
     while True:
-        look = _look(root, gh_path, sha, branch)
+        look = _look(root, gh_path, sha, branch, exact_only=bool(carried))
         res = _verdict(root, gh_path, look, base_sha) if look else res  # failed look: keep last
         if _settled(res, min(deadline, start + NO_RUN_GRACE_S)):
-            return res
+            return _carried(res, sha, carried)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
         time.sleep(min(POLL_INTERVAL_S, remaining))
     if res is None:  # `gh run list` failed on every look: no verdict, never green
-        return _result("unknown")
+        return _carried(_result("unknown"), sha, carried)
     res["reason"] = res["reason"] or "timeout"  # a no-run look keeps no-run-for-sha
+    return _carried(res, sha, carried)
+
+
+def _names(carried):
+    ids = [carried] if isinstance(carried, str) else list(carried) if isinstance(carried, (list, tuple)) else []
+    return "the gate" + ("s " if len(ids) > 1 else " ") + ", ".join(ids) if ids else "a gate"
+
+
+def _carried(res, sha, carried):
+    """Add the owner brief for a land that carried a gate and whose pushed sha is not green."""
+    if carried and res["verdict"] != "green":
+        res["follow_up"] = (
+            f"This land carried {_names(carried)}, which it did not run, so CI on the pushed commit {sha[:12]} is "
+            f"its only check. CI is {res['verdict']}" + (f" ({res['reason']})" if res["reason"] else "")
+            + ". Owner action: open the CI run for that commit"
+            + (", read the failure and fix it with a new commit" if res["verdict"] == "red"
+               else ", wait for it to finish or re-run it, then run `run.py finish --no-wait` again")
+            + ". Nothing was reverted.")
     return res
 
 
@@ -331,7 +356,7 @@ def _nearest(runs, dist):
     return None, looked
 
 
-def _look(root, gh, sha, branch):
+def _look(root, gh, sha, branch, exact_only=False):
     """One look: ``({workflow: deciding run or None}, followed, descendant workflows)``."""
     exact = _list_runs(gh, root, ["--commit", sha])
     if exact is None:
@@ -341,7 +366,7 @@ def _look(root, gh, sha, branch):
     deciding = {wf: _decide(rs) for wf, rs in _by_workflow(exact).items()}
     fallback = [wf for wf, run in deciding.items() if run is None]
     used_descendant = set()
-    if fallback or not exact:
+    if (fallback or not exact) and not exact_only:  # a carried land takes no descendant run
         got = _descendants(root, gh, sha, branch)
         if got is None:
             return None

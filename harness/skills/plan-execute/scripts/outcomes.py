@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -72,7 +73,13 @@ def _default_ledger_path():
 
 def ledger_path():
     override = os.environ.get(LEDGER_PATH_ENV)
-    return Path(override) if override else _default_ledger_path()
+    if override:
+        return Path(override)
+    # Under pytest (env inherited by subprocesses too) never touch the tracked
+    # ledger: a test file outside this folder's conftest wrote fixture rows to it.
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return Path(tempfile.gettempdir()) / "plan-execute-outcomes-pytest.ndjson"
+    return _default_ledger_path()
 
 
 # --------------------------------------------------------------------------

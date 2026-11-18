@@ -34,6 +34,7 @@ It emits two things and one gate:
    `slide · claim_headline · role · source_ids · workbook_refs · chart · assumptions · open_questions · note_requirement · review_status`.
    - **Claims, not topics.** The headline is the claim **sentence** (a full assertion — "Margin recovered to 14% on lower clinker cost"), never a topic label ("Margin"). A file-spec topic label is **rewritten** to the claim sentence and the original kept in `source_headline` so the transform is auditable.
    - **Every number names a source.** `source_ids` come from the claim's provenance; the `note_requirement` reserves the §2.1 evidence speaker note (Claim / Source IDs / Calculation / Assumptions / Needs review) the M2 evidence map fills in.
+   - **Above 10 slides, the map opens with 1-2 plain-language summary slides** right after the cover (`role: summary`): the spine, its proof and the road, for a reader who stops there. Each summary claim also appears, with its source, on a later slide. (why: 2026-11-17 AI strategy deck, readers asked for the argument up front; your brand skill's claim and road blocks draw it.)
 
 3. **The GATE** — a **hard stop**. Status `blocked` until **both**: (a) every claim names a source **or** is explicitly flagged `unsupported` (the invariant), and (b) a named human **approves** the spine + slide map (`--approve`). An unsourced *and* unflagged number, or an `unsupported` claim still slotted to render, is a `must-fix` **render-blocker**: the architecture cannot reach a renderable state. Sections, titles, and asks that assert no figure need no source.
 

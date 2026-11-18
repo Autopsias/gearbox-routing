@@ -5,7 +5,7 @@ review found one forged surface row was a PASS with no review).
 KNOWN NEGATIVES: reads stay open, and the main session (the orchestrator, which
 writes `<sid>.accepted.json` for the owner) is never touched.
 
-Run: python3 -m pytest hooks/test_verify_state_guard.py -q
+Run: scripts/pytest-m hooks/test_verify_state_guard.py -q
 """
 
 import json

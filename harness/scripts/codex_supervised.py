@@ -160,6 +160,25 @@ def attempt_argv(n, flags, thread_id):
     return ["codex", "exec", "resume", thread_id] + flags + ["-"], "resume"
 
 
+# The read-only sandbox does not cover MCP servers: the user's Ref "Plans" server
+# (api.plan.ref.tools) let review runs publish repo details as Ref documents
+# (2026-11-14, 6 documents). Only the full-table form works: `Plans.enabled=false`
+# alone fails "invalid transport". The Ref docs server ("ref") stays on.
+NO_REF_PLANS_WRITES = ["-c", 'mcp_servers.Plans={url="https://api.plan.ref.tools/mcp",enabled=false}']
+
+
+def build_flags(a, out):
+    """Flags legal on both the fresh and the resume path (see the sandbox note in main)."""
+    flags = ["--json", "--skip-git-repo-check", "-o", str(out),
+             "-c", f'sandbox_mode="{a.sandbox}"',
+             "-c", f"stream_idle_timeout_ms={a.idle_timeout * 1000}"] + NO_REF_PLANS_WRITES
+    if a.model:
+        flags += ["-m", a.model]
+    if a.effort:
+        flags += ["-c", f"model_reasoning_effort={a.effort}"]
+    return flags
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--prompt-file", required=True)
@@ -191,13 +210,7 @@ def main() -> int:
     # accept -c/-m/-o/--json. Passing the sandbox as a config key keeps ONE flag set that
     # is legal on both the fresh and the resume path — the alternative, two divergent
     # argvs, is what silently broke the recovery path on its first real test.
-    flags = ["--json", "--skip-git-repo-check", "-o", str(out),
-             "-c", f'sandbox_mode="{a.sandbox}"',
-             "-c", f"stream_idle_timeout_ms={a.idle_timeout * 1000}"]
-    if a.model:
-        flags += ["-m", a.model]
-    if a.effort:
-        flags += ["-c", f"model_reasoning_effort={a.effort}"]
+    flags = build_flags(a, out)
 
     started = time.time()
     hard_deadline = started + a.total_deadline

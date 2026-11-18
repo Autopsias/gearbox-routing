@@ -22,12 +22,16 @@ import uuid
 from pathlib import Path
 
 import land_brief as lb
+import land_carry as lcy
 import land_flaky as lfk
+import land_gate_split as lgs
+import land_load as lld
 import land_repair as lrp
 import land_state as lst
 import plan_scope as ps
 import plan_ship as pship
 import run_state_io as rsi
+import safe_json as sj
 import worktree as wt
 from land_state import (conflicted, park,
                         porcelain, rev, save)
@@ -54,13 +58,14 @@ def step_sync(plan_dir, ctx, st):
                     f"silently left behind. Commit or discard it, then re-run "
                     f"`run.py land {plan_dir}`.")
     if ctx["remote"]:
-        git(["fetch", ctx["remote"], ctx["default"]], ctx["root"], timeout=600)
+        git(["fetch", ctx["remote"], ctx["default"]], ctx["root"], timeout=lst.timeout_for(600))
     if rev(tree, ctx["upstream"]) is None:
         return park(plan_dir, ctx, st, "default-unresolved",
                     f"LAND PARKED — {ctx['upstream']} does not resolve. §4.0 resolves the "
                     "default branch ONCE at `begin` and never re-derives it; a default "
                     "that vanished mid-plan is a decision, not a guess.")
-    rc, out, err = git(["merge", "--no-edit", ctx["upstream"]], tree, timeout=600)
+    rc, out, err = git(["merge", "--no-edit", ctx["upstream"]], tree,
+                       timeout=lst.timeout_for(600))
     if rc != 0:
         conflicts, status = conflicted(tree), porcelain(tree)
         git(["merge", "--abort"], tree)
@@ -120,7 +125,9 @@ def step_worktree(plan_dir, ctx, st):
         # tracked file left in a parked land worktree. Measured: both were
         # destroyed here, silently, on the next `land`. `step_finish` has always
         # used force=False for this same call.
-        status, extra = wt.teardown_worktree(ctx["root"], Path(path), False)
+        # drop_ignored: nobody works in a land worktree, so an ignored file there is
+        # a gate's own output (2026-11-18: a venv parked one land on every run).
+        status, extra = wt.teardown_worktree(ctx["root"], Path(path), False, drop_ignored=True)
         git(["worktree", "prune"], ctx["root"])
         if status == "preserved":
             return park(plan_dir, ctx, st, "land-worktree-dirty",
@@ -160,6 +167,50 @@ def step_worktree(plan_dir, ctx, st):
 # --------------------------------------------------------------------------
 # 3 — merge the plan branch into the detached land HEAD (§4.2, §4.4)
 # --------------------------------------------------------------------------
+def _session_classes(status):
+    """The classes one session's PASSED gates prove: a review gate gives review, a test gate tests."""
+    got = set()
+    for gid, v in status.items():
+        if v == "passed" and ("test" in gid or "review" in gid):
+            got.add("tests" if "test" in gid else "review")
+    return got
+
+
+def _session_record(vdir, sid):
+    """One session's gate_status; a missing or unreadable record is an empty one."""
+    try:
+        return sj.get_dict(sj.load_dict(Path(vdir, f"{sid}.json").read_text()), "gate_status", {})
+    except OSError:
+        return {}
+
+
+def _recorded_classes(plan_dir):
+    """Classes that EVERY session's gate record proves, so one session's tests never stamp
+    another session's change. The session list is the manifest's, not the records on disk:
+    a session with a missing or unreadable record proves nothing, and neither does a manifest
+    that cannot be read.
+
+    step_merge runs before the land re-gate, so the land state holds no gates yet; the
+    re-gate then checks the merged tree itself before anything is pushed."""
+    try:
+        manifest = sj.load_dict(Path(plan_dir, "manifest.json").read_text())
+    except OSError:
+        return set()
+    vdir = Path(plan_dir, "_verify" + "_state")
+    per_session = [_session_classes(_session_record(vdir, sj.get_str(s, "id", "?")))
+                   for s in sj.get_list(manifest, "sessions", [])]
+    return set.intersection(*per_session) if per_session else set()
+
+
+def _land_message(plan_dir, ctx):
+    """The land commit message with its `Verified:` line, from the gate record (not a self-report)."""
+    msg = f"plan({ctx['slug']}): land\n"
+    helper = Path(__file__).resolve().parents[3] / "scripts" / "verified_trailer.py"
+    r = subprocess.run(["python3", str(helper), "--classes", ",".join(sorted(_recorded_classes(plan_dir))), "--filter"],
+                       input=msg, capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 and r.stdout else msg
+
+
 def step_merge(plan_dir, ctx, st):
     """§4.4 — ONE strategy: ALWAYS ``--no-ff``. There is no fast-forward path.
 
@@ -194,7 +245,7 @@ def step_merge(plan_dir, ctx, st):
             save(plan_dir, ctx, st)
         return None
     rc, out, err = _merge_watched(plan_dir, ctx, st, path,
-                                  ["merge", "--no-ff", "-m", f"plan({ctx['slug']}): land",
+                                  ["merge", "--no-ff", "-m", _land_message(plan_dir, ctx),
                                    ctx["branch"]])
     if rc != 0:
         return _conflict_park(plan_dir, ctx, st, path, (err or out)[:2000])
@@ -233,7 +284,7 @@ def _merge_watched(plan_dir, ctx, st, path, args):
     st["merge_pid"] = p.pid
     save(plan_dir, ctx, st)
     try:
-        out, err = p.communicate(timeout=600)
+        out, err = p.communicate(timeout=lst.timeout_for(600))
     except subprocess.TimeoutExpired:
         p.kill()
         out, err = p.communicate()
@@ -357,8 +408,9 @@ def step_ack(plan_dir, ctx, st):
 
     This function is the ONLY gate on the push, and it lives here rather than on
     the dispatch path on purpose: a by-name session dispatch (``begin --sessions
-    sNN``) walks straight through checkpoints — measured in this repo — so a land
-    checkpoint enforced by dispatch policy would be skippable. Enforced HERE it is
+    sNN``) once walked straight through checkpoints — measured in this repo; begin_guard
+    now refuses an unanswered session — and a land checkpoint enforced by dispatch
+    policy would still be skippable. Enforced HERE it is
     un-skippable by construction: there is no code path to ``step_push`` that does
     not come through this comparison.
     """
@@ -377,16 +429,22 @@ def step_ack(plan_dir, ctx, st):
     ack = st.get("ack") or None
     if ack and all(ack.get(k) == v for k, v in cand.items()):
         return None
-    # §5.3 shows the human the DIFF against what they approved, so the prior ack
-    # has to survive `invalidate_stale_ack` clearing it a step earlier.
+    # §5.3 shows the human the DIFF against what they approved: the prior ack, or
+    # the copy `step_gate` moved to `invalidated_from` when it reset.
     prior = ack or st.get("invalidated_from")
+    if ack and ack.get("carries") and ack.get("gate_digest") != cand["gate_digest"]:
+        # §17.1 invariant 13: a carried ack whose re-run test gates changed the result.
+        lcy.log_reset(plan_dir, ctx, "gate-result", from_digest=ack.get("gate_digest"),
+                      to_digest=cand["gate_digest"])
     st.update({"state": "awaiting_review", "ack": None, "invalidated_from": prior,
                "candidate": {**cand, "merge_sha": st.get("merge_sha")}})
     st["brief"] = lb.review({**cand, "merge_sha": st.get("merge_sha")}, st.get("gates") or [],
                             plan_dir, st["land_path"], ctx["root"], prior=prior,
                             warning="\n".join(filter(None, [st.get("at_land_warning"),
                                                             lrp.cost_note(st),
-                                                            lfk.flaky_note(st)])) or None)
+                                                            lfk.flaky_note(st),
+                                                            lgs.note(st),
+                                                            lld.note(st)])) or None)
     save(plan_dir, ctx, st)
     lst.write_notice(plan_dir, st["brief"])
     rsi.log_event(plan_dir, "plan_land_awaits_review", session_ids=[], slug=ctx["slug"],

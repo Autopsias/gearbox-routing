@@ -84,9 +84,19 @@ TYPE_MEMORY = "internal-memory"    # a fact from a project-memory / knowledge-gr
 # and exclude it from the corroborating/contradicting set (it stays listed as audit
 # context only). Detection is by frontmatter markers the write-back stamps.
 DERIVED_PROVENANCE_AUTHORITY = "derived-provenance"
-_QUAR_AUTHORITY_RE = re.compile(r"source_authority\s*:\s*derived-provenance", re.I)
-_QUAR_PHASE_RE = re.compile(r"\bphase\s*:\s*quarantine\b", re.I)
-_QUAR_PROMOTED_RE = re.compile(r"\bphase\s*:\s*promoted\b", re.I)
+
+
+def _kv_re(key: str, value: str) -> "re.Pattern[str]":
+    """`key: value` in every shape the note's frontmatter text reaches us in: YAML (bare or
+    quoted), JSON, `key=value` (as SKILL.md writes it) and the note body's own sentence
+    "`key` is `value`"."""
+    q = "[\"'`]?"
+    return re.compile(r"\b%s%s%s\s*(?::|=|\s+is\s)\s*%s%s\b" % (q, key, q, q, value), re.I)
+
+
+_QUAR_AUTHORITY_RE = _kv_re("source_authority", "derived-provenance")
+_QUAR_PHASE_RE = _kv_re("phase", "quarantine")
+_QUAR_PROMOTED_RE = _kv_re("phase", "promoted")
 
 
 def _is_quarantined_derived(row: dict) -> bool:

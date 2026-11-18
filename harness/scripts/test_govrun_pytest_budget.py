@@ -166,6 +166,8 @@ ARGPARSE_TRUTH = [
     # token, so this is a `-k` expression named "n8", not a worker request.
     # Reading it as one would refuse a command that runs no workers at all.
     (["-kn8"], None), (["-mn8"], None),
+    # an attached VALUE that looks like `-n` is still the value: read LOW = bypass
+    (["-n8", "-r=-n", "0"], 8), (["-n", "8", "-k=-n", "2"], 8), (["-n8", "-r=-n0"], 8),
 ]
 
 

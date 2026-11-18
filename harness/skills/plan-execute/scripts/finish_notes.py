@@ -96,6 +96,8 @@ def brief(out, notes):
                       for c in ci.get("failed_checks") or []]
             lines.append("  The base had the same failures." if ci.get("inherited")
                          else "  The base did not have them all, or could not be compared.")
+        if ci.get("follow_up"):                    # GAT-01: a land that carried a gate
+            lines.append("  " + ci["follow_up"])
         if ci.get("verdict") in REPOLL:
             lines.append(f"  Re-run later: run.py finish {out['plan_dir']} --no-wait")
     return "\n".join(lines + [n for n in notes if n])

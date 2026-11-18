@@ -17,6 +17,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import lease_guard as lg
 import run_state_io as rsi
 import safe_json as sj
 
@@ -65,11 +66,7 @@ def _fsync_dir(dirpath):
 #   * ``ship-record`` re-verifies the token and REFUSES (halt + decision brief)
 #     when the lease was taken over or expired mid-directive.
 #
-# ponytail: the lease only DETECTS a mid-directive takeover, it cannot prevent
-# the overlap — nothing renews a lease while run.py is not running. The defence
-# is a lease long enough that expiry means "the orchestrator really is gone"
-# (see _lease_seconds) plus the ship-record refusal. Renewal needs a heartbeat
-# that outlives run.py; add one only if operations start outliving the lease.
+# A running land RENEWS its lease and is never taken over while alive (lease_guard).
 # --------------------------------------------------------------------------
 REPO_SCOPED_PREFIXES = ("git:", "push:", "deploy:")
 REPO_LOCK_DIRNAME = "plan-locks"
@@ -156,10 +153,14 @@ def _lease_seconds(guarded_timeout):
 
 
 def _read_lock(lp):
+    """{} for a missing file or bytes that are not a lease; any other read error raises
+    LockError: a lease we cannot read is never judged unreadable and taken (s07 finding A)."""
     try:
         return sj.load_dict(Path(lp).read_bytes()) or {}
-    except OSError:
+    except FileNotFoundError:
         return {}
+    except OSError as e:
+        raise rsi.LockError(f"cannot read the lease file {lp} ({type(e).__name__}: {e}); retry.") from e
 
 
 def _lease_state(info):
@@ -198,7 +199,7 @@ def _locked_message(resource, lp, info, state):
     )
 
 
-def _new_lease(plan_dir, resource, guarded_timeout, taken_over_from=None):
+def _new_lease(plan_dir, resource, guarded_timeout, taken_over_from=None, holder_kind=None):
     now = datetime.now(UTC)
     seconds = _lease_seconds(guarded_timeout)
     info = {
@@ -212,6 +213,7 @@ def _new_lease(plan_dir, resource, guarded_timeout, taken_over_from=None):
         "lease_seconds": seconds,
         "guarded_timeout": guarded_timeout,
         "lease_rationale": LEASE_RATIONALE,
+        **lg.holder_fields(holder_kind),
     }
     if taken_over_from:
         info["taken_over_from"] = taken_over_from
@@ -219,20 +221,21 @@ def _new_lease(plan_dir, resource, guarded_timeout, taken_over_from=None):
     return info
 
 
-def _steal_expired(lp, resource):
-    """Atomically take an expired/unreadable lease aside so exactly one contender
-    can replace it. Returns the displaced record (for the takeover receipt), or
+def _steal_expired(plan_dir, lp, resource):
+    """Atomically take an expired/unreadable lease (or our own dead land holder's) aside so
+    exactly one contender can replace it. Returns the displaced record (for the takeover receipt), or
     None when the file vanished under us. Raises ``rsi.LockError`` if the lease
     is live or foreign."""
     cur = _read_lock(lp)
     state = _lease_state(cur)
-    if state in ("live", "foreign-host"):
+    if state == "foreign-host" or (state == "live" and not lg.dead_own_land(plan_dir, resource, cur)):
         raise rsi.LockError(_locked_message(resource, lp, cur, state))
     if state == "unreadable" and _unreadable_is_young(lp):
         raise rsi.LockError(
             f"shipping resource {resource!r}: {lp} exists but carries no readable "
             f"lease and was written under {UNREADABLE_GRACE_SECONDS}s ago — another "
             f"contender is writing it right now. Retry; do not remove it.")
+    cause = lg.check_takeover(plan_dir, resource, lp, cur, _locked_message(resource, lp, cur, state))
     aside = lp.with_name(f"{lp.name}.superseded-{uuid.uuid4().hex[:8]}")
     try:
         os.rename(str(lp), str(aside))
@@ -243,8 +246,8 @@ def _steal_expired(lp, resource):
         aside.unlink()
     except OSError:
         pass
-    return {k: displaced.get(k) for k in
-            ("token", "plan_dir", "host", "pid", "started_at", "expires_at")}
+    return {"cause": cause, **{k: displaced.get(k) for k in
+            ("token", "plan_dir", "host", "pid", "started_at", "expires_at")}}
 
 
 def _lease_record_key(resource):
@@ -331,37 +334,36 @@ def _unreadable_is_young(lp):
     build's lock. Stealing one instantly let two plans hold one lease."""
     try:
         age = datetime.now(UTC).timestamp() - lp.stat().st_mtime
-    except OSError:
+    except FileNotFoundError:
         return False
+    except OSError as e:
+        raise rsi.LockError(f"cannot stat the lease file {lp} ({e}); retry.") from e
     return 0 <= age < UNREADABLE_GRACE_SECONDS
 
 
-def acquire_ship_lock(plan_dir, resource, *, guarded_timeout=None):
-    """Take a lease on ``resource``. Atomic exclusive create — exactly one of N
-    simultaneous contenders wins. Raises ``rsi.LockError`` when a live (or
-    foreign-host) lease already exists. An EXPIRED lease is taken over, and the
-    takeover is recorded on both sides.
-
-    ``guarded_timeout`` is the longest step timeout this resource guards; it sets
-    the lease duration (see LEASE_RATIONALE, which is written into the file)."""
+def acquire_ship_lock(plan_dir, resource, *, guarded_timeout=None, holder_kind=None):
+    """Take a lease on ``resource`` (O_EXCL create, one winner). Raises ``rsi.LockError`` for a
+    live, foreign-host or live-holder lease; an expired one is taken over, recorded both sides.
+    ``guarded_timeout`` sets the lease duration (LEASE_RATIONALE)."""
     lp = _ship_lock_path(plan_dir, resource)
     lp.parent.mkdir(parents=True, exist_ok=True)
     takeover = None
     for _attempt in range(4):
-        info = _new_lease(plan_dir, resource, guarded_timeout, takeover)
-        if not _create_with_content(lp, info):
-            renewed = _renew_own_lease(plan_dir, resource, lp, guarded_timeout)
-            if renewed is not None:
-                return renewed
-            takeover = _steal_expired(lp, resource) or takeover
-            continue
-        _record_lease(plan_dir, resource, info, lp)
-        rsi.log_event(plan_dir, "shipping_lock_acquired", resource=str(resource),
-                      token=info["token"], lock_file=str(lp),
-                      expires_at=info["expires_at"], lease_seconds=info["lease_seconds"])
-        if takeover:
-            _record_takeover(plan_dir, resource, info, takeover, lp)
-        return True
+        info = _new_lease(plan_dir, resource, guarded_timeout, takeover, holder_kind)
+        with lg.mutex(lp):  # §17.5.1: one read-check-write at a time, host-wide
+            if not _create_with_content(lp, info):
+                renewed = _renew_own_lease(plan_dir, resource, lp, guarded_timeout)
+                if renewed is not None:
+                    return renewed
+                takeover = _steal_expired(plan_dir, lp, resource) or takeover
+                continue
+            _record_lease(plan_dir, resource, info, lp)
+            rsi.log_event(plan_dir, "shipping_lock_acquired", resource=str(resource),
+                          token=info["token"], lock_file=str(lp),
+                          expires_at=info["expires_at"], lease_seconds=info["lease_seconds"])
+            if takeover:
+                _record_takeover(plan_dir, resource, info, takeover, lp)
+            return True
     raise rsi.LockError(
         f"shipping resource {resource!r}: lost the acquire race four times at {lp}; "
         f"another plan is contending for it right now — retry."
@@ -369,18 +371,14 @@ def acquire_ship_lock(plan_dir, resource, *, guarded_timeout=None):
 
 
 def _renew_own_lease(plan_dir, resource, lp, guarded_timeout):
-    """Extend a lease this plan already holds (a resumed ship-begin re-acquiring
-    its own resource) and return True, or None when the file is not ours to
-    renew. Renewal keeps the TOKEN — the directive already in the orchestrator's
-    hands stays valid — and only pushes the expiry out.
-
-    Only a LIVE lease of ours is renewed. An expired one goes through the normal
-    takeover path even when the token is our own, because by then another plan
-    was entitled to take it and the takeover must be recorded either way."""
+    """Extend a lease this plan already holds; None when the file is not ours to renew.
+    Keeps the TOKEN. A land lease: only its holder process renews, even after expiry."""
     rec = our_lease(plan_dir, resource)
     cur = _read_lock(lp)
     if not rec or not cur.get("token") or cur.get("token") != rec.get("token"):
         return None
+    if cur.get("holder_kind") == lg.LAND:  # §17.4: only its holder, on this host; never adopted
+        return lg.renew_locked(plan_dir, resource, lp, cur) if lg.is_holder(cur) else None
     if _lease_state(cur) != "live":
         return None
     now = datetime.now(UTC)
@@ -403,7 +401,7 @@ def _record_takeover(plan_dir, resource, info, takeover, lp):
     rsi.log_event(plan_dir, "shipping_lease_taken_over", resource=str(resource),
                   token=info["token"], lock_file=str(lp),
                   from_plan=takeover.get("plan_dir"), from_token=takeover.get("token"),
-                  from_host=takeover.get("host"), from_expires_at=takeover.get("expires_at"))
+                  from_host=takeover.get("host"), cause=takeover.get("cause"), from_expires_at=takeover.get("expires_at"))
     victim = takeover.get("plan_dir")
     if not victim or str(Path(plan_dir).resolve()) == str(victim):
         return
@@ -450,17 +448,20 @@ def release_ship_lock(plan_dir, resource):
     if not lp.exists():
         _forget_lease(plan_dir, resource)
         return False
-    rec = our_lease(plan_dir, resource)
-    cur = _read_lock(lp)
-    ours = (rec and cur.get("token") == rec.get("token")) or \
-           (rec is None and not _is_repo_scoped(resource))
+    with lg.mutex(lp):
+        rec, cur = our_lease(plan_dir, resource), _read_lock(lp)
+        ours = ((rec and cur.get("token") == rec.get("token")
+                 and (cur.get("holder_kind") != lg.LAND or lg.is_holder(cur))) or
+                (rec is None and not _is_repo_scoped(resource)))
+        if ours:
+            lp.unlink(missing_ok=True)
     if not ours:
         rsi.log_event(plan_dir, "shipping_lock_not_ours", resource=str(resource),
                       lock_file=str(lp), holder_token=cur.get("token"),
                       holder_plan=cur.get("plan_dir"))
-        _forget_lease(plan_dir, resource)
+        if cur.get("token") != (rec or {}).get("token"):  # a non-holder keeps the holder's record
+            _forget_lease(plan_dir, resource)
         return False
-    lp.unlink(missing_ok=True)
     _forget_lease(plan_dir, resource)
     rsi.log_event(plan_dir, "shipping_lock_released", resource=str(resource))
     return True

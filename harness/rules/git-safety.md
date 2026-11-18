@@ -1,6 +1,6 @@
 # Git Safety Rules for Agents
 
-**PRIORITY: HIGH** — these prevent git state corruption and lost work in
+These rules prevent git state corruption and lost work in
 automated workflows. Invariants only; the worked patterns, recovery procedures
 and agent-authoring checklist live in
 `~/.claude/docs/reference_git_safety_playbook.md` — read it when you are
@@ -19,6 +19,8 @@ sessions, has no natural "finally" cleanup, and makes work look lost.
   operation can push or pop between the two agents.
 - **NEVER use stash for baseline preservation** — the success path forgets to drop
   it, and the stash then holds OLD state while the tree holds new.
+  To run a test against the old code, copy your file aside, write the old one with
+  `git show origin/main:<path> > <path>`, run the test, then copy yours back.
 - If stash is truly unavoidable: name it identifiably, drop it by ref before
   returning, and report the outcome.
 - **Verify clean state before returning** — no orphaned `agent-*` stashes, no
@@ -26,7 +28,7 @@ sessions, has no natural "finally" cleanup, and makes work look lost.
 
 ## Destructive deletion of pre-existing files
 
-**PRIORITY: HIGH** — deleting work you did not create is hard to undo and easy to
+Deleting work you did not create is hard to undo and easy to
 over-authorize.
 
 - **NEVER delete or `rm -rf` a pre-existing file/directory you did not create without
@@ -55,11 +57,16 @@ confirmation is the bar for any destructive delete.
   code, compare against main, or start a branch.** A local `main` can be days behind
   (or diverged) and answers confidently from old code; nothing errors. Branch from
   `origin/main`, never from the bare local ref.
-- **ALWAYS fast-forward the primary checkout after you merge a PR**, or report how far
-  behind it is and which files block the fast-forward. After `gh pr merge` the
-  `merge-ff-main.py` hook reports the gap (it only reads; it runs no fetch or merge outside
-  the sandbox) — run the pull it names, never ignore it. (example-project 2026-11-11: two
-  merges left `main` 36 behind and the owner had to ask.)
+- **ALWAYS fast-forward the primary checkout after you merge a PR.** Report the gap instead
+  only when files truly block it. First compare the dirty files with the incoming commits
+  (`git diff --name-only HEAD origin/main`). Restore a dirty file only when it is identical
+  on `origin/main`. Leave every other dirty file alone. Never end with "not touched" when a
+  safe pull exists. After `gh pr merge` the `merge-ff-main.py` hook reports the gap (it only
+  reads; it runs no fetch or merge outside the sandbox) — run the pull it names, never ignore it.
+- **NEVER hide the output of `git commit`.** A hook can block the commit while the rest of
+  the chain goes on. Read the hook output, then run `git log -1 --oneline` and check the new
+  hash before you push. A push with no new commit sends an empty branch, and `gh pr create`
+  fails with "No commits between".
 
 *Why:* example-project 2026-09-17 reported a deploy gap of 7 commits that was really 2;
 Kuzushi 2026-10-16 answered a reader-feedback question from a `main` 33 commits behind

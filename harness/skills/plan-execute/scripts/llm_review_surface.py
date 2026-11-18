@@ -435,8 +435,13 @@ def prepare_surface(args, scope, exclude=()):
     if note:
         print(note, file=sys.stderr if focus == set() else sys.stdout)
     if focus == set():
-        return (FINDINGS if led.priors else
-                PASS if ledger.reviewed_unchanged(led) else INDETERMINATE)
+        if led.blocking or not ledger.reviewed_unchanged(led):
+            return FINDINGS if led.blocking else INDETERMINATE
+        if led.cleared:   # the ledger must say "accepted", not stay "open" for ever
+            ledger.record(led, [{**p, "kind": "finding", "attempt": led.attempt,
+                                 "evidence": "accepted by the owner on an unchanged surface"}
+                                for p in led.cleared])
+        return PASS
     diff_file = write_diff_file(
         args.cwd, base,
         os.path.join(tempfile.gettempdir(), f"plan-execute-review-{os.getpid()}.diff"),

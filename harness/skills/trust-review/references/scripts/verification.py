@@ -136,7 +136,7 @@ def _dedupe_key(claim_text: str) -> str:
 AUTHORITY_SCORE = {"official": 3, "primary": 2, "secondary": 1, "low": 0}
 
 OFFICIAL_PATTERNS = (
-    ".gov", ".gov.", ".mil", ".int", "europa.eu", "ec.europa.eu", "ecb.europa.eu",
+    ".gov", ".mil", ".int", "europa.eu", "ec.europa.eu", "ecb.europa.eu",
     "esma.europa.eu", "sec.gov", "federalreserve.gov", "bankofengland.co.uk",
     "bis.org", "imf.org", "worldbank.org", "oecd.org", "un.org", "who.int",
     "bipm.org", "iso.org", "ieee.org", "nist.gov", "eur-lex.europa.eu",
@@ -161,22 +161,22 @@ LOW_PATTERNS = (
 
 
 def _domain(url: str) -> str:
-    m = re.match(r"https?://([^/]+)", url or "", re.IGNORECASE)
+    # a browser strips tab/CR/LF before parsing, so any control char or space fails closed
+    m = None if re.search(r"[\x00-\x20\x7f]", url or "") else re.match(r"https?://(?:[^/?#@\\]*@)?([^/?#:@\\]+)(?=[/?#:\\]|$)", url or "", re.I)
     host = (m.group(1) if m else (url or "")).lower()
-    return host[4:] if host.startswith("www.") else host
+    return "" if not re.fullmatch(r"[a-z0-9.-]+", host) else (host[4:] if host.startswith("www.") else host)
 
 
 def authority_of(url: str, primary_domains: Sequence[str] = ()) -> str:
-    """Classify a URL's authority tier (conventions.md §2.4). Unknown ⇒ `low` (the
-    conservative default: an unrecognised page is weak corroboration, never enough to
-    clear a must-fix). The entity's own domain (passed in `primary_domains`) ⇒ official."""
+    """Classify a URL's authority tier (conventions.md §2.4). Unknown ⇒ `low` (the conservative
+    default: weak corroboration, never enough to clear a must-fix). Own domain (`primary_domains`) ⇒ official."""
     host = _domain(url)
     if not host:
         return "low"
     for pd in primary_domains or ():
-        if pd and pd.lower() in host:
+        if pd and (host == pd.lower().strip(".") or host.endswith("." + pd.lower().strip("."))):
             return "official"
-    if any(p in host for p in OFFICIAL_PATTERNS):
+    if re.search(r"(?:^|\.)gov\.[a-z]{2}$", host) or any(("." + host).endswith(p) if p[0] == "." else (host == p or host.endswith("." + p)) for p in OFFICIAL_PATTERNS):
         return "official"
     if any(host == d or host.endswith("." + d) for d in PRIMARY_NEWS):
         return "primary"

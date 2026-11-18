@@ -30,8 +30,18 @@ the all-clear contract.
 
 import json
 import os
+import sys
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+try:
+    from dyno_paths import REVIEW_STAMP  # noqa: E402
+except ImportError:  # never let the stamp path take the routing nudge down
+    REVIEW_STAMP = os.path.expanduser("~/.gearbox-state/last-whole-history-review")
+
+REVIEW_NOTES = os.path.expanduser("~/.claude/reflection-notes.md")
+REVIEW_MAX_DAYS = 30
 LEDGER = os.path.join(ROOT, "evals", "routing", "outcomes.ndjson")
 STAMP = os.path.join(ROOT, "evals", "routing", ".last-aggregated")
 
@@ -43,17 +53,47 @@ GROWTH_MULTIPLE = 30
 BOOTSTRAP_RECORD_SIZE = 760
 
 
+_MESSAGES = []
+
+
 def _emit(text):
-    print(json.dumps({
-        "systemMessage": text,
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": text,
-        },
-    }))
+    _MESSAGES.append(text)
+
+
+def _flush():
+    """One JSON object per run (SessionStart expects a single document)."""
+    text, _MESSAGES[:] = "\n".join(_MESSAGES), []
+    if text:
+        print(json.dumps({
+            "systemMessage": text,
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": text,
+            },
+        }))
+
+
+def review_reminder():
+    """One stat-only line when the whole-history review is overdue (stamp, else notes file)."""
+    try:
+        age = time.time() - os.stat(REVIEW_STAMP).st_mtime
+    except OSError:
+        if not os.path.exists(REVIEW_NOTES):
+            return
+        age = None  # no stamp but notes exist: overdue, age unknown
+    if age is not None and age <= REVIEW_MAX_DAYS * 86400:
+        return
+    when = "never recorded" if age is None else "%d days ago" % (age // 86400)
+    _emit("last whole-history review: %s — run /insights, then /myusage-self-assessment" % when)
 
 
 def main():
+    review_reminder()
+    routing_nudge()
+    _flush()
+
+
+def routing_nudge():
     try:
         current_size = os.path.getsize(LEDGER)
     except OSError:

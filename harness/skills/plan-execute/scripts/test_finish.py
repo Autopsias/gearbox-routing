@@ -4,7 +4,7 @@ Every test runs on the real bare-origin fixture (``_land_fixture``): a real
 ``origin.git``, a real primary checkout that owns ``main``, real plan worktrees.
 Only ``finish_ci.ci_verdict`` (s03's, built in parallel) is stubbed.
 
-    python3 -m pytest -q test_finish.py
+    scripts/pytest-m -q skills/plan-execute/scripts/test_finish.py
 """
 
 import json
@@ -23,6 +23,7 @@ import finish_record as fr  # noqa: E402
 import land_state as lst  # noqa: E402
 import plan_teardown as pt  # noqa: E402
 import ship_locks as sl  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, local_main, main_side, origin_main,  # noqa: E402
                            run_cli, work)
 from worktree import git  # noqa: E402
@@ -36,9 +37,9 @@ INDEX = ("# Active Plans\n\n"
 def ci(monkeypatch):
     calls, verdicts = [], []
 
-    def stub(root, sha, *, branch, timeout_s, gh="gh", base_sha=None):
+    def stub(root, sha, *, branch, timeout_s, gh="gh", base_sha=None, carried=False):
         calls.append({"sha": sha, "branch": branch, "timeout_s": timeout_s,
-                      "base_sha": base_sha})
+                      "base_sha": base_sha, "carried": carried})
         return {"verdict": verdicts.pop(0) if verdicts else "green", "match": "exact",
                 "run_id": 1, "run_sha": sha, "failed_checks": [], "followed_runs": [],
                 "inherited": None, "reason": None}
@@ -135,7 +136,8 @@ def test_clean_apply_pass_commits_the_record_and_leaves_the_owner_clean(fx, ci, 
     assert seen == ["held"]                       # still ours after the leftovers step
     ctx = finish.context(fx["plan"])
     assert sl.lease_status(fx["plan"], ctx["resource"])["status"] != "held"
-    assert ci[0] == [{"sha": ci_sha, "branch": "main", "timeout_s": 0, "base_sha": None}]
+    assert ci[0] == [{"sha": ci_sha, "branch": "main", "timeout_s": 0, "base_sha": None,
+                      "carried": []}]
     st = _state(fx)
     assert st["mode"] == "apply" and st["finished_at"] and st["target_sha"] == rec["sha"]
     assert st["origin_sha"] == before and st["armed_at"]
@@ -143,24 +145,38 @@ def test_clean_apply_pass_commits_the_record_and_leaves_the_owner_clean(fx, ci, 
     assert '"event": "plan_finish"' in events
 
 
-def test_a_stray_file_is_never_committed_and_an_unrelated_edit_blocks(fx, ci):
+def test_a_stray_file_is_never_committed_and_a_dirty_path_the_range_misses_is_left_alone(fx, ci):
     _arm(fx)
     _dirty_record(fx)
     (fx["root"] / "stray.txt").write_text("mine\n")
     (fx["root"] / "shared.txt").write_text("my edit\n")
+    other = fx["plans"]["other"] / "PLAN.html"
+    other.write_text("<html>other, mid-run</html>\n")
     out = finish.finish(fx["plan"], timeout_s=0)
     assert out["record"]["status"] == "pushed"
     assert "stray.txt" not in out["record"]["paths"]
     assert "shared.txt" not in _changed(fx, out["preflight"]["origin_sha"], origin_main(fx))
-    co = out["checkout"]
-    assert co["status"] == "blocked" and co["restored"] == []
-    assert {(b["path"], b["why"]) for b in co["blocking"]} == {
-        ("stray.txt", "outside-record"), ("shared.txt", "outside-record")}
-    assert co["command"] == (f"git -C {co['owner']} fetch origin && "
-                             f"git -C {co['owner']} merge --ff-only origin/main")
+    co = out["checkout"]                  # none of the three is in the incoming range
+    assert co["status"] == "fast-forwarded" and co["blocking"] == [], co
+    assert local_main(fx) == origin_main(fx)
     assert (fx["root"] / "stray.txt").read_text() == "mine\n"
     assert (fx["root"] / "shared.txt").read_text() == "my edit\n"
+    assert other.read_text() == "<html>other, mid-run</html>\n"
     assert (fx["plan"] / "PLAN.html").read_text() == "<html>done</html>\n"
+
+
+def test_a_dirty_path_the_range_does_touch_still_blocks(fx, ci):
+    _arm(fx)
+    _dirty_record(fx)
+    (fx["root"] / "shared.txt").write_text("my edit\n")
+    main_side(fx, "shared.txt", "their edit\n")          # origin changes the same file
+    out = finish.finish(fx["plan"], timeout_s=0)
+    co = out["checkout"]
+    assert co["status"] == "blocked" and co["restored"] == []
+    assert {(b["path"], b["why"]) for b in co["blocking"]} == {("shared.txt", "outside-record")}
+    assert co["command"] == (f"git -C {co['owner']} fetch origin && "
+                             f"git -C {co['owner']} merge --ff-only origin/main")
+    assert (fx["root"] / "shared.txt").read_text() == "my edit\n"
     assert out["action"] == "finished"            # a blocked checkout is a report
 
 
@@ -179,8 +195,7 @@ def test_another_plans_row_and_folder_are_never_staged_and_block(fx, ci):
     co = out["checkout"]
     assert co["status"] == "blocked"
     assert {(b["path"], b["why"], b["plan"]) for b in co["blocking"]} == {
-        ("_plans/other/PLAN.html", "other-plan", "other"),
-        ("_plans_index.md", "other-plan", "other")}
+        ("_plans_index.md", "other-plan", "other")}   # the other plan's folder is not in the range
     assert (other / "PLAN.html").read_text() == "<html>other, mid-run</html>\n"
 
 
@@ -424,7 +439,7 @@ def test_report_only_writes_nothing_then_apply_performs_it(fx, ci):
     out = finish.finish(fx["plan"], timeout_s=0)
     assert out["mode"] == "report-only" and out["action"] == "finished"
     assert out["record"]["status"] == "would-push"
-    assert out["checkout"]["status"] == "would-fast-forward" and out["checkout"]["restored"] == []
+    assert out["checkout"]["status"] == "up-to-date" and out["checkout"]["restored"] == []  # nothing pushed yet
     assert (origin_main(fx), local_main(fx), _status(fx)) == (before, local, status)
     st = _state(fx)
     assert st["mode"] == "report-only" and st["reported_at"] and st["finished_at"]
@@ -507,7 +522,7 @@ def test_a_killed_report_only_run_never_blocks_the_steps_of_an_apply_run(fx, ci,
 def ci_stub(ci):
     calls, verdicts = ci
 
-    def stub(root, sha, *, branch, timeout_s, gh="gh", base_sha=None):
+    def stub(root, sha, *, branch, timeout_s, gh="gh", base_sha=None, carried=False):
         calls.append(sha)
         return {"verdict": "green", "match": "exact", "run_id": 1, "run_sha": sha,
                 "failed_checks": [], "followed_runs": [], "inherited": None, "reason": None}
@@ -582,7 +597,7 @@ def _old_amend_gitignore(project_root):
 @pytest.mark.parametrize("head,extra,status", [
     (b"__pycache__/\n\n", "", "fast-forwarded"),             # a blank-line end
     (b"__pycache__/\r\n*.log  \r\n", "", "fast-forwarded"),   # CRLF, trailing spaces
-    (b"__pycache__/\n", "", "fast-forwarded"),                # 5 old lines vs origin's 7
+    (b"__pycache__/\n", "", "fast-forwarded"),                # 5 old lines vs origin's 8
     (b"__pycache__/\n", "mine.txt\n", "blocked"),             # anything else still blocks
 ])
 def test_an_old_plan_builder_gitignore_amendment_is_restored(tmp_path, ci, head, extra, status):
@@ -596,7 +611,7 @@ def test_an_old_plan_builder_gitignore_amendment_is_restored(tmp_path, ci, head,
     _arm(fx)
     _dirty_record(fx)
     out = finish.finish(fx["plan"], timeout_s=0)
-    assert ".gitignore" in out["record"]["paths"]     # origin gets all 7 lines
+    assert ".gitignore" in out["record"]["paths"]     # origin gets all 8 lines
     co = out["checkout"]
     assert co["status"] == status, out["brief"]
     if status == "fast-forwarded":
@@ -621,7 +636,7 @@ def test_a_real_land_then_finish_hands_ci_the_landed_base(fx, ci):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     assert run_cli("land", fx["plan"])[1]["action"] == "land-awaits-review"
-    assert run_cli("land-ack", fx["plan"], "--note", "ok")[1]["action"] == "land-acked"
+    assert ack_only(fx["plan"], "ok")[1]["action"] == "land-acked"
     rc, out = run_cli("land", fx["plan"])
     assert (rc, out["action"]) == (0, "landed"), out
     landed = lst.load(fx["plan"])
@@ -629,6 +644,24 @@ def test_a_real_land_then_finish_hands_ci_the_landed_base(fx, ci):
     assert out["action"] == "finished", out["brief"]
     assert ci[0][-1]["base_sha"] == landed["landed_base"] and landed["landed_base"]
     assert ci[0][-1]["sha"] == landed["landed_sha"]
+
+
+@pytest.mark.parametrize("carried_gates, flag", [(["ci-check"], ["ci-check"]), ([], []),
+                                                 ([], [])], ids=["non-review", "none", "review-only"])
+def test_ci_is_told_when_the_land_carried_a_gate_on_the_first_check_and_every_later_one(
+        fx, ci, carried_gates, flag):
+    """GAT-01: the first check and a later `--no-wait` re-poll both read the land record."""
+    _landed(fx)
+    ctx = lst.context(fx["plan"])
+    lst.save(fx["plan"], ctx, {**lst.load(fx["plan"]), "carried_gates": carried_gates or ["review"],
+                            "ci_only_gates": carried_gates})   # a copied review pass is no CI-only gate
+    ci[1].append("pending")
+    assert finish.finish(fx["plan"], timeout_s=0)["ci"]["verdict"] == "pending"
+    finish.finish(fx["plan"], timeout_s=0)             # the re-poll of a pending verdict
+    assert [c["carried"] for c in ci[0]] == [flag, flag]
+    ev = [json.loads(ln) for ln in (fx["plan"] / "run.ndjson").read_text().splitlines()]
+    ev = [e for e in ev if e["event"] == "plan_finish_ci"]
+    assert ev and all(e["carried"] == flag and e["exact_only"] is bool(flag) for e in ev)
 
 
 # --------------------------------------------------------------------- FIN-09

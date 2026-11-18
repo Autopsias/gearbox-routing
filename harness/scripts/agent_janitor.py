@@ -74,6 +74,7 @@ from datetime import datetime, timezone
 
 UID = os.getuid()
 from janitor_paths import _is_unsafe, _resolved_inside, owner_only_slugs  # noqa: E402,F401
+from janitor_codex_broker import BROKER_RE, classify_broker  # noqa: E402
 HOME = os.path.expanduser("~")
 
 SCRATCHPAD_BASE = f"/private/tmp/claude-{UID}"
@@ -162,6 +163,7 @@ PATTERNS = (
                 "rsync", "git", "uv"}),
      _SCRATCHPAD_PATH_RE),
     ("codex-exec", frozenset({"codex"}), re.compile(r"(?:^|\s)exec(?:\s|$)")),
+    ("codex-broker", frozenset({"node"}), BROKER_RE),
 )
 
 
@@ -573,7 +575,10 @@ class Candidate:
 def classify(proc: Proc, pattern: str, now: float):
     """-> Candidate, or None if too young / not yet worth reporting."""
     root = session_ref(proc.command)
-    if root is None:
+    if pattern == "codex-broker":
+        cls, reason = classify_broker(proc.command)
+        threshold = AGE_DEAD_SESSION_S if cls == "dead-session" else AGE_BARE_S
+    elif root is None:
         cls, reason, threshold = "bare", "no-session-evidence", AGE_BARE_S
     else:
         newest = newest_mtime(root)
@@ -962,7 +967,10 @@ def _reap_under_lock(args, hashval, lock, out, procs, scoped_dir):
                       "refusing to --apply", file=sys.stderr)
                 return 2
             live = ps_snapshot()
-            planned = sum(len(_tree_pids(c.proc.pid, live)) for c in killable)
+            # A broker counts once: its tree is its MCP servers (up to 134 seen), and
+            # a gone --cwd already proves it dead, unlike a crashed-supervisor burst.
+            planned = sum(1 if c.pattern == "codex-broker" else len(_tree_pids(c.proc.pid, live))
+                          for c in killable)
             if planned > MAX_KILLS:
                 log("ERROR", "refused-max-kills", planned=planned,
                     max=MAX_KILLS, hash=hashval)

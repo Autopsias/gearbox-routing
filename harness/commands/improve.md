@@ -62,7 +62,7 @@ Before launching any agents, ask the user:
 
 **Options (AskUserQuestion):**
 - **Historical + current conversation** — Full scan: history from recent sessions, prior /improve audit, plus current conversation analysis
-- **Current conversation only** — Analyze only this session's patterns and feedback
+- **Current conversation only** — Analyze only this session's patterns and feedback (the one exception: the 'Standing default' check below reads the local question counter, which counts past questions; it adds no history analysis)
 
 Store the answer as the `scope` for the rest of the skill.
 
@@ -95,7 +95,7 @@ History Scan Agent prompt (background, cross-session feedback extraction) and th
 Prior-Improve Cross-Check Agent prompt (audits whether prior `/improve` runs' accepted
 changes actually landed). Launch both per that file, in parallel with Discovery.
 
-Full scope also runs the 'Question-class check' in that file: it proposes a 'Standing default' finding for a class of question you answer the same way almost every time.
+The 'Question-class check' in that file runs in every scope, not only full: read `~/.gearbox-state/improve/standing-default-classes.json` (written weekly by `scripts/weekly_numbers.py`) and present each class in it as a 'Standing default' finding, following steps 2 to 7 of that check. If the file is missing or older than 14 days, say so in one line and skip it. Only a full-scope run re-runs the counter itself.
 
 ## Phase 3: Current Conversation Analysis (Foreground)
 
@@ -160,33 +160,54 @@ Then read each config file from the config map.
 
 For each existing rule in config files, check if the current conversation shows it being violated.
 
-**First, for every violated rule, ask: can the thing that makes the mistake possible be
-removed or restructured** — a stale file, an unpinned default, a shell option? If yes,
-propose **"Remove the cause"** with the exact change (the file to delete, the default to
-pin, the option to drop), and stop there for that rule: do not also propose strengthening
-it or converting it to a hook. The two branches below, and the "generate the complete
-implementation" hook instructions, run **only when removal is not possible** for that
-rule:
+**One order for every finding, new or repeated, whose mistake has a shape** (a command, a
+path, a file, a setting). A new gap with no rule yet follows it too; a rule that was
+violated is only the common case. Offer the first that is possible and say in the finding
+why each earlier one is not:
 
-- If the rule was violated once: suggest strengthening (emphasis, position, examples) — not removal
-- If the rule shows a pattern of repeated violation (across sessions in full scope, OR multiple times within the current conversation in current-only scope): suggest **converting to a hook** instead — hooks are deterministic enforcement, while CLAUDE.md instructions are probabilistic (~80% compliance)
+1. **Remove the cause** (ledger `layer: shape`). Can the thing that makes the mistake
+   possible be removed or restructured: a stale file, an unpinned default, a shell option?
+   Propose the exact change (the file to delete, the default to pin, the option to drop).
+2. **Add a row to `hooks/command_rules.json`** (ledger `layer: check`). When the mistake is a
+   command or path a pattern can match, propose one row: `pattern`, `fix` (the text the
+   agent reads when refused), `gap` (the ledger key) and `date`, plus a plant-and-allow test
+   line: one command that must be refused and one near miss that must pass. Read the rows
+   already in the table first; extend a row before you add a near-duplicate.
+3. **Text** (ledger `layer: text`). A rule in CLAUDE.md, a skill or a memory note. Only when
+   steps 1 and 2 are impossible. Rules of judgement (how to write, when to ask) have no
+   shape and go straight here.
 
-When suggesting "convert to hook" (removal not possible), **generate the complete implementation**:
+The recommended option is the first one that is possible. Do not also propose a later one
+for the same finding, except that a text rule may keep the reason for a row or removal.
 
-- Detect the right hook event based on rule type:
-  - `PreToolUse` with `Bash` matcher: for command gating rules
-  - `PreToolUse` with specific tool matcher: for tool-specific rules
-  - `PostToolUse`: for validation after tool execution
-  - `Notification`: for reminders and announcements
-- Generate the actual hook JSON config ready to paste into settings.json
-- Include the shell command/script that enforces the rule
-- Note: "This rule is currently advisory (~80% compliance as a CLAUDE.md instruction). As a hook, it becomes 100% deterministic."
+**A finding for a check or a rule lists the old occurrences.** Run `git grep -n` for the old
+pattern in named folders (never `grep -r` at a repo root) and list each hit. The same change
+removes them, or the finding says why one stays. A row that refuses a pattern the repo itself
+still uses fails on its own files.
 
-When presenting enforcement gap findings in Phase 5, offer four options:
-- "Remove the cause" — delete or restructure the thing that makes the mistake possible (the stale file, the unpinned default, the shell option), naming the exact change. Presented alone when removal is possible; the other options do not apply to that finding.
-- "Strengthen rule" — rewrite with NEVER/ALWAYS emphasis, move to top of file
-- "Convert to hook" — create a hook that enforces the rule deterministically. Include the generated JSON config in the finding. Follow up with a second AskUserQuestion: "Which scope should this hook be configured at?" with options: "Project (.claude/settings.json)", "Global (~/.claude/settings.json)", "Project local (.claude/settings.local.json)"
-- "Both" — strengthen the rule AND add a hook as backup enforcement
+For step 3 only, when the rule was violated once suggest strengthening (emphasis, position,
+examples); when it shows a pattern of repeated violation (across sessions in full scope, OR
+multiple times within the current conversation in current-only scope) say so in the finding:
+repeated violation of a text rule is the sign that steps 1 and 2 were not looked at hard
+enough. A settings-file hook (`PreToolUse`, `PostToolUse`) is a last resort for shapes the
+table cannot match (for example a tool other than Bash); generate its complete JSON config
+and ask the scope question below.
+
+When presenting enforcement gap findings in Phase 5, offer these options, in this order:
+- "Remove the cause" - the exact change. Presented alone when removal is possible; the other options do not apply to that finding.
+- "Add a command-rules row" - include the row JSON and the plant-and-allow line in the finding.
+  A new row starts with `"mode": "observe"`: it logs each command it would have refused to
+  `~/.gearbox-state/command-rules-hits.ndjson` and blocks nothing. For each observe row, read the raw NDJSON
+  (the `rule` key is the row's `gap`; the cap drops the oldest half silently, so a missing old hit is
+  not proof of none) and list its hits beside the row's `date`; propose `enforce` when every hit was a real fault, removal when any hit was
+  false. Zero hits since the `date` is never a reason to promote: keep observing, check the
+  keyword is in the settings.json fast path, or remove the row. Observe mode does not make a slow pattern safe: the hook runs every pattern on every
+  keyword command with a 15 s timeout and `onFailure: block`. A new row also needs its keyword
+  added to the `grep -qF` fast path in the `command-rules` entry of `settings.json`, or it never
+  runs and its observe log reads zero.
+- "Write the rule" - text, with NEVER/ALWAYS emphasis at the top of its file.
+- "Strengthen rule" - for an existing text rule violated once.
+- "Settings hook" - only for a shape the table cannot match. Follow up with a second AskUserQuestion: "Which scope should this hook be configured at?" with options: "Project (.claude/settings.json)", "Global (~/.claude/settings.json)", "Project local (.claude/settings.local.json)"
 
 ### 4b: Progressive Evolution (Pattern Promotion) — full scope only
 
@@ -267,7 +288,7 @@ Assign a confidence level to every finding as a secondary axis:
 | **Medium** | 1-2 signals from current session, or pattern match without direct evidence |
 | **Low** | Speculative — inferred from config structure or best practices, no direct user signal |
 
-**Scope note:** In current-only scope, "recurrence across 2+ sessions" is unavailable. Session-based signals cap at Medium unless there's a direct user correction.
+**Scope note:** In current-only scope, "recurrence across 2+ sessions" is unavailable. Session-based signals cap at Medium unless there's a direct user correction. A 'Standing default' finding is the exception: it carries its own session count from the weekly file and keeps High.
 
 Confidence doesn't change priority order (Critical still beats Improvement regardless of confidence), but helps the user decide scrutiny level — high confidence findings can be accepted faster, low confidence ones deserve more thought.
 
@@ -356,16 +377,17 @@ buckets — Drifted, Re-surfaced — before Targeted).
 1. **Print every finding as a numbered list in the chat.** Each entry keeps these fields: "[Tier | Confidence] — [Source: current conversation / past session date] — [Description and proposed change]. Evidence: "[verbatim quote, or cited config excerpt `path:line`]". File: [full path]. Proposed: [what to add/modify/remove]". Mark each entry `[batch]` or `[own question]`. Decide it from the first option the finding lists (the one 'Apply all' would apply) BEFORE you count: an enforcement-gap finding whose first option is a 'Remove the cause' that deletes is `[own question]`. List `[own question]` findings last, under the heading 'Asked one by one'.
 2. **Ask ONE AskUserQuestion:** 'Apply all N (Recommended)' / 'Review one by one' / 'Apply none'. N counts the `[batch]` findings only. If N is 0, skip this question and ask each `[own question]` finding on its own. A free-text answer that names numbers ('all except 3 and 7') applies the rest of the batchable findings and treats the named ones as excluded.
 3. **What each answer does.**
-   - 'Apply all N': apply each batchable finding as its 'Proposed:' line says. For an enforcement-gap finding that is the first option the finding lists ('Remove the cause' when removal is possible, else 'Strengthen rule'). 'Modify' is never part of 'Apply all'. Then ask each exception finding on its own, one question each (Accept / Reject / Modify), in presentation order.
+   - 'Apply all N': apply each batchable finding as its 'Proposed:' line says. For an enforcement-gap finding that is the first option the finding lists (the first of the 4a order that is possible). 'Modify' is never part of 'Apply all'. Then ask each exception finding on its own, one question each (Accept / Reject / Modify), in presentation order.
    - 'Review one by one': ask every finding, exceptions included, with Accept / Reject / Modify. If 8+ findings, after presenting 5, ask: "Continue with remaining findings, or apply what we have so far?"
    - 'Apply none': apply nothing from the whole list, exceptions included, and ask nothing more. Say in the run summary 'T findings declined as a set (B batch, E own question)'.
-4. **Keeps its own question.** Write this as one short block under the list. A finding keeps its own question when its edit (a) removes, demotes or moves existing text or a file out of where it lives: a deleted file or memory, a deleted or demoted rule, a Content Misplacement move, a 'Remove the cause' that deletes; or (b) changes a hook, a permission or a deny entry in any settings file, including 'Convert to hook' and 'Both' (their scope follow-up question stays); or (c) is a 'Remove the cause' candidate from a memory note (the grammar is in `evidence-ledger.md`, "The candidate line"): it always keeps its own question, so 'Apply all' never decides one; or (d) is a 'Standing default' finding: its question names the default text and the target file, and its first option starts with 'Apply this default (Recommended)'. An exception is applied only after its own yes; 'Apply none' declines it with the set.
+4. **Keeps its own question.** Write this as one short block under the list. A finding keeps its own question when its edit (a) removes, demotes or moves existing text or a file out of where it lives: a deleted file or memory, a deleted or demoted rule, a Content Misplacement move, a 'Remove the cause' that deletes; or (b) adds a row to `hooks/command_rules.json`, or changes a hook, a permission or a deny entry in any settings file, including 'Settings hook' (their scope follow-up question stays); or (c) is a 'Remove the cause' candidate from a memory note (the grammar is in `evidence-ledger.md`, "The candidate line"): it always keeps its own question, so 'Apply all' never decides one; or (d) is a 'Standing default' finding: its question names the default text and the target file, and its first option starts with 'Apply this default (Recommended)'. An exception is applied only after its own yes; 'Apply none' declines it with the set.
    A candidate question: yes starts a session with the change as its brief (or prints the brief as a /plan-builder request where no session tool exists) and changes the line to `(open, started <date>: <name>)`; the brief tells that session to close the line as `(closed <date>: built <commit or plan>)` when its work merges. No closes the line as `(closed <date>: declined)` and records the normal rejection. 'Apply none', a skipped question or an ended run changes nothing, so the line waits for the next full-scope run.
 5. **`/improve audit` never offers 'Apply all'.** Each audit deletion, demotion and correction keeps its own question (see `relevance-audit.md`).
 
 **Order (current-only scope; full scope's order is in the reference file above):**
 1. Targeted (from /improve args)
 2. Critical → Promotion → Content Misplacement → Improvement → Technique → Maintenance → Reinforcement → New Skill → User Coaching
+3. 'Standing default' findings from the weekly file (Improvement tier), after the rest
 
 ## Phase 6: Apply Changes
 

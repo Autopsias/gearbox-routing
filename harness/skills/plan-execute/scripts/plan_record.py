@@ -24,7 +24,7 @@ import finish_repair as frp
 import plan_scope as ps
 import worktree as wt
 
-RUNTIME_LOCAL = ("LAND_NOTICE.txt", "_worktrees/")
+RUNTIME_LOCAL = ("LAND_NOTICE.txt", "_worktrees/", ".land-run.lock")
 PLANS_DIR = ps.PLANS_DIR              # ONE definition, in plan_scope
 GIT_TIMEOUT = 900
 
@@ -131,7 +131,8 @@ def _record_plan(target, plan_dir, message=None):
 def _keep_runtime_local(target, dest, pathspec):
     """Put every ``RUNTIME_LOCAL`` path in the copy back to ``target``'s ``HEAD``.
 
-    R4 / finish-contract decision (a): ``LAND_NOTICE.txt`` and ``_worktrees/`` are
+    R4 / finish-contract decision (a): ``LAND_NOTICE.txt``, ``_worktrees/`` and
+    ``.land-run.lock`` (s07) are
     local runtime, kept out of every record BY NAME. A ``.gitignore`` line is not
     enough: ``_drop_ignored`` asks the land worktree, built from origin's tree,
     which may lack it. ``rmtree`` + ``copytree`` would stage a delete, a change or

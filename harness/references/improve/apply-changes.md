@@ -80,11 +80,18 @@ a recipe there when you add one here.
 
 ## Feedback-type findings
 
-A feedback finding is applied to its target file **and** saved as a memory file:
+A feedback finding is applied to its target file by the layer the finding chose (tool fix,
+`hooks/command_rules.json` row, or text). It is also saved as a memory file, but the note
+records **the reason for the incident only**. The note is never the enforcement: when a
+tool fix or a check was applied, the note says what was applied and where, and states no
+rule of its own.
 
 - File: `feedback_[topic].md` in the project's memory directory.
 - Frontmatter: name, description, `type: feedback`.
-- Content: the rule + **Why:** + **How to apply:**.
+- Content: **Why:** (the incident) + **Applied:** (the change and its layer). Add **How to
+  apply:** only when the layer is text.
+- A check row added to `hooks/command_rules.json` also removes the old occurrences the
+  finding listed, in the same change.
 
 Update the MEMORY.md index whenever a new memory file is created, by any recipe here.
 

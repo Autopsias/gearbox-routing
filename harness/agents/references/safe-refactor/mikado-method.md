@@ -1,4 +1,4 @@
-**MIKADO GIT GUARD: If `git_mode == "lightweight"`, do NOT use `git stash push/pop/drop` in this phase. Instead: make the change directly, verify with `bash -n`, and continue. If verification fails, restore from `{file}.bak` and try a different grouping.**
+**MIKADO GIT GUARD: If `git_mode == "lightweight"`, make no git commits or resets in this phase. Instead: make the change directly, verify with `bash -n`, and continue. If verification fails, restore from `{file}.bak` and try a different grouping.**
 
 ---
 
@@ -9,13 +9,13 @@
 **For each logical grouping (CRUD, validation, utils, etc.):**
 
 ```
-1. git stash push -m "mikado-{function_name}-$(date +%s)"
+1. Start from a clean tree on the temp branch (the last checkpoint commit)
 2. Create new module file
 3. COPY (don't move) functions to new module
 4. Update facade to import from new module
 5. Run tests
-6. If PASS: git stash drop, continue
-7. If FAIL: git stash pop, note prerequisite, try different grouping
+6. If PASS: git add -A && git commit -m "mikado: {function_name}", continue
+7. If FAIL: git reset --hard HEAD, delete the module file this step created, note prerequisite, try different grouping
 ```
 
 **Example Python migration:**
@@ -66,11 +66,11 @@ grep -r "from services.user._legacy import" tests/
 ```
 
 **For each test file needing updates:**
-1. `git stash push -m "test-import-{filename}"`
+1. Start from a clean tree on the temp branch
 2. Update import to use facade path
 3. Run that specific test file
-4. If PASS: `git stash drop`
-5. If FAIL: `git stash pop`, investigate
+4. If PASS: `git commit -am "mikado: test import {filename}"`
+5. If FAIL: `git reset --hard HEAD`, investigate
 
 ## PHASE 4: Cleanup
 

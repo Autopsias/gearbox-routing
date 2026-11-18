@@ -274,7 +274,8 @@ def _split_cluster(arg):
             if value.startswith("="):
                 value = value[1:]  # argparse strips exactly one attached `=`
             if value:
-                out.append(value)
+                # a value is no option: `-r=-n` must not read as `-n` (same rule as hooks/governor_parse.py)
+                out.append(" " + value if value[0] == "-" else value)
             break
     return out
 

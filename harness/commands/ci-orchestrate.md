@@ -1,7 +1,7 @@
 ---
 description: "Analyzes CI/CD pipeline failures, categorizes issues (lint, type, test, build), and dispatches parallel specialist agents to fix them. Use when you say 'fix CI', 'CI is failing', 'pipeline broken', 'fix GitHub Actions'."
 argument-hint: "[issue] [--fix-all] [--strategic] [--research] [--docs] [--force-escalate] [--check-actions] [--quality-gates] [--performance] [--intent=<block>] [--only-stage=<stage>] [--fix-single-category]"
-allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "WebSearch", "WebFetch", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "Skill", "WebSearch", "WebFetch", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
 ## TASKLIST INTEGRATION (MANDATORY)
@@ -73,7 +73,7 @@ fi
 **STEP 0.1.5: Execute Targeted Stage (if --only-stage specified)**
 If `TARGET_STAGE != "all"`: detect CI platform from workflow files, check for `skip_to_stage` input support, trigger via `gh workflow run` with `-f skip_to_stage="$TARGET_STAGE"`, then exit.
 
-`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
+For unattended runs use `/loop` or `/epic-dev --auto`.
 
 **STEP 0.2: Check for Auto-Escalation**
 
@@ -114,21 +114,16 @@ A post-run `grep -c '\[intent-into-review\] intent_block=present'` proves the pa
 **STEP 2: CI Failure Analysis**
 Use read-only diagnostic tools: check GitHub Actions status, examine recent CI results, identify failing gates, categorize failures.
 
-**STEP 3: Discover Project Context (SHARED CACHE)**
+**STEP 3: Discover Project Context (once)**
 
 ```bash
-if [[ -f "$HOME/.claude/scripts/shared-discovery.sh" ]]; then
-    source "$HOME/.claude/scripts/shared-discovery.sh"
-    discover_project_context
-else
-    PROJECT_CONTEXT=""
-    [ -f "CLAUDE.md" ] && PROJECT_CONTEXT="Read CLAUDE.md for project conventions. "
-    [ -d ".claude/rules" ] && PROJECT_CONTEXT+="Check .claude/rules/ for patterns. "
-    PROJECT_TYPE=""
-    [ -f "pyproject.toml" ] && PROJECT_TYPE="python"
-    [ -f "package.json" ] && PROJECT_TYPE="${PROJECT_TYPE:+$PROJECT_TYPE+}node"
-    SHARED_CONTEXT="$PROJECT_CONTEXT"
-fi
+PROJECT_CONTEXT=""
+[ -f "CLAUDE.md" ] && PROJECT_CONTEXT="Read CLAUDE.md for project conventions. "
+[ -d ".claude/rules" ] && PROJECT_CONTEXT+="Check .claude/rules/ for patterns. "
+PROJECT_TYPE=""
+[ -f "pyproject.toml" ] && PROJECT_TYPE="python"
+[ -f "package.json" ] && PROJECT_TYPE="${PROJECT_TYPE:+$PROJECT_TYPE+}node"
+SHARED_CONTEXT="$PROJECT_CONTEXT"
 ```
 
 Pass `$SHARED_CONTEXT` to ALL agent prompts instead of each agent discovering independently.

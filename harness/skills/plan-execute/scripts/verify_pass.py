@@ -105,12 +105,16 @@ def run_argv(plan_dir, session_id, g, dry_run):
     if dry_run:
         return {"returncode": 0, "stdout": "(dry-run pass)", "stderr": ""}
     import gate_timing as gt
+    import land_env as lev
     import locked_checks as lc
     import plan_scope as pscope
     import review_context as rvs
     import ship_state_io as ssio
 
     cwd = pscope.gate_cwd(plan_dir, session_id, g)
+    problem = lev.gate_problem(cwd, g["argv"])
+    if problem:   # returncode None = indeterminate: never charged as a rework
+        return {"returncode": None, "stdout": "", "stderr": problem}
     env = {**rvs.declared_env(g, plan_dir, session_id, cwd), **lc.gate_env(plan_dir, session_id)}
     t0 = gt.now()
     res = ssio.run_deploy_argv(g["argv"], cwd=cwd, timeout=g.get("timeout", 1200),

@@ -31,6 +31,29 @@ and a guard cheap enough to run on every Bash call cannot also be a shell parser
 In short: this guard blocks known command shapes only. It is a best-effort safety
 net, not a security boundary, and a differently written command can get past it.
 
+FAIL CLOSED (GRD-01). The settings.json entry wraps this file in a shell fast path
+and sets "onFailure": "block". The shell reads stdin once; when the payload text,
+with quotes and backslashes removed, holds no `git` (case-insensitive) and the raw
+text holds no backslash-u (a JSON escape can spell a letter), it exits 0 and Python
+never starts. Otherwise it pipes the saved payload here. Exit 0 allows,
+exit 2 passes this guard's own refusal through, every other code (crash, missing
+python3, a hook timeout) refuses with one line saying the GUARD failed and that
+the same command can be tried again.
+Paths that still ALLOW: a missing guard file (as on every other hook entry), a
+payload that does not parse, a directory that is not a repository, and a
+`git status` that fails inside the guard.
+Timeouts: the hook timeout and this file's inner `git status` timeout are both
+10 s, so the hook timeout fires first and refuses.
+A missing python3 refuses every command with `git` in its text until python3 is
+back or the entry is removed by hand.
+RECOVERY if the guard refuses every git command: hooks act only on agent-session
+tool calls, so the owner reverts the commit in his own terminal and runs
+`gearbox deploy`. There is deliberately no switch that bypasses a wrapper
+failure: a switch an agent session can reach is a way around it. The
+GEARBOX_ALLOW_DIRTY_RESET switch below skips only this guard's dirty-tree check.
+Known limit of the fast path (accepted by the owner 2026-11-13): a git command hidden from the text (a variable, an
+alias, a script file, a backslash-newline split, ANSI-C quoting) passes it, as it passes the regex.
+
 Escape hatch, for when the discard is genuinely intended:
     GEARBOX_ALLOW_DIRTY_RESET=1 <command>
 

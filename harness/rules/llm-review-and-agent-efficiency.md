@@ -1,6 +1,6 @@
 # Efficiency Rules for LLM Reviews, Gates, and Dispatched Agents
 
-**PRIORITY: HIGH** — these prevent silent, expensive waste in any step that runs
+These rules prevent silent, expensive waste in any step that runs
 an LLM review, a verification gate, or a dispatched subagent. Invariants only;
 the measurements behind each one, and the concrete fixes they imply, live in
 `~/.claude/docs/reference_llm_review_efficiency.md` — read that when you are
@@ -31,9 +31,17 @@ in one or two commands; the failure is never measuring.
   your turn with no closeout and return it after you wake (a silent 660 s
   command survived this way). On the Workflow route it says the command "is
   terminated when you give your final response" — the member returns without
-  waking, so stay in your turn and wait with Monitor or short polls. Codex is
-  not tested. Otherwise run test suites in the orchestrator, or as a gate, and
+  waking, so stay in your turn and wait with Monitor and an until-loop
+  (`until <check>; do echo waiting; sleep 30; done`, which prints a line on each pass so the turn never goes 600 s with no output). Never write `sleep N` followed by a check:
+  Claude Code blocks it every time. Codex is not tested. Otherwise run test suites in the orchestrator, or as a gate, and
   keep gaps between tool calls short.
+- **The echo-per-pass loop is for a Workflow member only. In the main session,
+  NEVER arm a Monitor on a command already started with `run_in_background`**:
+  its completion notice is the one event you need. Every Monitor stdout line
+  wakes the session, so a main-session until-loop prints nothing per pass
+  (`until <check>; do sleep 30; done; <report>`). Measured: a 60 s "waiting"
+  echo woke one session ~8 times (example-project 2026-11-14) and another ~16 times
+  (Trader 2026-11-16), each answered with "Still running."
 - **Resume a stalled agent ONCE.** If the resume produces little or nothing,
   dispatch a FRESH agent with the on-disk state named in the prompt ("X and Y
   already exist; verify, do not rebuild"). Successive resumes degrade — measured
@@ -43,6 +51,10 @@ in one or two commands; the failure is never measuring.
   mechanism is a claim about that mechanism, and the same rule applies as to any
   other claim: verify it before handing it to an agent or the user. Telling two
   agents to "run the tests in the foreground" is what killed them.
+- **NEVER put `&` inside a command that you already start with `run_in_background`.** The
+  wrapper exits, the inner job dies, and no log appears. Run the real command as the
+  background command. Before you arm a Monitor on a log, check that the log exists: an
+  `until` loop on a file that was never created never ends.
 
 Cost reporting itself is a Behavior rule, not repeated here: see the
 "repeated step's cost visibly compounds" bullet in `~/.claude/CLAUDE.md`.

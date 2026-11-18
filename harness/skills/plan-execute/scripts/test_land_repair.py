@@ -28,6 +28,7 @@ import land_state as lst  # noqa: E402
 import manifest_io as mio  # noqa: E402
 import plan_mutate as pm  # noqa: E402
 import plan_scope as ps  # noqa: E402
+from _land_fixture import ack_only, record_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, main_side, origin_main,  # noqa: E402
                            run_cli, work)
 from worktree import git  # noqa: E402
@@ -198,7 +199,7 @@ def test_add_session_then_begin_then_a_fixed_tree_lands(fx, via):
     rc, out = _land(iso)
     assert out["action"] == "land-awaits-review", out
     assert "Repair round 1: ci-gate " in out["brief"] and " s on the base" in out["brief"]
-    assert run_cli("land-ack", plan_dir, "--note", "repaired")[1]["action"] == "land-acked"
+    assert ack_only(plan_dir, "repaired")[1]["action"] == "land-acked"
     rc, out = _land(iso)
     assert (rc, out["action"]) == (0, "landed"), out
 
@@ -279,7 +280,7 @@ def test_a_mixed_red_parks_as_before(fx, other):
     rc, out = _land(iso)
     if other == "skill":
         assert out["action"] == "invoke-skill" and out["gate"] == "other-gate", out
-        run_cli("land-record", iso["plan_dir"], "--gate", "other-gate", "--status", "failed")
+        record_only(iso["plan_dir"], "other-gate", "failed")
         rc, out = _land(iso)
     assert (rc, out["action"], out["kind"]) == (1, "land-parked", "gate-failed"), out
     assert "ci-gate" in out["failed"]
@@ -372,10 +373,12 @@ def test_a_flaky_test_the_plan_touched_holds_the_land_until_the_plan_changes_it(
     assert _state(iso)["plan_touched_flakes"]["ci-gate: tests/t.py::test_flaky"]["file"] == "tests/t.py"
     # Unchanged candidate, then a plan commit elsewhere: the gate is green (run,
     # then cached), and land still refuses, naming the test, with no re-run advice.
-    for change in (None, None, "src/other.py"):
+    for i, change in enumerate((None, None, "src/other.py")):
         if change:
             work(iso["tree"], change, "X = 1\n")
-        rc, out = _land(iso)
+        # The 3rd run on one head after two reds needs a cost line (land_cost); a commit resets it.
+        extra = ["--cost-report", "test: re-run of an unchanged head on purpose"] if i == 1 else []
+        rc, out = run_cli("land", iso["plan_dir"], *extra)
         assert (rc, out["kind"]) == (1, "gate-flaky"), out
         assert all(g["outcome"] == "pass" for g in _state(iso)["gates"])
         assert "tests/t.py::test_flaky" in out["brief"] and "run.py land" not in out["brief"]
@@ -639,8 +642,7 @@ def test_a_held_failure_before_a_skill_round_trip_keeps_its_hold(tmp_path):
     def skill_round_trip():
         rc, out = _land(iso)
         assert out["action"] == "invoke-skill", out
-        assert run_cli("land-record", iso["plan_dir"], "--gate", "z-skill",
-                       "--status", "passed")[0] == 0
+        assert record_only(iso["plan_dir"], "z-skill", "passed")[0] == 0
     skill_round_trip()                         # run 1 red, then the skill verdict
     assert _land(iso)[1]["kind"] == "gate-flaky"   # run 2 red, re-run 3 green: held
     work(iso["tree"], "tests/t.py", "def test_flaky():\n    assert 1\n", msg="try a fix")

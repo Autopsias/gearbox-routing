@@ -18,7 +18,9 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import plan_mutate as pm  # noqa: E402
-from _land_fixture import build_repo, isolate, main_side, run_cli, work  # noqa: E402
+import pytest  # noqa: E402
+from _land_fixture import record_only  # noqa: E402
+from _land_fixture import build_repo, isolate, main_side, work  # noqa: E402
 from test_land_repair import _flaky, _gate, _land, _seq, _state  # noqa: E402
 from worktree import git  # noqa: E402
 
@@ -39,8 +41,7 @@ def test_a_first_failure_before_a_skill_round_trip_is_held(tmp_path):
     work(iso["tree"], "tests/t.py", "def test_a():\n    pass\n")
     rc, out = _land(iso)                       # run 1 red, then the skill asks
     assert out["action"] == "invoke-skill", out
-    assert run_cli("land-record", iso["plan_dir"], "--gate", "z-skill",
-                   "--status", "passed")[0] == 0
+    assert record_only(iso["plan_dir"], "z-skill", "passed")[0] == 0
     rc, out = _land(iso)                       # run 2 green: nothing changed since run 1
     assert (rc, out.get("kind")) == (1, "gate-flaky"), out
     assert out["tests"] == ["tests/t.py::test_a"] and "run.py land" not in out["brief"], out
@@ -89,6 +90,22 @@ def test_the_fast_forward_alone_leaves_a_round_gone_green_flaky(tmp_path):
     assert "Nothing is left for it to repair" not in out["brief"], out
     assert "tests/t.py::test_a failed, then passed: flaky" in out["brief"], out
     assert "tests/t.py::test_a" in _state(iso)["red_then_green"]
+
+
+def test_a_review_that_passes_after_the_owner_accepts_its_findings_lands(tmp_path):
+    """2026-11-18: an accepted finding is the review's new input, not a flake. The
+    accept file sits in the plan record, which the tree check skips."""
+    accept = tmp_path / "proj" / "_plans" / "plan-a" / "_verify_state" / "land.accepted.json"
+    gate = _gate(tmp_path, f'if [ ! -f {accept} ]; then {WHOLE}; fi',
+                 env_allowlist=["PLAN_EXECUTE_REVIEW_EXCLUDE"])
+    fx = build_repo(tmp_path, gates={"review-gate": gate}, built=True)
+    iso = isolate(fx, "plan-a")
+    work(iso["tree"], "src/f.py", "F = 1\n")
+    assert _land(iso)[1]["kind"] == "gate-inherited"
+    accept.parent.mkdir(exist_ok=True)
+    accept.write_text('{"accepted": []}\n')
+    rc, out = _land(iso)
+    assert out["action"] == "land-awaits-review", out
 
 
 def test_an_unrelated_default_branch_commit_keeps_a_whole_gate_hold(tmp_path):
@@ -231,3 +248,49 @@ def test_a_hold_anchors_to_the_gate_relative_path_when_both_are_changed(monkeypa
         st = {"land_path": "/land", "expected": "e", "plan_head": "h1"}
         lfk.hold(st, "gate-b", [("tests/t.py::test_x", "tests/t.py")], cwd=f"/land/{pkg}")
         assert st["plan_touched_flakes"]["gate-b: tests/t.py::test_x"]["file"] == "tests/t.py"
+
+
+# LND-14 (land_load.py): a failing gate that declares `rerun_tests` re-runs only its
+# failing ids, alone. The re-run logs each call to rerun.txt and answers per `then`.
+LOADED = ('if [ -f BROKEN ]; then echo "FAILED tests/t.py::test_a[load 1] - slow"; '
+          'echo "1 failed, 3 passed in 1.0s"; exit 1; fi')
+ALONE = {"pass": 'echo "1 passed in 0.1s"; exit 0',
+         "fail": 'echo "FAILED $1 - slow"; echo "1 failed in 0.1s"; exit 1',
+         "queue": 'echo "govrun: queue timeout, not a test failure" >&2; exit 75'}
+
+
+@pytest.mark.parametrize("then,touched,want", [
+    ("pass", False, "land-awaits-review"),   # every id passes alone: green, with a note
+    ("fail", False, "land-repair"),          # fails again alone: red exactly as today
+    ("queue", False, "gate-indeterminate"),  # govrun queue timeout: undecided, not a pass
+    ("pass", True, "land-repair"),           # a file the plan changed: held, no re-run
+])
+def test_a_failing_gate_re_runs_only_its_failing_tests_alone(tmp_path, monkeypatch,
+                                                             then, touched, want):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    led = tmp_path / ".gearbox-state" / "land" / "load-flaky.ndjson"
+    led.parent.mkdir(parents=True)
+    led.write_text(json.dumps({"test": "tests/t.py::test_a[load 1]"}) + "\n")
+    rerun = {"timeout": 60, "argv": ["/bin/sh", "-c", f'echo "$@" >> {tmp_path}/rerun.txt; '
+                                     f'echo "govrun: acquired shared after 3s" >&2; {ALONE[then]}',
+                                     "rerun"]}
+    fx = build_repo(tmp_path, gates={"ci-gate": _gate(tmp_path, LOADED, rerun_tests=rerun)},
+                    built=True)
+    iso = isolate(fx, "plan-a")
+    work(iso["tree"], "BROKEN", "x\n")
+    if touched:
+        work(iso["tree"], "tests/t.py", "def test_a():\n    pass\n")
+    rc, out = _land(iso)
+    assert want in (out.get("action"), out.get("kind")), out
+    runs = (tmp_path / "rerun.txt").read_text().splitlines() if (tmp_path / "rerun.txt").exists() else []
+    assert runs == ([] if touched else ["tests/t.py::test_a[load 1]"]), runs
+    said = json.dumps(out)
+    if then == "pass" and not touched:
+        assert "passed alone" in out["brief"] and "waited 3 s" in out["brief"], out["brief"]
+        assert "the ledger saw it 1 time(s) before, so make it a fix task" in out["brief"]
+        assert len(led.read_text().splitlines()) == 2
+        assert _state(iso)["gates"][0]["load_flaky"], _state(iso)["gates"]
+    else:
+        assert len(led.read_text().splitlines()) == 1     # nothing load-flaky was logged
+        assert {"fail": "still red", "queue": "Undecided, never a pass"}.get(
+            then, "a failing test is in a file this plan changed") in said, said

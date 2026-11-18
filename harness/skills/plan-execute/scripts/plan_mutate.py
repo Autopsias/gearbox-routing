@@ -103,6 +103,7 @@ import dispatch as dsp  # noqa: E402
 import safe_json as sj  # noqa: E402
 import session_fields as sess_help  # noqa: E402
 import structural_gate as sg  # noqa: E402
+from status_pairs import log_status_change  # noqa: E402
 # Re-exported: callers and tests reach these as `pm.<name>`, and nothing
 # monkeypatches them. plan_journal never imports this file back.
 from plan_journal import (  # noqa: E402,F401
@@ -363,7 +364,7 @@ def build_generation(plan_dir, spec, *, touched_sessions, status_ops, log_entry)
             spec, plan_dir, prior_html, status_ops, validate_js=True, changelog=changelog
         ).encode("utf-8"),
         "spec.json": (json.dumps(spec, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
-        "manifest.json": json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8"),
+        "manifest.json": (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
     }
     for sid in sorted(set(touched_sessions)):
         s = by_id[sid]
@@ -570,6 +571,10 @@ def _run(plan_dir, spec_before, spec_after, *, op, session, summary, touched_ses
     targets.update(migrated)
 
     txn = commit(plan_dir, targets, {"op": op, "session": session})
+    before = ab.read_all_statuses(prior_html)
+    for aid, status, _ in status_ops:
+        log_status_change(plan_dir / "PLAN.html", aid, before.get(aid, "TODO"), status)
+        before[aid] = status
     return {
         "txn": txn,
         "op": op,

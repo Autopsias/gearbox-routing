@@ -23,6 +23,7 @@ Codex reads the same paths: its skill mirror copies `scripts/` and `references/`
 | Build or change a real page, app screen, HTML report or artifact | BUILD, then REVIEW |
 | Judge an existing page, a deployed site or screenshots | REVIEW |
 | Is this the right structure: the first review of an app, after a big feature, the owner says a page feels busy or wrong, a structural finding, or about once a quarter | DIRECTION, then BUILD and REVIEW |
+| A slide deck (Marp, PDF or PowerPoint) | REVIEW, read through the "Slide decks" section of `real-pages.md` |
 | A product mock-up, demo frame, faux UI, hero or loop animation | DEMO |
 | "Stageshow has an update", or the Monday notification | UPSTREAM |
 
@@ -42,7 +43,7 @@ allowed CDNs); this skill owns the craft and the review.
 ## REVIEW
 
 ```
-- [ ] 1. Frames: shoot.mjs, every changed page, 1366 and 390, real seeded state
+- [ ] 1. Frames: shoot.mjs, every changed page, 1366 and 390, real seeded state; then every route into the changed part (menu entry, next-step button, in-page link): click it and note where it lands
 - [ ] 2. Box fit: layout.mjs on each page at both widths
 - [ ] 3. Self-check: answer verify.md, as real-pages.md reads it, from the frames
 - [ ] 4. Two blind reviewers: a fresh Sonnet agent and Codex get the rules and the frames, nothing else
@@ -134,6 +135,17 @@ the pinned copy and report the update.
 
 ## Gotchas
 
+- **2026-11-16, your-workspace AI strategy deck.** One big number among three looked like emphasis to the
+  first reviewer (D-016, made larger) and like a mistake to the next fresh reader (D-042, made
+  equal again). Parallel numbers stay the same size; say in words which one matters. Text size
+  needs no argument either: your brand skill's layout check fails any text under 12px and any sentence
+  under 16px, so run it before the reviewers.
+- **2026-11-16, your-workspace AI strategy deck.** Three rounds of two reviewers argued by eye about
+  white text on orange, blue and green. One pixel measurement settled it (3.13, 3.91, 4.14),
+  and a check in the deck build now fails on it. Measure contrast in round 1, before the
+  reviewers. The reviewer also called the brand logo's overlapping letters a fault: check a
+  brand asset before you report it.
+
 - **2026-11-07, Kuzushi trial.** The blind reviewer was right on 12 of 15 claims. Three failed
   the frame check: it guessed a phone inset (12px called "cut tight"), called a quote bigger
   than the title, and read a sticky sidebar in a full-page shot as a seam. Step 5 exists for
@@ -174,3 +186,9 @@ the pinned copy and report the update.
 - **2026-11-08, first Kuzushi DIRECTION run.** Codex and Sonnet named the same structural
   problem on all three pages. Both also caught a brief error: it said "white belt" for a Home
   frame that showed a 2nd dan reader. Name the seeded state of each frame in the brief.
+- **2026-11-15, Kuzushi examination steps.** Two review rounds read crops of the changed
+  section with the sidebar cut off, and passed it. The owner then found that the menu entry
+  above it opened the form under the examination, and that no belt had a menu entry for its
+  examination. Before step 4, click every route into the changed part and measure where it
+  lands (pixels from the top, section open or closed), on both widths; give the reviewers one
+  frame with the navigation in it.

@@ -589,7 +589,8 @@ def test_a_finished_run_leaves_no_branch_worktree_or_lock_behind(tmp_path):
     common = Path(git(["rev-parse", "--path-format=absolute", "--git-common-dir"],
                       root, check=True)[1])
     locks = common / sl.REPO_LOCK_DIRNAME
-    assert not locks.exists() or list(locks.iterdir()) == [], list(locks.iterdir())
+    left = [p for p in locks.iterdir() if p.suffix != ".mutex"] if locks.exists() else []  # the flock sidecar stays
+    assert left == [], left
     for plan_dir in (a, b):
         assert not (Path(plan_dir) / ".lock").exists()
 

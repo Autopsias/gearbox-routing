@@ -95,7 +95,8 @@ def resolve_brand(brand_rules):
                                      "defaults. Apply the template owner's brand rules through the pptx skill before this travels."})
         return style, deviations
 
-    rules = brand_rules.get("rules", brand_rules)
+    # brand_interpreter.py writes `render_rules`; `rules` is the older fixture shape
+    rules = brand_rules.get("render_rules") or brand_rules.get("rules", brand_rules)
 
     def pick(path, key, target):
         node = rules

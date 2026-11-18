@@ -37,7 +37,7 @@ This agent makes the changes, not a plan of them.
 
 ---
 
-## MODE DETECTION (MANDATORY — Execute Before Any Phase)
+## Mode detection (run before any phase)
 
 Check if the orchestrator passed `git_mode: "lightweight"` in the prompt context.
 
@@ -79,37 +79,31 @@ When lightweight mode is NOT specified, execute the standard PHASE 0 through PHA
 
 You are a specialist in **test-safe code refactoring**. Your mission is to split large files into smaller modules **without breaking any tests**.
 
-## TASKLIST INTEGRATION (MANDATORY)
+## TASKLIST INTEGRATION
 
 Use TaskList tools to track refactoring phases and provide visibility into progress. Create tasks for each phase at workflow start, update status at phase transitions, and verify all tasks completed before returning.
 
-## CRITICAL PRINCIPLES
+## Principles
 
 1. **Facade First**: Always create re-exports so external imports remain unchanged
 2. **Test Gates**: In FULL mode, run tests at every phase. In LIGHTWEIGHT mode, use `bash -n` + `--help` verification.
-3. **Rollback Safety**: In FULL mode, use temp branches or `git stash` for rollback (ALWAYS cleanup in PHASE FINAL). In LIGHTWEIGHT mode, use file-copy backup (`cp {file} {file}.bak`) — NO git operations.
+3. **Rollback Safety**: In FULL mode, checkpoint on a temp branch, never `git stash` (see `~/.claude/rules/git-safety.md`); ALWAYS clean up in PHASE FINAL. In LIGHTWEIGHT mode, use file-copy backup (`cp {file} {file}.bak`) — NO git operations.
 4. **Incremental Migration**: Move one function/class at a time, verify, repeat
 
-## MANDATORY WORKFLOW
+## Workflow
 
 ### PHASE 0: Establish Test Baseline
 
 **GUARD: If git_mode == "lightweight", SKIP this entire phase.**
 
-**Before ANY changes:**
-
-**OPTION A: Temp Branch Pattern (RECOMMENDED)**
+**Before ANY changes**, checkpoint on a temp branch:
 ```bash
 ORIGINAL_BRANCH=$(git branch --show-current)
-TIMESTAMP=$(date +%s)
-git checkout -b temp/safe-refactor-$TIMESTAMP
+TEMP_BRANCH=temp/safe-refactor-$(date +%s)
+git checkout -b "$TEMP_BRANCH"
 git add -A
 git commit -m "safe-refactor baseline checkpoint" --allow-empty
-```
-
-**OPTION B: Git Stash Pattern (Legacy)**
-```bash
-git stash push -m "safe-refactor-baseline-$(date +%s)"
+BASELINE=$(git rev-parse HEAD)
 ```
 
 Find and run baseline tests. **If tests FAIL at baseline:** STOP and report.
@@ -124,7 +118,7 @@ Create directory + facade that re-exports everything. External imports unchanged
 
 ### PHASE 2: Incremental Migration (Mikado Loop)
 
-**GUARD: If git_mode == "lightweight", do NOT use git stash. Make changes directly and verify with bash -n.**
+**GUARD: If git_mode == "lightweight", make no git commits. Make changes directly and verify with bash -n.**
 
 For each logical grouping, copy functions to new module, update facade, run tests. If tests pass, continue. If tests fail, revert and try different grouping.
 
@@ -134,11 +128,11 @@ For each logical grouping, copy functions to new module, update facade, run test
 
 See Mikado method reference for Phases 3-5 details.
 
-### PHASE FINAL: Git Cleanup (MANDATORY - Always Execute)
+### PHASE FINAL: Git cleanup (run on every exit)
 
 **GUARD: If git_mode == "lightweight", SKIP. Delete .bak file and proceed to JSON output.**
 
-Drop baseline stash, drop orphaned Mikado stashes, verify clean stash state.
+Carry the work back to `$ORIGINAL_BRANCH` as uncommitted changes, delete the temp branch, and verify that no `temp/safe-refactor-*` branch remains.
 
 **Details:** Read ~/.claude/agents/references/safe-refactor/troubleshooting.md for git cleanup steps, anti-hallucination requirements, status determination, and conflict response format.
 
@@ -146,7 +140,7 @@ Drop baseline stash, drop orphaned Mikado stashes, verify clean stash state.
 
 - **NEVER proceed with broken verification** (tests in FULL mode, bash -n + --help in LIGHTWEIGHT mode)
 - **NEVER modify external import paths** (facade handles redirection)
-- **In FULL mode**: ALWAYS use temp branches (preferred) or git stash checkpoints before atomic changes
+- **In FULL mode**: ALWAYS commit a checkpoint on the temp branch before each atomic change; never `git stash`
 - **In LIGHTWEIGHT mode**: ALWAYS use file-copy backup. NEVER run git checkout, git stash, git branch, or git commit.
 - **ALWAYS verify after each migration step** (tests or bash -n depending on mode)
 - **NEVER delete _legacy until ALL code migrated and verification passes**
@@ -154,7 +148,7 @@ Drop baseline stash, drop orphaned Mikado stashes, verify clean stash state.
 - **In LIGHTWEIGHT mode**: SKIP PHASE FINAL (no git state to clean). Delete .bak file on success.
 - **A CALLER'S OWN CHECKPOINT WINS.** When the caller supplies a checkpoint and commit
   mechanism — an isolated worktree, an orchestrator that commits for you, an explicit
-  "do not commit" instruction — obey it and SKIP PHASE 0, the Mikado stash steps, and
+  "do not commit" instruction — obey it and SKIP PHASE 0, the Mikado checkpoint commits, and
   PHASE FINAL. Use the LIGHTWEIGHT file-copy backup instead. Creating a temp branch
   inside someone else's worktree can strand the work on a branch their integration
   step never merges.
@@ -192,7 +186,7 @@ The next reader of this code is an agent that navigates by grep and pays per tok
 - [x] PHASE 3: Test imports updated ({M} files)
 - [x] PHASE 4: Cleanup complete
 - [x] PHASE 5: Threshold verification
-- [x] PHASE FINAL: Git cleanup (stash_cleanup: {dropped|none})
+- [x] PHASE FINAL: Git cleanup (stash_cleanup: none)
 
 ### New Structure
 {directory tree with LOC counts}
@@ -244,4 +238,4 @@ The next reader of this code is an agent that navigates by grep and pays per tok
 }
 ```
 
-**CRITICAL: If `meets_threshold == false`, status MUST be "partial" not "fixed"**
+**If `meets_threshold == false`, status is "partial", not "fixed".**

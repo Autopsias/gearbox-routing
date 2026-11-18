@@ -38,11 +38,11 @@ type: reference
 - After 2+ failed integration attempts
 - ONLY for authoritative verification (use sparingly)
 
-**Semgrep Security** (`mcp__semgrep-hosted__*`)
-- Security vulnerability scanning before commits
-- Code quality and security analysis
-- Use `security_check` for quick scans of code snippets
-- Use `semgrep_scan` for comprehensive file analysis
+**Semgrep Security** (Guardian plugin, `mcp__plugin_semgrep_guardian__*`)
+- Guardian scans every file write automatically, in Claude Code and in Codex (`semgrep@claude-plugins-official`); findings arrive at the end of the turn
+- Its tools read findings (`get_semgrep_sast_findings`, `_secrets_`, `_supply_chain_`), check `status`, and log in; they do not scan a file on demand
+- For an on-demand scan, run the CLI: `semgrep scan --config p/default <paths>`
+- There is no `semgrep-hosted` server: the `mcp-remote` route to mcp.semgrep.ai failed to log in and was turned off in Codex on 2026-11-15
 - Always offer to fix identified vulnerabilities
 
 **Chrome DevTools** (`mcp__chrome-devtools__*`)

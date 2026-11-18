@@ -1,7 +1,7 @@
 ---
-description: "Ship-tail: run the full ops chain — fix local tests → quality commit → push + open PR → watch CI to green (auto-fix + re-push on red) — as one named, explicit step. NEVER auto-merges. NEVER skips git hooks. Closes the CI loop dual-path (gh API or self-hosted runner logs). Use when you say 'ship it', 'ship tail', 'run ship-tail', 'test commit pr', 'check ci on my pr', 'is ci green after my push', or 'watch ci to green' — this command already watches CI to green, so route post-push CI-status prose here instead of a manual poll (for fixing CI failures directly, not just watching, use /ci-orchestrate)."
+description: "Ship-tail: run the full ops chain — fix local tests → quality commit → push + open PR → watch CI to green (auto-fix + re-push on red) — as one named, explicit step. Merges only when every check is green, through ~/.claude/scripts/merge_when_green.py (never `gh pr merge --auto`). NEVER skips git hooks. Closes the CI loop dual-path (gh API or self-hosted runner logs). Use when you say 'ship it', 'ship tail', 'run ship-tail', 'test commit pr', 'check ci on my pr', 'is ci green after my push', or 'watch ci to green' — this command already watches CI to green, so route post-push CI-status prose here instead of a manual poll (for fixing CI failures directly, not just watching, use /ci-orchestrate)."
 argument-hint: "[message] [--dry-run] [--skip-tests] [--no-pr] [--no-ci] [--branch=<name>]"
-allowed-tools: ["Task", "Bash", "SlashCommand", "Read", "Grep"]
+allowed-tools: ["Task", "Bash", "Skill", "Read", "Grep"]
 ---
 
 # Ship-Tail: test → commit → pr
@@ -10,7 +10,7 @@ allowed-tools: ["Task", "Bash", "SlashCommand", "Read", "Grep"]
 
 ## HARD CONSTRAINTS (enforced here, not in prompt text)
 
-- NEVER auto-merge. The PR STAGE opens a PR and stops. Merging requires explicit human action.
+- NEVER use `gh pr merge --auto`. After the CI loop is GREEN, the last stage runs `python3 ~/.claude/scripts/merge_when_green.py <pr>`, which merges only when every check of the head commit is green (owner decision). Deploy and release stay an explicit request.
 - NEVER pass --no-verify to any git command. Fix the underlying hook issue instead.
 - NEVER run against a dirty tree at the start (see State Machine below).
 - SLASH_DEPTH cap: if SLASH_DEPTH >= 2, report and EXIT — do not re-enter the chain.
@@ -27,8 +27,10 @@ PREFLIGHT → TEST-FIX → COMMIT-POINT → PR → CI-LOOP → DONE
 | TEST-FIX | After PREFLIGHT | Test files, source files (via fixer agents) | All tests pass |
 | COMMIT-POINT | After TEST-FIX | git add, git commit (with hooks) | Commit succeeds, tree clean |
 | PR | After COMMIT-POINT | git push, gh pr create/update | PR URL confirmed |
-| CI-LOOP | After PR (unless --no-pr/--no-ci) | /ci-orchestrate fixes + guarded re-push; NEVER merge | CI green, OR escalate (ceiling/identical-failure/no-provable-path) |
+| CI-LOOP | After PR (unless --no-pr/--no-ci) | /ci-orchestrate fixes + guarded re-push; merge only via merge_when_green.py after GREEN | CI green, OR escalate (ceiling/identical-failure/no-provable-path) |
 | DONE | After CI-LOOP | None | Report printed |
+
+**Verified line:** every commit ship-tail makes ends with `Verified: tests|run|review|none`, added by `python3 ~/.claude/scripts/verified_trailer.py --transcript auto --filter` (reads the commit message on stdin, prints it with the line; it never blocks the commit). `verified_trailer.py --list-none --since <date>` lists the commits stamped none.
 
 **Dirty-tree policy (PREFLIGHT):**
 - If the tree is dirty but ONLY because test-fix work is in progress (we just ran fixes): that is the EXPECTED state — proceed to COMMIT-POINT.
@@ -136,7 +138,7 @@ If `--dry-run`:
     STAGE 1 [test-fix]  : /test-orchestrate --no-chain  (skipped: --skip-tests set)
     STAGE 2 [commit]    : /commit-orchestrate --no-chain [message-hint]
     STAGE 3 [pr]        : /pr create
-    STAGE 4 [ci-loop]   : watch CI (gh API OR runner-log) → on red /ci-orchestrate --fix-all + guarded re-push → loop to green (max 3 cycles); NEVER merge  (skipped if --no-pr/--no-ci)
+    STAGE 4 [ci-loop]   : watch CI (gh API OR runner-log) → on red /ci-orchestrate --fix-all + guarded re-push → loop to green (max 3 cycles); on green run merge_when_green.py  (skipped if --no-pr/--no-ci)
   ```
   EXIT.
 
@@ -152,7 +154,7 @@ would re-add code the intent names as deliberately removed downgrades to `ask-us
 silent `auto-fix`):
 
 ```
-SlashCommand(command="/test-orchestrate --no-chain --intent=$INTENT_BLOCK")
+Skill(skill="test-orchestrate", args="--no-chain --intent=$INTENT_BLOCK")
 ```
 
 (`--intent` carries the BEGIN/END-wrapped untrusted intent block built in STEP 0. The
@@ -175,7 +177,7 @@ change intent too — this stage dispatches the same code-modifying fixer agents
 re-add a deliberately-removed line, so they must classify intent-touching fixes as `ask-user`:
 
 ```
-SlashCommand(command="/commit-orchestrate --no-chain --intent=$INTENT_BLOCK [message-hint from $ARGUMENTS]")
+Skill(skill="commit-orchestrate", args="--no-chain --intent=$INTENT_BLOCK [message-hint from $ARGUMENTS]")
 ```
 
 After completion:
@@ -201,7 +203,7 @@ Skip this step if `--no-pr` is set (report "PR STAGE skipped by --no-pr flag").
 Push and create/update PR:
 
 ```
-SlashCommand(command="/pr create")
+Skill(skill="pr", args="create")
 ```
 
 After completion, confirm PR URL is reported.
@@ -216,7 +218,7 @@ Skip this step if `--no-pr` is set (nothing was pushed) or `--no-ci` is passed
 (report "CI loop skipped by --no-ci flag").
 
 **This STAGE closes the loop: watch CI to green; on red, trigger `/ci-orchestrate`
-and re-push; loop until green or a bounded ceiling. It NEVER auto-merges.**
+and re-push; loop until green or a bounded ceiling. On green it runs ~/.claude/scripts/merge_when_green.py.**
 
 **Full algorithm:** read `~/.claude/references/ship-tail/ci-loop.md` and
 follow it exactly. Summary of the contract:
@@ -241,7 +243,7 @@ follow it exactly. Summary of the contract:
    last fix. If the SAME failing-check set recurs from a run that did NOT
    post-date the fix → ESCALATE (do not re-fix an unfixable failure). Emit
    `[ship-tail][ci-loop] cycle=<n> path=<path> sha=<sha>` each cycle.
-4. **On red:** `SlashCommand(command="/ci-orchestrate --fix-all --intent=$INTENT_BLOCK")`
+4. **On red:** `Skill(skill="ci-orchestrate", args="--fix-all --intent=$INTENT_BLOCK")`
    (the intent block from STEP 0, so CI fixers don't "fix" a deliberate choice back out —
    they downgrade an intent-touching fix to `ask-user` per the findings contract), then a
    **guarded re-push** `git push --force-with-lease=<ref>:<EXPECTED_SHA>` (never a
@@ -249,8 +251,7 @@ follow it exactly. Summary of the contract:
    the SHA). NEVER `--no-verify`.
 5. **Per-stage transient retry:** a `529`/`5xx`/transient probe error retries
    (bounded) and does not fail the whole run.
-6. **NEVER auto-merge.** The loop ends at GREEN or ESCALATE — merge stays a human
-   action.
+6. **Merge only through `~/.claude/scripts/merge_when_green.py`** (never `--auto`). The loop ends at GREEN or ESCALATE; on GREEN the script runs.
 
 On GREEN: log `[ship-tail][ci-loop] GREEN` and proceed to the report.
 On ESCALATE / ceiling: log `[ship-tail][ci-loop] ESCALATE reason=<...>`, report
@@ -266,7 +267,7 @@ ship-tail COMPLETE
   Commit : <hash> <subject>
   PR     : <url or "skipped">
   CI     : <GREEN after N cycle(s) via <path>> | <ESCALATED: reason> | <skipped (--no-ci)>
-  Merge  : NOT performed — human action (ship-tail never auto-merges)
+  Merge  : <MERGED | NO MERGE: reason from merge_when_green.py> (deploy/release stay an explicit request)
 ```
 
 ---
@@ -275,7 +276,7 @@ ship-tail COMPLETE
 
 | Command | Effect |
 |---------|--------|
-| `/ship-tail` | Full chain: fix tests → quality commit → push + PR → watch CI to green (auto-fix + re-push on red); never merges |
+| `/ship-tail` | Full chain: fix tests → quality commit → push + PR → watch CI to green (auto-fix + re-push on red); merges via merge_when_green.py only when every check is green |
 | `/ship-tail --skip-tests` | Skip test-fix STAGE; commit + PR + CI loop only |
 | `/ship-tail --no-pr` | Fix tests + commit; no PR (and no CI loop) |
 | `/ship-tail --no-ci` | Fix tests + commit + PR; skip the CI watch-fix-repush loop |
@@ -287,4 +288,4 @@ ship-tail COMPLETE
 
 Before ship-tail, the chain was emergent: `/test-orchestrate` STEP 10 auto-invoked `/commit-orchestrate`, and `/commit-orchestrate`'s chain-invocation.md called `/pr create`. That worked but was invisible — you could not run the chain as a first-class operation, and double-fires were possible if SLASH_DEPTH tracking fell out of sync. Ship-tail makes the chain explicit, suppresses the emergent auto-chain inside each stage (`--no-chain`), and owns sequencing as a single documented entry point.
 
-The CI loop (STEP 5) closes the tail: after the PR pushes, ship-tail watches CI to green and, on red, triggers `/ci-orchestrate` and re-pushes — looping (bounded) until green. It auto-detects its environment so the SAME command works both where `api.github.com` is reachable (gh path) and inside a network sandbox like example-project's where it is blocked (self-hosted runner-log path: `~/actions-runners/*/_diag/Worker_*.log`). It NEVER auto-merges — green is the end of the loop; merging stays a deliberate human action. See `references/ship-tail/ci-loop.md` for the full algorithm and `references/ship-tail/test_runner_log_path.sh` for the parser/fixture-hygiene tests.
+The CI loop (STEP 5) closes the tail: after the PR pushes, ship-tail watches CI to green and, on red, triggers `/ci-orchestrate` and re-pushes — looping (bounded) until green. It auto-detects its environment so the SAME command works both where `api.github.com` is reachable (gh path) and inside a network sandbox like example-project's where it is blocked (self-hosted runner-log path: `~/actions-runners/*/_diag/Worker_*.log`). On green it runs `~/.claude/scripts/merge_when_green.py`, which merges only when every check is green (never `--auto`); deploy and release stay an explicit request. See `references/ship-tail/ci-loop.md` for the full algorithm and `references/ship-tail/test_runner_log_path.sh` for the parser/fixture-hygiene tests.

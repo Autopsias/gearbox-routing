@@ -309,6 +309,19 @@ def test_session_keyed_groups_get_the_new_session_not_an_items_list():
     assert all("items" not in g for g in phases)
 
 
+def test_category_keyed_groups_get_no_items_list():
+    """before-after workstreams that name a category and list no items: adding `items` to
+    one group made the coverage check call every older item ungrouped."""
+    spec = {"categories": [{"key": "count", "label": "Count"}, {"key": "fix", "label": "Fix"}],
+            "items": [{"id": "count-01", "category": "count"}, {"id": "fix-02", "category": "fix"}],
+            "infographic": {"type": "before-after", "workstreams": [
+                {"name": "See the repeats", "category": "count"},
+                {"name": "Fix the known cause", "category": "fix"}]}}
+    assert pm.attach_to_infographic(spec, ["fix-02"], session_id="s05") == ("Fix the known cause", None)
+    assert pm.attach_to_infographic(spec, ["fix-02"], "see the repeats") == ("See the repeats", None)
+    assert all("items" not in g for g in spec["infographic"]["workstreams"])
+
+
 def test_unknown_infographic_group_refused(plan):
     with pytest.raises(pm.MutationError, match="matches no group"):
         pm.add_session(plan, sid="s04", title="A", new_items=["w-04|work|X"],

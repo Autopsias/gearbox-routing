@@ -13,6 +13,7 @@ from pathlib import Path
 
 from common import parse_json, typed
 from health import LAYERS, health_dir, load_card, staleness
+from secrets_scan import last_marker
 
 GLYPH = {"pass": "✓", "warn": "!", "fail": "✕", "na": "–", "pending": "○"}
 CHIP = {"pass": "c-pass", "warn": "c-warn", "fail": "c-fail", "na": "c-na",
@@ -299,6 +300,11 @@ def render(repo):
              "layers": layers}
     if stale:
         entry["stale"] = stale
+    # The last COMPLETED secrets scan rides the history line; a pending scan
+    # leaves the old marker (read before load_history dropped a same-run entry).
+    marker = card.get("secrets_scanned") or last_marker(repo)
+    if marker:
+        entry["secrets_scanned"] = marker
     lines = [json.dumps(h) for h in history] + [json.dumps(entry)]
     (health_dir(repo) / "history.jsonl").write_text("\n".join(lines) + "\n")
     counts = (f"{len(bf)} blocking · {len(af)} advisory fails · {len(warns)} warnings · "

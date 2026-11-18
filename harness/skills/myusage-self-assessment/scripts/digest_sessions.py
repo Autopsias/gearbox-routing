@@ -30,6 +30,7 @@ Design notes / hard-won schema facts (verified against the live corpus
 Usage:
     python3 digest_sessions.py [--projects DIR] [--history FILE]
                                [--out FILE] [--max-samples N] [--pretty]
+                               [--since-days N] [--include-temp-projects]
 Writes JSON to --out (default stdout). Exit 0 on success even if some files
 are malformed (they are counted in `skipped`, never fatal).
 """
@@ -50,7 +51,19 @@ API_ERR_RE = re.compile(r"API Error", re.I)
 INTERRUPT_RE = re.compile(r"\[Request interrupted", re.I)
 DENY_RE = re.compile(r"(permission|denied|not allowed|blocked by|requires approval)", re.I)
 # Auto-spawned / non-interactive entrypoints we want to be able to segment on.
-INTERACTIVE_ENTRYPOINTS = {"cli", "vscode", "ide", None}
+# The desktop app is where the owner works since 2026-09; without it the digest
+# called 73 of 399 real sessions interactive (run of 2026-11-12).
+INTERACTIVE_ENTRYPOINTS = {"cli", "vscode", "ide", "claude-desktop", None}
+# User-type text the owner did not type: command wrappers, hook and harness notices.
+MACHINE_TEXT_RE = re.compile(
+    r"^\s*(<|\[SYSTEM NOTIFICATION|\[Request interrupted|Caveat:|This session is being continued"
+    r"|Stop hook feedback|Base directory for this skill)")
+COMMAND_TAG_RE = re.compile(r"<command-name>(/[^<\s]+)</command-name>")
+CLASSIFIER_RE = re.compile(r"denied by the Claude Code auto mode classifier\. Reason: \[([^\]]+)\]")
+BABYSIT_TERMS = {"proceed", "continue", "yes", "check", "retry", "go",
+                 "y", "c", "ok", "next", "do it"}
+# Project dirs under a temp folder are eval-harness checkouts (41,987 of 44,104 files).
+TEMP_PROJECT_RE = re.compile(r"^-(private-)?(var-folders|tmp)")
 
 
 def _text_of(content):
@@ -79,6 +92,31 @@ def _iter_records(path):
                 continue
 
 
+def _count_tool_results(s, content, max_samples):
+    for it in content:
+        if isinstance(it, dict) and it.get("type") == "tool_result" and it.get("is_error"):
+            s["tool_errors"] += 1
+            s["classifier_denials"].update(CLASSIFIER_RE.findall(str(it.get("content"))))
+            if len(s["err_samples"]) < max_samples:
+                s["err_samples"].append(str(it.get("content"))[:200])
+
+
+def _count_main_user_text(s, stripped, is_meta):
+    s["user_msgs"] += 1
+    if stripped.startswith("/"):
+        s["commands"][stripped.split()[0]] += 1
+    # Desktop and current CLI wrap a typed command in a tag.
+    s["commands"].update(COMMAND_TAG_RE.findall(stripped))
+    if not is_meta and not MACHINE_TEXT_RE.match(stripped):
+        s["human_msgs"] += 1
+        if stripped.lower().rstrip(".!") in BABYSIT_TERMS:
+            s["babysit_msgs"] += 1
+    if INTERRUPT_RE.search(stripped):
+        s["interrupts"] += 1
+    if DENY_RE.search(stripped) and "denied" in stripped.lower():
+        s["denials"] += 1
+
+
 def digest_session(path: Path, max_samples: int) -> dict:
     s = {
         "session_id": path.stem,
@@ -91,10 +129,14 @@ def digest_session(path: Path, max_samples: int) -> dict:
         "records": 0,
         "main_records": 0,
         "sidechain_records": 0,
-        "user_msgs": 0,          # human turns in the main conversation
+        "user_msgs": 0,          # user-type text turns in the main conversation (includes machine text)
+        "human_msgs": 0,         # of those, the ones the owner typed
+        "babysit_msgs": 0,       # typed turns that are only a go-ahead
         "sidechain_user_msgs": 0,
         "assistant_msgs": 0,
         "commands": Counter(),   # slash commands typed by the human
+        "skills": Counter(),     # skills the model invoked
+        "classifier_denials": Counter(),  # auto-mode refusals by reason
         "models": Counter(),
         "tool_errors": 0,
         "api_errors": 0,
@@ -136,29 +178,21 @@ def digest_session(path: Path, max_samples: int) -> dict:
                 isinstance(it, dict) and it.get("type") == "tool_result" for it in content
             )
             if is_tool_result:
-                for it in content:
-                    if isinstance(it, dict) and it.get("type") == "tool_result" and it.get("is_error"):
-                        s["tool_errors"] += 1
-                        if len(s["err_samples"]) < max_samples:
-                            s["err_samples"].append(str(it.get("content"))[:200])
+                _count_tool_results(s, content, max_samples)
             elif isinstance(content, (str, list)) and txt.strip():
                 if side:
                     s["sidechain_user_msgs"] += 1
                 else:
-                    s["user_msgs"] += 1
-                    stripped = txt.strip()
-                    if stripped.startswith("/"):
-                        cmd = stripped.split()[0]
-                        s["commands"][cmd] += 1
-                    if INTERRUPT_RE.search(stripped):
-                        s["interrupts"] += 1
-                    if DENY_RE.search(stripped) and "denied" in stripped.lower():
-                        s["denials"] += 1
+                    _count_main_user_text(s, txt.strip(), bool(d.get("isMeta")))
         elif t == "assistant":
             s["assistant_msgs"] += 1
             msg = d.get("message") or {}
             if msg.get("model"):
                 s["models"][msg["model"]] += 1
+            if not side and isinstance(msg.get("content"), list):
+                for it in msg["content"]:
+                    if isinstance(it, dict) and it.get("type") == "tool_use" and it.get("name") == "Skill":
+                        s["skills"][(it.get("input") or {}).get("skill") or "?"] += 1
             usage = msg.get("usage") or {}
             s["input_tokens"] += int(usage.get("input_tokens") or 0)
             s["output_tokens"] += int(usage.get("output_tokens") or 0)
@@ -176,8 +210,10 @@ def digest_session(path: Path, max_samples: int) -> dict:
 
     # Heuristic: sessions dominated by sidechain/no human turns, or spawned
     # from a non-interactive entrypoint, are automation not human work.
-    s["interactive"] = s["user_msgs"] > 0 and s.get("entrypoint") in INTERACTIVE_ENTRYPOINTS
+    s["interactive"] = s["human_msgs"] > 0 and s.get("entrypoint") in INTERACTIVE_ENTRYPOINTS
     s["commands"] = dict(s["commands"])
+    s["skills"] = dict(s["skills"])
+    s["classifier_denials"] = dict(s["classifier_denials"])
     s["models"] = dict(s["models"])
     return s
 
@@ -186,8 +222,7 @@ def digest_history(path: Path) -> dict:
     """Typed-prompt frequency table from ~/.claude/history.jsonl."""
     out = {"records": 0, "by_project": Counter(), "commands": Counter(),
            "babysit": Counter(), "top_prompts": []}
-    babysit_terms = {"proceed", "continue", "yes", "check", "retry", "go",
-                     "y", "c", "ok", "next", "do it"}
+    babysit_terms = BABYSIT_TERMS
     prompts = Counter()
     if not path.exists():
         out["missing"] = True
@@ -219,6 +254,9 @@ def aggregate(sessions: list[dict], history: dict) -> dict:
                                         "user_msgs": 0, "output_tokens": 0})
     models = Counter()
     commands = Counter()
+    skills: Counter[str] = Counter()
+    classifier: Counter[str] = Counter()
+    human = babysit = 0
     tool_err = api_err = interrupts = denials = 0
     for s in sessions:
         p = per_project[s["project_dir"]]
@@ -230,6 +268,10 @@ def aggregate(sessions: list[dict], history: dict) -> dict:
         p["output_tokens"] += s["output_tokens"]
         models.update(s["models"])
         commands.update(s["commands"])
+        skills.update(s["skills"])
+        classifier.update(s["classifier_denials"])
+        human += s["human_msgs"]
+        babysit += s["babysit_msgs"]
         tool_err += s["tool_errors"]
         api_err += s["api_errors"]
         interrupts += s["interrupts"]
@@ -249,9 +291,15 @@ def aggregate(sessions: list[dict], history: dict) -> dict:
             "history_prompts": history.get("records", 0),
             "babysit_prompts": babysit_total,
             "babysit_share": round(babysit_total / hist_records, 3),
+            # history.jsonl gets no desktop prompts; these two come from the transcripts.
+            "human_msgs": human,
+            "babysit_msgs": babysit,
+            "classifier_denials": sum(classifier.values()),
         },
         "model_mix": dict(models.most_common(20)),
         "command_usage": dict(commands.most_common(50)),
+        "skill_usage": dict(skills.most_common(50)),
+        "classifier_denials": dict(classifier.most_common(20)),
         "per_project": {k: v for k, v in sorted(
             per_project.items(), key=lambda kv: -kv[1]["sessions"])},
         # External benchmark thresholds for the miners to check against.
@@ -266,6 +314,20 @@ def aggregate(sessions: list[dict], history: dict) -> dict:
     }
 
 
+def select_files(projects: Path, since_days, include_temp):
+    """Main-session transcript files by the digest's rules. Returns (files, n_all, n_temp)."""
+    files = sorted(projects.glob("*/*.jsonl")) if projects.exists() else []
+    n_all = len(files)
+    if not include_temp:
+        files = [f for f in files if not TEMP_PROJECT_RE.match(f.parent.name)]
+    n_temp = n_all - len(files)
+    if since_days is not None:
+        import time
+        cutoff = time.time() - since_days * 86400
+        files = [f for f in files if f.stat().st_mtime >= cutoff]
+    return files, n_all, n_temp
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--projects", default=str(DEFAULT_PROJECTS))
@@ -275,10 +337,14 @@ def main(argv=None):
     ap.add_argument("--pretty", action="store_true")
     ap.add_argument("--per-session-out", default=None,
                     help="optional path to write the full per-session array")
+    ap.add_argument("--since-days", type=int, default=None,
+                    help="read only session files modified in the last N days")
+    ap.add_argument("--include-temp-projects", action="store_true",
+                    help="also read eval-harness checkouts under temp folders (slow: ~9 min on 18 GB)")
     args = ap.parse_args(argv)
 
-    projects = Path(args.projects)
-    files = sorted(projects.glob("*/*.jsonl")) if projects.exists() else []
+    files, n_all, n_temp = select_files(Path(args.projects), args.since_days, args.include_temp_projects)
+    n_old = n_all - n_temp - len(files)
     sessions, skipped = [], 0
     for f in files:
         try:
@@ -293,6 +359,8 @@ def main(argv=None):
     agg["generated"] = datetime.datetime.now().isoformat(timespec="seconds")
     agg["skipped_files"] = skipped
     agg["session_files"] = len(files)
+    agg["skipped_temp_project_files"] = n_temp
+    agg["skipped_old_files"] = n_old
     agg["history"] = {k: history[k] for k in
                       ("records", "by_project", "commands", "babysit", "top_prompts")
                       if k in history}

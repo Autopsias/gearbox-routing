@@ -1,7 +1,7 @@
 ---
 name: type-error-fixer
 description: "Fixes Python type errors and adds missing annotations; use PROACTIVELY when mypy errors appear. Examples: \"error: Function is missing a return type annotation\", \"error: Argument 1 to 'func' has incompatible type\", \"error: Cannot determine type of 'variable'\", \"Need type hints for function parameters\"."
-tools: Read, Edit, MultiEdit, Bash, Grep, SlashCommand
+tools: Read, Edit, MultiEdit, Bash, Grep
 model: sonnet
 effort: medium
 color: orange

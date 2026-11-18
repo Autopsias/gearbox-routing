@@ -1,7 +1,8 @@
 # <Title of the source>: worth adopting?
 
 <!-- One page. One or two lines per bullet. Say each point once. Leave out a section that has
-     nothing in it, except "Dropped". Delete this comment. -->
+     nothing in it, except "Dropped", "Above the target" and "Principles": write those two as
+     "- none: <reason>" when empty, or `wa_ledger.py add-row` refuses the row. Delete this comment. -->
 
 - **Source:** <url or "pasted text"> · <author> · <date of the source> · got by <method>; <full | cut at … | paywalled, parts from summaries>
 - **Judged:** <YYYY-MM-DD> against `<target repo>` at commit `<short sha>`
@@ -25,6 +26,10 @@
 
 - <item>
 
+## Above the target
+
+- <where else the idea applies: a product, an account feature, repeated work> — <verdict by the same bar, or "looked at and not taken: reason">
+
 ## Parked
 
 - **<title>** — blocked by <rule quoted | vendor terms | unverified mechanism | missing release>. Re-open when <condition>.
@@ -38,6 +43,10 @@ Reasons: already have it (`path`) · no pain today · carry cost near the gain �
 ## What the source shows about the target
 
 - <a weak point of the target that is not already an item above, with its evidence>
+
+## Principles
+
+- **<what the source argues, one line>** ("<quote>", <place>) — stand: <with it | partly | against it>, <one number and its command, across the repos the skills serve> — direction: <a number to watch | a habit | a plan theme | a question for the owner | we work this way already>
 
 ## Decision card
 

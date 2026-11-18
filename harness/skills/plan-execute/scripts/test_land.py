@@ -30,6 +30,7 @@ import land_brief as lb  # noqa: E402
 import land_state as lst  # noqa: E402
 import dispatch as dsp  # noqa: E402
 import land_steps  # noqa: E402
+from _land_fixture import ack_only, ignored_gate_output  # noqa: E402
 from _land_fixture import (_arm_prepush, _arm_slow_commit,  # noqa: E402
                            _kill_when, build_repo,
                            checked_out_branch, isolate, local_main, main_side,
@@ -48,7 +49,7 @@ def _ack_and_land(plan_dir):
     final assertion testing a different path than the one named."""
     rc, parked = run_cli("land", plan_dir)
     assert (rc, parked["action"]) == (1, "land-awaits-review"), parked
-    rc, acked = run_cli("land-ack", plan_dir, "--note", "approved")
+    rc, acked = ack_only(plan_dir, "approved")
     assert (rc, acked["action"]) == (0, "land-acked"), acked
     return run_cli("land", plan_dir)
 
@@ -142,6 +143,11 @@ def test_a_failing_regate_parks_with_the_gate_output(fx):
     # step on the very next invocation.
     rc_again, again = run_cli("land", iso["plan_dir"])
     assert (rc_again, again["action"], again["kind"]) == (1, "land-parked", "gate-failed")
+    # A THIRD run on one head after two reds is refused without a cost line (land_cost).
+    rc3, third = run_cli("land", iso["plan_dir"])
+    assert (rc3, third["action"], third["kind"]) == (1, "land-refused", "cost-report-required")
+    rc4, fourth = run_cli("land", iso["plan_dir"], "--cost-report", "20 min, 2 passes, no change, stop")
+    assert (rc4, fourth["action"], fourth["kind"]) == (1, "land-parked", "gate-failed")
     # KNOWN NEGATIVE — remove the marker and the SAME gate passes and lands, so
     # the park above is the gate deciding, not the gate being unable to run.
     git(["rm", "-q", "GATE_FAIL"], iso["tree"], check=True)
@@ -185,7 +191,7 @@ def test_no_entry_point_pushes_without_an_ack(fx):
         assert (rc, out["action"]) == (1, "land-awaits-review"), cmd
         assert origin_main(fx) == before, cmd
     # An ack cannot be forged ahead of the candidate it is supposed to bind to.
-    rc, out = run_cli("land-ack", iso["plan_dir"], "--note", "forged")
+    rc, out = ack_only(iso["plan_dir"], "forged")
     assert out["action"] == "land-acked"          # the candidate DOES exist now
     st = lst.load(iso["plan_dir"])
     assert st["ack"]["main_head"] == st["expected"] == before
@@ -206,7 +212,7 @@ def test_a_moved_main_invalidates_the_ack_and_re_parks(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved THIS candidate")
+    ack_only(iso["plan_dir"], "approved THIS candidate")
     approved = lst.load(iso["plan_dir"])["ack"]["main_head"]
     moved = main_side(fx, "src/elsewhere.py", "E = 1\n")
     rc, out = run_cli("land", iso["plan_dir"])
@@ -216,7 +222,7 @@ def test_a_moved_main_invalidates_the_ack_and_re_parks(fx):
     assert origin_main(fx) == moved                       # we did NOT land
     assert "RE-APPROVAL" in out["brief"] and "main_head" in out["brief"]
     # KNOWN POSITIVE — a fresh ack on the NEW candidate lands.
-    run_cli("land-ack", iso["plan_dir"], "--note", "re-approved")
+    ack_only(iso["plan_dir"], "re-approved")
     rc2, out2 = run_cli("land", iso["plan_dir"])
     assert (rc2, out2["action"]) == (0, "landed")
 
@@ -239,7 +245,7 @@ def test_a_rebuilt_merge_cannot_ride_an_ack_granted_for_the_previous_one(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved THIS merge")
+    ack_only(iso["plan_dir"], "approved THIS merge")
     st = lst.load(iso["plan_dir"])
     approved_merge = st["ack"]["merge_sha"]
     assert approved_merge, "the ack must record the merge it approved"
@@ -261,7 +267,7 @@ def test_a_rebuilt_merge_cannot_ride_an_ack_granted_for_the_previous_one(fx):
     assert origin_main(fx) != after["merge_sha"]   # and nothing was pushed
 
     # KNOWN POSITIVE — approving the REBUILT merge lands it.
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved the rebuild")
+    ack_only(iso["plan_dir"], "approved the rebuild")
     rc2, out2 = run_cli("land", iso["plan_dir"])
     assert (rc2, out2["action"]) == (0, "landed")
 
@@ -270,7 +276,7 @@ def test_a_changed_gate_result_invalidates_the_ack(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved a green gate set")
+    ack_only(iso["plan_dir"], "approved a green gate set")
     before = lst.load(iso["plan_dir"])["gate_digest"]
     work(iso["tree"], "GATE_FAIL", "planted after approval\n")   # plan head moves too
     rc, out = run_cli("land", iso["plan_dir"])
@@ -290,7 +296,7 @@ def test_the_land_worktree_is_detached_uniquely_named_and_never_moves_local_main
     assert land_path.name.startswith("plan-a__land-") and land_path.name != "plan-a__land-"
     assert git(["symbolic-ref", "--quiet", "HEAD"], land_path)[0] != 0   # DETACHED
     before_main, before_branch = local_main(fx), checked_out_branch(fx)
-    run_cli("land-ack", iso["plan_dir"], "--note", "ok")
+    ack_only(iso["plan_dir"], "ok")
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (0, "landed")
     assert local_main(fx) == before_main                   # §4.3 — NEVER moved
@@ -738,7 +744,7 @@ def test_a_preserved_land_worktree_is_never_reported_as_a_finished_land(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    ack_only(iso["plan_dir"], "approved")
     # Someone left untracked content in the land worktree before the teardown.
     (Path(lst.load(iso["plan_dir"])["land_path"]) / "hand-written.txt").write_text("mine\n")
     rc, out = run_cli("land", iso["plan_dir"])
@@ -748,11 +754,11 @@ def test_a_preserved_land_worktree_is_never_reported_as_a_finished_land(fx):
     assert Path(st["land_path"]).is_dir()                      # nothing was forced
     assert git(["merge-base", "--is-ancestor", st["landed_sha"], "origin/main"],
                fx["root"])[0] == 0
-    # KNOWN POSITIVE — clear the content and the SAME command finishes. The CODE
-    # is never re-pushed: the merge commit is unchanged and everything the resume
-    # adds is confined to the plan's own record (§8.c2's final record legitimately
-    # grows, because it carries what was written while the land was parked).
+    # KNOWN POSITIVE — clear the content and the SAME command finishes. The CODE is
+    # never re-pushed: the merge is unchanged and the resume adds only to the plan's
+    # own record (§8.c2's final record grows with what was written while parked).
     (Path(st["land_path"]) / "hand-written.txt").unlink()
+    ignored_gate_output(fx, st["land_path"])          # a gate's own output never holds it
     landed_sha = st["landed_sha"]
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (0, "landed")
@@ -770,7 +776,7 @@ def test_a_plan_branch_that_moves_under_a_recorded_ack_invalidates_it(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    ack_only(iso["plan_dir"], "approved")
     approved = lst.load(iso["plan_dir"])["ack"]["plan_head"]
     before = origin_main(fx)
     moved = work(iso["tree"], "src/sneaky.py", "SNEAKY = 1\n", "an out-of-band commit")

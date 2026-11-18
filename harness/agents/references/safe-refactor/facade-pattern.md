@@ -111,7 +111,7 @@ EOF
 **TEST GATE after Phase 1:**
 ```bash
 # Run baseline tests again - MUST pass
-# If fail: git stash pop (revert) and report failure
+# If fail: git reset --hard "$BASELINE" (revert) and report failure
 ```
 
 ## LANGUAGE DETECTION

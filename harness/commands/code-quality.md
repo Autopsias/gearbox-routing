@@ -1,7 +1,7 @@
 ---
 description: "Scans codebase for quality violations (file size >500 LOC, function length >100 lines, complexity >12 via ruff C901, plus an advisory slop scan) and dispatches safe-refactor agents to fix them. Use when you say 'check code/file size and complexity', 'files too large', 'reduce complexity', 'split large files', or 'adopt quality gates in this repo' (--adopt)."
 argument-hint: "[--check] [--fix] [--dry-run] [--adopt] [--refresh-exceptions] [--focus=file-size|function-length|complexity] [--path=...] [--max-parallel=N] [--no-chain] [--continue] [--fix-single-rule]"
-allowed-tools: ["Task", "Bash", "Grep", "Read", "Glob", "SlashCommand", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+allowed-tools: ["Task", "Bash", "Grep", "Read", "Glob", "Skill", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
 # Code Quality Orchestrator

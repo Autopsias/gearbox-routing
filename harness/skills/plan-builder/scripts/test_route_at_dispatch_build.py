@@ -111,6 +111,13 @@ def test_a_v8_spec_with_no_models_builds(tmp_path):
     assert page.count(rad.DISPATCH_LABEL) >= 2          # both cards, plus strip/hero
     assert '<span class="chip chip-task-class" title="Task class">linchpin</span>' in page
     assert 'class="chip model-sonnet"' not in page      # no invented default model
+    # Every written file passes the repo whitespace hooks, or the plan commit is blocked.
+    written = [p for p in (tmp_path / "plan").rglob("*") if p.suffix in (".html", ".json", ".md")]
+    assert {"PLAN.html", "manifest.json", "spec.json", "s01.prompt.md"} <= {p.name for p in written}
+    for p in written:
+        text = p.read_text()
+        assert text.endswith("\n"), p.name
+        assert not re.search(r"[ \t]+$", text, re.MULTILINE), p.name
 
 
 def test_an_override_carries_its_reason_into_the_manifest(tmp_path):

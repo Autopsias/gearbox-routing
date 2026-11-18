@@ -84,7 +84,19 @@ def _end_to_end_on_a_throwaway_repo():
                 [sys.executable, os.path.join(HERE, "gearbox-classify.py"),
                  "--claude-dir", d, "--pathspec", os.path.join(HERE, "deploy.pathspec")],
                 capture_output=True, check=True).stdout
-            return json.loads(out)
+            res = json.loads(out)
+            # PARITY: the pure function land_carry imports must give the CLI's
+            # answer on the same paths and settings pair, or harvest and the
+            # land carry classify one path two ways.
+            status = gc.git_status(d)
+            head, now = gc._settings_pair(d)
+            pure = gc.classify_paths([p for _, p in status], head, now, SPEC,
+                                     {p for xy, p in status if xy == "??"})
+            # live_auto is the CLI's deploy-only subset of live_untracked (it reads the files);
+            # the pure function cannot know it, so it is checked as a subset, not as parity.
+            assert {k: v for k, v in res.items() if k not in ("claude_dir", "live_auto")} == pure, (res, pure)
+            assert set(res["live_auto"]) <= set(res["live_untracked"]), res
+            return res
 
         assert classify()["harness"] == []
 
@@ -122,6 +134,15 @@ def _end_to_end_on_a_throwaway_repo():
         r = classify()
         assert "settings.json" in r["harness"], r
         assert r["errors"], r
+
+        # invalid UTF-8 at HEAD that would still parse once its byte is replaced:
+        # strict decoding makes it uninspectable (harness), never routine churn
+        open(os.path.join(d, "settings.json"), "wb").write(b'{"model": "a\xff"}')
+        run("commit", "-qam", "bad byte")
+        open(os.path.join(d, "settings.json"), "w").write('{"model": "b"}')
+        assert gc._settings_pair(d)[0] is None
+        r = classify()
+        assert "settings.json" in r["harness"] and r["errors"], r
 
 
 def main():

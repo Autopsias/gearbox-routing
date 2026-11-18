@@ -20,11 +20,11 @@ Cmd+F) to look for a word.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
+Counts: 38 skills · 69 commands · 41 subagents · 14 hooks.
 
 ## By what you want to do
 
-[Plan and build](#plan-and-build) · [Review and decisions](#review-and-decisions) · [Code quality and testing](#code-quality-and-testing) · [Session safety and context](#session-safety-and-context) · [Cost, routing and authoring](#cost-routing-and-authoring) · [Commands and reference](#commands-and-reference)
+[Plan and build](#plan-and-build) · [Review and decisions](#review-and-decisions) · [Code quality and testing](#code-quality-and-testing) · [Session safety and context](#session-safety-and-context) · [Cost, routing and authoring](#cost-routing-and-authoring) · [Commands and reference](#commands-and-reference) · [Not in the module index](#not-in-the-module-index)
 
 ### Plan and build
 
@@ -135,7 +135,7 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 **[Small hooks](modules/small-hooks.md)** · install: `./install-module small-hooks`
 
-- `agent-elapsed-nag.py` — Remind the orchestrator to report elapsed cost while a dispatch runs long. *(hook, runs on PreToolUse, SubagentStop)*
+- `agent-elapsed-nag.py` — Remind the orchestrator to report elapsed cost while a dispatch runs long. *(hook, runs on Stop, PreToolUse, SubagentStop)*
 - `instructions-inventory.py` — BD-01 — measure which instruction files actually load, per project. *(hook, runs on InstructionsLoaded)*
 - `routing-cadence-check.py` — Nudge when routing outcomes have piled up unanalyzed. *(hook, runs on SessionStart)*
 - `skill-usage-log.py` — Logs each skill that starts, so you can see which skills are used and which never trigger. *(hook, runs on PreToolUse (Skill))*
@@ -183,6 +183,11 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 - `/review` — [ROUTING ALIAS — demoted s08] /review now routes to a canonical reviewer.
 - `/wait-what` — Re-explain your last reply in plain words, because it did not land.
 - `improve-nudge.py` — Nudge the agent to offer /improve at the right moments (NUDGE-01). *(hook, runs on SessionStart (startup), UserPromptSubmit, PostToolUse (Bash))*
+
+### Not in the module index
+
+- `claude-hook.cmd` (hook) —  *(hook, runs on Stop, SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop, SessionEnd, StopFailure, SubagentStart, TeammateIdle, PostToolUseFailure, PermissionRequest, Elicitation, ElicitationResult, PostToolBatch)* · —
+- `claude-hook.sh` (hook) —  *(hook, runs on PostCompact)* · —
 
 ## A to Z
 
@@ -323,7 +328,7 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 | `epic-implementer` | A command, a skill or Claude dispatches it | Implements stories (TDD GREEN phase). | [BMAD method and epic builds](modules/bmad.md) |
 | `epic-quality-gate` | A command, a skill or Claude dispatches it | Makes the Phase-8 requirements-traceability quality-gate decision (PASS/CONCERNS/FAIL). | [BMAD method and epic builds](modules/bmad.md) |
 | `epic-story-creator` | A command, a skill or Claude dispatches it | Creates user stories from epics. | [BMAD method and epic builds](modules/bmad.md) |
-| `epic-story-validator` | A command, a skill or Claude dispatches it | Validates stories (Phase 2) and makes quality gate decisions (Phase 8). | [BMAD method and epic builds](modules/bmad.md) |
+| `epic-story-validator` | A command, a skill or Claude dispatches it | Validates stories (Phase 2). | [BMAD method and epic builds](modules/bmad.md) |
 | `epic-test-expander` | A command, a skill or Claude dispatches it | Expands test coverage after implementation (Phase 6). | [BMAD method and epic builds](modules/bmad.md) |
 | `epic-test-fixer` | A command, a skill or Claude dispatches it | Makes failing pytest green in the verification gate loops (Gates 2.5/3.5/4.5/5.5/6.5/7.5) by fixing IMPLEMENTATION code only \u2014 tests, golden vectors and … | [BMAD method and epic builds](modules/bmad.md) |
 | `epic-test-reviewer` | A command, a skill or Claude dispatches it | Reviews test quality against best practices (Phase 7). | [BMAD method and epic builds](modules/bmad.md) |
@@ -355,7 +360,9 @@ Counts: 38 skills · 69 commands · 41 subagents · 12 hooks.
 
 | Hook | Runs on | What it does | Module card |
 |---|---|---|---|
-| `agent-elapsed-nag.py` | PreToolUse, SubagentStop | Remind the orchestrator to report elapsed cost while a dispatch runs long. | [Small hooks](modules/small-hooks.md) |
+| `agent-elapsed-nag.py` | Stop, PreToolUse, SubagentStop | Remind the orchestrator to report elapsed cost while a dispatch runs long. | [Small hooks](modules/small-hooks.md) |
+| `claude-hook.cmd` | Stop, SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop, SessionEnd, StopFailure, SubagentStart, TeammateIdle, PostToolUseFailure, PermissionRequest, Elicitation, ElicitationResult, PostToolBatch |  | — |
+| `claude-hook.sh` | PostCompact |  | — |
 | `compact-policy.py` | SessionStart (compact), UserPromptSubmit, PreCompact (auto), PostCompact | Compaction policy for Claude Code: classify the session, then decide whether an automatic compaction may proceed. | [Context compaction policy](modules/compaction.md) |
 | `dispatch-audit.py` | PreToolUse (Agent) | Record what model + effort every subagent dispatch actually asked for, so tier drift is VISIBLE instead of silent. | [Routing skills](modules/routing-skills.md) |
 | `git-tree-guard.py` | PreToolUse (Bash) | Refuse a tree-wide destructive git command while the working tree carries tracked modifications. | [Git safety guard](modules/git-safety.md) |

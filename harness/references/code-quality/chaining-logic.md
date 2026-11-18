@@ -260,7 +260,7 @@ Ralph Loop provides **iterative self-correction**. If an agent hallucinates:
 For each file in violation list, spawn a Ralph loop instead of single-shot agent:
 
 ```
-SlashCommand(command="/ralph-loop \"
+Skill(skill="ralph-loop", args="\"
 Refactor {file_path} to reduce function length violations.
 
 Target: Functions should be <100 lines
@@ -321,7 +321,7 @@ if [[ "$ARGUMENTS" != *"--no-chain"* ]]; then
     DEPTH=${SLASH_DEPTH:-0}
     if [ $DEPTH -lt 3 ]; then
         export SLASH_DEPTH=$((DEPTH + 1))
-        SlashCommand(command="/commit-orchestrate --message 'refactor: reduce file sizes'")
+        Skill(skill="commit-orchestrate", args="--message 'refactor: reduce file sizes'")
     fi
 fi
 ```

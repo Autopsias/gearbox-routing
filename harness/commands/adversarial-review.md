@@ -86,9 +86,7 @@ The `adversarial-review` subcommand accepts `--model` (`-m`; codex-companion.mjs
 `handleReviewCommand` valueOptions) but its usage line does not show it; left
 unset, it asks for the `~/.codex/config.toml` model. On a CLI older than that
 model it fails HTTP 400 — worded either "requires a newer version of Codex"
-(2026-09-05, codex-cli 0.147.0) or, misleadingly, "not supported when using
-Codex with a ChatGPT account" (2026-10-01, `gpt-6.1-sol` on 0.158.0; OK on
-0.159.3). When the preflight or the first call fails that way, rerun
+or, misleadingly, "not supported when using Codex with a ChatGPT account". When the preflight or the first call fails that way, rerun
 `adversarial-review` with `--model gpt-6.1-sol` (the pin the other Codex calls
 below use), say so in the report, and tell the operator the fix:
 `npm install -g @openai/codex@latest`. An entry-point failure is a version
@@ -461,7 +459,7 @@ Confidence: [0.0-1.0]
 3. ...
 ```
 
-Rules: minimum 3 findings, maximum 12. Every CRITICAL/HIGH needs deterministic evidence. No praise. No filler.
+Rules: report every finding you can support, at most 12; zero findings is a valid result. Every CRITICAL/HIGH needs deterministic evidence. No praise. No filler.
 
 **Quote-the-line evidence gate (applies to BOTH the dual-model and single-model formats, at synthesis time):** a HIGH or CRITICAL finding must carry the verbatim motivating line (or verbatim quoted plan/document text) plus its location (`file:line` for code, section name for plans) in its Evidence field. A HIGH/CRITICAL finding whose evidence is only a paraphrase or a general claim is DEMOTED one severity level (CRITICAL→HIGH, HIGH→MEDIUM) with the note `(demoted: no verbatim evidence)` — never reported at full severity. (Source: everyinc/compound-engineering-plugin ce-code-review quote gate, 2026-07-09.)
 

@@ -63,7 +63,7 @@ Before deriving facts from scratch, probe for the harness's own usage analytics:
 Run the bundled script over the real corpus:
 
 ```bash
-python3 scripts/digest_sessions.py --pretty \
+python3 scripts/digest_sessions.py --pretty --since-days 60 \
     --out /tmp/self_assessment_digest.json \
     --per-session-out /tmp/self_assessment_sessions.json
 ```
@@ -71,13 +71,21 @@ python3 scripts/digest_sessions.py --pretty \
 It walks `~/.claude/projects/*/*.jsonl` (one file per session) and
 `~/.claude/history.jsonl` (typed prompts) and emits per-project + aggregate
 metrics: session counts, interactive-vs-automation split, model mix, slash-command
-usage, tool_errors, api_errors, interrupts, denials, token totals, err_samples,
-and the babysit-prompt share. It fixes the historically-flubbed **aiTitle** field
-and keeps **sidechain (subagent) records separate** from the main human loop.
+and skill usage, tool_errors, api_errors, interrupts, auto-mode refusals by reason,
+token totals, err_samples, typed messages and the go-ahead share. It fixes the
+historically-flubbed **aiTitle** field and keeps **sidechain (subagent) records
+separate** from the main human loop.
 
-Expect **1,500+ session files** on a mature setup (the reference corpus had 1,750
-sessions + ~11,600 history prompts = ~13k records, digested in ~18 s). Confirm the
-counts look sane before proceeding; a sudden collapse means a path moved.
+A session is interactive when the owner typed at least one message in the terminal
+or the desktop app. Take the go-ahead share from `totals.human_msgs` and
+`totals.babysit_msgs`: `history.jsonl` gets no desktop prompts. Temp-folder eval
+checkouts are skipped by default (`--include-temp-projects` reads them, ~9 minutes
+on 18 GB). Transcripts older than about two months are gone, so compare with the
+numbers the last section recorded, not with a re-count.
+
+Reference run 2026-11-12 (`--since-days 60`): 2,574 files read, 41,527 temp files
+skipped, 897 interactive sessions, 59 s. Confirm the counts look sane before
+proceeding; a sudden collapse means a path or a transcript format moved.
 
 The digest carries the external benchmark thresholds the miners check against:
 **Read:Edit ratio > 6** (good), **edits-without-prior-Read < 10%**, **frustration
@@ -172,3 +180,9 @@ with: ranked verdicts (each tagged skill/automation/fix/nothing), session-id
 citations on every material claim, the re-measure block (if a prior run exists),
 and an explicit not-proposing list. Diagnosis only — this skill decides and
 records; it does not build, edit configs, or install anything.
+
+## Auto-mode refusal report
+
+Run `python3 scripts/classifier_report.py --since-days 60` before reviewing auto-mode rules with /auto-mode-setup.
+It writes refusals by reason, with the five most frequent commands each, to `~/.claude/usage-data/classifier-report.md`.
+Keep it out of the repo: commands can hold client terms. Its total equals the digest's `classifier_denials` total for the same window.

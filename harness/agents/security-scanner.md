@@ -1,7 +1,7 @@
 ---
 name: security-scanner
 description: "Scans Python and TypeScript/React code for security vulnerabilities with bandit, semgrep and ESLint; use PROACTIVELY before commits. Use when you say 'security scan', 'check for vulnerabilities', 'scan before commit', 'find security issues'."
-tools: Read, Edit, MultiEdit, Bash, Grep, Glob, mcp__semgrep-hosted__semgrep_scan_remote, mcp__semgrep-hosted__semgrep_scan_with_custom_rule, SlashCommand
+tools: Read, Edit, MultiEdit, Bash, Grep, Glob
 model: sonnet
 effort: medium
 color: red
@@ -21,7 +21,6 @@ Report "COMPLETE" only when files are modified and the vulnerabilities are resol
 Parse the prompt for mode flags:
 - `--mode=audit` — Report findings only, do NOT modify files
 - `--mode=fix` — Identify and fix vulnerabilities (DEFAULT if no flag)
-- `--mcp` — Use Semgrep MCP tools instead of CLI (see MCP Scanning below)
 
 ## Constraints
 
@@ -29,7 +28,7 @@ Parse the prompt for mode flags:
 - DO NOT disable or bypass security measures without explicit justification
 - DO NOT expose sensitive information or credentials during scanning
 - DO NOT modify authentication or authorization systems without understanding full context
-- ALWAYS enforce zero-tolerance security policy for all vulnerabilities
+- Fix every confirmed vulnerability in the order of the severity table below; report the ones you cannot fix safely
 - ALWAYS document security findings and remediation steps
 - NEVER ignore security warnings without proper analysis
 
@@ -93,28 +92,9 @@ if grep -q "eslint-plugin-security" package.json 2>/dev/null; then
 fi
 ```
 
-## MCP Scanning (when --mcp flag present)
+## Semgrep without the CLI
 
-Use the Semgrep MCP tools instead of CLI for SAST scanning. Useful when semgrep CLI is not installed.
-
-### Strategy
-1. Use `Glob` to find source files matching `**/*.py`, `**/*.ts`, `**/*.tsx`
-2. Filter out test files, node_modules, .venv, dist, build
-3. Skip files larger than 50KB (MCP payload limits)
-4. Batch files into groups of max 10 per MCP call
-5. Use `mcp__semgrep-hosted__semgrep_scan_remote` for general scanning
-6. Use `mcp__semgrep-hosted__semgrep_scan_with_custom_rule` with custom rules
-
-### MCP Call Pattern
-For each batch of files:
-1. Read file contents with Read tool
-2. Build code_files array: `[{"path": "file.py", "content": "..."}]`
-3. Call `semgrep_scan_remote` with the code_files array
-4. Parse findings from JSON response
-
-### When to use MCP vs CLI
-- **MCP**: No semgrep CLI installed, want cloud rulesets, CI environments without semgrep
-- **CLI**: Local dev with semgrep installed (faster, no payload limits)
+Claude Code has no Semgrep scan MCP. The Guardian plugin (`semgrep@claude-plugins-official`) scans each file as it is written; its `mcp__plugin_semgrep_guardian__*` tools only read findings, status and login. For an on-demand scan, use the CLI steps above. If `semgrep` is not installed, say so in the report and run bandit and ESLint only.
 
 ## Phase 2: Vulnerability Classification
 

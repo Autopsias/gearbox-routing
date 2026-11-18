@@ -85,11 +85,14 @@ def spawner():
         else:
             subprocess.run(["/bin/sh", "-c", f"{inner} &"], cwd=cwd, check=True)
         for _ in range(100):
-            hit = [p for p in aj.ps_snapshot() if marker in p.command and p.ppid == 1]
-            if hit:
+            snap = aj.ps_snapshot()
+            hit = [p for p in snap if marker in p.command and p.ppid == 1]
+            # sh may not have forked `sleep` yet; tree-kill tests need the child.
+            if hit and aj.descendants(hit[0].pid, aj.children_map(snap)):
                 return hit[0]
             time.sleep(0.05)
-        raise AssertionError(f"detached process {marker} never appeared at PPID 1")
+        raise AssertionError(
+            f"detached process {marker} never appeared at PPID 1 with a child")
 
     yield spawn
 

@@ -36,7 +36,7 @@ silently dropped every request for a newer model). The write multipliers (main 2
 assume the default TTL buckets; confirm the main bucket when in doubt:
 
 ```bash
-claude -p "reply ok" --model claude-haiku-4-5 --output-format json | python3 -c "import json,sys;print(json.load(sys.stdin)['usage']['cache_creation'])"
+claude -p "reply ok" --model haiku --output-format json | python3 -c "import json,sys;print(json.load(sys.stdin)['usage']['cache_creation'])"
 ```
 
 `ephemeral_1h_input_tokens` > 0 means the one-hour cache is in effect.
@@ -70,13 +70,20 @@ decision card of at most three options; the house shape is in
 `~/.claude/references/shared/decision-card-html.md`. Save any adopted change back into
 the baseline memory note with the date.
 
+Trial to 2026-12-17 (worth-adopting ledger, row 2026-11-17, Parrott): keep one living page.
+If the baseline memory note holds no `Data page:` URL, start the page from the Data type
+(`Artifact`, `action: "quickstart"`, `intent: "other"`; it names the Dashboard type, listed as
+"Data") and save its URL in the note. Else republish to that URL, so the trend stays on one
+page and each number shows its source. If the type is absent or the fill fails, publish the
+plain page as before and say so.
+
 ## Gotchas (observed)
 
-- **lines are not requests.** One API request spans several transcript lines,
+- **Lines are not requests.** One API request spans several transcript lines,
   each carrying the same `usage` and `effort`. Counting lines doubled every effort figure in
   the first audit. The script deduplicates by `requestId`; keep it that way.
 - **MCP trimming is not a lever.** MCP server definitions add a small fixed cost
   to the base context (measure it with `--strict-mcp-config --mcp-config '{"mcpServers":{}}'`).
-- **hand edits to the live settings file block deploy.** A key deletion in
+- **Hand edits to the live settings file block deploy.** A key deletion in
   `~/.claude/settings.json` classes as harness drift; commit it in your harness source,
   restore the live file, then redeploy.

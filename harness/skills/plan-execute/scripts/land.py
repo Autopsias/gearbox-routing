@@ -35,8 +35,9 @@ result BEFORE the next runs, so a crash resumes rather than restarts:
               worktree removed — it is where step 8 happens.
 
 WHY THE CHECKPOINT IS ENFORCED IN THE MECHANISM AND NOT ON THE DISPATCH PATH.
-This repo MEASURED that by-name session dispatch (``begin --sessions sNN``) walks
-straight through ``requires_human_checkpoint`` — only ``plan`` surfaces it. So a
+This repo MEASURED that by-name session dispatch (``begin --sessions sNN``) once walked
+straight through ``requires_human_checkpoint``; ``begin_guard`` now refuses that, but
+only ``plan`` surfaces a checkpoint and records its answer. So a
 land gated by dispatch policy would be skippable by a documented command. Instead
 ``land_steps.step_ack`` sits between the gates and the push and there is no other
 route to ``step_push``: without a valid ack the push is unreachable, whatever
@@ -63,13 +64,17 @@ import sys
 from pathlib import Path
 
 import plan_teardown as pt
+import land_answer as la
+import land_cost as lc
 import land_env as lev
 import land_gate as lgt
+import land_phase2 as lp2
 import land_start as lsg
 import land_state as lst
 import land_push as steps
+import land_reservation as lr
+import lease_guard as lg
 import run_state_io as rsi
-import ship_locks as sl
 from land_state import LAND_TIMEOUT, context, load, save
 from worktree import git
 
@@ -122,8 +127,31 @@ def _remote_kept(msg, cleanup, manual=None):
     return msg
 
 
-def land(plan_dir):
-    """Run (or resume) the land protocol. Idempotent at every step."""
+def _take_lease(plan_dir, ctx, why="own-land"):
+    """None once the land lease is held, else the park to return (reserved or locked)."""
+    try:
+        lr.acquire(plan_dir, ctx["resource"], why, guarded_timeout=LAND_TIMEOUT,
+                   holder_kind=lg.LAND)
+    except lr.Reserved as e:
+        return lr.parked(e.rec)
+    except rsi.LockError as e:
+        return {"action": "land-locked", "resource": ctx["resource"], "message": str(e),
+                **lr.retry_fields(plan_dir, ctx["resource"])}
+    return None
+
+
+def _early_park_end(plan_dir, ctx, answered, park):
+    """A land that parks before the lease is taken is a real park: it ends this plan's
+    reservation, answered or not (R6 §17.2 inv. 3 and 7); ``lr.end`` takes the host mutex."""
+    lr.end(plan_dir, ctx["resource"], "answered" if answered else "real-park")
+    return park
+
+
+def land(plan_dir, answered=False, cost_report=None):
+    """Run (or resume) the land protocol. Idempotent at every step. ``answered`` is the
+    owner's answer going straight on (land_answer, R6 §17.2 inv. 5): the lease it takes
+    ends this plan's reservation in the same mutex hold, whatever the attempt returns."""
+    why = "answered" if answered else "own-land"
     plan_dir = str(Path(plan_dir).resolve())
     ctx = context(plan_dir)
     if ctx is None:
@@ -132,8 +160,11 @@ def land(plan_dir):
                            "nothing to land (§6's version gate, or §7.2's non-git target)."}
     guard = _preflight(plan_dir, ctx)
     if guard is not None:
-        return guard
+        return _early_park_end(plan_dir, ctx, answered, guard)
     st = load(plan_dir, ctx) or lst.new_state(ctx)
+    refused = lc.check(plan_dir, ctx, st, cost_report)
+    if refused is not None:
+        return refused
     if st.get("state") == "landed":
         cleanup = st.get("cleanup")
         if cleanup is not None and cleanup.get("worktree") != "preserved":
@@ -147,14 +178,13 @@ def land(plan_dir):
         # it alone, under a fresh lease — `step_cleanup` is idempotent, so
         # re-running it on an already-clean plan costs a few no-op git calls,
         # never re-walks the (already-succeeded) protocol above it.
-        try:
-            sl.acquire_ship_lock(plan_dir, ctx["resource"], guarded_timeout=LAND_TIMEOUT)
-        except rsi.LockError as e:
-            return {"action": "land-locked", "resource": ctx["resource"], "message": str(e)}
+        busy = _take_lease(plan_dir, ctx, why)
+        if busy:
+            return busy
         try:
             cleanup = pt.step_cleanup(plan_dir, ctx, st)
         finally:
-            sl.release_ship_lock(plan_dir, ctx["resource"])
+            lr.release(plan_dir, ctx["resource"], why="landed")
         msg = _remote_kept("already landed — nothing to do"
                            if cleanup.get("worktree") != "preserved"
                            else "already landed — cleanup still refused, see `cleanup.detail`",
@@ -165,15 +195,16 @@ def land(plan_dir):
     # After the push the gates are over, so a wrong interpreter must not stop the record.
     guard = None if steps.already_landed(ctx, st) else lev.check(plan_dir, ctx)
     if guard is not None:
-        return guard
+        return _early_park_end(plan_dir, ctx, answered, guard)
+    # §4.1 — LOCKS FIRST, worktree second. Acquired before anything is
+    # created, so the lease (not a filesystem collision) is the single
+    # arbiter between two landers.
+    busy = _take_lease(plan_dir, ctx, why)
+    if busy:
+        return busy
+    out = {}
     try:
-        # §4.1 — LOCKS FIRST, worktree second. Acquired before anything is
-        # created, so the lease (not a filesystem collision) is the single
-        # arbiter between two landers.
-        sl.acquire_ship_lock(plan_dir, ctx["resource"], guarded_timeout=LAND_TIMEOUT)
-    except rsi.LockError as e:
-        return {"action": "land-locked", "resource": ctx["resource"], "message": str(e)}
-    try:
+        lp2.enter(plan_dir, ctx, st)          # R7 §18.1: phase 2 opens only on an ack
         # RESUME AFTER THE POINT OF NO RETURN. Everything up to and including the
         # push is skipped once git confirms the merge is already on the target:
         # the sync, the merge and the re-gate all describe a world that no longer
@@ -181,9 +212,11 @@ def land(plan_dir):
         sequence = ((steps.step_final_record,) if steps.already_landed(ctx, st)
                     else steps.STEPS)
         for step in sequence:
-            out = step(plan_dir, ctx, st)
-            if out is not None:
-                return out
+            res = (lg.renew_or_park(plan_dir, ctx, st, step.__name__)
+                   or lp2.run_step(plan_dir, ctx, st, step, steps._reset))
+            if res is not None:
+                out = res
+                return res
         finish = steps.step_finish(plan_dir, ctx, st)
         # STEP 9 — post-land cleanup (§15's `land-success` row). Only when the
         # land itself succeeded: `step_finish`'s OWN preserved-land-worktree
@@ -191,11 +224,17 @@ def land(plan_dir):
         # not be reinterpreted as a landed result with a cleanup note.
         if finish.get("action") == "landed":
             finish["cleanup"] = pt.step_cleanup(plan_dir, ctx, st)
+        out = finish
         return finish
     finally:
-        # §15 — a parked plan holds NOTHING. The lease is released on every exit,
-        # including the AWAITS_REVIEW park, which may outlive it by days.
-        sl.release_ship_lock(plan_dir, ctx["resource"])
+        # §15 — a parked plan holds NOTHING. The lease is released on every exit, including
+        # the owner stops, which leave a reservation (R6 §17.2) written before the release.
+        out = out or {}
+        try:
+            lp2.leave(plan_dir, ctx, st, out)     # §18.6: marker gone before the lease goes
+        finally:
+            lr.release(plan_dir, ctx["resource"], lr.owner_stop(out),
+                       "landed" if out.get("action") == "landed" else "real-park")
 
 
 def land_ack(plan_dir, note=None):
@@ -335,6 +374,7 @@ def land_record(plan_dir, gate, status, findings_count=None, result_file=None):
             return {"action": "error", "gate": gate,
                     "message": f"--result-file {result_file} does not exist or is empty. A "
                                "PASS that names an artifact must be able to show it."}
+    st["red_parks"] = 0     # a recorded verdict is new information: no cost line needed after it
     st.setdefault("skill_gates", {})[gate] = {
         "outcome": outcome, "gate_key": st["gate_key"],
         "findings_count": int(findings_count or (0 if outcome == "pass" else 1)),
@@ -409,15 +449,22 @@ def land_action(plan_dir, action):
 
 # The CLI seams `run.py` binds to. One table, so a new land subcommand is one
 # row here and a parser in `run_parsers._add_land_parsers` — never a branch in
-# `run.py`'s dispatch.
+# `run.py`'s dispatch. Every row that writes takes the per-plan run lock ONCE (R6
+# §17.5.2); the answers (`land-ack`, `land-record`, `land-verify`) then go straight
+# on with the land in the same process (`land_answer`).
 CLI = {
-    "land": lambda plan_dir, args: land(plan_dir),
-    "land-resume": lambda plan_dir, args: land(plan_dir),
-    "land-ack": lambda plan_dir, args: land_ack(plan_dir, args.note),
-    "land-verify": lambda plan_dir, args: land_verify(plan_dir, args.decision, args.note),
-    "land-record": lambda plan_dir, args: land_record(
-        plan_dir, args.gate, args.status, args.findings_count,
-        getattr(args, "result_file", None)),
+    "land": lambda plan_dir, args: la.run_locked(
+        plan_dir, lambda p: land(p, cost_report=getattr(args, "cost_report", None))),
+    "land-resume": lambda plan_dir, args: la.run_locked(
+        plan_dir, lambda p: land(p, cost_report=getattr(args, "cost_report", None))),
+    "land-ack": lambda plan_dir, args: la.run_locked(
+        plan_dir, lambda p: la.ack_push(p, args.note, land_ack, land)),
+    "land-verify": lambda plan_dir, args: la.run_locked(
+        plan_dir, lambda p: la.then_land(p, land_verify(p, args.decision, args.note), land)),
+    "land-record": lambda plan_dir, args: la.run_locked(
+        plan_dir, lambda p: la.then_land(p, land_record(
+            p, args.gate, args.status, args.findings_count,
+            getattr(args, "result_file", None)), land)),
     "land-status": lambda plan_dir, args: land_status(plan_dir),
 }
 
@@ -426,10 +473,14 @@ def _cli(argv=None):
     p = argparse.ArgumentParser(prog="land", description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
     for name in ("land", "land-resume", "land-status"):
-        sub.add_parser(name).add_argument("plan_dir")
+        sp = sub.add_parser(name)
+        sp.add_argument("plan_dir")
+        if name != "land-status":
+            sp.add_argument("--cost-report", default=None)
     ack = sub.add_parser("land-ack")
     ack.add_argument("plan_dir")
-    ack.add_argument("--note", default=None)
+    ack.add_argument("--note", default=None,
+                     help="why you approved THIS candidate; the same command then pushes it")
     ver = sub.add_parser("land-verify")
     ver.add_argument("plan_dir")
     ver.add_argument("--decision", required=True, choices=list(lgt.DECISIONS))
@@ -441,15 +492,7 @@ def _cli(argv=None):
     rec.add_argument("--findings-count", type=int, default=None)
     rec.add_argument("--result-file", default=None)
     a = p.parse_args(argv)
-    if a.cmd in ("land", "land-resume"):
-        return land(a.plan_dir)
-    if a.cmd == "land-status":
-        return land_status(a.plan_dir)
-    if a.cmd == "land-ack":
-        return land_ack(a.plan_dir, a.note)
-    if a.cmd == "land-verify":
-        return land_verify(a.plan_dir, a.decision, a.note)
-    return land_record(a.plan_dir, a.gate, a.status, a.findings_count, a.result_file)
+    return CLI[a.cmd](a.plan_dir, a)
 
 
 if __name__ == "__main__":  # pragma: no cover — operator/evidence entry point

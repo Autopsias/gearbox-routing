@@ -97,11 +97,10 @@ if tests_fixed > 0 and all_tests_passing:
 
         # Check if coverage validation is appropriate
         if tests_fixed > 5 or coverage_impacted:
-            print("Validating coverage after test fixes...")
-            SlashCommand(command="/coverage validate")
+            # A subagent cannot run a slash command: report it for the main session
+            print("Next for the main session: /coverage validate")
 
         # If significant test improvements, commit them
         if tests_fixed > 10:
-            print("Committing unit test improvements...")
-            SlashCommand(command="/commit-orchestrate 'test: Fix unit test failures and improve test reliability'")
+            print("Next for the main session: /commit-orchestrate 'test: Fix unit test failures and improve test reliability'")
 ```

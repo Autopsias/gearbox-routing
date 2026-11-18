@@ -1,7 +1,7 @@
 ---
 name: unit-test-fixer
 description: "Fixes Python pytest/unittest failures (assertions, mocks, fixtures); use PROACTIVELY when unit tests fail. Examples: \"pytest assertion failed in test_function()\", \"Mock configuration not working properly\", \"Test fixture setup failing\", \"unittest errors in test suite\"."
-tools: Read, Edit, MultiEdit, Bash, Grep, Glob, SlashCommand
+tools: Read, Edit, MultiEdit, Bash, Grep, Glob
 model: sonnet
 effort: medium
 color: purple

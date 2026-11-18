@@ -240,6 +240,28 @@ def test_plan_changes_names_each_at_land_gate_the_plan_side_touched(tmp_path):
     assert "could not read origin" in line and "JSONDecodeError" in line
 
 
+@pytest.mark.parametrize("ignored", [True, False])
+def test_a_gitignored_main_registry_reaches_the_land_worktree(tmp_path, ignored):
+    root, land = tmp_path / "root", tmp_path / "land"
+    root.mkdir()
+    git(["init", "-q"], root, check=True)
+    (root / ".gitignore").write_text(f"{REG}\n" if ignored else "other\n")
+    git(["add", "-A"], root, check=True)
+    git(["-c", "user.email=t@e", "-c", "user.name=T", "commit", "-qm", "o"], root, check=True)
+    (root / ".claude").mkdir()
+    (root / REG).write_text(_registry(**{"x": _ci("true")}))     # outside git, main only
+    git(["worktree", "add", "-q", "--detach", str(land), "HEAD"], root, check=True)
+    assert not (land / REG).exists()                             # a fresh land worktree
+    # KNOWN POSITIVE (ignored) and KNOWN NEGATIVE (an untracked, unignored file stays unread).
+    assert ("x" in dict(lal.at_land_gates(land, land))) is ignored
+    assert lal.plan_changes(land, "HEAD") == []                  # not a plan change
+    (land / ".gitignore").write_text(f"{REG}\n")                 # the plan's own ignore rules
+    assert ("x" in lal.registry(land)) is ignored                # ... never choose the registry
+    (land / ".claude").mkdir()
+    (land / REG).write_text(_registry())                         # the tree's own file wins
+    assert "x" not in lal.registry(land)
+
+
 def test_a_registry_lstat_permission_error_parks_not_reads_as_absent(tmp_path, monkeypatch):
     real = os.lstat
 

@@ -12,7 +12,9 @@ the value has the wrong type. ``bool`` is never an ``int`` here. A caller that
 must tell "missing" from "wrong type" (to refuse the second) checks ``key in d``.
 """
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc          # not datetime.UTC: the pre-push hook may run on Python 3.9
 
 
 def load_dict(text):

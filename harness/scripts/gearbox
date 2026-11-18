@@ -158,9 +158,12 @@ do_harvest() {
 
   # Untracked runtime output is harvestable; untracked anything ELSE is never
   # auto-added — that is the guard against silently tracking transcripts/PII.
+  # Deploy adds only `live_auto`: new memory notes and plan files outside every
+  # _evidence/ folder (which holds `claude -p` transcripts), each under 200 KB.
+  # Every other new path waits for `gearbox harvest`.
   if [ "$routine" = 1 ]; then
-    classes="churn,live_state"     # tracked modifications only: deploy must not
-  else                             # create new tracked paths without an operator
+    classes="churn,live_state,live_auto"
+  else
     classes="churn,live_state,live_untracked,harness"
   fi
   snap_paths "$SNAP.add" "$classes"
@@ -216,14 +219,39 @@ do_harvest() {
   # on disk or is still known to the index.
   : > "$SNAP.addable"
   while IFS= read -r -d '' p; do
-    if [ -e "$CD/$p" ] || git -C "$CD" ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+    if [ -e "$CD/$p" ] || git --literal-pathspecs -C "$CD" ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
       printf '%s\0' "$p" >> "$SNAP.addable"
     fi
   done < "$SNAP.add"
   if [ -s "$SNAP.addable" ]; then
-    xargs -0 git -C "$CD" add --all -- < "$SNAP.addable"
+    xargs -0 git --literal-pathspecs -C "$CD" add --all -- < "$SNAP.addable"
   else
     say "harvest: every classified path is already resolved in the index — nothing to stage"
+  fi
+
+  # A file can change between classification and staging (a note swapped for a directory,
+  # a note grown past the cap). Re-check what git actually staged, not the working files:
+  # every NEW staged path (whatever its class: live_state can add files too) must still fit
+  # the auto-harvest policy, else it is unstaged. --no-renames: a rename or copy record
+  # would hide the addition and carry two paths.
+  if [ "$routine" = 1 ]; then
+    python3 - "$CD" <<'PY' >&2 || die 1 "harvest: could not validate the staged set — nothing committed"
+import re, subprocess, sys
+cd = sys.argv[1]
+git = ["git", "--literal-pathspecs", "-C", cd]
+raw = subprocess.run(git + ["diff", "--cached", "--raw", "-z", "--no-renames", "--no-ext-diff", "--diff-filter=A"], capture_output=True, check=True).stdout
+f = raw.decode("utf-8", "surrogateescape").split("\0")[:-1]
+if len(f) % 2:
+    sys.exit("unexpected git output: odd field count")
+ok = re.compile(r"^(projects/[^/]+/memory/.*\.md|_plans/.*)$")
+for meta, path in zip(f[0::2], f[1::2]):
+    mode, blob = meta.split()[1], meta.split()[3]
+    size = int(subprocess.run(git + ["cat-file", "-s", blob], capture_output=True, check=True).stdout)
+    if mode in ("100644", "100755") and ok.match(path) and "_evidence" not in path.split("/") and size < 204800:
+        continue
+    subprocess.run(git + ["reset", "-q", "--", path], check=True)
+    print(f"harvest: NOT staged (outside the auto-harvest policy; left for `gearbox harvest`): {path}")
+PY
   fi
 
   if git -C "$CD" diff --cached --quiet; then
@@ -235,7 +263,7 @@ do_harvest() {
 import json, sys
 d = json.load(open(sys.argv[1]))
 sel = [c.strip() for c in sys.argv[2].split(",")]
-label = {"live_state": "live-state", "live_untracked": "live-state (new)",
+label = {"live_state": "live-state", "live_untracked": "live-state (new)", "live_auto": "live-state (new)",
          "churn": "machine-churn", "harness": "HARNESS hotfix"}
 counts = [f"{len(d[c])} {label[c]}" for c in sel if d[c]]
 print("harvest: " + ", ".join(counts))
@@ -270,7 +298,25 @@ $body"
 }
 
 # --- drift ------------------------------------------------------------------
+# Help text, or a refusal of any argument a subcommand does not know. deploy and
+# drift once ignored unknown arguments, so `gearbox deploy --help` ran a real deploy.
+usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+check_args() {  # check_args <subcommand> <allowed flag...> -- "$@"
+  local sub="$1"; shift
+  local allowed=()
+  while [ "$1" != "--" ]; do allowed+=("$1"); shift; done
+  shift
+  local a ok f
+  for a in "$@"; do
+    case "$a" in -h|--help) usage; exit 0 ;; esac
+    ok=0
+    for f in "${allowed[@]}"; do [ "$a" = "$f" ] && ok=1; done
+    [ "$ok" = 1 ] || die 1 "$sub: unknown argument: $a"
+  done
+}
+
 do_drift() {
+  check_args drift --brief -- "$@"
   local brief=0
   [ "${1:-}" = "--brief" ] && brief=1
   preflight
@@ -314,6 +360,7 @@ do_drift() {
 
 # --- deploy -----------------------------------------------------------------
 do_deploy() {
+  check_args deploy -- "$@"
   preflight
   take_lock
 
@@ -415,7 +462,7 @@ do_deploy() {
 
   # (c cont.) routine dirt is auto-harvested, never blocking. Committing it before
   # the sync is also what keeps a churned settings.json from making the merge refuse.
-  if [ "$(snap_count churn,live_state)" != "0" ]; then
+  if [ "$(snap_count churn,live_state,live_auto)" != "0" ]; then
     say "-- auto-harvest (routine classes) --"
     do_harvest --routine
     ahead="$(git -C "$CD" rev-list --count "$up..HEAD")"
@@ -508,11 +555,9 @@ do_deploy() {
   # Like the port render, this is loud but non-fatal to the primary Claude deploy.
   say "-- sync ~/.agents skills --"
   local mirror_sync="$CD/skills/codex-skill-sync/scripts/sync_from_claude.py"
-  # The sync needs PyYAML; a Homebrew python3 bump (3.15) arrived without it.
-  local mirror_py=python3 p
-  for p in python3 python3.14 python3.13; do
-    if command -v "$p" >/dev/null && "$p" -c 'import yaml' 2>/dev/null; then mirror_py=$p; break; fi
-  done
+  # The sync needs PyYAML; scripts/pyres picks the Python that has it (ADR 0006).
+  local mirror_py
+  mirror_py=$("$CD/scripts/pyres" yaml) || mirror_py=python3
   if [ "$codex_render_ok" != "1" ]; then
     warn "   SKIPPED: ~/.codex render failed, so port precedence is not trustworthy."
   elif [ ! -f "$mirror_sync" ]; then
@@ -552,8 +597,6 @@ case "${1:-}" in
   deploy)  shift; do_deploy "$@" ;;
   drift)   shift; do_drift "$@" ;;
   harvest) shift; do_harvest "$@" ;;
-  -h|--help|"")
-    sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
-    ;;
+  -h|--help|"") usage ;;
   *) die 1 "unknown subcommand: $1 (deploy | drift | harvest)" ;;
 esac

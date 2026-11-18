@@ -323,3 +323,12 @@ def preserved(path, plan_dir, extra):
     lines += ["", f"  cd {path}", "  git status --porcelain --ignored=matching",
               f"  run.py land-resume {plan_dir}"]
     return "\n".join(lines)
+
+
+def reserved(rec, wait):
+    """The brief for a land that another plan's owner-stop reservation holds back."""
+    return (f"LAND PARKED — {rec.get('plan_slug')} is waiting on its owner ({rec.get('reason')}) "
+            f"and holds the next land turn until {rec.get('expires_at')} (about {wait} s). "
+            "Nothing was taken or written. It ends when its owner answers, when that plan lands "
+            "or parks for real, "
+            f"or at that time. Re-run `run.py land <plan-dir>` after it.")

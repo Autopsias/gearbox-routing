@@ -36,7 +36,8 @@ Gate 1 needs no stored state. Gates 2 and 3 are the reason this file exists.
       "sightings": [
         {"session": "<id-or-date>", "quote": "...", "seen": "YYYY-MM-DD"}
       ],
-      "retired": null
+      "retired": null,
+      "layer": "shape|check|text"
     }
   ],
   "rejections": [
@@ -62,6 +63,7 @@ Both top-level keys are always present, both are always arrays. An empty ledger 
 | `gaps[].sightings[].quote` | The verbatim excerpt that evidenced the gap in that session — a transcript quote, or the cited config text (`path:line`) for a file-derived finding. Word-for-word, not paraphrased. This is what gate 1 produced; storing it is what lets gate 3 later judge "materially new". |
 | `gaps[].sightings[].seen` | Date the sighting was recorded, `YYYY-MM-DD`. Drives the 90-day expiry. |
 | `gaps[].retired` | `null` while the gap is live. Set to `YYYY-MM-DD` once a rule covers it. A retired gap is not presented again, with two exceptions: a `standing-default-` key and an open candidate line (see "Matching a finding to a gap key" and "The candidate line"). |
+| `gaps[].layer` | Written with `retired`, never before: where the lesson was stored. `shape` = the cause was removed (a tool fix), `check` = a row in `hooks/command_rules.json`, `text` = a rule in a config file or skill. Old retired gaps have no `layer`: never rewrite them; a reader counts a missing value as unmarked (shown as text for display only, with the unmarked count beside it). |
 | `rejections[].edit` | One-line summary of the exact edit the user rejected, naming the target file. Specific enough that a later run can tell whether it is proposing the same thing. |
 | `rejections[].rejected` | Date of the rejection, `YYYY-MM-DD`. |
 | `rejections[].evidence_then` | The verbatim quotes that supported the edit *at the moment it was rejected*. This is the baseline "materially new evidence" is measured against. |
@@ -167,7 +169,7 @@ already declined once.
 ### Retiring a gap
 
 When a finding is **accepted and applied**, set that gap's `retired` to today's
-date. The rule now covers it; further sightings are noise. Do not delete the gap —
+date and its `layer` (`shape`, `check` or `text`, the layer of the 4a option that was applied). The rule now covers it; further sightings are noise. Do not delete the gap —
 the retirement date is the record of when it was closed. Retiring a gap never closes
 an open candidate line. For a `standing-default-`
 key the date is the adoption date: it restarts that class's count (`--after`), and

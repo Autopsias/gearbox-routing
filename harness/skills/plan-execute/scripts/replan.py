@@ -54,6 +54,7 @@ from pathlib import Path
 
 import article_block as ab
 import closeout_pipeline as cp
+import findings_digest as fd
 import manifest_io as mio
 import plan_mutate as pm
 import run_state_io as rsi
@@ -514,6 +515,6 @@ def changes_since(plan_dir, rec, invalidated):
     return [
         e
         for e in pm.read_changelog(plan_dir)
-        if (e.get("at") or "") > at
+        if (e.get("at") or "") > at and e.get("op") not in fd.DISPLAY_ONLY_OPS
         and ({e.get("session")} | set(e.get("sessions_touched") or [])) & set(invalidated)
     ]

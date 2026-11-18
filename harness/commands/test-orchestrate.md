@@ -2,7 +2,7 @@
 name: test-orchestrate
 description: "Analyzes test failures and dispatches parallel specialist agents (unit-test-fixer, api-test-fixer, database-test-fixer, e2e-test-fixer) to fix them. Use when you say 'fix tests', 'tests are failing', 'test orchestrator', or need strategic test failure analysis. For the full commit->push->PR->CI-green chain, use /ship-tail instead (which calls this internally as its test-fix step)."
 argument-hint: "[test_scope] [--run-first] [--coverage] [--fast] [--strategic] [--research] [--force-escalate] [--no-chain] [--intent=<block>] [--api-only] [--database-only] [--vitest-only] [--pytest-only] [--playwright-only] [--only-category=<unit|integration|e2e|acceptance>] [--fix-single-type]"
-allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 disable-model-invocation: false
 ---
 
@@ -24,7 +24,7 @@ Execute this test orchestration procedure for: "$ARGUMENTS"
 [ ] STEP 1    Parse arguments
 [ ] STEP 2    Discover cached test results
 [ ] STEP 2.5  Test framework intelligence (save markers — MUST)
-[ ] STEP 2.6  Discover project context (shared cache)
+[ ] STEP 2.6  Discover project context (once)
 [ ] STEP 3    Decision logic + early exit
 [ ] STEP 4    Run fresh tests (if needed)
 [ ] STEP 5    Read test result files
@@ -103,7 +103,7 @@ Report the mode: "Operating in [TACTICAL/STRATEGIC] mode."
 
 ## STEP 0.5: Ralph Loop Mode Detection
 
-`--loop` was retired with its runner script. Run the command without it; for unattended runs use `/loop` or `/epic-dev --auto`.
+For unattended runs use `/loop` or `/epic-dev --auto`.
 
 ---
 
@@ -221,33 +221,23 @@ grep -l "@pytest.mark.slow" tests/**/*.py 2>/dev/null | wc -l | xargs echo "Slow
 
 ---
 
-## STEP 2.6: Discover Project Context (SHARED CACHE - Token Efficient)
-
-**Token Savings**: Using shared discovery cache saves ~14K tokens (2K per agent x 7 agents).
+## STEP 2.6: Discover Project Context (once, shared with every agent)
 
 ```bash
-echo "=== Loading Shared Project Context ==="
-
-if [[ -f "$HOME/.claude/scripts/shared-discovery.sh" ]]; then
-    source "$HOME/.claude/scripts/shared-discovery.sh"
-    discover_project_context
-else
-    echo "Shared discovery not found, using inline discovery"
-    PROJECT_CONTEXT=""
-    [ -f "CLAUDE.md" ] && PROJECT_CONTEXT="Read CLAUDE.md for project conventions. "
-    [ -d ".claude/rules" ] && PROJECT_CONTEXT+="Check .claude/rules/ for patterns. "
-    PROJECT_TYPE=""
-    [ -f "pyproject.toml" ] && PROJECT_TYPE="python"
-    [ -f "package.json" ] && PROJECT_TYPE="${PROJECT_TYPE:+$PROJECT_TYPE+}node"
-    SHARED_CONTEXT="$PROJECT_CONTEXT"
-fi
+PROJECT_CONTEXT=""
+[ -f "CLAUDE.md" ] && PROJECT_CONTEXT="Read CLAUDE.md for project conventions. "
+[ -d ".claude/rules" ] && PROJECT_CONTEXT+="Check .claude/rules/ for patterns. "
+PROJECT_TYPE=""
+[ -f "pyproject.toml" ] && PROJECT_TYPE="python"
+[ -f "package.json" ] && PROJECT_TYPE="${PROJECT_TYPE:+$PROJECT_TYPE+}node"
+SHARED_CONTEXT="$PROJECT_CONTEXT"
 
 echo "PROJECT_TYPE=$PROJECT_TYPE"
 echo "VALIDATION_CMD=${VALIDATION_CMD:-pnpm prepush}"
 echo "TEST_FRAMEWORK=${TEST_FRAMEWORK:-pytest}"
 ```
 
-**CRITICAL**: Pass `$SHARED_CONTEXT` to ALL agent prompts instead of asking each agent to discover.
+Pass `$SHARED_CONTEXT` to every agent prompt, so no agent has to rediscover the framework.
 
 ---
 
@@ -340,7 +330,7 @@ If TACTICAL mode, skip to STEP 7.5.
 
 ## STEP 8: PARALLEL AGENT DISPATCH
 
-### CRITICAL: Launch ALL agents in ONE response with multiple Task calls.
+### Launch all agents in one response with multiple Task calls, so they run concurrently.
 
 **Instructions:** Read `~/.claude/references/test-orchestrate/agent-dispatch-rules.md` and follow the enhanced agent context template, dispatch examples, and model strategy.
 

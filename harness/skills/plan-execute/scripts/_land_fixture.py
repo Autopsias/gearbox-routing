@@ -56,9 +56,11 @@ def _built_plan(root, slug):
     return d
 
 
-def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False):
+def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False,
+               plan_gates=("marker-gate",)):
     """A primary checkout on ``main`` with a real ``origin`` and N plan dirs.
-    ``gates`` adds registry entries; ``built`` makes each plan with plan-builder."""
+    ``gates`` adds registry entries; ``built`` makes each plan with plan-builder;
+    ``plan_gates`` are the gate ids a hand-made plan's one session declares."""
     tmp = Path(tmp)
     origin = tmp / "origin.git"
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
@@ -87,7 +89,7 @@ def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False):
         (d / "PLAN.html").write_text("<html>base</html>\n")
         (d / "manifest.json").write_text(json.dumps(
             {"plan_schema_version": 7,
-             "sessions": [{"id": "s01", "verify": {"gates": ["marker-gate"]}}]}) + "\n")
+             "sessions": [{"id": "s01", "verify": {"gates": list(plan_gates)}}]}) + "\n")
         plans[slug] = d
     git(["init", "-q", "-b", "main", "."], root, check=True)
     git(["config", "user.email", "t@example.com"], root, check=True)
@@ -190,9 +192,13 @@ def run_cli(*argv, cwd=None):
 # tests and the evidence generator arm the same conditions, and a second copy
 # is a second thing to drift.
 # --------------------------------------------------------------------------
-def _arm_prepush(fx, times=1):
+def _arm_prepush(fx, times=1, race_dir="projects/race/memory"):
     """A pre-push hook that advances origin/main from a third clone, ``times``
-    times, then stands down — a REAL competing lander inside our push window."""
+    times, then stands down — a REAL competing lander inside our push window.
+
+    The race commit writes under ``race_dir``. The default is a live-state path (a
+    harvest), the one move R6 §17.1 re-syncs unattended; ``race_dir=""`` writes at
+    the repo root, harness code, which sends the land back to review."""
     hook = Path(fx["root"]) / ".git" / "hooks" / "pre-push"
     # `unset GIT_DIR ...` is LOAD-BEARING, not hygiene. git exports GIT_DIR (and
     # friends) into every hook, and a `git clone` + `git push` run under them
@@ -211,7 +217,7 @@ d=$(mktemp -d)
 git clone -q "{fx['origin']}" "$d/c" || exit 0
 cd "$d/c" || exit 0
 git config user.email r@example.com && git config user.name R
-echo "race $n" > raced-$n.txt && git add -A && git commit -q -m "race $n"
+mkdir -p "./{race_dir}" && echo "race $n" > "./{race_dir}/raced-$n.txt" && git add -A && git commit -q -m "race $n"
 git push -q origin HEAD:main
 exit 0
 """)
@@ -291,3 +297,40 @@ def _arm_slow_gate(fx):
                                   f"[ -f '{fx['root']}/.SLOWGATE' ] && sleep 60; "
                                   "test ! -f GATE_FAIL"]}}))
     (Path(fx["root"]) / ".SLOWGATE").touch()
+
+
+def ack_only(plan_dir, note):
+    """Record the land ack and NOTHING else, as `(0, result)` like ``run_cli``. The
+    ``land-ack`` command now pushes in the same step (R6 §17.3), so the tests that stage
+    "acked, not yet landed" record the ack through the function that only records it."""
+    import land  # noqa: PLC0415
+    return 0, land.land_ack(str(plan_dir), note)
+
+
+def _only(result):
+    return (1 if result.get("action") == "error" else 0), result
+
+
+def verify_only(plan_dir, decision, note=None):
+    """Record the on-box disposition and NOTHING else, as `(rc, result)`. The `land-verify`
+    command now goes straight on with the land (R6 §17.2), which these tests count runs of."""
+    import land  # noqa: PLC0415
+    return _only(land.land_verify(str(plan_dir), decision, note))
+
+
+def record_only(plan_dir, gate, status):
+    """`land-record`'s record, without the land that now follows it (see `verify_only`)."""
+    import land  # noqa: PLC0415
+    return _only(land.land_record(str(plan_dir), gate, status))
+
+
+def ignored_gate_output(fx, land_path):
+    """What a land gate leaves behind (2026-11-18: a venv, test results): a
+    git-ignored folder in the land worktree."""
+    common = Path(git(["rev-parse", "--git-common-dir"], fx["root"], check=True)[1])
+    common = common if common.is_absolute() else Path(fx["root"]) / common
+    (common / "info").mkdir(exist_ok=True)
+    with open(common / "info" / "exclude", "a") as fh:
+        fh.write("test-results/\n")
+    (Path(land_path) / "test-results").mkdir()
+    (Path(land_path) / "test-results" / "junit.xml").write_text("<x/>\n")

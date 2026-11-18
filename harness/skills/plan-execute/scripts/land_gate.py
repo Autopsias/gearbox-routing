@@ -44,7 +44,11 @@ import gate_expect as gx
 import gate_files
 import gate_timing as gt
 import land_at_land as lal
+import land_broker as lbk
+import land_carry as lc
 import land_flaky as lfk
+import lease_guard as lg
+import land_load as lld
 import land_repair as lrp
 import land_short as lsh
 import land_start as lsg
@@ -145,7 +149,7 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
         # would have lost §5.1b entirely and handed the reviewer the whole record.
         env[rvs.EXCLUDE_ENV] = ",".join([f"{lst.ps.PLANS_DIR}/{ctx['slug']}", *_base_excludes(cwd, st["expected"])])
     t0 = time.monotonic()
-    res = ssio.run_deploy_argv(g["argv"], cwd=cwd, timeout=g.get("timeout", 1200),
+    res = ssio.run_deploy_argv(g["argv"], cwd=cwd, timeout=lst.timeout_for(g.get("timeout", 1200)),
                                env_allowlist=g.get("env_allowlist", []), env_extra=env)
     wall_s = round(time.monotonic() - t0, 1)     # the brief's per-gate cost (Long gates)
     rc = res.get("returncode")
@@ -177,6 +181,7 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
             "short_review": lsh.short_review(out) if outcome == "skipped" and not cause else None,
             "log": lrp.write_log(ctx, gid + log, res),       # LND-03: the full output
             "findings_count": 1 if outcome == "fail" else 0,
+            "review": rvs.EXCLUDE_ENV in (g.get("env_allowlist") or []),
             "excerpt": gx.expect_excerpt(gid, miss, out[-4000:])}
     gt.log_run(plan_dir, "land" + log.replace(".", "-"), None, gid, wall_s, rec["outcome"])
     if log != ".base":        # LND-12: every land-tree failure is recorded, and saved, now
@@ -300,7 +305,7 @@ def _gate_set_digest(gates):
     blob = json.dumps([[gid, g.get("kind"), g.get("argv"), g.get("cwd"),
                         g.get("skill"), g.get("indeterminate_exit"),
                         g.get("timeout"), sorted(g.get("env_allowlist") or []),
-                        g.get("expect")]
+                        g.get("expect"), g.get("rerun_tests")]
                        for gid, g in gates], sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
@@ -386,6 +391,28 @@ def disposition(st, gid, key):
     return rec if rec and rec.get("gate_key") == key else None
 
 
+def _run_argv_step(plan_dir, ctx, st, gid, g, key):
+    """Run one argv gate that has no cached answer. Returns the gate's record, or
+    a park directive (it has an ``action``): bad cwd, or the lease was lost."""
+    cwd = gate_cwd(g.get("cwd"), ctx["plan_tree"], st["land_path"])
+    if cwd is None:
+        return park(plan_dir, ctx, st, "gate-cwd-outside-land",
+                    f"LAND PARKED — gate {gid!r} declares cwd {g.get('cwd')!r}, which "
+                    f"is missing from, or resolves outside, the land worktree {st['land_path']}. Running "
+                    "it unmapped would execute the gate in the OPERATOR'S CHECKOUT — "
+                    "the collision this isolation exists to prevent — and would gate "
+                    "a tree that is not the candidate.")
+    if (lost := lg.renew_or_park(plan_dir, ctx, st, f"before gate {gid}")) is not None:
+        return lost
+    rec = lld.retry(ctx, st, gid, g, _run_argv_gate(plan_dir, ctx, st, gid, g, cwd))
+    if "action" not in rec and rec["outcome"] == "pass":
+        # Only a green verdict is cached; saved at once so a crash or the skill round trip resumes free.
+        st.setdefault("argv_gates", {})[gid] = {**rec, "gate_key": key, "full_at": lst.now()}
+        st["gate_key"] = key
+        save(plan_dir, ctx, st)
+    return rec
+
+
 def step_gate(plan_dir, ctx, st):
     """Run the plan's UNION of verify gates in the land worktree, on the exact
     tree that will be pushed (§5.1b: AFTER ``record-plan``, never before).
@@ -408,18 +435,14 @@ def step_gate(plan_dir, ctx, st):
                     f"LAND PARKED — a verify gate does not resolve ({e.reason}): {e}. A gate "
                     "that cannot run is never counted green — an unlaunchable gate and a "
                     "passing one are the same exit code.")
-    key = (f"{st['expected']}:{st.get('plan_head')}:{st.get('merge_sha')}"
-           f":{_gate_set_digest(gates)}")
+    set_key = _gate_set_digest(gates)
+    key = f"{st['expected']}:{st.get('plan_head')}:{st.get('merge_sha')}:{set_key}"
     if st.get("gate_key") != key:
-        # The key is written WITH the reset, not only at the bottom. Left stale,
-        # a park between here and there (an unreadable surface, an empty one, a
-        # gate cwd outside the land) leaves `land_record` accepting a verdict,
-        # stamping it with the OLD key and returning success — and `step_gate`
-        # then discards it. A receipt for work that was thrown away.
-        # `on_box_gates` resets WITH the rest: a human's disposition judged the old
-        # candidate, and a new plan head, merge or gate set is a different tree.
-        st.update({"gate_key": key, "skill_gates": {}, "argv_gates": {},
-                   "on_box_gates": {}})
+        # The key is written WITH the reset (or carry), and saved, before any park
+        # below: left stale, `land_record` would stamp a verdict with the OLD key.
+        # R6 §17.1: a runtime-only main move keeps settled review passes and owner
+        # answers; anything else empties all three tables, as before.
+        lc.apply(plan_dir, ctx, st, gates, key, lc.decide(plan_dir, ctx, st, set_key))
     lsg.settle(plan_dir, st)        # LND-13: start_pending ends with its session only
     surface = _surface(st, ctx)
     st["files_examined"] = None if surface is None else len(surface)
@@ -449,30 +472,19 @@ def step_gate(plan_dir, ctx, st):
                 return {"action": "invoke-skill", "skill": g["skill"], "args": g.get("args", ""),
                         "gate": gid, "cwd": st["land_path"], "stage": "land-regate",
                         "gate_key": key, "files_examined": len(surface),
+                        "stale_cwd_pids": lbk.stale_cwd_pids(st["land_path"]),
                         "record_with": f"run.py land-record {plan_dir} --gate {gid} "
                                        "--status passed|failed"}
             results.append({"gate_id": gid, "wall_s": None, **_bare(rec)})
             continue
         rec = disposition(st, gid, key) or _cached_pass(st, gid, key)
         if rec is None:
-            cwd = gate_cwd(g.get("cwd"), ctx["plan_tree"], st["land_path"])
-            if cwd is None:
-                return park(plan_dir, ctx, st, "gate-cwd-outside-land",
-                            f"LAND PARKED — gate {gid!r} declares cwd {g.get('cwd')!r}, which "
-                            f"is missing from, or resolves outside, the land worktree {st['land_path']}. Running "
-                            "it unmapped would execute the gate in the OPERATOR'S CHECKOUT — "
-                            "the collision this isolation exists to prevent — and would gate "
-                            "a tree that is not the candidate.")
-            rec = _run_argv_gate(plan_dir, ctx, st, gid, g, cwd)
+            if "action" in (rec := _run_argv_step(plan_dir, ctx, st, gid, g, key)):
+                return rec                 # a park: bad cwd, or the lease was lost
             ran += 1
-            if rec["outcome"] == "pass":
-                # Written only AFTER the verdict is known to be green, and only
-                # then. Persisted immediately so the skill-gate round trip below
-                # (and any crash) resumes without paying for this gate twice.
-                st.setdefault("argv_gates", {})[gid] = {**rec, "gate_key": key}
-                st["gate_key"] = key
-                save(plan_dir, ctx, st)
         results.append({"wall_s": None, **_bare(rec)})
+    lc.drop_unsettled(plan_dir, ctx, st, [r["gate_id"] for r in results
+                                          if r["outcome"] not in _SETTLED], key)
     st.update({"gate_key": key, "gates": results, "gate_digest": lst.gate_digest(results)})
     save(plan_dir, ctx, st)
     rsi.log_event(plan_dir, "plan_land_regate", session_ids=[], slug=ctx["slug"],
@@ -483,5 +495,4 @@ def step_gate(plan_dir, ctx, st):
     # LND-12: a green one still parks while a check that failed on it is held.
     out = (lrp.repair(plan_dir, ctx, st, results, gates) or _verdict(plan_dir, ctx, st, results)
            or lfk.flake_hold(plan_dir, ctx, st))
-    # LND-13: green, so no directive follows.
     return out or lsg.green(plan_dir, ctx, st, lfk.unrepaired(ctx, st))

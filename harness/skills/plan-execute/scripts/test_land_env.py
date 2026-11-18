@@ -6,6 +6,7 @@ whatever python3 is on PATH; test_no_requirements_file_means_no_check proves tha
     pytest skills/plan-execute/scripts/test_land_env.py -q
 """
 
+import os
 import sys
 import venv
 from pathlib import Path
@@ -17,6 +18,13 @@ sys.path.insert(0, str(SCRIPTS))
 
 import land_env as lev  # noqa: E402
 from _land_fixture import build_repo, isolate, origin_main, run_cli, work  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def no_ci_venv(tmp_path, monkeypatch):
+    """The real /tmp/ci-venv on this machine would turn every park below into a pass."""
+    monkeypatch.setattr(lev, "VENV", str(tmp_path / "no-ci-venv"))
+    monkeypatch.setenv("LAND_CI_VENV", lev.VENV)    # and for run.py subprocesses
 
 
 @pytest.fixture
@@ -49,7 +57,7 @@ def test_a_venv_that_resolves_pytest_passes(tree, tmp_path, monkeypatch):
     assert _check(tree) is None
 
 
-def test_an_interpreter_outside_a_venv_parks_with_the_build_command(tree, monkeypatch):
+def test_an_interpreter_outside_a_venv_parks_or_switches_to_the_ci_venv(tree, monkeypatch):
     monkeypatch.setenv("PATH", str(Path(sys.base_prefix) / "bin"))
     out = _check(tree)
     assert (out["action"], out["kind"]) == ("land-parked", "land-environment"), out
@@ -57,6 +65,18 @@ def test_an_interpreter_outside_a_venv_parks_with_the_build_command(tree, monkey
     assert f"python3.14 -m venv {lev.VENV} && {lev.VENV}/bin/python -m pip install -r " in out["brief"]
     assert str(tree / lev.REQUIREMENTS) in out["brief"]
     assert f'PATH={lev.VENV}/bin:"$PATH" run.py land /plans/p' in out["brief"]
+    bare = str(Path(sys.base_prefix) / "bin")
+    _venv(lev.VENV, pytest_file=False)               # a CI venv that cannot run the gates
+    assert "not in a virtual environment" in _check(tree)["problem"]
+    assert os.environ["PATH"] == bare               # a failed switch leaves PATH as it was
+    site = next(Path(lev.VENV).glob("lib/python*/site-packages"))
+    (site / "pytest.py").write_text("")
+    site.chmod(0o777)                               # another user could plant code here
+    assert "not in a virtual environment" in _check(tree)["problem"]
+    assert os.environ["PATH"] == bare
+    site.chmod(0o755)
+    assert _check(tree) is None                     # a working, private CI venv: no park
+    assert os.environ["PATH"] == f"{lev.VENV}/bin{os.pathsep}{bare}"
 
 
 def test_a_venv_without_pytest_parks(tree, tmp_path, monkeypatch):
@@ -89,6 +109,21 @@ def test_a_python3_that_hangs_parks_at_the_time_limit(tree, tmp_path, monkeypatc
     monkeypatch.setenv("PATH", str(stub.parent))
     monkeypatch.setattr(lev, "TIMEOUT_S", 1)        # the real limit is 30 s; the stub sleeps 30
     assert _check(tree)["problem"] == "python3 did not answer in 1 s"
+
+
+def test_a_session_gate_with_a_bare_python3_is_not_run_and_not_charged(tree, tmp_path, monkeypatch):
+    import plan_scope
+    import verify_pass
+    ran = tmp_path / "ran.txt"
+    gate = {"name": "g", "argv": ["/bin/sh", "-c", f"python3 -c 0; touch {ran}"]}
+    monkeypatch.setattr(plan_scope, "gate_cwd", lambda *a: str(tree))
+    monkeypatch.setenv("PATH", f"{Path(sys.base_prefix) / 'bin'}:/usr/bin:/bin")
+    res = verify_pass.run_argv(str(tmp_path), "s01", gate, dry_run=False)
+    assert res["returncode"] is None and "GATE NOT RUN" in res["stderr"], res
+    assert f"python3.14 -m venv {lev.VENV}" in res["stderr"] and not ran.exists()
+    (tmp_path / "plain").mkdir()
+    assert lev.gate_problem(tmp_path / "plain", gate["argv"]) is None  # no requirements file
+    assert lev.gate_problem(tree, ["/bin/sh", "-c", "true"]) is None  # gate runs no python3
 
 
 def test_land_parks_before_any_gate_runs(tmp_path, monkeypatch):

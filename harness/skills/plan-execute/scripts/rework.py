@@ -15,6 +15,7 @@ import sys as _sys
 
 import article_block as ab
 import escalation as esca
+import halt_clears
 import manifest_io as mio
 import outcomes as outc
 import route_at_dispatch as rad
@@ -320,6 +321,9 @@ def _halted(plan_dir, session_id, state, gate, excerpt, fb, stuck):
         reason += (" SURFACE TOO LARGE FOR ONE REVIEW PASS: the final attempt's findings were "
                    "all in code untouched since the previous attempt -- the reviewer's sample, "
                    "not the agent's regression. Split the session; redispatching it re-samples.")
+    rounds = halt_clears.rounds_line(plan_dir, session_id)
+    if rounds:
+        reason += f" [{rounds}]"
     # ESC-02 — when the budget runs out MID-LADDER, say where the climb stopped
     # and which rungs were never tried. Without this the BLOCKED brief reads
     # "we tried and failed" when the truth is "we stopped one rung short", and

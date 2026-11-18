@@ -8,6 +8,11 @@ The retro proposes. The owner approves. Nothing in the skill changes without a y
 Read all of `<target>/docs/worth-adopting/LEDGER.md`: the table, and the section "Owner
 overrides". Work only on rows and overrides after the last row whose source is `retro`.
 
+First run `git -C ~/your-private-harness status --short docs/worth-adopting`, and work in a worktree on
+`origin/main`, never with a pull in the edit clone. The clone can hold another run's lines that
+nobody committed: count them as a row, and name them in the reply (2026-11-18: a pull refused
+on one such row, and the pushed ledger had one row less than the clone).
+
 ## 2. Count four things
 
 Give each as "n of m", with the rows behind it.

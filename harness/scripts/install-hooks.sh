@@ -14,7 +14,7 @@ ROOT="$(git -C "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" rev-parse -
 HOOKS_REL="githooks"
 HOOKS_DIR="$ROOT/$HOOKS_REL"
 
-for h in pre-commit commit-msg; do
+for h in pre-commit commit-msg pre-push; do
   [[ -f "$HOOKS_DIR/$h" ]] || { echo "FATAL: missing $HOOKS_DIR/$h" >&2; exit 1; }
   chmod +x "$HOOKS_DIR/$h"
 done
@@ -25,10 +25,11 @@ git -C "$ROOT" config core.hooksPath "$HOOKS_REL"
 # executable hook is the exact failure this script exists to prevent.
 resolved="$(git -C "$ROOT" config --get core.hooksPath)"
 [[ "$resolved" == "$HOOKS_REL" ]] || { echo "FATAL: core.hooksPath is '$resolved', expected '$HOOKS_REL'" >&2; exit 1; }
-for h in pre-commit commit-msg; do
+for h in pre-commit commit-msg pre-push; do
   [[ -x "$HOOKS_DIR/$h" ]] || { echo "FATAL: $HOOKS_DIR/$h is not executable" >&2; exit 1; }
 done
 
 echo "hooks installed: core.hooksPath=$resolved -> $HOOKS_DIR"
 echo "  pre-commit  (gitleaks secret gate + routing drift guard)"
 echo "  commit-msg  (routing-pin approval-token gate)"
+echo "  pre-push    (waits, bounded and fail-open, while a land pushes main)"

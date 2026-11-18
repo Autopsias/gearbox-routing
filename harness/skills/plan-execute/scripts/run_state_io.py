@@ -115,7 +115,7 @@ def rewrite_halt_notice(plan_dir, detail):
     return True
 
 
-from halt_clears import HaltClearRefused, clear_halt, clear_halt_cli  # noqa: E402,F401
+from halt_clears import EXITS, HaltClearRefused, clear_halt, clear_halt_cli  # noqa: E402,F401
 
 
 def is_halted(plan_dir):

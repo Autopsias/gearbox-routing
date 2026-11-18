@@ -111,6 +111,10 @@ def plan_lifecycle_active(plan_dir, errors=None, detail=None):
         html_text = _html_text(plan_dir)
         if html_text is None:
             return None
+        if is_retired(plan_dir):
+            if detail is not None:
+                detail["blocked"] = False
+            return False
         statuses = ab.read_all_statuses(html_text)
         action = dsp.next_action(manifest, statuses).get("action")
         if detail is not None:
@@ -130,6 +134,14 @@ def plan_lifecycle_active(plan_dir, errors=None, detail=None):
         return bool((state.get("halt") or {}).get("set"))
 
     return _guarded(errors, Path(plan_dir).name, "manifest/PLAN.html", _read)
+
+
+def is_retired(plan_dir):
+    """True once the operator ran `retire-plan`: an isolated plan carries the mark
+    in its plan-state file, a non-isolated one in run_state.json."""
+    import plan_worktree as pwt
+    return bool((pwt.load_state(plan_dir) or {}).get("retired")
+                or rsi.load_state(plan_dir).get("retired"))
 
 
 def _land_unfinished(plan_dir):

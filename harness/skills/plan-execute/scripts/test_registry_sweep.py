@@ -132,6 +132,7 @@ def test_apply_preserves_a_leftover_worktree_holding_real_content(tmp_path):
     result = sw.apply_sweep(root, root / "_plans")
     cleaned = next(g for g in result["groups_cleaned"] if g["group"] == "g")
     assert cleaned["result"]["preserved"], cleaned
+    assert "scratch.txt" in sw.render_apply_result(result)
     assert path.is_dir() and (path / "scratch.txt").exists()
     assert wt.git(["rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"], root)[0] == 0
 

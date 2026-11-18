@@ -41,6 +41,7 @@ import land_brief as lb  # noqa: E402
 import land_state as lst  # noqa: E402
 import land_steps  # noqa: E402
 import ship_state_io as ssio  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, local_main,  # noqa: E402
                            origin_main, run_cli, work)
 from worktree import git  # noqa: E402
@@ -57,7 +58,7 @@ def _gates(fx, spec):
 
 def _land_with_ack(iso):
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    ack_only(iso["plan_dir"], "approved")
     return run_cli("land", iso["plan_dir"])
 
 
@@ -72,11 +73,10 @@ def test_a_landed_plan_resumes_to_landed_after_its_worktree_is_removed_by_hand(f
     _gates(fx, {"marker-gate": {"kind": "argv", "cwd": ".", "timeout": 120,
                                 "argv": ["/bin/sh", "-c", "echo ran > gate.log; exit 0"]}})
     iso = isolate(fx, "plan-a")
-    work(iso["tree"], ".gitignore", "__pycache__/\n*.log\n")
     work(iso["tree"], "src/f.py", "F = 1\n")
     rc, out = _land_with_ack(iso)
-    # The gate's own git-ignored artefact makes the final teardown refuse: the
-    # land SUCCEEDED (pushed, record published) and parked only on cleanup.
+    # The gate's UNTRACKED artefact (not git-ignored) makes the final teardown
+    # refuse: the land SUCCEEDED (pushed, record published) and parked only on cleanup.
     assert (rc, out.get("kind")) == (1, "land-worktree-preserved"), out
     st = lst.load(iso["plan_dir"])
     assert st["landed_sha"] and st["final_record_sha"]
