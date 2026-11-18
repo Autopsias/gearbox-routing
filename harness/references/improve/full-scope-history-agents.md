@@ -1,7 +1,9 @@
 # Full-scope history agents + cross-session mechanics
 
-Read this ONLY when scope = "Historical + current conversation" (the full-sweep path).
-When scope = "Current conversation only", none of this applies — only the Discovery
+Read this when scope = "Historical + current conversation" (the full-sweep path).
+When scope = "Current conversation only", only the section "Question-class check — every
+scope" below applies: all of its steps 2 to 7, including the `--members` answer check and
+the evidence-ledger read, which are local reads. Otherwise only the Discovery
 Agent runs, and Phase 4b / the Prior-Improve audit / cross-session confidence rules are
 skipped entirely per the main command file.
 
@@ -78,9 +80,11 @@ Return a structured report:
 
 Return only the report above. Cite session dates and target files.
 
-## Question-class check — full scope only
+## Question-class check — every scope
 
-Counts the questions agents asked you and proposes a standing default for a class you answer the same way almost every time.
+The weekly numbers run (`scripts/weekly_numbers.py`) runs step 1 and writes the classes with status PASS to `~/.gearbox-state/improve/standing-default-classes.json`: `{"at": <iso time>, "days": 30, "classes": [{slug, key, n, first, pct, sessions}: n = questions asked, pct = share answering the first option]}`. In a default or `current` run, read that file instead of running step 1, then do steps 2 to 7 for each class in it. A full-scope run runs step 1 itself. The file lists classes only; steps 4 and 5 (the answer check) still decide whether a default is proposed.
+
+Counts the questions agents asked you and proposes a standing default for a class you answer the same way almost every time. It counts AskUserQuestion calls, plus two forms with no tool call: a message that ends in a numbered or lettered option list that you answer with only a pick ('1', 'option 2', 'B, fix everything'; a bare 'yes' or 'no' counts only when exactly one option label starts with that word), and a next-step button (`mcp__ccd_turn__wrap_up`) that you answer with its label. These count as answered questions, are classed by the same rules, and keep the same exclusions and bar.
 
 1. **Run it.** `python3 ~/.claude/scripts/improve_ask_classes.py --days 30`. That file exists there only after `gearbox deploy`; if it is missing, run the same file from `~/your-private-harness/scripts/`. (`--days` is the real flag: a bare `30` is rejected.)
 2. **Read the evidence ledger first.** For a class with an adopted default (gap `standing-default-<class-slug>` with `retired` set) or a rejected one (a rejection whose edit starts 'Standing default for <class-slug>'), re-run with `--after <that date>`. The count restarts at adoption or rejection: an adopted default that agents ignore shows up again as an 'Ignored default' (see `evidence-ledger.md`, 'Matching a finding to a gap key'), and a rejected one needs a fresh pass of the bar.

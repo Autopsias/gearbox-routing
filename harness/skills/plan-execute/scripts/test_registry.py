@@ -596,3 +596,17 @@ if __name__ == "__main__":
             "To regenerate the committed REG-01 cross-process proof instead, run:\n"
             "  python3 skills/plan-execute/scripts/test_registry.py --generate-evidence"
         )
+
+
+def test_a_retired_non_isolated_plan_is_done_and_not_a_neighbour(tmp_path):
+    import plan_teardown as pt
+    root = _wt_repo(tmp_path)
+    old = _make_plan(root, "plan-old", _todo_session())
+    _begun(old)
+    plan_b = _make_plan(root, "plan-b", _todo_session())
+    # KNOWN POSITIVE: not retired -> active and named by the refusal.
+    assert [o["plan"] for o in reg.other_active_plans(plan_b)] == ["plan-old"]
+    assert pt.retire_plan(str(old))["status"] == "retired"
+    row = [p for p in reg.collect(root, root / "_plans")["plans"] if p["plan"] == "plan-old"][0]
+    assert row["lifecycle"] == "done"
+    assert reg.other_active_plans(plan_b) == []

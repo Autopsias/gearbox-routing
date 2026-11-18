@@ -20,6 +20,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import land_state as lst  # noqa: E402
 import plan_record as precord  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (_arm_prepush, build_repo, isolate,  # noqa: E402
                            run_cli, work)
 from worktree import git  # noqa: E402
@@ -96,7 +97,7 @@ def test_a_land_leaves_no_runtime_local_file_modified_in_the_primary(tmp_path):
     (root / G1).write_text('{"note": "no group key, so cleanup skips it"}\n')
     work(iso["tree"], "src/f.py", "F = 1\n")
     assert run_cli("land", plan_dir)[1]["action"] == "land-awaits-review"
-    assert run_cli("land-ack", plan_dir, "--note", "ok")[1]["action"] == "land-acked"
+    assert ack_only(plan_dir, "ok")[1]["action"] == "land-acked"
     rc, out = run_cli("land", plan_dir)
     assert (rc, out["action"]) == (0, "landed"), out
 
@@ -105,6 +106,7 @@ def test_a_land_leaves_no_runtime_local_file_modified_in_the_primary(tmp_path):
                root, check=True)[1].split()
     assert f"_plans/{SLUG}/PLAN.html" in tree                    # the record did land
     assert NOTICE not in tree and not [p for p in tree if "/_worktrees/" in p], tree
+    assert f"_plans/{SLUG}/.land-run.lock" not in tree, tree      # s07: by name too
 
     # Catch the primary up the way finish does: an untracked record file that is
     # byte-identical to origin's copy is restored by the fast-forward itself.
@@ -132,7 +134,7 @@ def test_landed_base_is_the_origin_tip_the_pushed_merge_was_built_on(tmp_path):
     work(iso["tree"], "src/f.py", "F = 1\n")
     _arm_prepush(fx, times=1)                 # one competing lander forces a re-sync
     assert run_cli("land", iso["plan_dir"])[1]["action"] == "land-awaits-review"
-    assert run_cli("land-ack", iso["plan_dir"], "--note", "ok")[1]["action"] == "land-acked"
+    assert ack_only(iso["plan_dir"], "ok")[1]["action"] == "land-acked"
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (0, "landed"), out
     st = lst.load(iso["plan_dir"])

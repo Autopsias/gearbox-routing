@@ -47,20 +47,22 @@ EPIC_FILE     = "{sprint_artifacts}/epic-{epic_num}.md"
 STORY_FILE    = "{sprint_artifacts}/stories/{story_key}.md"
 ARCH_HINT     = "docs/architecture.md or docs/adrs/ if present — include in review scope"
 
-# CONDUCTOR NOTE — structural guard (mirrors phase-ship.md):
-# The conductor does NOT run SlashCommand directly.
-# The premortem is delegated to a fresh `claude` agent via Task() — that agent
-# has its own tool list that includes SlashCommand. This preserves the conductor's
-# pure-orchestrator invariant while still invoking /adversarial-review.
-Task(
-  description="Run premortem adversarial review for {story_key}",
-  prompt="You are the premortem agent for epic-dev Lane A. Your ONLY job is to
-adversarially red-team the BMAD PRD and story file BEFORE implementation begins,
-and emit findings in the findings-contract/v1 envelope.
+# The conductor runs /adversarial-review itself with the Skill tool: Claude Code has no
+# SlashCommand tool, so a dispatched agent cannot invoke it.
+# LANE-SEPARATION RULE: use /adversarial-review (lane-neutral). NEVER invoke /plan-harden —
+# that is a Lane B tool and its invocation from Lane A violates the lane boundary.
+Bash: echo "SLASH_DEPTH=${SLASH_DEPTH:-0}"
+IF SLASH_DEPTH < 2:
+  REVIEW_OUTPUT = Skill(skill="adversarial-review", args="PRD and story pre-implementation: focus on missing requirements, flawed assumptions, implementation risk, and acceptance-criteria gaps. Story: {story_key}. Epic file: {EPIC_FILE}. Story file: {STORY_FILE}.")
+ELSE:
+  REVIEW_OUTPUT = "skipped: SLASH_DEPTH >= 2"
 
-LANE-SEPARATION RULE: You MUST use /adversarial-review (lane-neutral primitive).
-NEVER invoke /plan-harden — that is a Lane B tool and its invocation from Lane A
-violates the non-negotiable lane boundary.
+# A fresh agent translates the review into the findings-contract/v1 envelope.
+Task(
+  description="Translate the premortem review for {story_key}",
+  prompt="You are the premortem agent for epic-dev Lane A. Your ONLY job is to translate the
+conductor's adversarial review of the BMAD PRD and story file into the findings-contract/v1
+envelope.
 
 Context:
 - Epic number: {epic_num}
@@ -105,10 +107,10 @@ STEP 2: Read the review targets
 Read the epic file at {EPIC_FILE} and story file at {STORY_FILE}.
 If docs/architecture.md exists, note that path as additional context.
 
-STEP 3: Invoke adversarial review
-Run /adversarial-review with a scope hint targeting PRD + story:
+STEP 3: Read the review
+The conductor ran /adversarial-review. Its output:
 
-  SlashCommand(command=\"/adversarial-review PRD and story pre-implementation: focus on missing requirements, flawed assumptions, implementation risk, and acceptance-criteria gaps. Story: {story_key}. Epic file: {EPIC_FILE}. Story file: {STORY_FILE}.\")
+{REVIEW_OUTPUT}
 
 STEP 4: Translate findings to findings-contract/v1
 Map the /adversarial-review output to the canonical envelope:
@@ -159,7 +161,7 @@ Output ONLY the JSON block (so the conductor can parse it). Example shape:
 }
 ```
 
-You have access to: Task, Bash, SlashCommand, Read, Grep, Write"
+You have access to: Bash, Read, Grep, Write"
 )
 
 # Parse the premortem report from Task output

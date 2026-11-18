@@ -1,7 +1,7 @@
 ---
 description: "Runs pre-commit quality checks (ruff, mypy, pytest) in parallel, stages changes intelligently, and commits with proper formatting — optionally pushing after. Use when you say 'commit changes', 'quality commit', 'commit this', or 'commit and push'/'commit this and push'/'push it'/'push my changes' (invoke with --push-after), or need an automated commit/push workflow. commit-orchestrate does NOT open a PR or watch CI — for the full commit→push→PR→CI-to-green chain in one step, use /ship-tail instead. disable-model-invocation: false (intentionally auto-triggers on the conversational phrases above per CLAUDE.md's routing table, not explicit-invocation-only)."
 argument-hint: "[commit_message] [--stage-all] [--quality-first] [--push-after] [--intent=<block>]"
-allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "SlashCommand", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+allowed-tools: ["Task", "Bash", "Grep", "Read", "LS", "Glob", "Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
 # ⚠️ GENERAL-PURPOSE COMMAND - Works with any project
@@ -54,17 +54,6 @@ git stash list  # Check for stashed changes
 # Check for potential commit blockers
 git log --oneline -5  # Recent commits for message pattern
 git branch --show-current  # Current branch
-```
-
-**STEP 2.5: Load Shared Project Context (Token Efficient)**
-
-```bash
-# Source shared discovery helper (uses cache if fresh)
-if [[ -f "$HOME/.claude/scripts/shared-discovery.sh" ]]; then
-    source "$HOME/.claude/scripts/shared-discovery.sh"
-    discover_project_context
-    # SHARED_CONTEXT, PROJECT_TYPE, VALIDATION_CMD now available
-fi
 ```
 
 **STEP 3: Quality Issue Detection & Agent Mapping**
@@ -333,12 +322,17 @@ else
 fi
 
 # Execute commit with professional message format
-git commit -m "$(cat <<EOF
+# The Verified line comes from the session transcript, never from a self-report.
+# Any helper failure (missing, crash) falls back to the unstamped message: the stamp never blocks a commit.
+MSG="$(cat <<EOF
 ${COMMIT_MSG}
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
+STAMPED="$(printf '%s\n' "$MSG" | python3 ~/.claude/scripts/verified_trailer.py --transcript auto --filter 2>/dev/null)"
+[ -n "$STAMPED" ] || STAMPED="$MSG"
+printf '%s\n' "$STAMPED" | git commit -F -
 
 # Verify commit succeeded
 if [ $? -eq 0 ]; then

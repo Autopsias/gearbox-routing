@@ -49,6 +49,7 @@ import closeout_pipeline as cp
 import evidence_proof as evp
 import gate_expect as gx
 import gate_policy as gp
+import halt_clears
 import locked_checks as lc
 import manifest_io as mio
 import outcomes as outc
@@ -63,6 +64,7 @@ import shipping_adapter as adapter
 import structural_gate as sg
 import stuck_protocol as sp
 import verifier_park as vpk
+import verify_query as vq
 from rework import _gate_failed
 from verify_pass import GATE_PASSED, first_pending as _first_pending  # noqa: F401 — re-exported
 from verify_pass import (gate_by_name as _gate_by_name, hand_pass_refusal,
@@ -134,22 +136,12 @@ gate_cwd = pscope.gate_cwd
 # --------------------------------------------------------------------------
 # verify-begin
 # --------------------------------------------------------------------------
-def verify_begin(plan_dir, session_id, *, dry_run=False, resume=False):
-    manifest = mio.load_manifest(plan_dir)
-    gates = compute_gates(plan_dir, manifest, session_id)
-    vb0 = _resolved_verify(manifest, session_id, plan_dir)
-    require_ev = bool(vb0 and vb0.get("require_evidence"))
-    # A verify block with no gates but require_evidence STILL runs — the evidence
-    # assertion fires at verify-finalize. Only a truly empty block is a noop.
-    if not gates and not require_ev and not lc.locked_paths(manifest, session_id):
-        return {"action": "noop", "session": session_id}
-
-    co = cp.load_closeout(plan_dir, session_id)
-    result = co.get("result") if co else None
-    # Only a claimed-complete session is verified. PARTIAL/BLOCKED never reach
-    # here from a healthy apply, but guard anyway.
-    if result != "DONE":
-        return {"action": "noop", "session": session_id, "reason": f"result={result}"}
+def verify_begin(plan_dir, session_id, *, dry_run=False, resume=False, simulate=False):
+    if dry_run and not simulate:   # a query: computes the answer, writes nothing
+        return vq.begin_query(plan_dir, session_id, resume)
+    early, manifest, gates, vb, co = vq.prologue(plan_dir, session_id)
+    if early:
+        return early
 
     state = _load_state(plan_dir, session_id)
     if state is not None:
@@ -179,7 +171,6 @@ def verify_begin(plan_dir, session_id, *, dry_run=False, resume=False):
         elif not resume:
             return _requires_resume(session_id, state)  # RT-04
     else:
-        vb = _resolved_verify(manifest, session_id, plan_dir)
         state = _new_state(plan_dir, manifest, session_id, gates, vb)
         _save_state(plan_dir, session_id, state)
         rsi.log_event(plan_dir, "verify_started", session_ids=[session_id],
@@ -195,21 +186,9 @@ def _advance(plan_dir, session_id, gates, state, dry_run):
         _save_state(plan_dir, session_id, state)
         return {"action": "passed", "session": session_id}
     g = _gate_by_name(gates, name)
-    if g["kind"] == "skill":
-        out = {"action": "invoke-skill", "session": session_id, "gate": name,
-               "skill": g["skill"], "args": g.get("args", ""), "step": name,
-               "success_criteria": g.get("success_criteria")}
-        # An isolated member's gate must look at THAT MEMBER's worktree, not the
-        # shared tree its peers are still editing (contract M4). The orchestrator
-        # invokes a skill-kind gate itself, so the location has to travel to it.
-        wt_cwd = gate_cwd(plan_dir, session_id, g)
-        if wt_cwd and wt_cwd != g.get("cwd"):
-            out["cwd"] = wt_cwd
-        return out
-    # argv-kind gate: this helper runs it.
-    if dry_run:
+    if dry_run and g["kind"] != "skill":   # simulate: run the argv gate's fake
         return _run_gate(plan_dir, session_id, name, dry_run=True)
-    return {"action": "run-argv", "session": session_id, "gate": name, "step": name}
+    return vq.directive(plan_dir, session_id, g)
 
 
 # --------------------------------------------------------------------------
@@ -280,6 +259,9 @@ def _run_gate(plan_dir, session_id, gate, *, dry_run=False):
 
 
 def verify_run_argv(plan_dir, session_id, gate):
+    pending = halt_clears.unmet_exit(plan_dir, session_id)
+    if pending:
+        return {"action": "review-exit-pending", "session": session_id, "gate": gate, "message": pending}
     return _run_gate(plan_dir, session_id, gate, dry_run=False)
 
 
@@ -471,7 +453,7 @@ def verify_status(plan_dir, session_id):
 def verify_simulate(plan_dir, session_id):
     """CI / smoke: run the full verify pipeline, auto-passing every gate (no real
     skill / real command). Produces real state + events."""
-    out = verify_begin(plan_dir, session_id, dry_run=True)
+    out = verify_begin(plan_dir, session_id, dry_run=True, simulate=True)
     guard = 0
     while out.get("action") in ("invoke-skill", "run-argv") and guard < 50:
         guard += 1

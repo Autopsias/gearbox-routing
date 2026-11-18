@@ -25,6 +25,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import land_state as lst  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (RUN_PY, _arm_slow_commit, build_repo,  # noqa: E402
                            isolate, origin_main, run_cli, work)
 from worktree import git  # noqa: E402
@@ -98,7 +99,7 @@ def test_a_killed_lands_orphan_merge_is_named_never_adopted(fx):
         assert (rc, out["action"]) == (1, "land-awaits-review"), out
         st = lst.load(iso["plan_dir"])
         assert st["resolution_required"] is False and "merge_pid" not in st
-        rc, _ = run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+        rc, _ = ack_only(iso["plan_dir"], "approved")
         rc, out = run_cli("land", iso["plan_dir"])
         assert (rc, out["action"]) == (0, "landed"), out
         assert origin_main(fx) != before

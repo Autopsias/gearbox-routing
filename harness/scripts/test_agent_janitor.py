@@ -147,6 +147,22 @@ def test_fresh_session_dir_is_unknown_not_dead(session_dirs):
     assert cand.cls == "unknown" and cand.reason == "session-dir-fresh"
 
 
+@pytest.mark.parametrize("name, made, cls, reason", [
+    ("wt", False, "dead-session", "broker-cwd-gone"),
+    ("wt", True, "unknown", "broker-cwd-exists"),
+    ("my wt", True, "unknown", "broker-cwd-exists"),  # a space must not cut the path
+])
+def test_codex_broker_is_killable_only_when_its_cwd_is_gone(tmp_path, name, made, cls, reason):
+    cwd = tmp_path / name
+    if made:
+        cwd.mkdir()
+    proc = fake(f"/usr/local/bin/node /c/openai-codex/codex/1.0.6/scripts/app-server-broker.mjs "
+                f"serve --endpoint unix:/t/b.sock --cwd {cwd} --pid-file /t/b.pid", age=10 * HOUR)
+    assert aj.match_pattern(proc) == "codex-broker"
+    cand = aj.classify(proc, "codex-broker", time.time())
+    assert (cand.cls, cand.reason) == (cls, reason)
+
+
 def test_missing_session_dir_is_unknown_not_dead():
     proc = fake(f"tail -f {aj.SCRATCHPAD_BASE}/-nope/{uuid.uuid4()}/tasks/x.output",
                 age=10 * HOUR)
@@ -438,6 +454,23 @@ def test_refuses_and_exits_nonzero_above_max_kills(spawner, session_dirs, monkey
     assert _alive(root.pid)
     assert notified and "MAX_KILLS" in notified[0]
     assert logged("refused-max-kills")
+
+
+def test_orphan_codex_broker_tree_is_killed_and_counts_once(spawner, tmp_path, monkeypatch):
+    """A broker's tree is its MCP servers (134 seen), so MAX_KILLS counts it once."""
+    root = spawner(f"/x/scripts/app-server-broker.mjs serve --cwd {tmp_path}/gone wt",
+                   argv0="node")
+    kids = aj.descendants(root.pid, aj.children_map(aj.ps_snapshot()))
+    assert kids, "test tree has no child to prove tree-kill against"
+    monkeypatch.setattr(aj, "MAX_KILLS", 1)
+
+    procs = only(aj.ps_snapshot(), {root.pid}, 5 * HOUR)
+    rc = aj.cmd_reap(reap_args(apply=True), out=open(os.devnull, "w"), procs=procs)
+
+    assert rc == 0
+    assert not _alive(root.pid)
+    for kid in kids:
+        assert not _alive(kid), f"broker child {kid} survived"
 
 
 def test_apply_aborts_when_the_registry_is_incomplete(monkeypatch):

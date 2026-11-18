@@ -166,7 +166,8 @@ def gate_descriptor(gate_id, g, cwd):  # cwd: a thunk, argv only. Shared with la
             "cwd": cwd(), "env_allowlist": g.get("env_allowlist", []),
             "timeout": g.get("timeout", 1200), "failure_mode": "fail-halt",
             "fixture_fake": g.get("fixture_fake"), "indeterminate_exit": g.get("indeterminate_exit"),
-            "expect": g.get("expect"), "land_covered_by": g.get("land_covered_by")}
+            "expect": g.get("expect"), "land_covered_by": g.get("land_covered_by"),
+            "rerun_tests": g.get("rerun_tests"), "phase2": g.get("phase2")}
 
 
 # Public alias: session verify gates (verify.py) resolve through the SAME registry
@@ -636,7 +637,7 @@ def ship_record(plan_dir, session_id, step, status, result_file=None, lease_toke
         return _reload_failed(plan_dir, session_id, e)
     if state is None:
         return _fail(plan_dir, session_id, "no-shipping-state",
-                     "ship-record with no shipping state", False, halt=True)
+                     "ship-record with no shipping state", False)
     refusal = _refuse_if_lease_lost(plan_dir, session_id, steps, step, lease_token)
     if refusal is not None:
         return refusal
@@ -658,7 +659,7 @@ def ship_run_argv(plan_dir, session_id, step):
         return _reload_failed(plan_dir, session_id, e)
     if state is None:
         return _fail(plan_dir, session_id, "no-shipping-state",
-                     "ship-run with no shipping state", False, halt=True)
+                     "ship-run with no shipping state", False)
     sd = _step_by_name(steps, step)
     if sd is None or sd["kind"] != "argv":
         return _fail(plan_dir, session_id, "not-argv-step", f"{step!r} is not an argv step",

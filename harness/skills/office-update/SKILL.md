@@ -20,7 +20,7 @@ This skill exists to make that impossible. It never re-judges trust by itself; i
 **Build on, never reimplement:**
 
 - `../trust-review/references/scripts/claim_identity.py` (**fd-02**) — computes every `claim_id` and every invalidation class. This skill asks it; it never hashes identity itself.
-- `eval/compat_harness.py` (**fd-03**) — the reader. The prior run is loaded through `v3_view` so a v1/v2/v3 prior all read the same way, optional fields default safely, and the prior run is consumed **READ-ONLY**.
+- `../trust-review/references/scripts/compat_harness.py` (**fd-03**) — the reader. The prior run is loaded through `v3_view` so a v1/v2/v3 prior all read the same way, optional fields default safely, and the prior run is consumed **READ-ONLY**.
 
 The engine is `scripts/office_update.py` (pure standard library).
 

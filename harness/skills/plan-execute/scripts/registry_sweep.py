@@ -160,6 +160,10 @@ def render_apply_result(result):
             f"preserved={[p['session'] for p in r.get('preserved', [])]} "
             f"branches_kept={[b['branch'] for b in r.get('branches_kept', [])]}"
         )
+        # the operator must see WHY a worktree was kept to clear it by hand
+        for p in r.get("preserved", []):
+            why = p.get("error") or "; ".join((p.get("content") or [])[:3]) or "no reason recorded"
+            lines.append(f"    kept {p['session']} {p.get('path')}: {why}")
     if not result["groups_cleaned"]:
         lines.append("  (none)")
 

@@ -1,11 +1,12 @@
 """FIX-02 - land and finish run the repo's whitespace fixers on the record first.
 
-    python3 -m pytest -q test_finish_repair.py
+    scripts/pytest-m -q skills/plan-execute/scripts/test_finish_repair.py
 The tool lookup is replaced by a stub fixer; one test uses the real pre-commit.
 """
 
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import textwrap
@@ -307,6 +308,12 @@ def test_8_second_run_changes_nothing(tmp_path, stub):
 
 @pytest.mark.skipif(not shutil.which("pre-commit"), reason="pre-commit is not installed")
 def test_real_tool_with_the_real_hook(fx, ci):
+    # pre-commit fetches the hook repo from GitHub; an outage is not a defect here
+    # (2026-11-17: an outage failed ci-check and held the two-phase land)
+    try:
+        socket.create_connection(("github.com", 443), timeout=5).close()
+    except OSError:
+        pytest.skip("github.com is unreachable: pre-commit cannot fetch the hook repo")
     (fx["root"] / ".pre-commit-config.yaml").write_text(
         "repos:\n- repo: https://github.com/pre-commit/pre-commit-hooks\n  rev: v4.5.0\n"
         "  hooks:\n  - id: trailing-whitespace\n  - id: end-of-file-fixer\n")

@@ -208,6 +208,7 @@ def test_a_stale_receipt_does_not_vouch_for_a_newer_dispatch(
     run.cmd_release(plan_dir)
     capsys.readouterr()
 
+    run.ab.apply_mutation(run._html_path(plan_dir), "s01", status="PARTIAL", note="rework")
     time.sleep(1.1)                       # the -o path is stamped per second
     by_id, _, _ = _begin_codex(plan_dir, ["s01"], capsys)
     second = by_id["s01"]

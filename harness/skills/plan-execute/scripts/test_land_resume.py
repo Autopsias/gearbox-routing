@@ -29,6 +29,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import land_state as lst  # noqa: E402
+from _land_fixture import record_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, local_main,  # noqa: E402
                            origin_main, run_cli, work)
 from worktree import git  # noqa: E402
@@ -200,9 +201,8 @@ def test_a_passing_argv_gate_is_not_re_run_by_the_skill_gate_round_trip(fx):
 
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"], out["gate"]) == (1, "invoke-skill", "z-skill-gate"), out
-    assert _runs(counter) == 1
-    rc, rec = run_cli("land-record", iso["plan_dir"], "--gate", "z-skill-gate",
-                      "--status", "passed")
+    assert _runs(counter) == 1 and out["stale_cwd_pids"] == []
+    rc, rec = record_only(iso["plan_dir"], "z-skill-gate", "passed")
     assert (rc, rec["action"]) == (0, "land-gate-recorded"), rec
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (1, "land-awaits-review"), out
@@ -218,17 +218,13 @@ def test_a_passing_argv_gate_is_not_re_run_by_the_skill_gate_round_trip(fx):
     assert _runs(counter) == 2
 
 
-def test_a_git_ignored_gate_artefact_parks_with_a_command_that_can_see_it(fx):
-    """§12.4's refusal reads `git status --porcelain --ignored`, so the content
-    that arms it is routinely git-IGNORED — a gate's own artefact, written into
-    the land worktree because that is where the re-gate runs.
-
-    The brief used to tell the operator to run plain `git status --porcelain`.
-    MEASURED: that prints NOTHING, so they re-run `land-resume` and get the
-    identical park, with the offending file named nowhere except a raw Python
-    dict interpolated into the text. A recovery command that cannot show the
-    problem is not a recovery command.
-    """
+def test_a_git_ignored_gate_artefact_never_parks_the_land_worktree(fx):
+    """A gate's own git-ignored artefact is written into the land worktree,
+    because that is where the re-gate runs. Nobody works there, so it is the
+    land's own output: the teardown removes it with the worktree. It used to park
+    `land-worktree-dirty` on every run (2026-11-18: a venv, a mypy cache and
+    test results parked one land eight times). An UNTRACKED file still parks,
+    with a command that can show it."""
     _gates(fx, {"marker-gate": {"kind": "argv", "cwd": ".", "timeout": 120,
                                 "argv": ["/bin/sh", "-c", "echo ran > gate.log; exit 0"]}})
     iso = isolate(fx, "plan-a")
@@ -238,18 +234,45 @@ def test_a_git_ignored_gate_artefact_parks_with_a_command_that_can_see_it(fx):
     assert (rc, out["action"]) == (1, "land-awaits-review"), out
     land_path = Path(lst.load(iso["plan_dir"])["land_path"])
     assert (land_path / "gate.log").exists()                    # the gate ran here
-    assert git(["status", "--porcelain"], land_path)[1] == ""   # ...and git is silent
     work(iso["tree"], "src/late.py", "LATE = 1\n")             # the candidate moves
 
     rc, out = run_cli("land", iso["plan_dir"])
-    assert (rc, out.get("kind")) == (1, "land-worktree-dirty"), out
-    # the RUNNABLE command, not a mention of the flag in prose: the whole
-    # defect was an operator copy-pasting a command that shows nothing.
-    assert "git status --porcelain --ignored=matching" in out["brief"], out["brief"]
-    assert "gate.log" in out["brief"], out["brief"]
-    assert (land_path / "gate.log").exists()
+    assert (rc, out["action"]) == (1, "land-awaits-review"), out   # rebuilt, not parked
 
-    # KNOWN POSITIVE — the artefact goes and the same stale worktree rebuilds.
-    (land_path / "gate.log").unlink()
+    land_path = Path(lst.load(iso["plan_dir"])["land_path"])
+    (land_path / "notes.txt").write_text("mine\n")              # KNOWN POSITIVE
+    work(iso["tree"], "src/later.py", "LATER = 1\n")
+    rc, out = run_cli("land", iso["plan_dir"])
+    assert (rc, out.get("kind")) == (1, "land-worktree-dirty"), out
+    assert "git status --porcelain --ignored=matching" in out["brief"], out["brief"]
+    assert "notes.txt" in out["brief"], out["brief"]
+    assert (land_path / "notes.txt").exists()
+
+    # The untracked file goes and the same stale worktree rebuilds.
+    (land_path / "notes.txt").unlink()
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (1, "land-awaits-review"), out
+
+
+def test_a_process_holding_a_deleted_land_folder_is_named(tmp_path):
+    """A codex broker keeps the cwd of a `__land-*` worktree that land later deletes and
+    recreates at the same path; the next review from it fails."""
+    import shutil
+    import subprocess
+    import time
+
+    import land_broker
+    land = tmp_path / "__land-x"
+    land.mkdir()
+    stale = subprocess.Popen(["sleep", "60"], cwd=land)
+    try:
+        shutil.rmtree(land)
+        land.mkdir()
+        fresh = subprocess.Popen(["sleep", "60"], cwd=land)
+        try:
+            time.sleep(0.3)
+            assert land_broker.stale_cwd_pids(str(land)) == [stale.pid]
+        finally:
+            fresh.kill()
+    finally:
+        stale.kill()

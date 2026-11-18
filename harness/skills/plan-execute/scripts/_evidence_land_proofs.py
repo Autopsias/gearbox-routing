@@ -22,6 +22,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import land_state as lst  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (_arm_prepush, _arm_slow_commit,  # noqa: E402
                            _arm_slow_gate, _kill_when, build_repo,
                            checked_out_branch, isolate, local_main, main_side,
@@ -66,7 +67,7 @@ def proof_checkpoint(tmp):
     # NEGATIVE CONTROL — the identical command WITH the ack must land, or the
     # park above proves only that the fixture cannot land at all. This is the
     # FIRST ack of a real candidate, and `ok` requires it to be accepted.
-    rc_a, ack2 = run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    rc_a, ack2 = ack_only(iso["plan_dir"], "approved")
     rc_l, landed = run_cli("land", iso["plan_dir"])
     negative = {"command": "run.py land-ack <plan-dir> && run.py land <plan-dir>",
                 "ack_exit_code": rc_a, "ack_action": ack2.get("action"),
@@ -86,7 +87,7 @@ def proof_stale_ack(tmp):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/feature.py", "FEATURE = 1\n")
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved this candidate")
+    ack_only(iso["plan_dir"], "approved this candidate")
     approved = lst.load(iso["plan_dir"])["ack"]
     before = origin_main(fx)
     moved = main_side(fx, "src/elsewhere.py", "ELSEWHERE = 1\n")
@@ -99,7 +100,7 @@ def proof_stale_ack(tmp):
                 "ack_after": st.get("ack"), "state_after": st.get("state"),
                 "ok": (out.get("action") == "land-awaits-review" and rc == 1
                        and st.get("ack") is None and origin_main(fx) == moved)}
-    rc2, out2 = run_cli("land-ack", iso["plan_dir"], "--note", "re-approved")
+    rc2, out2 = ack_only(iso["plan_dir"], "re-approved")
     rc3, out3 = run_cli("land", iso["plan_dir"])
     negative = {"command": "re-ack the NEW candidate, then run.py land <plan-dir>",
                 "ack_exit_code": rc2, "land_exit_code": rc3, "action": out3.get("action"),
@@ -148,7 +149,7 @@ def proof_forged_ack(tmp):
 
 def _land_with_ack(fx, iso):
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    ack_only(iso["plan_dir"], "approved")
     return run_cli("land", iso["plan_dir"])
 
 

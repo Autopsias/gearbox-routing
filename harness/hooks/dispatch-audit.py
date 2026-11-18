@@ -33,6 +33,7 @@ Self-check: hooks/test_dispatch_audit.sh
 import datetime
 import json
 import os
+import re
 import sys
 
 
@@ -93,6 +94,24 @@ def is_unpinned_generic(model, sub):
     return model is None and sub in _GENERIC_SUBAGENT_TYPES
 
 
+# Purpose tag: a fixed word list over agent type + description, first match wins, no model
+# call. Unknown stays "other" — never a guess. scripts/pyramid_metrics.py reuses this to
+# classify old records at read time.
+_PURPOSE_WORDS = (
+    ("verify", r"review|verif|test[- ]?fix|gate|check|audit|adversarial|validat"),
+    ("research", r"explore|search|read|web|research|investigat|scan"),
+    ("build", r"build|implement|fix|refactor|create|write|scaffold|migrat"),
+)
+
+
+def purpose_of(sub, desc):
+    text = "%s %s" % (sub or "", desc or "")
+    for name, words in _PURPOSE_WORDS:
+        if re.search(words, text, re.I):
+            return name
+    return "other"
+
+
 def build_record(ev):
     ti = ev.get("tool_input")
     if not isinstance(ti, dict):
@@ -113,6 +132,7 @@ def build_record(ev):
         # run at. A named-agent effort: frontmatter overrides this and is invisible here.
         "session_effort": effort_level(ev.get("effort")) or os.environ.get("CLAUDE_EFFORT"),
         "description": (desc or "")[:120] if isinstance(desc, str) else "",
+        "purpose": purpose_of(sub if isinstance(sub, str) else None, desc if isinstance(desc, str) else None),
     }
     if is_unpinned_generic(model, sub):
         # Present ONLY when true — a scan of the ledger must be able to grep this

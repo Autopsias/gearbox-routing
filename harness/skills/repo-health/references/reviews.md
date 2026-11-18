@@ -189,8 +189,12 @@ reader's judgement, checked against the files.
 
 1. **Count.** Run `python3 <skill>/scripts/trust_ladder.py <repo> --json` and
    keep its report as the numbers: prose files and bytes, the check files, the
-   NEVER/ALWAYS lines that name a grep-able token, fix and revert commits in 90
-   days, doc paths that do not resolve, and the verification base. It finds the
+   rule lines (an imperative NEVER/ALWAYS that names a grep-able token) counted
+   apart from narrative uses of "never", at most five graduation candidates
+   ranked by recurrence, the lengths of `.complexity-exceptions`,
+   `.file-size-exceptions` and `.function-length-exceptions` now and 30 days
+   ago, fix and revert commits in 90 days, doc paths that do not resolve, and
+   the verification base. It finds the
    memory folder as `~/.claude/projects/<slug>/memory`, where the slug is the
    resolved repo path with every character that is not a letter or digit
    replaced by `-`; pass `--memory-dir` to read another. A missing folder reads
@@ -213,7 +217,10 @@ reader's judgement, checked against the files.
    or hook; else a rule), and the `path:line` evidence for both the Correction
    and the place the new form would live. Prefer the Corrections that recur:
    a rule whose mistake also shows in the fix commits or rework findings.
-   Change nothing."
+   Change nothing." Rank by recurrence in the repo's own record, the script's
+   ranking as the start: a rule whose mistake also shows in the fix commits or
+   rework findings goes first. Every candidate carries its smallest check and
+   its target layer.
 4. **Verify.** Re-open every file a candidate names. Drop a candidate whose
    file does not show the Correction, or whose Correction a check already
    enforces (a candidate on layer 2 that is really on layer 2 moves nowhere).
@@ -234,7 +241,12 @@ reader's judgement, checked against the files.
 6. **Summary rows.** In [the summary](#summary), this review's section gives
    the counts from step 1 in one line each, the surviving candidates (layer
    now → layer proposed, smallest form, `path:line`), the autonomy-readiness
-   lines, and the dropped candidates with one line on why.
+   lines, and the dropped candidates with one line on why. The section ends
+   with the clean-up trend: each exception list's length now and 30 days ago
+   ("none" for a missing file, never 0). **When no list shrank in 30 days, the
+   decision card's first option is "Build a clean-up plan"** (a plan that
+   works the old offenders down); otherwise the card leads with the top
+   graduation candidate.
 
 What this review does NOT do: it never designs the top-rung fix, and it changes
 nothing in the repo. A candidate is a proposal. It lands through a plan in that

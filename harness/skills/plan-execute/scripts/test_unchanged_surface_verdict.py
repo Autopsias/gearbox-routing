@@ -21,7 +21,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import halt_clears
 import plan_mutate as pm
+import run_state_io as rsi
 import run
 import verifier_park as vpk
 import verify as vfy
@@ -90,9 +92,20 @@ def test_an_unchanged_surface_after_a_failed_review_halts_and_can_be_retired(tmp
     assert state["outcome"] == "halted", state
     assert _status(plan_dir, "s01") == "BLOCKED"
 
+    # 2026-11-16 (s04): from the third clear, a review halt takes only a checked exit,
+    # and "split" lets no gate run until the plan changed.
+    assert "review rounds, new findings per round 1,0" in outs[-1]["reason"], outs[-1]["reason"]
+    st = rsi.load_state(plan_dir)
+    st["halt_clears"] = {"s01": 2}
+    rsi.save_state(plan_dir, st)
+    rsi.clear_halt(plan_dir, cost_report="3 rounds", exit_="split")
+    assert vfy.verify_run_argv(plan_dir, "s01", "gate:rev")["action"] == "review-exit-pending"
+    assert calls.read_text() == "xx", "no review ran"
+
     # Step 4 of the incident: the operator's way out is accepted.
     assert pm.in_flight_state(plan_dir)["verify"] == []
     assert pm.retire_session(plan_dir, "s01", reason="superseded")["retired"] == ["s01"]
+    assert halt_clears.unmet_exit(plan_dir, "s01") == ""       # the plan changed
 
 
 def test_a_human_BLOCKED_disposition_settles_the_verify_cycle(tmp_path):
@@ -156,6 +169,35 @@ def test_an_unchanged_surface_after_a_PASSED_review_keeps_its_pass(tmp_path):
     # Control: one changed byte is new code again and IS reviewed.
     (repo / "work.py").write_text("v2\n")
     assert run_gate().returncode == 0 and calls.read_text() == "xx"
+
+
+def test_an_accepted_finding_lets_an_unchanged_surface_pass(tmp_path):
+    """2026-11-16 (two-phase-land s04): the owner accepted the open findings, but an
+    unchanged surface failed before the accept list was read, and the list had to
+    carry the gate's long file name. 13 review runs, no exit."""
+    finding = [{"file": "work.py", "line": 1, "severity": "high", "summary": "unguarded read"}]
+    repo, calls, plan, run_gate = _land_gate(
+        tmp_path, "REVIEWED_FILES: 1\n```json\n" + json.dumps(finding) + "\n```")
+    assert run_gate().returncode == 1
+    accept = plan / "_verify_state" / "land.accepted.json"      # the short, session-wide name
+
+    def entry(phrase):
+        accept.write_text(json.dumps({"accepted": [
+            {"file": "work.py", "contains": phrase, "reason": "proved by a test"}]}))
+
+    entry("some other finding")                       # plant: this accepts nothing here
+    refused = run_gate()
+    assert refused.returncode == 1 and "FAILED" in refused.stderr, refused.stdout + refused.stderr
+
+    entry("unguarded read")
+    for _ in range(2):                                # the second run reads "accepted" from the ledger
+        passed = run_gate()
+        assert passed.returncode == 0, passed.stdout + passed.stderr
+    assert calls.read_text() == "x", "no run after the first may ask the reviewer again"
+    rows = [json.loads(ln) for ln in
+            (plan / "_verify_state" / "land.low.claude.findings.ndjson").read_text().splitlines()]
+    last = [r for r in rows if r.get("kind") == "finding"][-1]
+    assert (last["status"], last["accept_reason"]) == ("accepted", "proved by a test")
 
 
 def test_a_deleted_surface_file_is_not_an_unchanged_surface(tmp_path):

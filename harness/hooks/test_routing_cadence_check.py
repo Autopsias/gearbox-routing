@@ -39,6 +39,29 @@ def run_with(tmp, ledger_bytes, stamp):
     stamp_path.write_text(json.dumps(stamp))
     mod.LEDGER = str(ledger)
     mod.STAMP = str(stamp_path)
+    mod.REVIEW_STAMP = mod.REVIEW_NOTES = str(tmp / "absent")  # review reminder silent here
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        mod.main()
+    return buf.getvalue().strip()
+
+
+def run_review(tmp, stamp_age_days, notes_exist):
+    import os
+    import time
+    mod = load()
+    mod.LEDGER = mod.STAMP = str(tmp / "absent-ledger")
+    mod.REVIEW_STAMP = str(tmp / "review-stamp")
+    mod.REVIEW_NOTES = str(tmp / "notes.md")
+    for p in (mod.REVIEW_STAMP, mod.REVIEW_NOTES):
+        if os.path.exists(p):
+            os.remove(p)
+    if notes_exist:
+        Path(mod.REVIEW_NOTES).write_text("x")
+    if stamp_age_days is not None:
+        Path(mod.REVIEW_STAMP).write_text("x")
+        t = time.time() - stamp_age_days * 86400
+        os.utime(mod.REVIEW_STAMP, (t, t))
     buf = io.StringIO()
     with redirect_stdout(buf):
         mod.main()
@@ -46,6 +69,15 @@ def run_with(tmp, ledger_bytes, stamp):
 
 
 def main():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        assert run_review(tmp, 5, True) == "", "fresh stamp must be silent"
+        out = run_review(tmp, 40, True)
+        assert json.loads(out)["systemMessage"].count("last whole-history review: 40 days ago") == 1, out
+        assert json.loads(out)["systemMessage"].endswith("/myusage-self-assessment")
+        assert "never recorded" in run_review(tmp, None, True)
+        assert run_review(tmp, None, False) == "", "no stamp and no notes must be silent"
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
 

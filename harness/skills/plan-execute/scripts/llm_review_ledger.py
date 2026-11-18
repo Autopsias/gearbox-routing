@@ -45,6 +45,8 @@ from pathlib import Path
 
 import safe_json as sj
 from latest_by_key import latest_then_filter
+from llm_review_accept import (  # noqa: F401 -- re-exported: the ledger's public names
+    _norm, _norm_summary, accept_note, accepted_match, accepted_path, accepted_paths, load_accepted)
 from llm_review_prior_section import prompt_section  # noqa: F401 -- also re-exported
 
 #: THE SEVERITY FLOOR. A finding at or above this blocks; anything below is
@@ -64,22 +66,6 @@ def ledger_path(plan_dir, session):
     return Path(plan_dir) / "_verify_state" / f"{session}.findings.ndjson"
 
 
-def _norm(path):
-    """Strip leading `./` only. NOT `lstrip("./")` -- that strips a character SET,
-    so a root dotfile like `.complexity-exceptions` came back as
-    `complexity-exceptions`: it never matched the delta, so a real finding on it
-    was classed `outside` and demoted to non-blocking `noted` (2026-08-20, the
-    fifth instance of this same call in this repo)."""
-    return re.sub(r"^(\./)+", "", str(path).strip())
-
-
-def _norm_summary(text):
-    """A summary reduced to comparable words: lowercase, letters and spaces only,
-    single-spaced. The fingerprint and the accept list both read a summary through
-    this, so they agree about what two wordings have in common."""
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z ]+", " ", str(text).lower())).strip()
-
-
 def fingerprint(f):
     """Stable id for a finding: file + normalised summary. LINE IS EXCLUDED --
     it drifts with every edit above it, which is how a line-anchored allowlist
@@ -87,57 +73,6 @@ def fingerprint(f):
     return hashlib.sha1(
         f"{_norm(f.get('file', ''))}|{_norm_summary(f.get('summary', ''))}".encode()
     ).hexdigest()[:10]
-
-
-def accepted_path(plan_dir, session):
-    return Path(plan_dir) / "_verify_state" / f"{session}.accepted.json"
-
-
-def load_accepted(plan_dir, session):
-    """Findings the operator has declared this session does not have to fix.
-
-    OPT-IN and FAIL-CLOSED. A missing file, unreadable JSON, or a malformed entry
-    yields NO accepts -- never a blanket one. An entry needs a `file`, a non-empty
-    `contains` phrase and a `reason`; an EMPTY phrase would match every finding in
-    the file, so it is dropped rather than honoured.
-
-    KEYED ON A PHRASE, NEVER ON THE FINDING ID. The id hashes the whole summary
-    and the reviewer rewords its summary between attempts, so one deferred gap
-    arrived under two different ids on attempts 4 and 5. A phrase
-    that survives the rewording is the only key that keeps matching.
-
-    This CANNOT clear a real regression by itself: it names one file and one
-    phrase, the reason is recorded beside every finding it clears, and the
-    convergence line counts what it cleared.
-    """
-    try:
-        raw = sj.load_dict(accepted_path(plan_dir, session).read_bytes())
-    except OSError:
-        return []
-    entries = sj.get_list(raw, "accepted") or []
-    out = []
-    for e in entries:
-        if not isinstance(e, dict):
-            continue
-        phrase = _norm_summary(e.get("contains", ""))
-        if not (e.get("file") and phrase and str(e.get("reason", "")).strip()):
-            continue
-        out.append({"file": _norm(e["file"]), "contains": phrase,
-                    "severity": str(e.get("severity", "")).strip().lower(),
-                    "reason": str(e["reason"]).strip()})
-    return out
-
-
-def accepted_match(accepted, file, summary, severity):
-    """The accept entry covering this finding, or None. The file must match and the
-    phrase must appear in the summary; a `severity` on the entry pins that too."""
-    path, summ = _norm(file or ""), _norm_summary(summary)
-    sev = str(severity or "").strip().lower()
-    for e in accepted or []:
-        if e["file"] == path and e["contains"] in summ and \
-                (not e["severity"] or e["severity"] == sev):
-            return e
-    return None
 
 
 def findings_array(result):
@@ -259,17 +194,6 @@ def review_focus(ctx):
     return delta | {_norm(p.get("file") or "") for p in ctx.priors if p.get("file")}
 
 
-def accept_note(plan_dir, session, accepted):
-    """Always say what the accept file did: a misnamed file was ignored in silence."""
-    d = Path(plan_dir) / "_verify_state"
-    strays = sorted(f.name for f in d.glob(f"{session.split('.')[0]}*.accepted.json")
-                    if f != accepted_path(plan_dir, session)) if d.is_dir() else []
-    note = f"accept_file={accepted_path(plan_dir, session).name} entries={len(accepted)}"
-    if strays:
-        note += f" WARNING other accept file(s) NOT read: {', '.join(strays)}"
-    return note
-
-
 class Context:
     """Everything the gate needs from the ledger for ONE run, computed once."""
 
@@ -290,6 +214,14 @@ class Context:
         self.retired = [p for p in self.priors if inside and _norm(p.get("file") or "") not in inside]
         self.priors = [p for p in self.priors if p not in self.retired]
         self.accepted = load_accepted(plan_dir, session)
+        # A prior the owner accepted does not block an UNCHANGED surface. It did:
+        # the accept list was applied only when a reviewer ran, and an unchanged
+        # surface never runs one, so the owner's exit could not be taken (s04).
+        self.cleared = [{**p, "status": "accepted", "accept_reason": hit["reason"]} for p in self.priors
+                        if (hit := accepted_match(self.accepted, p.get("file"), p.get("summary"),
+                                                  p.get("severity")))]
+        gone = {p["fid"] for p in self.cleared}
+        self.blocking = [p for p in self.priors if p["fid"] not in gone]
         self.accept_note = accept_note(plan_dir, session, self.accepted)
         unchanged = len([p for p in self.hashes if p not in self.delta])
         self.section = prompt_section(self.attempt, self.priors, self.delta, unchanged)
@@ -314,7 +246,7 @@ def reviewed_unchanged(ctx):
     review, so those bytes WERE reviewed. Same KEYS: a deleted file leaves every
     other hash equal. Every present path HASHED: a skipped directory can change
     with every hash still equal."""
-    return (ctx is not None and ctx.attempt > 1 and not ctx.priors
+    return (ctx is not None and ctx.attempt > 1 and not ctx.blocking
             and bool(ctx.hashes) and not ctx.unhashed
             and ctx.hashes == last_surface(ctx.records))
 
@@ -332,7 +264,7 @@ def narrow_to_delta(ctx, changed, new_files):
     focus = review_focus(ctx)
     if focus is None:
         return None, changed, new_files, ""
-    if not focus and ctx.priors:
+    if not focus and ctx.blocking:
         # AN UNCHANGED SURFACE KEEPS ITS VERDICT. The last attempt left blocking
         # findings open and nothing in the surface moved, so they are still open:
         # this is a FAIL, not "nothing to review". Scored INDETERMINATE it went
@@ -342,16 +274,17 @@ def narrow_to_delta(ctx, changed, new_files):
         return set(), changed, new_files, (
             f"llm-review: FAILED — attempt {ctx.attempt} and no file in the reviewed "
             f"surface changed since attempt {ctx.attempt - 1}, which left "
-            f"{len(ctx.priors)} blocking finding(s) open. They are still open:\n"
+            f"{len(ctx.blocking)} blocking finding(s) open. They are still open:\n"
             + "\n".join(f"  - {p['fid']}  {p.get('file')}:{p.get('line')}  "
-                        f"[{p.get('severity')}]  {p.get('summary')}" for p in ctx.priors))
+                        f"[{p.get('severity')}]  {p.get('summary')}" for p in ctx.blocking))
     if not focus and reviewed_unchanged(ctx):
         # THE PASS TWIN: a land re-gate after main moved hit INDETERMINATE here on
         # every retry, and an argv gate cannot be waived.
         return set(), changed, new_files, (
             f"llm-review: PASSED — attempt {ctx.attempt} and the reviewed surface is "
             f"byte-identical to attempt {ctx.attempt - 1}, which was reviewed and left "
-            f"no blocking finding open. The verdict stands; nothing was re-sampled.")
+            f"no blocking finding open. The verdict stands; nothing was re-sampled."
+            + accepted_block(ctx.cleared))
     if not focus:
         return set(), changed, new_files, (
             f"llm-review: INDETERMINATE — attempt {ctx.attempt} and no file in the "
@@ -365,6 +298,13 @@ def narrow_to_delta(ctx, changed, new_files):
         f"[llm-review-gate] attempt {ctx.attempt}: surface NARROWED to the fix delta — "
         f"{len(changed) + len(new_files)} of {before} file(s). Everything unchanged since "
         f"the last attempt was reviewed then and is not re-sampled now.")
+
+
+def _open_or_accepted(ctx, p, counts):
+    """An open prior the owner declared is accepted: its old-id copy clears too (s07)."""
+    hit = accepted_match(getattr(ctx, "accepted", []), p.get("file"), p.get("summary"), p.get("severity"))
+    counts["accepted" if hit else "prior_open"] += 1
+    return {"status": "accepted", "accept_reason": hit["reason"]} if hit else {"status": "open"}
 
 
 def judge(ctx, parsed, floor=None):
@@ -390,10 +330,11 @@ def judge(ctx, parsed, floor=None):
                          "status": "noted", "evidence": f.get("summary")})
             continue
         if pid and pid in prior_by_id:
-            st = "fixed" if str(f.get("prior", "")).lower() == "fixed" else "open"
+            fixed = str(f.get("prior", "")).lower() == "fixed"
             seen.add(pid)
-            counts["prior_" + st] += 1
-            recs.append({**prior_by_id[pid], "kind": "finding", "attempt": a, "status": st,
+            counts["prior_fixed"] += fixed
+            st = {"status": "fixed"} if fixed else _open_or_accepted(ctx, prior_by_id[pid], counts)
+            recs.append({**prior_by_id[pid], "kind": "finding", "attempt": a, **st,
                          "evidence": f.get("summary")})
             continue
         path = _norm(f.get("file", ""))
@@ -401,12 +342,9 @@ def judge(ctx, parsed, floor=None):
         # LOCAL GROUND TRUTH WINS, IN BOTH DIRECTIONS. `ctx.delta` is computed
         # here from content hashes of this attempt's surface against the last
         # one; the reviewer cannot know it better than we do. Trusting its
-        # self-reported tag broke coming and going: tag a real defect in the file
-        # the fix just touched `"new_in": "outside"` and it was DEMOTED to
-        # `noted`, so the gate passed; tag anything `"delta"` and it FORCED a
-        # block. Both were reachable, and both were found independently. The tag
-        # is bookkeeping now -- consulted only for a path we have nothing to
-        # check it against, i.e. one genuinely outside the delta.
+        # self-reported tag broke both ways: `"new_in": "outside"` on a real defect in
+        # the fixed file DEMOTED it to `noted`; `"delta"` on anything FORCED a block.
+        # The tag is bookkeeping now, consulted only for a path outside the delta.
         new_in = ("first" if a == 1 else
                   ("delta" if path in ctx.delta else f.get("new_in") or "outside"))
         # THE FLOOR IS THE WHOLE RULE. Severity decides blocking; location does not.
@@ -440,9 +378,9 @@ def judge(ctx, parsed, floor=None):
             recs.append({**p, "kind": "finding", "attempt": a, "status": "unverifiable",
                          "evidence": "outside this attempt's reviewed surface; not judged"})
             continue
-        counts["prior_open"] += 1                # omission IS not a fix, in surface
-        recs.append({**p, "kind": "finding", "attempt": a, "status": "open",
-                     "evidence": "not addressed by the reviewer; treated as OPEN"})
+        st = _open_or_accepted(ctx, p, counts)   # omission IS not a fix, in surface
+        recs.append({**p, "kind": "finding", "attempt": a, **st, "evidence": "not addressed "
+                     f"by the reviewer; treated as {st['status'].upper()}"})
     for p in getattr(ctx, "retired", ()):
         recs.append({**p, "kind": "finding", "attempt": a, "status": "retired",
                      "evidence": "its file left the reviewed surface; kept in the ledger, not judged"})

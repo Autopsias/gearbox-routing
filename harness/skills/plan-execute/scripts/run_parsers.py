@@ -225,8 +225,12 @@ def _add_land_parsers(sub):
     second path that could drift from it.
     """
     for name in ("land", "land-resume", "land-status"):
-        add_dir(sub.add_parser(
-            name, help="the land stage: sync, re-gate, human ack, serial merge"))
+        sp = sub.add_parser(name, help="the land stage: sync, re-gate, human ack, serial merge")
+        add_dir(sp)
+        if name != "land-status":
+            sp.add_argument("--cost-report", default=None,
+                            help="Required to re-run after the gates were red twice on one plan "
+                                 "head: '<elapsed, passes so far, what changed, the cut>'.")
     s = sub.add_parser("finish", help="the last step of every plan: commit its leftover "
                        "record, report leftovers, fast-forward the checkout when safe, "
                        "report CI (references/finish-contract.md)")
@@ -237,7 +241,9 @@ def _add_land_parsers(sub):
                    help="run a plan that finished in report-only mode for real")
     s = sub.add_parser("land-ack", help="record the human land decision (contract §5.1)")
     add_dir(s)
-    s.add_argument("--note", default=None, help="why you approved THIS candidate")
+    s.add_argument("--note", default=None,
+                   help="why you approved THIS candidate; the same command then pushes it "
+                        "(or says which input moved and why it did not)")
     # The disposition vocabulary is IMPORTED, never re-typed: `--decision` here and
     # `ack-checkpoint --decision` one scope over are the same two words, and this
     # module is already downstream of `land_gate` through `run.py`'s own imports.

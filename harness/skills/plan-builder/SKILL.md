@@ -244,7 +244,7 @@ If `<plan-dir>` is omitted it defaults to `./_plans/<slug>-<today>/`. A legacy `
 If the user passed **`--harden`** (or asked to "harden", "stress-test", or "pressure-test"
 the plan), the build hands straight off to the hardener — **automatically, with no user
 prompt**. Because `/plan-harden` is a slash command and this skill stays a **pure builder
-that does NOT hold `SlashCommand`** (the same permission-minimal rule the epic-dev conductor
+that does NOT invoke other skills itself** (the same permission-minimal rule the epic-dev conductor
 follows — never widen a startup-loaded skill's grant), the chain runs at the **orchestrator
 level**: finish the build, then your immediate next action for this request is to invoke
 
@@ -286,7 +286,7 @@ python build_plan.py spec.json --register-in /path/to/project
 **Layer 3 — Pointer in CLAUDE.md.** `--register-in` prints a one-line snippet (including the `/plan-execute <dir>` command) to paste into the project's `CLAUDE.md`.
 
 After building, respond to the user with:
-- The path to `PLAN.html` (open in a browser to view)
+- The path to `PLAN.html` (open in a browser to view). When `orca status --json` reports `result.app.running: true`, also open it in an Orca tab in the plan repository's own workspace — `orca tab create --url file://<abs PLAN.html> --worktree path:<repo root> --json` — and say the tab is open. The owner asked for this in 4 sessions; without `--worktree`, the tab lands in the session's workspace, not the plan's.
 - The `/plan-execute <plan-dir>` command to run it
 - The CLAUDE.md / index snippet (or offer to add it yourself)
 - Counts: sessions, items, categories; the infographic template; the first session

@@ -45,6 +45,7 @@ import land  # noqa: E402
 import land_gate as lgt  # noqa: E402
 import land_state as lst  # noqa: E402
 import verifier_park as vpk  # noqa: E402
+from _land_fixture import ack_only, verify_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, local_main,  # noqa: E402
                            origin_main, run_cli, work)
 from worktree import git  # noqa: E402
@@ -150,8 +151,7 @@ def test_verified_on_box_lands_and_is_NEVER_recorded_as_a_pass(fx, tmp_path):
     iso, counter, _ = _parked(fx, tmp_path)
     after_park = _runs(counter)
 
-    rc, rec = run_cli("land-verify", iso["plan_dir"], "--decision", lgt.VERIFIED_ON_BOX,
-                      "--note", "read the merged diff myself")
+    rc, rec = verify_only(iso["plan_dir"], lgt.VERIFIED_ON_BOX, "read the merged diff myself")
     assert (rc, rec["action"], rec["gates"]) == (0, "land-verified", [GATE]), rec
 
     rc, parked = run_cli("land", iso["plan_dir"])
@@ -173,7 +173,7 @@ def test_verified_on_box_lands_and_is_NEVER_recorded_as_a_pass(fx, tmp_path):
     assert st["gate_digest"] == lst.gate_digest(
         [{"gate_id": GATE, "outcome": lgt.VERIFIED_ON_BOX}])
 
-    rc, acked = run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    rc, acked = ack_only(iso["plan_dir"], "approved")
     assert (rc, acked["action"]) == (0, "land-acked"), acked
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (0, "landed"), out
@@ -186,8 +186,7 @@ def test_verified_on_box_lands_and_is_NEVER_recorded_as_a_pass(fx, tmp_path):
 
 def test_blocked_records_the_disposition_and_ships_nothing(fx, tmp_path):
     iso, counter, _ = _parked(fx, tmp_path)
-    rc, rec = run_cli("land-verify", iso["plan_dir"], "--decision", lgt.BLOCKED,
-                      "--note", "the merge breaks src/f.py")
+    rc, rec = verify_only(iso["plan_dir"], lgt.BLOCKED, "the merge breaks src/f.py")
     assert (rc, rec["action"], rec["decision"]) == (0, "land-verified", lgt.BLOCKED), rec
 
     rc, out = run_cli("land", iso["plan_dir"])
@@ -205,7 +204,7 @@ def test_a_disposition_does_not_carry_across_candidates(fx, tmp_path):
     would be an approval of work nobody saw — the same binding `land_record`'s
     `gate_key` stamp enforces for a skill verdict."""
     iso, counter, _ = _parked(fx, tmp_path)
-    run_cli("land-verify", iso["plan_dir"], "--decision", lgt.VERIFIED_ON_BOX)
+    verify_only(iso["plan_dir"], lgt.VERIFIED_ON_BOX)
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (1, "land-awaits-review"), out
     stamped = lst.load(iso["plan_dir"])["gate_key"]
@@ -248,8 +247,8 @@ def test_the_RESTRICTED_TREE_degrade_parks_the_same_way(fx, tmp_path):
     assert (rc, out.get("kind")) == (1, "gate-on-box-verification"), out
     assert out["causes"] == ["cross_family"]
     assert "RESTRICTED" in out["brief"], "the brief must name THIS cause, not a canned one"
-    rc, _ = run_cli("land-verify", iso["plan_dir"], "--decision", lgt.VERIFIED_ON_BOX,
-                    "--note", "reviewed on box; the tree may not leave this machine")
+    rc, _ = verify_only(iso["plan_dir"], lgt.VERIFIED_ON_BOX,
+                        "reviewed on box; the tree may not leave this machine")
     assert rc == 0
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"]) == (1, "land-awaits-review"), out

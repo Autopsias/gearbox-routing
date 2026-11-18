@@ -706,6 +706,41 @@ These rules never weaken a deterministic gate: a red test gate stays red, and a
 finding that shows a false pass (a check that reports pass when it must fail)
 or a silently dropped open finding always blocks.
 
+### The same stop rules hold for every session review gate
+
+The three rules above are not land-only. They apply to each review gate of a
+session (`llm-review-*`, `cross-family-review-*`, `adversarial-review`).
+Measured on `two-phase-land-2026-11-15` s04: 13 reviewer runs in about 14
+hours, 29 findings, new findings per run 3,3,2,3,2,1,1,0,3,2,2,3,4. The count
+never fell, because each run sampled a crash-recovery surface too large for one
+pass. Each of the 12 halt clears carried a free-text "one more review".
+
+When a session's rework budget ends on review findings, a further review round
+is not an option. The decision card offers exactly these exits:
+
+1. **Accept on record.** The owner accepts each open blocking finding. Write
+   one entry per finding into `_verify_state/<sid>.accepted.json` in the plan
+   folder: `{"accepted": [{"file": "<path>", "contains": "<phrase from the
+   finding's summary>", "reason": "<why>", "severity": "<optional>"}]}`. Every
+   review gate of that session reads this file (and its own
+   `<sid>.<level>.<reviewer>.accepted.json`). The match is by file and phrase,
+   never by finding id. With every open finding accepted, the gate passes on an
+   unchanged surface with no new reviewer run, prints each `ACCEPTED` line with
+   its reason and records the status `accepted` in the ledger.
+2. **Split.** Give part of the surface to a new session (`add-session`), or
+   retire the session (`retire-session`).
+3. **Escalate.** One whole-design pass in a new session one rung up
+   (`add-session` with the higher model), not a patch round on the same
+   session.
+
+The tool holds this from the THIRD clear of a review halt (a halt while a
+review ledger of the session holds an open blocking finding). `clear-halt`
+then needs `--exit accept|split|escalate`. `accept` is refused while one open
+blocking finding has no accept entry. After `split` or `escalate`, `verify-run`
+answers `review-exit-pending` for that session until the plan's change log
+gains an entry. The halt reason shows the new findings per round from the
+first halt on, so the trend is visible before the third clear.
+
 ### Canary review policy — `*-canary` gates
 
 `llm-review-low-canary`, `llm-review-medium-canary`, `cross-family-review-low-canary` and
@@ -733,6 +768,7 @@ A reviewer change is a new model, a new prompt line, or a new gate level. Judge 
 | Confirmed misses (`misses`, N1) | 16; bar is 10 | BUILD, counted 2026-10-17 |
 | Light-reviewed sensitive sessions (`sensitive_light_reviewed`, N2) | 5; bar is 5. Plus 3 with no review gate (`sensitive_no_review_gate`) | BUILD, counted 2026-10-17 |
 | Reviewer recall on the slice | opus-med 2/15 (0.13), sonnet-med 0/16; paired exact p = 0.5; 0 false blocks for both | No switch: indistinguishable at this n, judged 2026-10-31 |
+| Four new prompt lines (REV-02), sonnet-med on 8 held-out fail and 16 pass samples | 0/8 hits, baseline 0/8; 0 verified false blocks (8 pass blocks marked real, unchecked) | Removed 2026-11-18: not shown, not 'no effect' (8 samples, one judge, one pass) |
 
 Re-count, in this order, from the worktree root: `python3 evals/review/count_real_misses.py`, then `python3 evals/review/count_light_reviewed_sensitive.py`, then a hand classification of the new rows, then `python3 evals/review/check_counts.py`. Next re-count due 2026-12-01.
 

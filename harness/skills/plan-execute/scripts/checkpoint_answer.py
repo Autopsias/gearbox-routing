@@ -22,7 +22,8 @@ import egress
 import findings_digest as fd
 import run_state_io as rsi
 
-IGNORED = "--answer-file/--no-answer ignored: no checkpoint was resumed"
+IGNORED = ("--answer-file/--no-answer ignored: no checkpoint was resumed. An answer to a halt goes in "
+           "the same call that clears the halt: `clear-halt <plan-dir> --answer-file F`.")
 REFUSE_BARE = (
     "refusing to resume {sid}: it is parked at a human checkpoint and no answer was given. "
     "Pass `--answer-file {path}` with the owner's reply written to that file verbatim, or "
@@ -105,3 +106,21 @@ def handle(plan_dir, manifest, statuses, action, resume, answer, kind_of):
     except Exception as e:  # the answer is already on record; the page is display only
         out["checkpoint_answer"]["changelog_error"] = f"{e.__class__.__name__}: {e}"
     return out
+
+
+def record_halt_answer(plan_dir, sid, text):
+    """Append the halt answer under the flock and return its id. Not live until the
+    clear's own state write saves that id as run_state `halt_answer[sid]`."""
+    import uuid
+    rid = uuid.uuid4().hex
+    _append(plan_dir, {"id": rid, "at": rsi._now(), "session": sid, "answer": text})
+    return rid
+
+
+def display_halt_answer(plan_dir, sid, text):
+    try:  # display only, as above
+        import plan_mutate
+        plan_mutate.record_change(plan_dir, op="halt-answer", session=sid,
+                                  summary=f"owner answered the halt: {text}", sessions_touched=[sid])
+    except Exception:
+        pass

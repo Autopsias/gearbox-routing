@@ -419,7 +419,7 @@ def resolve_evidence_path(plan_dir, session_id, raw):
             except ValueError:
                 pass
         roots.append(Path(member))
-    roots += [Path(plan_dir), Path.cwd()]
+    roots += [Path(plan_dir), Path.cwd(), Path(repo_root(plan_dir) or ".")]  # cwd may be the plan dir
     for r in roots:
         cand = r / path
         if cand.exists():
@@ -653,7 +653,7 @@ def _unlock_worktree(root, path):
     return f"could not unlock {path}: {err}"
 
 
-def teardown_worktree(root, path, force):
+def teardown_worktree(root, path, force, drop_ignored=False):
     """One member's worktree teardown. Fixed order: repair (a harmless no-op
     unless the worktree's git-admin links drifted) -> the dirty-content
     refusal -> unlock -> remove. Never raises: any git failure here is
@@ -683,7 +683,7 @@ def teardown_worktree(root, path, force):
             git(["worktree", "repair", str(path)], root)
             all_leftovers = _porcelain(path, ignored=True)
             leftovers = [ln for ln, p in zip(all_leftovers, _status_paths(all_leftovers))
-                         if not _is_cache(p)]
+                         if not _is_cache(p) and not (drop_ignored and ln.startswith("!! "))]
             if leftovers and not force:
                 return "preserved", {"path": str(path), "content": leftovers[:20],
                                       "caches_ignored": len(all_leftovers) - len(leftovers)}

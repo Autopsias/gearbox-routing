@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import health  # noqa: E402
 import health_render as render  # noqa: E402
+import secrets_scan  # noqa: E402
 
 BAD_WORKFLOW = """\
 name: ci
@@ -140,6 +141,96 @@ def test_score_formula_caps_and_monotonicity():
     assert render.band(49) == "red" and render.band(50) == "amber" and render.band(90) == "green"
 
 
+# --- sec.secrets-history: ranged, capped, and the run still writes its history line ---
+
+def _scanner(tmp_path, body):
+    f = tmp_path / "scanner.sh"
+    f.write_text("#!/bin/sh\necho \"$@\" > \"$0.argv\"\n" + body)
+    return f
+
+
+def _hist(repo):
+    f = repo / ".claude" / "health" / "history.jsonl"
+    return [json.loads(ln) for ln in f.read_text().splitlines()]
+
+
+def _head(repo):
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _scan_and_render(repo, monkeypatch, scanner, cap="60"):
+    monkeypatch.setenv("REPO_HEALTH_GITLEAKS", f"sh {scanner}")
+    monkeypatch.setenv("REPO_HEALTH_SECRETS_CAP_S", cap)
+    health.collect(repo)
+    health.main(["scan-secrets", "--repo", str(repo)])
+    render.render(repo)
+
+
+def test_pending_scan_still_writes_history_and_keeps_the_old_marker(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, dirty=False)
+    head = _head(repo)
+    hf = repo / ".claude" / "health"
+    hf.mkdir(parents=True)
+    (hf / "history.jsonl").write_text(json.dumps(
+        {"ts": "2026-01-01", "commit": "old", "secrets_scanned": head}) + "\n")
+    _scan_and_render(repo, monkeypatch, _scanner(tmp_path, "sleep 30\n"), cap="1")
+    assert statuses(repo)["sec.secrets-history"] == "pending"
+    card = json.loads((hf / "scorecard.json").read_text())
+    assert "passed its 1s cap" in next(
+        c for c in card["checks"] if c["id"] == "sec.secrets-history")["detail"]
+    hist = _hist(repo)
+    assert len(hist) == 2 and hist[-1]["commit"] != "old"
+    assert hist[-1]["secrets_scanned"] == head          # marker unchanged, still carried
+
+
+def test_recorded_marker_gives_a_ranged_scan_and_a_completed_scan_moves_it(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, dirty=False)
+    first = _head(repo)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "two", "--allow-empty"], check=True)
+    hf = repo / ".claude" / "health"
+    hf.mkdir(parents=True)
+    (hf / "history.jsonl").write_text(json.dumps(
+        {"ts": "2026-01-01", "commit": "old", "secrets_scanned": first}) + "\n")
+    scanner = _scanner(tmp_path, "exit 0\n")
+    _scan_and_render(repo, monkeypatch, scanner)
+    assert f"--log-opts {first}..{_head(repo)}" in (tmp_path / "scanner.sh.argv").read_text()
+    assert statuses(repo)["sec.secrets-history"] == "pass"
+    assert _hist(repo)[-1]["secrets_scanned"] == _head(repo) != first
+
+
+def test_marker_that_is_not_an_ancestor_means_a_full_scan(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, dirty=False)
+    hf = repo / ".claude" / "health"
+    hf.mkdir(parents=True)
+    (hf / "history.jsonl").write_text(json.dumps(
+        {"ts": "2026-01-01", "commit": "old", "secrets_scanned": "0" * 40}) + "\n")
+    assert secrets_scan.last_marker(repo) == "0" * 40
+    with (hf / "history.jsonl").open("a") as f:      # a ref is not a marker: "HEAD..HEAD" scans nothing
+        f.write(json.dumps({"ts": "2026-01-02", "commit": "x", "secrets_scanned": "HEAD"}) + "\n")
+    assert secrets_scan.last_marker(repo) == "0" * 40
+    _scan_and_render(repo, monkeypatch, _scanner(tmp_path, "exit 1\n"))
+    assert "--log-opts" not in (tmp_path / "scanner.sh.argv").read_text()
+    assert statuses(repo)["sec.secrets-history"] == "fail"      # exit 1 = leaks
+    assert _hist(repo)[-1]["secrets_scanned"] == "0" * 40       # a leak never moves the marker
+
+
+def test_scan_secrets_prints_one_json_line_and_a_non_git_target_is_pending(tmp_path, monkeypatch, capsys):
+    repo = make_repo(tmp_path, dirty=False)
+    scanner = _scanner(tmp_path, "exit 0\n")         # no backslash inside the f-string (3.11)
+    monkeypatch.setenv("REPO_HEALTH_GITLEAKS", f"sh {scanner}")
+    health.collect(repo)
+    capsys.readouterr()
+    health.main(["scan-secrets", "--repo", str(repo)])
+    out = capsys.readouterr().out.splitlines()
+    assert len(out) == 1 and json.loads(out[0])["status"] == "pass"
+    plain = tmp_path / "not-git"
+    plain.mkdir()
+    status, _, scanned = secrets_scan.scan(plain)
+    assert status == "pending" and scanned == ""
+
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as td:
@@ -147,3 +238,22 @@ if __name__ == "__main__":
         test_clean_fixture_passes_and_records_result(Path(td))
     test_score_formula_caps_and_monotonicity()
     print("ok")
+
+
+def _verify_row(repo, makefile):
+    (repo / "Makefile").write_text(makefile)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    health.collect(repo, fresh=True)
+    card = json.loads((repo / ".claude" / "health" / "scorecard.json").read_text())
+    return next(c for c in card["checks"] if c["id"] == "ai.verify-command")
+
+
+def test_verify_command_is_a_pending_collect_probe_never_a_pass(tmp_path):
+    """A `test:` target that cannot start used to read pass."""
+    repo = make_repo(tmp_path, dirty=False)
+    row = _verify_row(repo, "test:\n\t@python3 -m pytest -q\nlint:\n\ttrue\n")
+    assert row["status"] == "pending" and "run: python3 -m pytest -q --collect-only -q" in row["detail"]
+    row = _verify_row(repo, "test:\n\t@echo ok\n")
+    assert row["status"] == "pending" and "no collect form" in row["detail"]
+    health.set_result(repo, "ai.verify-command", "fail", "No module named pytest")
+    assert statuses(repo)["ai.verify-command"] == "fail"

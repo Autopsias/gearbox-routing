@@ -77,7 +77,7 @@ Subcommands (all take the plan directory as the first positional arg):
                                    retirement or drop the dependency (which also
                                    rewrites those dependents' prompts, same
                                    transaction).
-  clear-halt DIR [--cost-report S] [--decision S] Clear the halt flag; a 2nd clear needs the cost line, a stuck session needs --decision.
+  clear-halt DIR [--cost-report S] [--decision S] [--exit accept|split|escalate] [--answer-file F] Clear the halt flag; a 2nd clear needs the cost line, a stuck session needs --decision, the 3rd clear of a review halt needs --exit.
   release DIR                      Release the lock (end of run).
   retire-plan DIR [--reason R]     §15's `abandon` row: end an UNLANDED,
                                    isolated plan without landing it. ALWAYS
@@ -175,6 +175,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import article_block as ab
+import begin_guard
 from apply_guards import (
     last_codex_dispatch as _last_codex_dispatch,  # noqa: F401 — read by tests
     last_dispatch_harness as _last_dispatch_harness,
@@ -2875,6 +2876,8 @@ def cmd_begin(plan_dir, sessions, unsafe_lock=False, harness="claude", resume=Fa
     # past the gate" (D4c); the integration gate needs it for contract §4's
     # "a member that ends non-DONE blocks integration".
     statuses = ab.read_all_statuses(html)
+    if (why := begin_guard.check(plan_dir, by_id, statuses, sessions)):
+        raise SystemExit(why)
 
     # ISO-01 — the PLAN's own branch and locked worktree. Strictly after
     # `_begin_preflight`'s REG-02 registry guard and strictly before every
@@ -2903,6 +2906,8 @@ def cmd_begin(plan_dir, sessions, unsafe_lock=False, harness="claude", resume=Fa
         rsi.log_event(plan_dir, "lock_fs_warning", fs_class=fs_class)
     rsi.acquire_lock(plan_dir)
     try:
+        if (why := begin_guard.check(plan_dir, by_id, ab.read_all_statuses(_html_path(plan_dir).read_text()), sessions)):
+            raise SystemExit(why)  # a second begin may have won the race to the lock
         rad.commit(plan_dir)  # v8: the switch and the frozen cells, under the lock
         lc.begin(plan_dir, manifest, sessions)  # v8 §5: locked-check snapshots, per generation
         for sid in sessions:
@@ -3958,8 +3963,9 @@ def cmd_record_receipt(plan_dir, session_id, agent_id, transcript, backend, inli
     receipt_cmd.record_receipt(plan_dir, session_id, agent_id, transcript, backend, inline_fix, _out)
 
 
-def cmd_clear_halt(plan_dir, cost_report=None, decision=None):
-    rsi.clear_halt_cli(plan_dir, cost_report, lambda p: _out(p, plan_dir=plan_dir), decision=decision)
+def cmd_clear_halt(plan_dir, cost_report=None, decision=None, exit_=None, answer_file=None):
+    rsi.clear_halt_cli(plan_dir, cost_report, lambda p: _out(p, plan_dir=plan_dir), decision=decision,
+                       exit_=exit_, answer_file=answer_file)
 
 
 def cmd_release(plan_dir):
@@ -4182,7 +4188,7 @@ def cmd_verify_record(plan_dir, session_id, gate, status, result_file):
 def cmd_verify_run(plan_dir, session_id, gate):
     out = vfy.verify_run_argv(plan_dir, session_id, gate)
     _out(out, plan_dir=plan_dir)
-    if out.get("action") in ("stale-closeout", "error"):
+    if out.get("action") in ("stale-closeout", "error", "review-exit-pending"):
         sys.exit(2 if out["action"] == "stale-closeout" else 1)
 
 
@@ -4207,9 +4213,11 @@ def _land_cli(cmd, plan_dir, args):
         print(payload["brief"].rstrip())
         print("=" * 72)
     _out(payload, plan_dir=plan_dir)
-    if cmd in ("land", "land-resume") and payload.get("action") != "landed":
+    if cmd in ("land", "land-resume", "land-ack") and payload.get("action") != "landed":
         sys.exit(1)
-    if payload.get("action") == "error":
+    # An answer that went straight on exits 0 like before; one that never started does not.
+    if payload.get("action") in ("error", "land-locked") or payload.get("kind") in (
+            "land-running", "land-reserved"):
         sys.exit(1)
 
 
@@ -4423,6 +4431,8 @@ def _add_mutation_parsers(sub):
     add_dir(s)
     s.add_argument("--cost-report", default=None, help="Required from the SECOND clear of one session's halt on.")
     s.add_argument("--decision", default=None, help="Required when the stuck protocol triggered for the session.")
+    s.add_argument("--exit", default=None, choices=rsi.EXITS, help="Required from the THIRD clear of a review halt.")
+    s.add_argument("--answer-file", default=None, help="The owner's words for the halted session's next attempt (given once).")
     s = sub.add_parser("release")
     add_dir(s)
 
@@ -4523,7 +4533,7 @@ _COMMANDS = {
     "add-session": lambda plan_dir, args: cmd_add_session(plan_dir, args),
     "amend-session": lambda plan_dir, args: cmd_amend_session(plan_dir, args),
     "retire-session": lambda plan_dir, args: cmd_retire_session(plan_dir, args),
-    "clear-halt": lambda plan_dir, args: cmd_clear_halt(plan_dir, args.cost_report, args.decision),
+    "clear-halt": lambda plan_dir, args: cmd_clear_halt(plan_dir, args.cost_report, args.decision, args.exit, args.answer_file),
     "release": lambda plan_dir, args: cmd_release(plan_dir),
     "retire-plan": lambda plan_dir, args: cmd_retire_plan(plan_dir, args.reason),
     "ship-begin": lambda plan_dir, args: (

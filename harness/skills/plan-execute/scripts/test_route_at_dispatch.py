@@ -86,7 +86,7 @@ V7 = [
      "prompt": "work"},
 ]
 GOLDEN_V7 = {
-    "claude": "56f1ec8a667d084f659795ff9f5cd828ade43d1e9c4c5f8a7a4dd2beac9c20d3",
+    "claude": "9e54791f5bb62035ada6312c7cce900c0a5a96a26d1750aa0221f744481af525",  # re-captured 2026-11-17: notified route arms no Monitor; load Monitor first
     "codex": "a17f95af7ce8093a3fedec0f08fa020b903ef667b7c93515cff6b3c580f7018f",
 }
 

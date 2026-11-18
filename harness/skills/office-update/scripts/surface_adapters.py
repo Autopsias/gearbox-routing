@@ -455,6 +455,7 @@ def parse_artifact_file(path: str, fmt: str) -> dict:
 
 
 def _parse_xlsx_file(path: str) -> dict:
+    """One claim per numeric cell (`Sheet!B14`), labelled by the first text cell to its left."""
     parsed = {"surface": "excel", "fmt": "xlsx", "claims": [], "layout": {}, "notes": []}
     try:
         import openpyxl
@@ -462,24 +463,51 @@ def _parse_xlsx_file(path: str) -> dict:
         parsed["layout"] = {"sheet_names": list(wb.sheetnames), "sheet_count": len(wb.sheetnames),
                             "defined_names": sorted(wb.defined_names.keys())
                             if hasattr(wb, "defined_names") else []}
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                label = None
+                for cell in row:
+                    v = cell.value
+                    if isinstance(v, str) and v.strip() and label is None:
+                        label = v.strip()
+                    elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                        parsed["claims"].append({
+                            "claim_text": "%s: %s" % (label, v) if label else str(v),
+                            "locator": "%s!%s" % (ws.title, cell.coordinate)})
     except Exception as e:                                       # noqa: BLE001
         parsed["notes"].append("openpyxl unavailable/failed (%s) — structure only" % e.__class__.__name__)
     return parsed
 
 
 def _parse_pptx_file(path: str) -> dict:
-    parsed = {"surface": "ppt", "fmt": "pptx", "claims": [], "layout": {}, "notes": []}
+    """One claim per text shape (`slide N/title` or `slide N/<shape name>`); the speaker
+    notes ride on the slide's first claim as its §2.1 evidence note (`slide N/notes`)."""
+    parsed = {"surface": "ppt", "fmt": "pptx", "claims": [], "layout": {}, "notes": [], "locators": []}
     try:
         from pptx import Presentation
         prs = Presentation(path)
-        parsed["layout"] = {"slide_count": len(prs.slides.__iter__.__self__._sldIdLst)
-                            if hasattr(prs, "slides") else len(list(prs.slides))}
+        parsed["layout"] = {"slide_count": len(prs.slides)}
+        for n, slide in enumerate(prs.slides, 1):
+            title = slide.shapes.title
+            claims = []
+            for shape in slide.shapes:
+                text = shape.text_frame.text.strip() if shape.has_text_frame else ""
+                if text:
+                    where = "title" if title is not None and shape.shape_id == title.shape_id else shape.name
+                    claims.append({"claim_text": text, "locator": "slide %d/%s" % (n, where)})
+            notes = slide.notes_slide.notes_text_frame.text.strip() if slide.has_notes_slide else ""
+            if notes:
+                parsed["locators"].append("slide %d/notes" % n)
+                if claims:
+                    claims[0]["evidence_note"] = {"locator": "slide %d/notes" % n, "text": notes}
+            parsed["claims"].extend(claims)
     except Exception as e:                                       # noqa: BLE001
         parsed["notes"].append("python-pptx unavailable/failed (%s)" % e.__class__.__name__)
     return parsed
 
 
 def _parse_doc_file(path: str, fmt: str) -> dict:
+    """One claim per document_map paragraph, at its §1.6 locator."""
     parsed = {"surface": "doc", "fmt": fmt, "claims": [], "layout": {}, "notes": []}
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(_HERE)),
@@ -489,7 +517,10 @@ def _parse_doc_file(path: str, fmt: str) -> dict:
         heads = [s.get("heading_path") for s in m.get("sections", [])]
         parsed["layout"] = {"style_names": [], "section_count": len(m.get("sections", [])),
                             "heading_paths": heads}
-        parsed["locators"] = [p.get("locator") for p in m.get("paragraphs", []) if p.get("locator")]
+        paras = [p for p in m.get("paragraphs", []) if p.get("locator")]
+        parsed["locators"] = [p["locator"] for p in paras]
+        parsed["claims"] = [{"claim_text": p["text"], "locator": p["locator"]}
+                            for p in paras if (p.get("text") or "").strip()]
     except Exception as e:                                       # noqa: BLE001
         parsed["notes"].append("document_map unavailable/failed (%s)" % e.__class__.__name__)
     return parsed

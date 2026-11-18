@@ -438,5 +438,9 @@ def apply_mutation(html_path, aid, *, status, note=None, updated=None):
     # line endings survive the edit cycle unchanged (P14).
     text = html_path.read_bytes().decode("utf-8")
     new_text = mutate_text(text, aid, status=status, note=note, updated=updated)
+    old = read_status(text, aid)
     _atomic_write_html(html_path, new_text)
+    from status_pairs import log_status_change  # late: stdlib-only module imports
+
+    log_status_change(html_path, aid, old, status)
     return status

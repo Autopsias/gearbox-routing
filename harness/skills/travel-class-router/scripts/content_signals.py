@@ -163,6 +163,10 @@ def scan(path: str, declared: str = "internal", internal_domain: str | None = No
         add("unsupported-number", "travels",
             f"{len(nums)} numeric token(s) — candidate; confirm vs source packet (S03)")
 
+    if not scanned:
+        # SKILL.md: an unreadable file defaults UP to at least Travels, never Internal
+        add("unreadable", "travels", "could not extract content; " + ("; ".join(warnings) or "no text"))
+
     content_min = "internal"
     for s in signals.values():
         content_min = _max_class(content_min, s["min_class"])

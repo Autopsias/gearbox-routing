@@ -305,7 +305,16 @@ def retire_plan(plan_dir, *, reason=None):
     """
     state = pwt.load_state(plan_dir)
     if not state:
-        return {"status": "noop", "reason": f"no {pwt.STATE_FILENAME} — this plan was never isolated"}
+        # Never isolated: no worktree or branch to touch; record the mark where
+        # the registry reads it for such plans.
+        rstate = rsi.load_state(plan_dir)
+        rstate["retired"] = {"reason": reason, "at": lst.now(), "worktree": "none"}
+        rsi.save_state(plan_dir, rstate)
+        sl.release_all_ship_locks(plan_dir)
+        rsi.release_lock(plan_dir)
+        rsi.log_event(plan_dir, "plan_retired", session_ids=[], reason=reason)
+        return {"status": "retired", "reason": reason,
+                "detail": "never isolated — no worktree or branch to remove"}
     result = remove_plan_worktree(plan_dir, force=False)
     root = repo_root(plan_dir) or Path(state["repo_root"])
     slug = state["plan_slug"]

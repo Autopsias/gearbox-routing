@@ -180,7 +180,8 @@ def _test_speed_routes(agent, LADDER):
             "path, a hardcoded port, one shared database, module-level globals "
             "mutated by tests — and give each worker its own (tmp_path, port 0, a "
             "per-worker DB name). Prove it with random order and "
-            "`~/.claude/scripts/govrun pytest -n 2`, twice each; both green twice "
+            "`~/.claude/scripts/govrun --max-wait 0 pytest -n 2` in a background Bash call, twice "
+            "each; both green twice "
             "or it is not fixed. Do not add `-n auto`."),
     }
 

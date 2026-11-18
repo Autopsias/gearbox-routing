@@ -127,15 +127,14 @@ class CommandText(io.StringIO):
 
 
 def segments(command):
-    """The command split into the separate commands a shell would run.
+    return [seg for seg, _ in segments_ops(command)]
 
-    The punctuation chars are what make `a&&b` and `pytest -n 8|tail` split
-    without spaces, and the lexer keeps quoted text as ONE token — which is the
-    whole reason `grep -rn 'docker build' .` is not a docker build. `\\n` is
-    moved OUT of whitespace and INTO the punctuation set so a newline splits
-    instead of vanishing; `\\r` stays whitespace, so a CRLF is one separator.
-    Comments are handled by `CommandText`, not here.
-    """
+
+def segments_ops(command):
+    """``[(segment, operator after it or None)]``: the separate commands a shell would run.
+    The punctuation chars make `a&&b` and `pytest -n 8|tail` split without spaces; quoted text stays
+    ONE token (so `grep -rn 'docker build' .` is not a docker build). `\\n` is a punctuation char so
+    a newline splits; `\\r` stays whitespace. Comments are handled by `CommandText`."""
     lexer = shlex.shlex(CommandText(command), posix=True,
                         punctuation_chars="();<>|&\n`")
     lexer.whitespace = " \t\r"
@@ -153,12 +152,12 @@ def segments(command):
     out, current = [], []
     for token in tokens:
         if token in SEPARATORS:
-            out.append(current)
+            out.append((current, token))
             current = []
         else:
             current.append(token)
-    out.append(current)
-    return [resplit_env_s(seg) for seg in out if seg]
+    out.append((current, None))
+    return [(resplit_env_s(seg), op) for seg, op in out if seg]
 
 
 def runner_words(name, rest):

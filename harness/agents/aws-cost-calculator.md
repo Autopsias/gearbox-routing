@@ -59,7 +59,7 @@ TIER 4: WebSearch (Built-in Fallback)
 
 ```
 mcp__exa__agent_run({
-  query: "Research CURRENT AWS pricing as of January 2026 for the following services:
+  query: "Research CURRENT AWS pricing as of today's date for the following services:
     - EC2 m5.xlarge (on-demand, reserved 1yr, reserved 3yr, spot)
     - RDS PostgreSQL db.t3.medium
     - S3 Standard storage per GB

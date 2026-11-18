@@ -1,7 +1,7 @@
 ---
 description: "Orchestrates BMAD development: standard, TDD/ATDD (--full), UAT (--uat), or end-of-epic validation (--end). Use when you say 'develop epic N', 'start epic', 'run epic UAT', 'end of epic tests'."
 argument-hint: "<epic-number> [--full|--uat|--end|--phase N|--yolo|--auto|--parallel-stories N|--no-ship]"
-allowed-tools: ["Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
+allowed-tools: ["Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep", "AskUserQuestion", "Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
 ---
 
 # BMAD Epic Development
@@ -182,9 +182,8 @@ After STEP 5 completes (epic status marked done):
 
 **Instructions:** Read `~/.claude/references/epic-dev/full/phase-ship.md` and follow all steps.
 
-Skip with `--no-ship` flag. The ship phase dispatches ship-tail via a Task agent — the
-conductor itself does NOT call SlashCommand directly (pure-orchestrator invariant preserved;
-the Task agent has its own tool list that includes SlashCommand).
+Skip with `--no-ship` flag. The conductor runs ship-tail itself with the `Skill` tool:
+Claude Code has no `SlashCommand` tool, so a dispatched agent cannot invoke it.
 
 ---
 

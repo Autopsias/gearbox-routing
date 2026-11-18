@@ -525,9 +525,8 @@ PASS → proceed to Phase 3. CONCERNS → surface + ask (or log in --auto). FAIL
 ## PHASE 9: Ship (post-quality-gate ops chain)
 **Instructions:** Read ~/.claude/references/epic-dev/full/phase-ship.md and follow all steps.
 
-This phase runs AFTER STEP 7 (epic completion) and dispatches the shared ship-tail via a
-dedicated Task agent. The conductor itself does NOT call SlashCommand — the ship agent has
-its own tool list that includes SlashCommand. Skip with `--no-ship`.
+This phase runs AFTER STEP 7 (epic completion). The conductor runs the shared ship-tail
+itself with the `Skill` tool (Claude Code has no `SlashCommand` tool). Skip with `--no-ship`.
 
 ---
 

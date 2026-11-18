@@ -14,6 +14,7 @@ rate of finding classes did not fall (28% before, 36% after; ledger row
 The findings ledgers under `_verify_state/*.findings.ndjson` are untouched.
 """
 import json
+import re
 from pathlib import Path
 
 import safe_json as sj
@@ -22,6 +23,12 @@ ANSWERS_FILE = "_checkpoint_answers.ndjson"
 #: Change-log ops that void an answer recorded before them: the session was sent
 #: back, amended or retired, so the answer was given against state that changed.
 RETIRING_OPS = {"redispatch", "amend-session", "retire-session", "resolve-replan"}
+#: Halt answers are retired only by these: a redispatch or amend-session carries the answer
+#: forward (an `--exit split` is carried out by amend-session AFTER the clear).
+HALT_RETIRING_OPS = {"retire-session", "resolve-replan"}
+#: Change-log entries that only DISPLAY an owner answer. Readers that treat "a newer entry"
+#: as proof the plan changed (unmet_exit, replan.changes_since) must skip them.
+DISPLAY_ONLY_OPS = {"checkpoint-answer", "halt-answer"}
 
 def _ndjson_objects(path):
     """Every JSON-object line of `path` as bytes-split lines decoded strictly;
@@ -53,14 +60,14 @@ def current_checkpoint(plan_dir, session_id):
     return newest
 
 
-def _retired(plan_dir, session_id, answer_at):
+def _retired(plan_dir, session_id, answer_at, ops=RETIRING_OPS):
     """Is there a retiring change-log entry for the session newer than the answer?
     An entry whose time cannot be parsed counts as retiring (fail closed)."""
     at = sj.parse_iso_aware(answer_at)
     if at is None:
         return True
     for rec in _ndjson_objects(Path(plan_dir) / "_changelog.ndjson"):
-        if rec.get("op") not in RETIRING_OPS:
+        if rec.get("op") not in ops:
             continue
         if rec.get("session") != session_id and session_id not in sj.get_list(rec, "sessions_touched", []):
             continue
@@ -107,8 +114,67 @@ def live_answer(plan_dir, session_id):
     return ("ok", best)
 
 
+def _closeout_after(plan_dir, session_id, at):
+    """True when any closeout of the session (live or archived `.r<N>`) was persisted after `at`.
+    Unparseable files or times count as newer (fail closed)."""
+    for f in sorted((Path(plan_dir) / "_closeouts").glob(f"{session_id}.*json")):
+        if f.name != f"{session_id}.json" and not re.match(rf"^{re.escape(session_id)}\.r\d+\.json$", f.name):
+            continue
+        try:
+            when = sj.parse_iso_aware((json.loads(f.read_bytes().decode("utf-8")) or {}).get("_persisted_at"))
+        except (OSError, ValueError, UnicodeDecodeError, AttributeError):
+            return True
+        if when is None or when > at:
+            return True
+    return False
+
+
+def live_halt_answer(plan_dir, session_id):
+    """The owner's answer given when the session's halt was cleared, until a closeout of the
+    session is persisted after it. `None`, ``("ok", record)`` or ``("unreadable", why)``.
+    Pure read: run_state.json `halt_answer[sid]` names the record by id."""
+    try:
+        state = sj.load_dict((Path(plan_dir) / "run_state.json").read_bytes()) or {}
+    except OSError:
+        return None
+    rid = (state.get("halt_answer") or {}).get(session_id) if isinstance(state.get("halt_answer"), dict) else None
+    if not rid:
+        return None
+    rec = next((r for r in _ndjson_objects(Path(plan_dir) / ANSWERS_FILE)
+                if r.get("id") == rid and r.get("session") == session_id), None)
+    if rec is None:
+        return ("unreadable", f"the halt answer {rid} for {session_id} is not in {ANSWERS_FILE}")
+    at = sj.parse_iso_aware(rec.get("at"))
+    if at is None or _closeout_after(plan_dir, session_id, at) \
+            or _retired(plan_dir, session_id, rec.get("at"), HALT_RETIRING_OPS):
+        return None
+    return ("ok", rec)
+
+
+def _halt_block(plan_dir, session_id):
+    got = live_halt_answer(plan_dir, session_id)
+    if got is None:
+        return ""
+    head = "--- OWNER'S ANSWER AT THE HALT BEFORE THIS ATTEMPT ---\n"
+    tail = "--- END OWNER'S ANSWER ---\n\n---\n\n"
+    state, rec = got
+    if state == "unreadable":
+        return (head + f"  The owner's halt answer could not be read: {rec}.\n"
+                "  Stop and flag this in your closeout. Do not guess what the owner said.\n" + tail)
+    body = "".join("  " + part for part in str(rec.get("answer")).splitlines(True))
+    if not body.endswith("\n"):
+        body += "\n"
+    return (head + body + "The owner gave this when clearing the halt on this session. Treat it as the\n"
+            "direction for this attempt, within this session's verify contract. If it contradicts\n"
+            "your prompt, follow it and record the contradiction as a deviation in your closeout.\n" + tail)
+
+
 def _answer_block(plan_dir, session_id):
     """The block that opens the digest, or "" when no answer is live."""
+    return _halt_block(plan_dir, session_id) + _pre_dispatch_block(plan_dir, session_id)
+
+
+def _pre_dispatch_block(plan_dir, session_id):
     got = live_answer(plan_dir, session_id)
     if got is None:
         return ""

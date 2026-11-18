@@ -26,7 +26,7 @@ export SLASH_DEPTH=$((INVOCATION_DEPTH + 1))
 # If --push-after flag was used and commit succeeded, create/update PR
 if [[ "$ARGUMENTS" == *"--push-after"* ]] && [[ "$COMMIT_SUCCESS" == "true" ]]; then
     echo "Commit pushed to remote. Creating/updating PR..."
-    SlashCommand(command="/pr create")
+    Skill(skill="pr", args="create")
 fi
 
 # If on a feature branch and commit succeeded, offer PR creation
@@ -38,10 +38,10 @@ if [[ "$CURRENT_BRANCH" != "main" ]] && [[ "$CURRENT_BRANCH" != "master" ]] && [
     PR_EXISTS=$(gh pr view --json number 2>/dev/null)
     if [[ -z "$PR_EXISTS" ]]; then
         echo "No PR exists for this branch. Creating one..."
-        SlashCommand(command="/pr create")
+        Skill(skill="pr", args="create")
     else
         echo "PR already exists. Checking status..."
-        SlashCommand(command="/pr status")
+        Skill(skill="pr", args="status")
     fi
 fi
 ```

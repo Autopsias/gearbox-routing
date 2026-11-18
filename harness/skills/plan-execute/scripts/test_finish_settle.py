@@ -2,7 +2,7 @@
 superseded and busy outcomes, the per-invocation lock, the reset on reopen.
 Split out of test_finish.py (file-size bound); it reuses that file's fixtures.
 
-    python3 -m pytest -q test_finish_settle.py
+    scripts/pytest-m -q skills/plan-execute/scripts/test_finish_settle.py
 """
 # ruff: noqa: F811  (ci and fx are pytest fixtures imported from test_finish)
 

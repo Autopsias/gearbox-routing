@@ -5,10 +5,12 @@ KNOWN POSITIVE — a dirty tree plus `git reset --hard` must be refused — is t
 test that matters. The known negatives matter just as much: a guard that blocks
 ordinary work gets disabled, and then it protects nothing.
 
-Run: python3 -m pytest hooks/test_git_tree_guard.py -q
+Run: scripts/pytest-m hooks/test_git_tree_guard.py -q
 """
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -172,3 +174,118 @@ def test_heredoc_opener_may_carry_trailing_shell(repo):
                "fix: a message that mentions git reset --hard HEAD\n"
                "EOF")
     assert run(command, dirty(repo)).returncode == 0
+
+
+# --- the settings.json entry: fail closed, with a shell fast path ------------
+SETTINGS = Path(__file__).resolve().parent.parent / "settings.json"
+
+
+def _entry():
+    for g in json.loads(SETTINGS.read_text())["hooks"]["PreToolUse"]:
+        for h in g["hooks"]:
+            if "git-tree-guard.py" in h["command"]:
+                return h
+    raise AssertionError("git-tree-guard entry missing from settings.json")
+
+
+def wrapped(payload_obj, guard_src=None, path=None, tmp=None):
+    """Run the settings.json command string with a fake HOME holding the guard."""
+    assert tmp is not None, "wrapped() needs a tmp dir"
+    home = tmp / "home"
+    (home / ".claude" / "hooks").mkdir(parents=True, exist_ok=True)
+    g = home / ".claude" / "hooks" / "git-tree-guard.py"
+    if guard_src == "real":
+        shutil.copy(HOOK, g)
+    elif guard_src is not None:
+        g.write_text(guard_src)
+    env = {"HOME": str(home), "PATH": path or os.environ["PATH"]}
+    stdin = payload_obj if isinstance(payload_obj, str) else json.dumps(payload_obj)   # a str is the raw payload text
+    return subprocess.run(["/bin/bash", "-c", _entry()["command"]], input=stdin,
+                          capture_output=True, text=True, env=env)
+
+
+MARKER_GUARD = ("import sys,pathlib\n"
+                "pathlib.Path(__file__).with_name('ran').write_text(sys.stdin.read())\n")
+
+
+def test_entry_fails_closed_with_a_fast_path():
+    e = _entry()
+    assert e["onFailure"] == "block" and e["timeout"] == 10
+    assert "case " in e["command"] and "in=$(cat)" in e["command"]
+
+
+def test_no_git_in_the_payload_never_starts_python(tmp_path):
+    r = wrapped({"tool_input": {"command": "ls -la"}, "cwd": "/tmp"}, MARKER_GUARD, tmp=tmp_path)
+    assert r.returncode == 0
+    assert not (tmp_path / "home/.claude/hooks/ran").exists()
+
+
+def test_git_in_the_payload_reaches_the_guard_with_the_full_stdin(tmp_path):
+    payload = {"tool_input": {"command": "GIT status"}, "cwd": "/tmp"}
+    assert wrapped(payload, MARKER_GUARD, tmp=tmp_path).returncode == 0
+    assert json.loads((tmp_path / "home/.claude/hooks/ran").read_text()) == payload
+
+
+def test_wrapped_command_still_refuses_a_destructive_command(repo, tmp_path):
+    r = wrapped({"tool_input": {"command": "git reset --hard"}, "cwd": str(dirty(repo))}, "real", tmp=tmp_path)
+    assert r.returncode == 2 and "BLOCKED" in r.stderr and "tracked.txt" in r.stderr
+
+
+def test_wrapped_command_allows_a_clean_tree(repo, tmp_path):
+    assert wrapped({"tool_input": {"command": "git reset --hard"}, "cwd": str(repo)}, "real", tmp=tmp_path).returncode == 0
+
+
+def test_a_crashing_guard_is_refused_and_named(tmp_path):
+    r = wrapped({"tool_input": {"command": "git status"}}, "import sys; sys.exit(1)\n", tmp=tmp_path)
+    assert r.returncode == 2
+    assert "git-tree-guard.py" in r.stderr and "guard itself failed" in r.stderr and "tried again" in r.stderr
+
+
+def test_a_missing_python_is_refused(tmp_path):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in ("cat", "tr"):
+        (bindir / tool).symlink_to(shutil.which(tool))
+    r = wrapped({"tool_input": {"command": "git status"}}, "print(1)\n", path=str(bindir), tmp=tmp_path)
+    assert r.returncode == 2 and "guard itself failed" in r.stderr
+
+
+def test_a_missing_guard_file_still_allows(tmp_path):
+    # Deliberate (owner accepted 2026-11-14): the guard file ships at deploy time, so a block here would lock git out of an undeployed machine.
+    assert wrapped({"tool_input": {"command": "git reset --hard"}}, None, tmp=tmp_path).returncode == 0
+
+
+def test_known_limit_a_git_command_hidden_in_a_variable_passes_the_fast_path(tmp_path):
+    r = wrapped({"tool_input": {"command": "g=gi; ${g}t reset --hard"}}, MARKER_GUARD, tmp=tmp_path)
+    assert r.returncode == 0 and not (tmp_path / "home/.claude/hooks/ran").exists()
+
+
+@pytest.mark.parametrize("command", ["git status", "ls -la"])
+def test_a_failing_tool_in_the_fast_path_is_refused_not_read_as_no_git(tmp_path, command):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    (bindir / "cat").symlink_to(shutil.which("cat"))
+    (bindir / "tr").write_text("#!/bin/sh\nexit 1\n")
+    (bindir / "tr").chmod(0o755)
+    r = wrapped({"tool_input": {"command": command}}, MARKER_GUARD, path=str(bindir), tmp=tmp_path)
+    assert r.returncode == 2 and "guard itself failed" in r.stderr
+
+
+def test_a_printf_that_fails_in_the_fast_path_is_refused(tmp_path):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in ("cat", "tr"):
+        (bindir / tool).symlink_to(shutil.which(tool))
+    home = tmp_path / "home"
+    (home / ".claude" / "hooks").mkdir(parents=True)
+    (home / ".claude" / "hooks" / "git-tree-guard.py").write_text(MARKER_GUARD)
+    cmd = "printf(){ return 1; }; " + _entry()["command"]   # a printf that writes nothing and fails
+    r = subprocess.run(["/bin/bash", "-c", cmd], input=json.dumps({"tool_input": {"command": "git status"}}),
+                       capture_output=True, text=True, env={"HOME": str(home), "PATH": str(bindir)})
+    assert r.returncode == 2 and "guard itself failed" in r.stderr
+
+
+def test_a_json_escaped_letter_still_reaches_the_guard(repo, tmp_path):
+    raw = '{"tool_input": {"command": "g\\u0069t reset --hard"}, "cwd": "%s"}' % dirty(repo)   # the guard decodes it; the shell text has no `git`
+    r = wrapped(raw, "real", tmp=tmp_path)
+    assert r.returncode == 2 and "BLOCKED" in r.stderr

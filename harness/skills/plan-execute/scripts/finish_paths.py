@@ -114,3 +114,17 @@ def refuse_special(plan_dir, skip):
         raise Park("record-special-file", "the plan folder holds a pipe, socket or device "
                    "file; finish records only files, links and folders. Remove it, then "
                    "re-run: " + ", ".join(bad), bad)
+
+
+def touched(owner, head, target_sha, entries, git):
+    """The dirty ``entries`` the fast-forward ``head..target_sha`` can collide with: a path the
+    range changes, sits under (a directory, or a link that replaced one) or over (a file where
+    the range has a directory). Any other dirty path stays untouched, as `git merge --ff-only`
+    leaves it. A failed diff raises, so a broken check never reads as "nothing overlaps"."""
+    rc, out, err = git(["diff", "--name-only", "-z", head, target_sha], owner, strip=False)
+    if rc != 0:
+        raise RuntimeError(f"git diff failed in {owner}: {err.strip()}")
+    incoming = [q for q in out.split("\0") if q]
+    return [(xy, path) for xy, path in entries
+            if any(q == path.rstrip("/") or q.startswith(path.rstrip("/") + "/")
+                   or path.startswith(q + "/") for q in incoming)]

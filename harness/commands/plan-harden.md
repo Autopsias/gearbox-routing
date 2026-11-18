@@ -2,7 +2,7 @@
 description: "Pre-flight harden plan before exit. Runs parallel enrichment (project memory + external research + edge-cases), invokes /grill-with-docs and /adversarial-review with enrichment context loaded, then a Klein-style premortem, model + parallelization lints, and severity-tagged synthesis. Use when in plan mode and want maximum critique surface, or with --quick to just chain the existing two skills."
 argument-hint: "[--quick] [--interactive-grill] [--plan-file PATH] [--from-phase N] [--no-memory] [--no-research] [--no-edge-cases] [--no-blindspot]"
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Skill", "Agent", "Workflow", "AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet"]
-effort: high  # cascades to nested skills as adaptive-thinking guidance (cost-only tradeoff — neither nested review skill pins its own effort, so `high` only deepens them); history + unverified A/B protocol in ## Changelog. Delete this line to inherit the session level.
+effort: high  # cascades to nested skills as adaptive-thinking guidance (cost-only tradeoff — neither nested review skill pins its own effort, so `high` only deepens them). Delete this line to inherit the session level.
 ---
 
 # /plan-harden — meta-orchestrator for plan mode
@@ -568,7 +568,7 @@ plan-harden:
 
 ### 4.2: Apply to plan file (idempotent)
 
-**ORDERING — READ THIS FIRST, IT IS A REAL BUG IF YOU GET IT WRONG**  *(2026-08-21)*. On a
+**Ordering.** On a
 plan-builder plan, `PLAN_FILE` is `PLAN.html`, which is GENERATED from `spec.json`. So the
 rebuild that §4.2b REQUIRES destroys anything §4.2 writes into it. The order is fixed:
 
@@ -633,6 +633,8 @@ Next steps:
 
 On `opportunities`, follow this block with the §4.0b decision card; `linear-optimal` gets its one line and NO card.
 
+For a plan-builder plan, when `orca status --json` reports `result.app.running: true`, open the hardened `PLAN.html` in an Orca tab in the plan repository's own workspace (`orca tab create --url file://<abs PLAN.html> --worktree path:<repo root> --json`) and name the tab in the output; otherwise give the path only.
+
 ---
 
 ## --quick mode
@@ -685,37 +687,3 @@ resumption preconditions, and the rough token-budget numbers per phase: `Read
     drift across rounds; a wrong number inside a correct report is the hardest error to catch
     because everything around it is right. Re-run the command that produces each figure, or
     label it unverified.
-
----
-
-## Changelog
-
-- **2026-08-21** — Scope, sweep and execution, all from one measured session (three hardening
-  passes over a 107 KB plan; evidence in that plan's `PLAN-REVIEW-LOG.md`). (1) NEW §2.0b: the
-  review surface is MEASURED and, above ~60 KB, Phase 2 runs in `targeted` mode — a
-  whole-document verify loop does not converge on a large artifact, it resamples it
-  (19→10→1→1 then 12→6→13→9 across two passes, with pass 2's first round finding a CRITICAL
-  inside the fix pass 1 ended on). (2) NEW §2.1b: targeted mode reviews ONE session at a time
-  against a ≤15 KB verbatim contracts block — 25 findings in one parallel round against the
-  whole-document loop's 9, and the target session converged 7→1. (3) NEW §4.0c: a deterministic
-  contradiction sweep after EVERY mutation — *a fix applied in one place while the replaced
-  text survives elsewhere* was the majority defect in every round of all three passes, and an
-  ad-hoc sweep caught 9 findings neither model did. (4) NEW S.1b: `--from-phase` loads the
-  prior `*-REVIEW-LOG.md` as a findings ledger so a second pass stops re-litigating a settled
-  first. (5) §4.2 ordering fixed: the summary is written to a durable `PLAN-HARDEN-SUMMARY.md`
-  and inserted into `PLAN.html` only AFTER the last rebuild — §4.2b's required rebuild was
-  destroying it. (6) §4.2b's round-trip check now normalises the plan-directory path, which the
-  builder stamps into a header line, so the check can actually pass. (7) Rules 12–14:
-  render-verify instead of trusting structural proxies, EXECUTE embedded code against a known
-  positive and per-branch negatives, and re-measure every number at report time. Companion
-  edits: the verify prompt now demands a `## Convergence` answer and the loop branches on it
-  (new `scope-too-wide` outcome handing off to §2.1b); the review log records `verifier=` mode
-  every round; the model-lint checks `max_rework` against the schema's ceiling, which was
-  RAISED from 5 to 6 later the same day (`plan_limits.MAX_REWORK_CEILING`) because the longest
-  ladder — `sonnet@medium`, the `standard_build` default — needs 6, so the computed number is
-  now buildable for every cell instead of being clamped to one that cannot reach the apex.
-
-- **2026-08-03** — Ordering pass + parallelization lint, from the agent-janitor run's evidence. (1) NEW §4.0b `PARALLEL_LINT` (reference: `references/plan-harden/parallelization-lint.md`): deterministic write-conflict/gate/commit blockers + decision-card contract, advisory-only, placed AFTER the last plan mutation because hardening changes the DAG (observed: grilling added a cross-session data dependency). (2) §4.0 model-lint now ALSO runs early at S.3 as advisory grill enrichment — a 🔴 discovered only at Phase 4 arrives after the dominant Phase-2 spend; the Phase-4 pass stays authoritative. (3) Phase 3 premortem may overlap Phase 2's verify-loop waits (hypothesis committed before Phase 2 findings are read; reconciliation may then weigh them). Macro phase order confirmed correct against the same run: grilling before the dual-model pass let Phase 2 attack the improved plan — and catch a CRITICAL that Phase 1 itself introduced, which is the layering working, not an ordering defect.
-- **2026-07-09** — Phase 4.1: 🔴 plan-killer now requires quoted verbatim evidence (else downgraded to 🟡 with note). Companion edits in `/adversarial-review`: decision primer + relitigation suppression (R29) and fix-landed check (R30) in the Codex verify loop, quote-the-line gate at synthesis, fresh-context per-finding validator rule. Source: everyinc/compound-engineering-plugin gap review — ce-doc-review R29/R30 + ce-code-review quote gate.
-- **2026-07-01** — `effort` bumped `medium` → `high` for a deeper Phase-3 premortem + Phase-4 synthesis. Skill/command frontmatter effort is documented-honored and verified in binary 2.1.170 (overrides session effort; `CLAUDE_CODE_EFFORT_LEVEL` env var still wins).
-- **Cascade-to-nested-Skills A/B protocol** (`~/.claude/fixtures/plan-harden-corpus/ab-fork-inheritance-protocol.md`) remains **empirically unverified** — the `claude /usage` measurement scaffolding it depends on has been structurally dead since 2026-06-10 (no headless token output), so the A/B cannot complete.

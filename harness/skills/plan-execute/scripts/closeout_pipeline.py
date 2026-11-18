@@ -14,6 +14,7 @@ The parser is hardened (P4):
 """
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -61,9 +62,26 @@ def extract(raw):
 
     Failure dicts: {'status': 'missing'} | {'status': 'multiple'} ...
     """
+    # A notification can hand the closeout over HTML-escaped (&lt;plan-execute-closeout&gt;).
+    # Decode it only when no literal tag exists, so a real block is never touched.
+    if OPEN_TAG not in raw and "&lt;plan-execute-closeout&gt;" in raw:
+        raw = html.unescape(raw)
     defenced = _strip_code_fences(raw)
     opens = [m.start() for m in re.finditer(re.escape(OPEN_TAG), defenced)]
     closes = [m.start() for m in re.finditer(re.escape(CLOSE_TAG), defenced)]
+    if not opens and not closes:
+        # An agent told to write its closeout to a file can write the bare JSON with no tags
+        # (Kuzushi s187). The whole text being one object with a "session" key is
+        # the closeout itself: take it, and let the schema and scope checks judge it.
+        bare = defenced.strip()
+        if bare.startswith("{"):
+            try:
+                obj = json.loads(bare)
+            except json.JSONDecodeError:
+                obj = None
+            if isinstance(obj, dict) and "session" in obj:
+                return {"status": "ok", "json_text": bare}
+        return {"status": "missing"}
     if not opens or not closes:
         return {"status": "missing"}
 

@@ -38,6 +38,24 @@ def now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+# R7 §18.4 — the ONE phase-2 clock (time.monotonic). Set by `land_phase2.enter` only in
+# `on`, cleared by `leave`. It lives here because every module that runs a phase-2
+# operation already imports this one (land_gate gets no new line, s04).
+_PHASE2_DEADLINE = {}
+
+
+def remaining():
+    """Seconds left before the phase-2 deadline, never below 0; None outside phase 2."""
+    end = _PHASE2_DEADLINE.get("at")
+    return None if end is None else max(0.0, end - time.monotonic())
+
+
+def timeout_for(t):
+    """``min(t, remaining())`` while a phase-2 window is open, else ``t`` unchanged."""
+    left = remaining()
+    return t if left is None else min(t, left)
+
+
 def rev(cwd, expr):
     rc, out, _ = git(["rev-parse", "--verify", "--quiet", expr], cwd)
     return out if rc == 0 and out else None
@@ -246,32 +264,23 @@ def candidate(st):
     granted for a different one. Approving a merge means approving THAT merge.
 
     The other rebuild trigger, ``merged_plan_head != plan_head``, was already
-    safe: ``plan_head`` itself moved, so ``invalidate_stale_ack`` cleared the ack.
-    That is why this never showed up as a stale-ack failure.
+    safe: ``plan_head`` itself moved, so the ack no longer matched (under R6
+    ``step_gate`` now re-binds it on carry or moves it to ``invalidated_from``).
     """
     return {"plan_head": st.get("plan_head"), "main_head": st.get("expected"),
             "gate_digest": st.get("gate_digest"), "merge_sha": st.get("merge_sha")}
 
 
 def invalidate_stale_ack(st):
-    """§5.1d's FIRST of two comparisons: the ack is re-checked immediately BEFORE
-    the merge, not only before the push.
+    """§5.1d's FIRST comparison point, which under R6 (§17.1, "The ack, in order")
+    clears NOTHING: whether a moved candidate keeps the ack is decided once, by
+    `land_carry.decide` inside `step_gate`, which re-binds it on a carry and moves
+    it to ``invalidated_from`` on a reset. An ack `step_gate` did not re-bind never
+    matches `step_ack`'s full comparison, so leaving it here cannot push on it.
 
-    Only the two values that exist at that point can be compared — ``plan_head``
-    and ``main_head``; ``gate_digest`` is by construction not yet recomputed for
-    this candidate, and comparing a stale one would be worse than not comparing.
-    The second, complete comparison happens in ``step_ack`` before the push.
-
-    Returns True when it cleared an ack, so the caller can say so.
+    Returns False: it never clears an ack.
     """
-    ack = st.get("ack")
-    if not ack:
-        return False
-    if ack.get("plan_head") == st.get("plan_head") and ack.get("main_head") == st.get("expected"):
-        return False
-    st["invalidated_from"] = ack
-    st["ack"] = None
-    return True
+    return False
 
 
 # --------------------------------------------------------------------------
@@ -301,7 +310,15 @@ def clear_notice(plan_dir):
     (Path(plan_dir) / NOTICE_FILE).unlink(missing_ok=True)
 
 
+#: Parks that mean "a gate said red" (not `gate-indeterminate`: it could not decide).
+RED_KINDS = ("gate-failed", "gate-flaky", "gate-inherited", "gate-base-differs")
+
+
 def park(plan_dir, ctx, st, kind, brief, **extra):
+    if kind in RED_KINDS:            # land_cost.check reads this: red twice on one head
+        head = rev(plan_dir, ctx["branch"])
+        st["red_parks"] = int(st.get("red_parks", 0)) + 1 if st.get("red_head") == head else 1
+        st["red_head"] = head
     st["state"] = "parked"
     st["park"] = {"kind": kind, "at": now(), **extra}
     st["brief"] = brief

@@ -35,6 +35,5 @@ This command was collapsed in the **skill-unification** program (session s08, CP
 3. Otherwise default to **`/code-review`** (fast) for a working-tree diff, and tell the
    user `/adversarial-review` is available for a deeper dual-model pass.
 
-> **Why this exists:** there used to be ~8 typeable review entry points. They collapsed
-> to 2 canonical ones. `/review` is preserved as a thin back-compat alias — s09 concluded
-> without removing it (see the routing comment above). Do not add review logic here — route only.
+> `/review` is a thin alias for the two canonical reviews. Route only; add no review
+> logic here.

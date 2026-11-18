@@ -25,6 +25,16 @@ both: they have the same names.
 | `routing-retro` | One scanner script. Works from any project. Writes only to the misroute ledger, after you confirm. | 16 scripts. Also reads the outcome logs that the [plan pipeline](plan-pipeline.md) and the [compaction policy](compaction.md) write. |
 | `routing-update` | Run it in your clone of this repo; then run `install.sh` again. | Needs the plan pipeline. Some steps assume the original author's deploy tool. |
 
+## Follow-up fixes (trial)
+
+`routing-retro` has one extra report that is a trial and not a signal:
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/followup_fix.py <repo> [--days 60] [--ref origin/main]
+```
+
+It pairs each plan-session commit (`feat(<slug>): sNN session work`, older than 7 days) with fix, revert or hotfix commits in the next 7 days that change or delete lines the session commit added. It finds them with `git blame` on the fix's parent. It only reports. It changes nothing and writes nothing.
+
 ## Install
 
 **If you use only the routing framework**, `install.sh` installs these skills

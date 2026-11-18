@@ -21,7 +21,7 @@ string and fails. Two known-negatives keep the suite from being vacuous: clean t
 pass through UNCHANGED, and empty input must stay empty — a sanitizer that mangles clean
 prose is broken too.
 
-Run:  python3 -m pytest test_egress_sanitizer_redaction_goldens.py
+Run:  scripts/pytest-m skills/trust-review/references/scripts/test_egress_sanitizer_redaction_goldens.py
 """
 from __future__ import annotations
 

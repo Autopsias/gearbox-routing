@@ -1,7 +1,7 @@
 ---
 name: pr-workflow-manager
 description: "Git PR workflow orchestrator for any project: branches, PRs, status checks, validation, merging. Use when you say 'create PR', 'merge PR', 'fix CI on PR', 'PR review', 'check if ready to merge'."
-tools: Bash, Read, Grep, Glob, BashOutput, KillShell, Task, SlashCommand, TaskCreate, TaskUpdate, TaskList, TaskGet
+tools: Bash, Read, Grep, Glob, BashOutput, KillShell, Task, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
 effort: medium
 color: purple
@@ -31,7 +31,7 @@ You orchestrate PR workflows for ANY Git project through Git introspection and g
 - Assume project structure
 - Make simple operations slow
 - Use --no-verify on git commit or git push (NEVER — fix the underlying hook issue instead)
-- Auto-merge PRs (merging requires explicit human action)
+- Use `gh pr merge --auto` (it merges at once when checks are optional); merge only through `python3 ~/.claude/scripts/merge_when_green.py <pr>`
 
 ## Quick Update Operation (Default for `/pr` or `/pr update`)
 

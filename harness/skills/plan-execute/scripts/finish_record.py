@@ -26,7 +26,7 @@ import finish_repair as frp
 import land_brief as lb
 import worktree as wt
 from finish_paths import (Linked, Park, _exe, end_with_newline,  # noqa: F401
-                          lstat_inside, read_inside, refuse_special)
+                          lstat_inside, read_inside, refuse_special, touched)
 from land_state import MAX_RESYNC, is_stale, rev
 from plan_record import RUNTIME_LOCAL
 from worktree import git
@@ -463,8 +463,8 @@ def checkout(ctx, rel, target_sha, target_bytes, *, apply, lease_ok):
     if not head or not ancestor(owner, head, target_sha):                     # a
         return {**res, "status": "blocked", "command": cmd,
                 "blocking": [{"path": None, "why": "owner-not-behind", "plan": None}]}
-    restore, blocking = _classify(owner, _porcelain(owner), rel, slug, target_sha,
-                                 target_bytes)                                 # b
+    restore, blocking = _classify(owner, touched(owner, head, target_sha, _porcelain(owner), git),
+                                  rel, slug, target_sha, target_bytes)         # b
     if blocking:
         return {**res, "status": "blocked", "blocking": blocking, "command": cmd}
     if apply and not lease_ok():                                               # c

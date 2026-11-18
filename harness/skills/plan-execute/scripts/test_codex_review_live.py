@@ -25,7 +25,7 @@ per run (measured below), and the session gate already runs the default suite
 in ~535s. `-rP` is what prints a PASSING test's output, which is the whole
 point of running it:
 
-    CODEX_LIVE=1 python3 -m pytest \
+    CODEX_LIVE=1 scripts/pytest-m \
         skills/plan-execute/scripts/test_codex_review_live.py -q --no-header -rP
 
 MEASURED, codex-cli 0.147.0 / gpt-5.6-sol, over a 1-file 8-line

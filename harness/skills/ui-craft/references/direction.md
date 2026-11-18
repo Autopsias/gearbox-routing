@@ -88,6 +88,12 @@ with the project's own CSS tokens and real content, shot with `shoot.mjs` at 136
 mock-up shows the structure; its controls need not work. Send the pictures first (the current
 page beside each direction), then the list.
 
+For the owner's own products, also put the mock-ups on one private Design canvas (`Artifact`,
+`action: "quickstart"`, `intent: "design"`), so the owner sees the directions side by side and
+comments on a part. Name the project's design system or decline the default: the account
+default is your-workspace's. Never for client work: the mock-ups leave the machine. This is a trial to
+2026-12-17 (worth-adopting ledger, row 2026-11-17, Parrott).
+
 ## 6. The owner picks
 
 The owner picks one direction, or none. Record the pick and its reason where the project keeps

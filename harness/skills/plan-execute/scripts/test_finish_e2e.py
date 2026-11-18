@@ -19,6 +19,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import finish  # noqa: E402
 import registry_plans as rp  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import build_repo, local_main, origin_main, run_cli, work  # noqa: E402
 from test_land_repair import _close  # noqa: E402
 from worktree import git  # noqa: E402
@@ -68,7 +69,7 @@ def _landed(fx, begin=True):
     _close(plan, "s01", "plan-a-i1")
     assert run_cli("plan", plan)[1]["action"] == "land"
     assert run_cli("land", plan)[1]["action"] == "land-awaits-review"
-    assert run_cli("land-ack", plan, "--note", "e2e")[1]["action"] == "land-acked"
+    assert ack_only(plan, "e2e")[1]["action"] == "land-acked"
     rc, out = run_cli("land", plan)
     assert (rc, out["action"]) == (0, "landed"), out
 

@@ -22,8 +22,8 @@ Gearbox-owned Codex ports. Use the commands directly for diagnosis or an immedia
 manual refresh:
 
 ```bash
-python3 ~/.claude/skills/codex-skill-sync/scripts/sync_from_claude.py          # report only
-python3 ~/.claude/skills/codex-skill-sync/scripts/sync_from_claude.py --apply  # write
+"$(~/.claude/scripts/pyres yaml)" ~/.claude/skills/codex-skill-sync/scripts/sync_from_claude.py          # report only
+"$(~/.claude/scripts/pyres yaml)" ~/.claude/skills/codex-skill-sync/scripts/sync_from_claude.py --apply  # write
 ```
 
 Always read the dry run before applying. The script is idempotent: a second run with
@@ -77,13 +77,13 @@ in the script. Do not edit the mirror by hand — the next sync overwrites it.
 
 Every one of these was observed, not imagined.
 
-- **Writing through a symlink edited the Claude canon.** Several skills
+- **Writing through a symlink edited the Claude canon.** Seven skills
   (`tdd`, `diagnose`, `write-a-skill`, `grill-me`, `grill-with-docs`,
   `improve-codebase-architecture`, `setup-matt-pocock-skills`) are installed in
   `~/.agents` and symlinked *into* `~/.claude/skills`. Mirroring them wrapped the
   Claude-side file. Rule 2 exists because of this. Symptom: the sync never settles,
   reporting the same handful of skills as changed on every run.
-- **Hand-rolled YAML frontmatter broke many skills in one pass.**
+- **Hand-rolled YAML frontmatter broke 65 skills in one pass.**
   Descriptions carry colons, quotes and `>`. The script emits frontmatter through
   PyYAML for that reason. An unparseable skill is an absent skill, so validate after
   any change to `render()`:
@@ -91,7 +91,7 @@ Every one of these was observed, not imagined.
 - **Codex truncates descriptions to roughly the first eight words.** It
   warns when it does. Put the verb and the object in the opening sentence, and prune
   skills you do not use: fewer skills means longer visible descriptions.
-- **A blanket "Claude"→"Codex" replace corrupted many filesystem paths.**
+- **A blanket "Claude"→"Codex" replace corrupted 78 filesystem paths.**
   It produced `~/.Codex/`, which exists nowhere, and identifiers like `Codex-ai`. Never
   bulk-replace the vendor name; the translation table above is deliberately narrow.
 - **A stale mirror instructed `git commit --no-verify`** where the current

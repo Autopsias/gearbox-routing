@@ -388,7 +388,7 @@ fi
 
 **Stash State Recording Rules:**
 1. If `stash_cleanup == "dropped"` and no orphaned stashes -> Expected state, record as-is
-2. If `stash_cleanup == "none"` and no orphaned stashes -> Acceptable, but unusual
+2. If `stash_cleanup == "none"` and no orphaned stashes -> Expected: safe-refactor checkpoints on a temp branch, not a stash
 3. If `stash_cleanup == "warning_orphaned"` -> Agent detected issue, investigate
 4. If `stash_cleanup == "preserved_for_rollback"` -> Failure case, stash intentionally kept
 5. If orphaned stashes exist but agent claimed "dropped" -> **Workflow bug, flag for review**

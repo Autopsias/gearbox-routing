@@ -72,14 +72,40 @@ def _bundled(land_path):
     return candidate if _present(candidate) else runtime
 
 
+def _ignored_local(land_path):
+    """The MAIN checkout's ``.claude/eval-gates.json`` when the repo gitignores that
+    path, else None. A land worktree is a fresh checkout, so an ignored registry is
+    never in it and the repo's own overrides went unread at land: profile-a-brain's
+    HIGH-only ``llm-review-high`` fell back to the empty-findings default (measured
+    2026-11-17). That copy is outside git, so no plan branch can have written it.
+    A tracked registry is never "ignored" here, so a tracked one still wins."""
+    rc, out, _ = git(["worktree", "list", "--porcelain"], land_path)
+    if rc != 0 or not out.startswith("worktree "):    # not a git tree: nothing to fall back to
+        return None
+    main = Path(out.splitlines()[0][len("worktree "):])
+    # Ask the MAIN checkout, never the candidate: the candidate's .gitignore is the
+    # plan's own text, and a plan must not choose which registry grades it.
+    rc, _, err = git(["check-ignore", "-q", REGISTRY.as_posix()], main)
+    if rc not in (0, 1):
+        raise Unreadable(f"{REGISTRY}: git check-ignore: {err}")
+    local = main / REGISTRY
+    return local if rc == 0 and _present(local) else None
+
+
+def _project_file(land_path):
+    """The candidate's project registry, or the main checkout's ignored one."""
+    own = Path(land_path) / REGISTRY
+    return own if _present(own) else _ignored_local(land_path)
+
+
 def registry(land_path):
     """The bundled default merged under the candidate tree's project file
     (project wins per gate id). An ABSENT file contributes nothing; a present one
     that cannot be read or parsed raises ``Unreadable``. ``_present`` so a dangling
     symlink counts as present-and-unreadable, not as absent."""
     merged = {}
-    for p in (_bundled(land_path), Path(land_path) / REGISTRY):
-        if _present(p):
+    for p in (_bundled(land_path), _project_file(land_path)):
+        if p is not None and _present(p):
             merged.update(_read(p))
     return merged
 
@@ -167,6 +193,8 @@ def _origin_registry(land_path, rev):
             merged.update(_parse(text, f"{rev}:{rel}"))
         elif rel != REGISTRY.as_posix() and os.path.lexists(runtime):
             merged.update(_read(runtime))
+        elif rel == REGISTRY.as_posix() and (local := _ignored_local(land_path)):
+            merged.update(_read(local))   # same copy `registry` read: not a plan change
     return merged
 
 

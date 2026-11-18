@@ -1,7 +1,7 @@
 ---
 name: digdeep
 description: "Analysis-only root-cause investigation (Five Whys + deep research) that never executes code. Use when you say 'investigate why', 'root cause', 'five whys', 'deep analysis', 'dig deeper'."
-tools: Read, Grep, Glob, SlashCommand, mcp__exa__web_search_exa, mcp__exa__agent_run, mcp__perplexity-ask__perplexity_ask, mcp__exa__web_fetch_exa, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url, mcp__semgrep-hosted__security_check, mcp__semgrep-hosted__semgrep_scan, mcp__semgrep-hosted__get_abstract_syntax_tree, mcp__ide__getDiagnostics
+tools: Read, Grep, Glob, mcp__exa__web_search_exa, mcp__exa__agent_run, mcp__perplexity-ask__perplexity_ask, mcp__exa__web_fetch_exa, mcp__ref__ref_search_documentation, mcp__ref__ref_read_url, mcp__ide__getDiagnostics
 model: opus
 effort: medium
 color: purple
@@ -311,11 +311,7 @@ if issues_identified and actionable_fixes:
 
         issues_text = "\n".join(issue_summary)
 
-        # Spawn parallel fixers for all identified issues
-        print("Spawning specialized agents to fix identified issues...")
-        SlashCommand(command=f"/parallelize_agents Fix the following issues identified by root cause analysis:\n{issues_text}")
-
-        # If security issues were found, ensure security validation
-        if any(issue['type'] == 'security' for issue in issues_identified):
-            SlashCommand(command="/security-scanner")
+        # Analysis only: hand the list back; the main session picks the fixer agents
+        # (security-scanner for security issues).
+        return issues_text
 ```

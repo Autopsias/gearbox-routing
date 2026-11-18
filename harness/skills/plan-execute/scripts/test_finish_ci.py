@@ -121,9 +121,9 @@ def env(tmp_path, monkeypatch):
         log = tmp_path / "gh.log"
         return [json.loads(x) for x in log.read_text().splitlines()] if log.exists() else []
 
-    def verdict(timeout_s=0, base_sha=None, gh="gh"):
+    def verdict(timeout_s=0, base_sha=None, gh="gh", carried=False):
         return finish_ci.ci_verdict(root, shas["SHA"], branch="main", timeout_s=timeout_s,
-                                    gh=gh, base_sha=base_sha)
+                                    gh=gh, base_sha=base_sha, carried=carried)
 
     e.spec, e.calls, e.verdict = spec, calls, verdict
     spec()
@@ -485,3 +485,80 @@ def test_a_local_remote_gets_no_repo_flag_and_never_gh_repo(env, monkeypatch):
     assert env.verdict()["verdict"] == "green"
     assert all("--repo" not in c for c in env.calls())
     assert set((env.tmp / "gh.log.env").read_text().splitlines()) == {"null"}
+
+
+# ------------------------------------------------------------------- GAT-01
+def test_a_corrected_descendant_does_not_cover_a_broken_pushed_tree_of_a_carried_land(env):
+    """The pushed sha is red, a later commit is green: a land that carried a gate is not green."""
+    sh = env.shas
+    env.spec(list={
+        **exact(env, run(20, sh["SHA"], conclusion="failure", minute=1)),
+        "run list --branch main": [run(23, sh["DESC2"], conclusion="success", minute=4)]},
+        jobs={"20": FAILED_JOBS})
+    res = env.verdict(carried=True)
+    assert res["verdict"] == "red" and res["match"] == "exact" and res["run_sha"] == sh["SHA"]
+    assert "Owner action" in res["follow_up"] and "Nothing was reverted" in res["follow_up"]
+    assert not any(c[:4] == ["run", "list", "--branch", "main"] for c in env.calls())
+
+
+@pytest.mark.parametrize("runs, verdict", [
+    ([], "unknown"),                                             # no run on the pushed sha
+    ([run(20, "SHA", status="in_progress", minute=1)], "pending"),
+    ([run(20, "SHA", conclusion="cancelled", minute=1)], "unknown"),
+    ([run(20, "SHA", conclusion="stale", minute=1)], "unknown"),
+], ids=["missing", "pending", "cancelled", "unknown-conclusion"])
+def test_a_carried_land_never_takes_a_descendant_and_briefs_the_owner(env, runs, verdict):
+    sh = env.shas
+    runs = [{**r, "headSha": sh["SHA"]} for r in runs]
+    env.spec(list={**exact(env, *runs),
+                   "run list --branch main": [run(23, sh["DESC2"], conclusion="success", minute=4)]})
+    res = env.verdict(carried=True)
+    assert res["verdict"] == verdict != "green" and res["match"] in (None, "exact")
+    assert "Owner action" in res["follow_up"]
+    # the same result for a land that carried nothing still falls back, with no brief
+    plain = env.verdict()
+    assert "follow_up" not in plain and plain["verdict"] in ("green", verdict)
+
+
+def test_a_red_brief_names_every_carried_gate(env):
+    sh = env.shas
+    env.spec(list=exact(env, run(20, sh["SHA"], conclusion="failure", minute=1)),
+             jobs={"20": FAILED_JOBS})
+    res = env.verdict(carried=["ci-check", "llm-review"])
+    assert res["verdict"] == "red"
+    assert "ci-check" in res["follow_up"] and "llm-review" in res["follow_up"]
+
+
+def test_a_green_exact_run_of_a_carried_land_has_no_brief(env):
+    env.spec(list=exact(env, run(20, env.shas["SHA"], minute=1)))
+    res = env.verdict(carried=True)
+    assert res["verdict"] == "green" and "follow_up" not in res
+
+
+def _no_gh(env):
+    return {"gh": str(env.tmp / "no-such-gh")}
+
+
+def _unauth(env):
+    env.spec(auth_rc=1)
+    return {}
+
+
+def _slow_auth(env):
+    env.spec(auth_sleep=5)
+    return {"timeout_s": 1}
+
+
+def _no_workflows(env):
+    (env.root / ".github" / "workflows" / "verify.yml").unlink()
+    return {}
+
+
+@pytest.mark.parametrize("arrange, reason", [(_no_gh, "gh-missing"), (_unauth, "gh-unauthenticated"),
+                                             (_slow_auth, "timeout"), (_no_workflows, "no-workflows")])
+def test_a_preflight_failure_still_briefs_the_owner_of_a_carried_land(env, arrange, reason):
+    kw = arrange(env)
+    res = env.verdict(carried=["ci-check"], **kw)
+    assert res["reason"] == reason and res["verdict"] != "green"
+    assert "ci-check" in res["follow_up"] and reason in res["follow_up"]
+    assert "follow_up" not in env.verdict(carried=[], **kw)       # nothing carried: no brief

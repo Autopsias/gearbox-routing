@@ -24,6 +24,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import improve_ask_picks  # noqa: E402
+
 BAR_MIN_QUESTIONS = 10
 BAR_FIRST_PCT = 95
 BAR_MIN_SESSIONS = 3
@@ -210,6 +213,9 @@ def _scan_file(f, lines, cutoff, res):
             _note_ask(line, res, pending, cutoff)
         elif pending and "tool_result" in line and any(i and i in line for i in pending):
             _note_result(line, res, pending, repo, Path(f).stem)
+    picks = improve_ask_picks.pick_entries(lines, cutoff, repo, Path(f).stem, parse_ts, classify)
+    res["entries"] += picks
+    res["picks"] += len(picks)
     # Whatever is still pending was asked in the window and never matched a result line
     # (renamed key, new id field, interrupted session): counted, so it cannot pass as a quiet month.
     res["no_result"] += sum(len(qs) for _, qs in pending.values())
@@ -227,7 +233,7 @@ def scan(projects_dir=None, days=30, after=None, now=None):
         cutoff = max(cutoff, d)
     mtime_cut = cutoff.timestamp() - 86400
     res = {"entries": [], "ask_lines": 0, "parsed_lines": 0, "unreadable": 0, "questions": 0, "files": 0,
-           "result_lines": 0, "unreadable_results": 0, "unparsed_answers": 0, "no_result": 0, "file_errors": 0}
+           "result_lines": 0, "unreadable_results": 0, "unparsed_answers": 0, "no_result": 0, "picks": 0, "file_errors": 0}
     for f in sorted(glob.glob(os.path.join(str(pdir), "*", "*.jsonl"))):
         try:
             if os.path.getmtime(f) < mtime_cut:
@@ -303,7 +309,7 @@ def print_table(rows):
 def print_members(entries, key):
     for e in entries:
         if e["key"] == key:
-            print(f"{e['date']} | {e['repo']} | {e['question']} | {e['opts'][0]} | {e['answer']} | {e['session']}")
+            print(f"{e['date']} | {e['repo']} | {e['question'][:300]} | {e['opts'][0]} | {e['answer']} | {e['session']}")
 
 
 def main(argv=None):
@@ -333,6 +339,7 @@ def main(argv=None):
           f"NEAR = >= {BAR_MIN_QUESTIONS} asked and >= {NEAR_MIN_PCT}% first (listed, never proposed)")
     print(f"parsed {r['parsed_lines']} of {r['ask_lines']} AskUserQuestion lines; unreadable: {r['unreadable']} "
           f"({unread_pct:.0f}%, max {UNREADABLE_MAX_PCT}%); questions parsed: {r['questions']}; answered: {answered}")
+    print(f"owner picks counted beside AskUserQuestion: {r['picks']} (prose option list or wrap-up button; included in 'answered')")
     print(f"result lines: {r['result_lines']}; unreadable results: {r['unreadable_results']} ({unres_pct:.0f}%, max {UNREADABLE_MAX_PCT}%); "
           f"unparsed_answers: {r['unparsed_answers']}; no_result: {r['no_result']}; "
           f"unparsed + no_result: {lost} of {slots} questions asked in the window ({unparsed_pct:.0f}%, max {UNREADABLE_MAX_PCT}%); unreadable files: {r['file_errors']}")
@@ -347,7 +354,7 @@ def main(argv=None):
     elif args.candidates:
         for e in entries:
             if e["key"] == "9" and e["answer"] == e["opts"][0]:
-                print(f"{e['date']} | {e['repo']} | {e['question']} | {e['opts'][0]}")
+                print(f"{e['date']} | {e['repo']} | {e['question'][:300]} | {e['opts'][0]}")
     else:
         print_table(class_stats(entries))
     fail = []

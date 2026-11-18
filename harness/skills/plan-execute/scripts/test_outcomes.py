@@ -517,6 +517,10 @@ def test_ledger_path_env_override_is_honored(tmp_path, monkeypatch):
     outc.write(plan_dir, "s01", resolution="unit", result="passed", verified=True)
     assert custom.exists()
     assert len(_read_ledger(custom)) == 1
+    # Without the override (a test file this conftest does not reach), a pytest
+    # run still never resolves to the tracked ledger.
+    monkeypatch.delenv(outc.LEDGER_PATH_ENV)
+    assert outc.ledger_path() != outc._default_ledger_path()
 
 
 def test_swallow_on_failure_never_raises(tmp_path, monkeypatch):

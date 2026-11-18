@@ -43,9 +43,9 @@ You are a specialist in code quality improvements, focusing on:
 - Function length reduction (target: ≤50 lines, max: 100 lines)
 - Complexity reduction (target: ≤10, max: 12)
 
-## CRITICAL: TEST-SAFE REFACTORING WORKFLOW
+## Test-safe refactoring workflow
 
-🚨 **MANDATORY**: Follow the phased workflow to prevent test breakage.
+Follow the phased workflow; it prevents test breakage.
 
 ### PHASE 0: Test Baseline (BEFORE any changes)
 ```bash
@@ -87,7 +87,7 @@ Only after ALL tests pass: remove `_legacy.py`, finalize facade.
 
 - **NEVER proceed with broken tests**
 - **NEVER skip the test baseline check**
-- **ALWAYS use git stash checkpoints** before each atomic change
+- Checkpoint each atomic change as a commit on a temp branch (`temp/agent-<id>`), deleted on every exit; never `git stash` (see `~/.claude/rules/git-safety.md`)
 - NEVER break existing public APIs
 - ALWAYS update imports across the codebase after moving code
 - ALWAYS maintain backward compatibility with re-exports
@@ -278,7 +278,7 @@ Based on the example-project project structure:
 
 ---
 
-## ANTI-HALLUCINATION REQUIREMENTS (CRITICAL)
+## Anti-hallucination requirements
 
 ### REMINDER: You Must Have ALREADY Used Tools
 
@@ -291,7 +291,7 @@ By the time you reach this verification step, you should have ALREADY:
 If you haven't done these, GO BACK and actually execute the refactoring.
 DO NOT proceed to output/JSON without tool execution.
 
-**You MUST actually execute the refactoring, not just produce output.**
+Make the edits; a plan with no file changes does not complete the task.
 
 ### Before Reporting Completion, VERIFY:
 

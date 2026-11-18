@@ -11,9 +11,14 @@ both, so the review states numbers instead of guessing them:
     Claude Code memory notes (files and bytes);
   - mechanical layer: lint, type, pre-commit, CI, hook and custom-check files,
     and the test file count;
-  - graduation candidates: prose lines that say NEVER or ALWAYS and name a
-    grep-able token (a backticked command, flag, path or pattern) — the rules a
-    check could enforce instead;
+  - graduation candidates: rule lines (an imperative that opens with or bolds
+    NEVER/ALWAYS and names a grep-able token: a backticked command, flag, path
+    or pattern), ranked by how often the token recurs in the fix and revert
+    subjects and in the other prose; at most 5 are listed. A narrative use of
+    "never" ("it never recounts `x`") is counted apart, not listed;
+  - clean-up trend: the length of .complexity-exceptions, .file-size-exceptions
+    and .function-length-exceptions now and at the last commit 30 or more days
+    old ("none" for a missing file, never 0);
   - fix and revert history: commits in the last 90 days whose subject says fix,
     revert or hotfix;
   - docs drift: backticked paths in CLAUDE.md, AGENTS.md and README.md that do
@@ -47,6 +52,13 @@ from shape import tracked_files, vendored  # noqa: E402
 
 WINDOW_DAYS = 90
 RULE_WORD = re.compile(r"\b(never|always)\b", re.I)
+# An imperative: the word opens the line (after a bullet or bold marker) or a
+# sentence, or is bolded/capitalised as a rule. "it is never X" is narrative.
+RULE_LEAD = re.compile(r"(^[\s>*_#\-\d.)]*|[.:;!?]\s+|\*\*|\u2014\s*)(never|always)\b", re.I)
+RULE_SHOUT = re.compile(r"\b(NEVER|ALWAYS)\b")
+MAX_CANDIDATES = 5
+EXCEPTION_LISTS = (".complexity-exceptions", ".file-size-exceptions",
+                   ".function-length-exceptions")
 BACKTICK = re.compile(r"`([^`\n]+)`")
 LINE_SUFFIX = re.compile(r":\d+(?:[-:]\d+)*$")
 PATH_EXTENSIONS = {".py", ".sh", ".md", ".json", ".yaml", ".yml", ".txt",
@@ -196,22 +208,61 @@ def _grep_token(span):
     return None
 
 
-def graduation_candidates(repo, sources):
-    """Prose lines with NEVER/ALWAYS that name at least one grep-able token."""
-    out = []
+def _is_rule(line):
+    """An imperative rule line, as opposed to a sentence that merely says 'never'."""
+    return bool(RULE_SHOUT.search(line)) or any(
+        m.group(2)[0].isupper() or m.group(1).strip() == "**" for m in RULE_LEAD.finditer(line))
+
+
+def graduation_candidates(repo, sources, fix_text=""):
+    """({rule lines with a grep-able token, top 5 by recurrence}, narrative count).
+
+    Recurrence = how often the token shows in the fix/revert subjects plus in
+    every prose file, so a rule whose mistake keeps coming back ranks first.
+    """
+    rules, narrative, prose = [], 0, ""
     for group, paths in sources.items():
         for path in paths or []:
             if not path.is_file():
                 continue
             label = f"memory/{path.name}" if group == "memory" else str(path.relative_to(repo))
-            for n, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
-                if not RULE_WORD.search(line):
-                    continue
+            text = path.read_text(errors="ignore")
+            prose += text.lower() + "\n"
+            for n, line in enumerate(text.splitlines(), 1):
                 tokens = [t for t in BACKTICK.findall(line) if _grep_token(t)]
-                if tokens:
-                    out.append({"file": label, "line": n, "tokens": tokens,
-                                "text": line.strip()[:200]})
-    return out
+                if not (tokens and RULE_WORD.search(line)):
+                    continue
+                if _is_rule(line):
+                    rules.append({"file": label, "line": n, "tokens": tokens, "text": line.strip()[:200]})
+                else:
+                    narrative += 1
+    for r in rules:
+        t = r["tokens"][0].strip().lower()
+        r["recurrence"] = fix_text.count(t) + prose.count(t) - 1  # -1: the rule's own line
+    rules.sort(key=lambda r: -r["recurrence"])  # stable: ties keep file order
+    return {"rule_lines": len(rules), "listed": rules[:MAX_CANDIDATES]}, narrative
+
+
+def _list_length(text):
+    """Entries in an exceptions list: non-blank lines that are not comments."""
+    return sum(1 for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#"))
+
+
+def exception_trend(repo, days=30):
+    """{file: {"now": n|None, "then": n|None}} plus the commit used for 'then'.
+
+    None means no such file (printed 'none', never 0). `then` is read at the
+    newest commit at least `days` old; None there too when the repo has none.
+    """
+    rc, out = run(["git", "rev-list", "-1", f"--before={days}.days.ago", "HEAD"], repo)
+    base = out.strip() if rc == 0 else ""
+    res = {}
+    for name in EXCEPTION_LISTS:
+        f = repo / name
+        now = _list_length(f.read_text(errors="ignore")) if f.is_file() else None
+        rc, old = run(["git", "show", f"{base}:{name}"], repo) if base else (1, "")
+        res[name] = {"now": now, "then": _list_length(old) if rc == 0 else None}
+    return {"base": base[:12] or None, "lists": res}
 
 
 def _classify(subject):
@@ -243,6 +294,12 @@ def fix_history(repo):
         if kind:
             counts[kind] += 1
     return counts
+
+
+def _fix_text(repo):
+    """Lower-cased subjects of the fix/revert/hotfix commits in the window."""
+    rc, out = run(["git", "log", f"--since={WINDOW_DAYS}.days", "--format=%s"], repo)
+    return "\n".join(x.lower() for x in out.splitlines() if _classify(x)) if rc == 0 else ""
 
 
 def _path_claims(line):
@@ -303,13 +360,17 @@ def build_report(repo, memory_dir):
     repo = Path(repo).resolve()
     files = tracked_files(repo)
     sources = prose_sources(repo, memory_dir)
+    cands, narrative = graduation_candidates(repo, sources, _fix_text(repo))
     return {
         "repo": str(repo),
         "memory_dir": str(memory_dir),
         "memory_dir_found": sources["memory"] is not None,
         "prose": prose_inventory(sources),
         "mechanical": mechanical_inventory(repo, files),
-        "candidates": graduation_candidates(repo, sources),
+        "candidates": cands["listed"],
+        "rule_lines": cands["rule_lines"],
+        "narrative_lines": narrative,
+        "cleanup_trend": exception_trend(repo),
         "history": fix_history(repo),
         "docs_drift": docs_drift(repo, files, memory_dir),
         "verification": verification_base(repo, files),
@@ -347,9 +408,22 @@ def _history_lines(r):
 
 def format_report(r):
     lines = [f"trust_ladder: {r['repo']}", ""] + _prose_lines(r) + [""] + _mechanical_lines(r)
-    lines += ["", f"## Graduation candidates: {len(r['candidates'])} NEVER/ALWAYS lines "
-              "that name a grep-able token"]
-    lines += [f"  {c['file']}:{c['line']}  {c['text']}" for c in r["candidates"]]
+    lines += ["", f"## Graduation candidates: {len(r['candidates'])} listed (max {MAX_CANDIDATES}) of "
+              f"{r['rule_lines']} rule lines that name a grep-able token; "
+              f"{r['narrative_lines']} narrative uses of never/always counted apart"]
+    lines += [f"  {c['file']}:{c['line']}  recurrence {c['recurrence']}  {c['text']}"
+              for c in r["candidates"]]
+    t = r["cleanup_trend"]
+    lines += ["", "## Clean-up trend: exception list lengths, now vs "
+              + (f"30 days ago (commit {t['base']})" if t["base"] else "30 days ago (no commit that old)")]
+    for name, v in t["lists"].items():
+        now = "none" if v["now"] is None else v["now"]
+        then = "none" if v["then"] is None else v["then"]
+        change = (f"{v['now'] - v['then']:+d}" if None not in (v["now"], v["then"]) else "n/a")
+        lines.append(f"  {name}: now {now}, then {then}, change {change}")
+    lines.append("  verdict: " + ("a list shrank" if any(
+        None not in (v["now"], v["then"]) and v["now"] < v["then"] for v in t["lists"].values())
+        else "no list shrank in 30 days"))
     lines += [""] + _history_lines(r)
     d = r["docs_drift"]
     lines += ["", f"## Docs drift: {d['unresolved']} of {d['checked']} backticked paths "

@@ -60,3 +60,114 @@ def test_a_new_claim_never_keeps_its_incoming_verdict():
     out = OU.build_next_claim_set([rec], change_set, "r1")
     claims = out["claims"] if isinstance(out, dict) else out
     assert [c["verdict"] for c in claims if c["claim_id"] == cid] == ["needs-review"]
+
+
+# --- 2026-11-12: the six medium/low findings from the same review
+import pytest  # noqa: E402
+
+sys.path.insert(0, os.path.join(HERE, "..", "..", "deck-architect", "scripts"))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "travel-class-router", "scripts"))
+import content_signals as CS  # noqa: E402  # ty: ignore[unresolved-import]
+import egress_sanitizer as ES  # noqa: E402
+import render_deck as RD  # noqa: E402  # ty: ignore[unresolved-import]
+import surface_adapters as SA  # noqa: E402  # ty: ignore[unresolved-import]
+import verification as V  # noqa: E402
+
+
+def test_render_reads_the_render_rules_key_brand_interpreter_writes():
+    brand = {"phase": "brand-rules", "render_rules": {"typography": {
+        "heading_font": {"value": "Arial", "determination": "extracted", "source": "theme"},
+        "body_font": {"value": None, "determination": "unclear", "note": "no minorFont"}}}}
+    style, deviations = RD.resolve_brand(brand)
+    assert style["heading_font"] == "Arial"
+    assert [d["rule"] for d in deviations] == ["body_font"]
+
+
+def test_a_real_markdown_file_yields_claims(tmp_path):
+    p = tmp_path / "memo.md"
+    p.write_text("# Results\n\nQ3 revenue was EUR 48.2M, up 12% on Q2.\n", encoding="utf-8")
+    parsed = SA.parse_artifact_file(str(p), "md")
+    texts = [c["claim_text"] for c in SA.extract_claims(parsed)]
+    assert any("48.2M" in t for t in texts)
+    assert all(c["locator"] in SA.locator_index(parsed) for c in parsed["claims"])
+
+
+def test_a_real_pptx_file_yields_claims_with_notes(tmp_path):
+    pptx = pytest.importorskip("pptx")
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    slide.shapes.title.text = "Q3 revenue grew 12% to EUR 48.2M"
+    slide.notes_slide.notes_text_frame.text = "Source: S1 board.xlsx Outputs!B14"
+    p = tmp_path / "deck.pptx"
+    prs.save(str(p))
+    parsed = SA.parse_artifact_file(str(p), "pptx")
+    [claim] = parsed["claims"]
+    assert claim["locator"] == "slide 1/title"
+    assert claim["evidence_note"] == {"locator": "slide 1/notes", "text": "Source: S1 board.xlsx Outputs!B14"}
+    assert parsed["layout"]["slide_count"] == 1
+
+
+def test_a_real_xlsx_file_yields_claims(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Outputs"
+    ws["A14"], ws["B14"] = "Revenue (EUR M)", 48.2
+    p = tmp_path / "model.xlsx"
+    wb.save(str(p))
+    claims = SA.parse_artifact_file(str(p), "xlsx")["claims"]
+    assert [(c["locator"], c["claim_text"]) for c in claims] == [("Outputs!B14", "Revenue (EUR M): 48.2")]
+
+
+def test_an_unreadable_file_is_routed_up_not_internal(tmp_path):
+    r = CS.scan(str(tmp_path / "missing.pptx"), declared="internal")
+    assert r["scanned"] is False
+    assert r["effective_class"] == "travels" and r["escalated"] is True
+    assert "unreadable" in r["signals"]
+    # a declared class above the default is kept
+    assert CS.scan(str(tmp_path / "missing.pptx"), declared="board-regulatory")["effective_class"] == "board-regulatory"
+
+
+@pytest.mark.parametrize("sens,travel", [("secret", "travels"), ("Restrictd", "internal"),
+                                         ("public", "board"), ("internal", "external")])
+def test_egress_refuses_an_unknown_class(sens, travel):
+    gate = ES.egress_gate(sens, travel)
+    assert gate["status"] == "blocked" and gate["mode"] == ES.MODE_SKIPPED
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://evil-example.com/ir", "low"),
+    ("https://example.com.evil.net/ir", "low"),
+    ("https://example.com@evil.net/ir", "low"),
+    ("https://evil.net\\@example.com/ir", "low"),        # a browser goes to evil.net
+    ("https://evil.net @example.com/ir", "low"),
+    ("https://a@b@example.com/ir", "low"),
+    ("https://example.com\t.evil.net/ir", "low"),         # a browser strips the tab: example.com.evil.net
+    ("https://example.com\n.evil.net/ir", "low"),
+    ("https://exa\u0000mple.com/ir", "low"),
+    ("https://ir.example.com/q3", "official"),
+    ("https://www.example.com:443/q3", "official"),
+    ("https://fun.org/x", "low"),
+    ("https://sec.gov.evil.net/x", "low"),
+    ("https://www.sec.gov/x", "official"),
+    ("https://www.gov.uk/x", "official"),
+    ("https://dre.gov.pt/x", "official"),
+    ("https://www.reuters.com/x", "primary"),
+])
+def test_authority_does_not_accept_a_lookalike_host(url, expected):
+    assert V.authority_of(url, ["example.com"]) == expected
+
+
+@pytest.mark.parametrize("snippet,quarantined", [
+    ("source_authority: derived-provenance\nphase: quarantine", True),
+    ('source_authority: "derived-provenance"', True),
+    ("source_authority: 'derived-provenance'", True),
+    ('{"source_authority": "derived-provenance", "phase": "quarantine"}', True),
+    ("stamped source_authority=derived-provenance", True),
+    ("> This note's `source_authority` is `derived-provenance`. While `phase: quarantine`", True),
+    ('source_authority: "derived-provenance"\nphase: "promoted"', False),
+    ('{"source_authority": "derived-provenance", "phase": "promoted"}', False),
+    ("source_authority: primary\nphase: quarantine", False),
+])
+def test_quarantine_detection_matches_its_documented_variants(snippet, quarantined):
+    assert ICA._is_quarantined_derived({"snippet": snippet}) is quarantined

@@ -57,7 +57,8 @@ def test_latest_status_per_finding_wins():
 
 class _Ctx:
     def __init__(self, attempt, priors=(), delta=()):
-        self.attempt, self.priors, self.delta = attempt, list(priors), set(delta)
+        self.attempt, self.delta = attempt, set(delta)
+        self.priors: list = list(priors)
         self.plan_dir = self.session = "x"
         self.hashes = {}
 
@@ -458,12 +459,13 @@ def test_a_prior_whose_file_left_the_surface_is_retired_not_carried(tmp_path):
 def test_the_convergence_line_always_names_the_accept_file(tmp_path):
     d = tmp_path / "p"
     (d / "_verify_state").mkdir(parents=True)
-    (d / "_verify_state" / "s01.accepted.json").write_text("{}")   # wrong name for ledger session s01.medium
+    (d / "_verify_state" / "s01.accepted.json").write_text("{}")   # the session-wide name: read
+    (d / "_verify_state" / "s01.high.codex.accepted.json").write_text("{}")   # another gate's: not read
     (tmp_path / "a.py").write_text("1")
     ctx = L.context(str(d), "s01.medium.codex", str(tmp_path), ["a.py"])
     line = L.convergence_line(L.judge(ctx, [])[1])
-    assert "accept_file=s01.medium.codex.accepted.json entries=0" in line
-    assert "NOT read: s01.accepted.json" in line
+    assert "accept_file=s01.medium.codex.accepted.json+s01.accepted.json entries=0" in line
+    assert "NOT read: s01.high.codex.accepted.json" in line
 
 
 def test_an_open_priors_file_rides_along_even_when_the_fix_never_touched_it(tmp_path):
@@ -674,6 +676,34 @@ def test_an_accepted_finding_never_becomes_a_blocking_prior(tmp_path):
          "reason": "deferred"}])
     _, _, recs = L.judge(_AcceptCtx(L.load_accepted(plan, session)), [UV])
     assert L.open_priors(recs) == []
+
+
+# The s07 case: the attempt-3 finding stayed OPEN under its old id while
+# its reworded copy was accepted, so the gate printed accepted=1 and still FAILED.
+STALE = {"fid": "d52d5b26a6", "file": "hooks/stopfailure-alert.py", "line": 231,
+         "severity": "high", "status": "open", "attempt": 3,
+         "summary": "Recent transcript writes do not block resume: a probe set the mtime."}
+
+
+@pytest.mark.parametrize("echoed,contains,status", [
+    (False, "transcript writes", "accepted"),    # unseen prior, declared -> clears
+    (True, "transcript writes", "accepted"),     # echoed open by id, declared -> clears
+    (False, "peel bound", "open"),               # KNOWN POSITIVE: not declared -> blocks
+    (True, "peel bound", "open"),
+])
+def test_an_open_prior_the_owner_declared_is_accepted(tmp_path, echoed, contains, status):
+    plan, session = _accept_file(tmp_path, [
+        {"file": "hooks/stopfailure-alert.py", "contains": contains, "reason": "owner s07"}])
+    ctx = _AcceptCtx(L.load_accepted(plan, session), attempt=4, delta=())
+    ctx.priors = [STALE]
+    parsed = [{"prior_id": STALE["fid"], "prior": "open", "summary": "still there"}] if echoed else []
+    fail, counts, recs = L.judge(ctx, parsed)
+    assert [r["status"] for r in recs] == [status]
+    assert fail is (status == "open")
+    assert (counts["accepted"], counts["prior_open"]) == ((1, 0) if status == "accepted" else (0, 1))
+    if status == "accepted":
+        assert recs[0]["accept_reason"] == "owner s07"
+        assert "ACCEPTED hooks/stopfailure-alert.py:231" in L.accepted_block(recs)
 
 
 def test_the_convergence_line_reports_what_it_accepted():

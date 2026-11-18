@@ -99,6 +99,10 @@ identical, so the command is the only thing that distinguishes them — asked fo
 next dispatch, the number came back correct and named `python3 -m pytest . -q` and its
 directory.
 
+The owner-decision half: a draft of the auto mode trust text said Codex was
+cleared "to review any content of these projects"; the record said "any your-workspace content". The
+commit security review caught it after the deploy, and a second commit and deploy narrowed it.
+
 ## ALWAYS end a substantive status report or handoff with a plain-language two-liner
 
 Four times across sessions the user had to ask "in plain language, what do I do next /
@@ -127,6 +131,10 @@ the rubric itself, so this rule is the binding.
 
 Self-widening permissions to route around a correct denial defeats the point of the gate
 — expanding the command surface must stay a human-gated change, never self-serve.
+
+The gate is his yes, not his keyboard: twice in one session the agent handed
+the operator a five-step command list for an edit he had already approved in substance; he
+answered "do all steps yourself, auto mode off".
 
 ## When a repeated step's cost visibly compounds
 
@@ -201,3 +209,7 @@ the need: the coverage command had fixed percent targets, `epic-code-reviewer` h
 report at least three issues, and `epic-test-expander` had to add edge cases.
 All three changed the same day. The rule covers the builders those edits do not
 reach. The test-value review of repo-health measures the result.
+
+## After a session opens a pull request it merges when every check is green
+
+Owner decision: 'Always merge when green'. It replaces the older rule 'NEVER auto-merge'. Why: 41 owner messages in 23 sessions said 'merge when green', 'check and merge' or 'merge and release', and 'Merge Without Review' was the top classifier refusal (30). The native `gh pr merge --auto` is barred because it merged at once when checks were optional (memory note gh-auto-merge-merges-at-once-on-optional-checks). `scripts/merge_when_green.py` waits for every check of the exact head commit, requires every pull_request job of the workflows to be present, and refuses on zero checks, any failure, a draft, a conflict, requested changes or a moved head. Skipped or neutral checks count only beside a success (PR #66 read verify success, secrets skipped). Deploy and release stay an explicit request.

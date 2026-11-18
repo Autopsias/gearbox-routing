@@ -25,7 +25,8 @@ FILES = {
                  "- Never guess a cause from memory.\n"                # no token: not a candidate
                  "- The guide is `docs/missing.md`.\n"                 # broken doc path
                  "- The checker is `scripts/check_x.py`.\n"            # resolves
-                 "- Never call `Task` from a subagent.\n",             # bare word: not grep-able
+                 "- Never call `Task` from a subagent.\n"
+                 "- The hook always exits 0 under `--quiet`.\n",         # narrative: counted apart             # bare word: not grep-able
     "AGENTS.md": "Always pass `--json` to the collector.\n",           # candidate: flag
     ".claude/rules/small.md": "ALWAYS keep changes small.\n",           # no token
     ".claude/hooks/guard.sh": "#!/bin/sh\nexit 0\n",
@@ -109,6 +110,10 @@ def test_every_section_counts_the_planted_fixture(tmp_path):
     where = sorted((c["file"], c["line"]) for c in r["candidates"])
     assert where == [("AGENTS.md", 1), ("CLAUDE.md", 2), ("memory/note.md", 1)], where
 
+    assert (r["rule_lines"], r["narrative_lines"], len(r["candidates"])) == (3, 1, 3)
+    # no exception list and no commit 30 days old in the fixture: none, never 0
+    assert r["cleanup_trend"]["lists"][".file-size-exceptions"] == {"now": None, "then": None}
+
     assert r["history"] == {"window_days": 90, "commits": 4, "fix": 1,
                             "revert": 1, "hotfix": 1}
 
@@ -163,7 +168,7 @@ def test_the_text_report_names_every_section(tmp_path):
     repo, home, memory = _fixture(tmp_path)
     p = subprocess.run([sys.executable, str(SCRIPT), str(repo), "--memory-dir", str(memory)],
                        env=_env(home), capture_output=True, text=True, check=True)
-    for header in ("## Prose layer", "## Mechanical layer", "## Graduation candidates: 3",
+    for header in ("## Prose layer", "## Mechanical layer", "## Graduation candidates: 3 listed", "## Clean-up trend", "no list shrank",
                    "## Fix and revert history", "## Docs drift: 1 of 2",
                    "## Verification base", "hyg.todo-density", "ai.verify-command"):
         assert header in p.stdout, header
@@ -226,3 +231,22 @@ def test_first_real_run_nested_configs_plan_probes_and_memory_pointers(tmp_path)
     assert m["custom-checks"] == ["scripts/check-size.py"]
     assert r["docs_drift"] == {"checked": 2, "unresolved": 1, "paths": [
         {"file": "CLAUDE.md", "line": 1, "path": "gone_note.md"}]}
+
+
+def test_candidates_are_capped_ranked_and_the_trend_reads_the_old_commit(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = _init(tmp_path / "repo", home)
+    rules = "".join(f"- NEVER touch `scripts/f{i}.py`.\n" for i in range(7))
+    (repo / "CLAUDE.md").write_text(rules)
+    (repo / ".file-size-exceptions").write_text("# c\na.py\nb.py\nc.py\n")
+    _git(repo, home, "add", "-A")
+    _commit(repo, home, "old", age_days=40)
+    (repo / ".file-size-exceptions").write_text("a.py\n")
+    _git(repo, home, "add", "-A")
+    _commit(repo, home, "fix: scripts/f5.py again", age_days=2)
+    r, _ = _run(repo, home, "--memory-dir", str(tmp_path / "none"))
+    assert len(r["candidates"]) == 5 and r["rule_lines"] == 7
+    assert r["candidates"][0]["tokens"] == ["scripts/f5.py"]  # the fix commit names it
+    assert r["cleanup_trend"]["lists"][".file-size-exceptions"] == {"now": 1, "then": 3}
+    assert r["cleanup_trend"]["lists"][".complexity-exceptions"] == {"now": None, "then": None}

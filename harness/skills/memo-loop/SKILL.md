@@ -11,9 +11,8 @@ re-runs every checkable finding itself and throws out the ones that do not repro
 **typed** terminal state that distinguishes "nothing material found" from "the critic never ran".
 
 > **It returns a critique, not a rewritten memo.** You rewrite — or hand the findings to a rewriter of
-> your choosing. memo-loop used to revise automatically; that loop was measured against single-pass
-> rewrites twice and lost both times, so it was descoped. Everything the eval showed
-> working is still here.
+> your choosing. An automatic revise loop lost to single-pass rewrites in evals, so the skill does not
+> revise.
 
 **Files are the only state.** Every pass reads disk and runs in a fresh context; nothing is carried in
 conversation history. That is what makes the fresh-context critic provable rather than asserted.

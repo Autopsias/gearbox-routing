@@ -1,7 +1,7 @@
 """FIN-01 / FIN-02 (s02) — the record step's confinement, on the real bare-origin
 fixture. Split from ``test_finish.py`` to keep each file under 500 lines.
 
-    python3 -m pytest -q test_finish_record.py
+    scripts/pytest-m -q skills/plan-execute/scripts/test_finish_record.py
 """
 
 import os
@@ -191,7 +191,7 @@ def test_the_checkout_step_never_restores_across_a_link(fx, ci, tmp_path, case):
         link = fx["plan"] / "link"
         os.symlink("PLAN.html", link)
         _push(fx, "plan link")
-        link.unlink()
+        git(["reset", "-q", "--hard", "HEAD~1"], fx["root"], check=True)  # owner behind
         link.write_text("PLAN.html")               # same bytes as the link's text
         target, path, keep = origin_main(fx), link, lambda: not link.is_symlink()
     else:

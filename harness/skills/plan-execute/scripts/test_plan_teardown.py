@@ -30,6 +30,8 @@ sys.path.insert(0, str(SCRIPTS))
 import land_state as lst  # noqa: E402
 import plan_scope as ps  # noqa: E402
 import plan_teardown as pt  # noqa: E402
+import run_state_io as rsi  # noqa: E402
+from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import build_repo, isolate, run_cli, work  # noqa: E402
 from worktree import git  # noqa: E402
 
@@ -41,7 +43,7 @@ def fx(tmp_path):
 
 def _land_with_ack(iso):
     run_cli("land", iso["plan_dir"])
-    run_cli("land-ack", iso["plan_dir"], "--note", "approved")
+    ack_only(iso["plan_dir"], "approved")
     return run_cli("land", iso["plan_dir"])
 
 
@@ -151,9 +153,10 @@ def test_retire_plan_preserves_and_reports_a_dirty_worktree(fx):
     assert git(["rev-parse", "--verify", "--quiet", iso["branch"]], fx["root"])[0] == 0
 
 
-def test_retire_plan_on_a_never_isolated_plan_is_a_noop(fx):
-    res = pt.retire_plan(str(fx["plans"]["plan-a"]))
-    assert res["status"] == "noop"
+def test_retire_plan_on_a_never_isolated_plan_records_the_mark(fx):
+    res = pt.retire_plan(str(fx["plans"]["plan-a"]), reason="old")
+    assert res["status"] == "retired"
+    assert rsi.load_state(fx["plans"]["plan-a"])["retired"]["reason"] == "old"
 
 
 # --------------------------------------------------------------------- LND-02.5
@@ -365,3 +368,14 @@ def test_a_first_call_remote_failure_is_retried_by_finish_then_deleted(fx, monke
     assert left["plan_branch_remote"] == "deleted"
     assert _origin_tip(fx, iso["branch"]) is None
     assert lst.load(iso["plan_dir"], ctx)["cleanup"]["branch_remote"] == "deleted"
+
+
+def test_retired_isolated_plan_with_unfinished_land_is_done_not_active(tmp_path):
+    import article_block as ab
+    import registry as reg
+    fx = build_repo(tmp_path, built=True)
+    iso = isolate(fx, "plan-a")
+    ab.apply_mutation(Path(iso["plan_dir"]) / "PLAN.html", "s01", status="DONE")
+    assert reg.classify_plan(iso["plan_dir"])["lifecycle"] == "active"   # KNOWN POSITIVE: unretired
+    pt.retire_plan(iso["plan_dir"])
+    assert reg.classify_plan(iso["plan_dir"])["lifecycle"] == "done"

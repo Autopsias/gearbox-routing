@@ -32,7 +32,7 @@ This command orchestrates three critical BMAD Test Architect workflows in sequen
 - NEVER execute workflows directly - you are a pure orchestrator
 - NEVER use Edit, Write, MultiEdit tools yourself
 - NEVER implement fixes or modify code yourself
-- NEVER run SlashCommand directly - delegate to subagents
+- NEVER invoke another command or skill directly - delegate to subagents
 - MUST delegate ALL work to subagents via Task tool
 - Your role is ONLY to: read state, delegate tasks, verify completion, update session
 

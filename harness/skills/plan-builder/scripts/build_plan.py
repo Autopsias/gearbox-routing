@@ -35,6 +35,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from plan_files import clean_text, write_clean_text
 from session_bundle import (  # noqa: F401 — re-exported: callers use bp.<name>
     gen_post_session_section, gen_session_prompt_md, gen_verify_section,
 )
@@ -1275,8 +1276,8 @@ def write_manifest(plan_dir, manifest):
     over a corrupt one heals it.
     """
     if prior_manifest(plan_dir) != manifest:
-        (plan_dir / "manifest.json").write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False))
+        write_clean_text(plan_dir / "manifest.json",
+                         json.dumps(manifest, indent=2, ensure_ascii=False))
 
 
 def claims_research(spec):
@@ -2684,6 +2685,7 @@ GITIGNORE_LINES = [
     "_plans/*/HALT_NOTICE.txt",
     "_plans/*/LAND_NOTICE.txt",
     "_plans/*/_worktrees/",
+    "_plans/*/.land-run.lock",
 ]
 
 
@@ -3187,7 +3189,7 @@ def render_html(spec, plan_dir):
     )
     template = template.replace("/* INSERT_CATS_ARRAY */ []", cats_array)
     template = template.replace("/* INSERT_CATEGORY_COLORS */", cat_colors)
-    return template
+    return clean_text(template)
 
 
 def _extract_inline_script(html_text):
@@ -3433,10 +3435,10 @@ def build(spec, out_path, project_root=None, preserve_state=False):
     # Validate BEFORE writing so a broken dashboard never lands on disk and a
     # --rebuild keeps the prior working PLAN.html. See dashboard-eslint.config.mjs.
     validate_dashboard_js(html_text)
-    plan_html.write_text(html_text)
+    write_clean_text(plan_html, html_text)
 
     # 2. spec.json (authoring input, kept for re-builds)
-    (plan_dir / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False))
+    write_clean_text(plan_dir / "spec.json", json.dumps(spec, indent=2, ensure_ascii=False))
 
     # 3. manifest.json — IMMUTABLE dispatch graph (regenerate each build).
     # Under --preserve-state, keep the plan's published CONTRACT too (`stamp`,
@@ -3448,7 +3450,7 @@ def build(spec, out_path, project_root=None, preserve_state=False):
     # 4. run_state.json — mutable. Only seed if missing (preserve runtime).
     rs_path = plan_dir / "run_state.json"
     if not rs_path.exists() or not preserve_state:
-        rs_path.write_text(json.dumps(init_run_state(), indent=2))
+        write_clean_text(rs_path, json.dumps(init_run_state(), indent=2))
 
     # 5. sessions/*.prompt.md + *.context.md
     sessions_dir = plan_dir / "sessions"
@@ -3457,11 +3459,9 @@ def build(spec, out_path, project_root=None, preserve_state=False):
         sid = s["id"]
         resolved_ps = resolve_post_session(s, phases_by_id)
         resolved_vb = resolve_verify(s, phases_by_id)
-        (sessions_dir / f"{sid}.prompt.md").write_text(
-            gen_session_prompt_md(s, plan_dir.name, items_by_id,
-                                  post_session=resolved_ps, verify=resolved_vb)
-        )
-        (sessions_dir / f"{sid}.context.md").write_text(gen_session_context_md(s, items_by_id))
+        write_clean_text(sessions_dir / f"{sid}.prompt.md", gen_session_prompt_md(
+            s, plan_dir.name, items_by_id, post_session=resolved_ps, verify=resolved_vb))
+        write_clean_text(sessions_dir / f"{sid}.context.md", gen_session_context_md(s, items_by_id))
 
     # 6. _closeouts/ directory placeholder
     (plan_dir / "_closeouts").mkdir(exist_ok=True)

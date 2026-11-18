@@ -26,6 +26,7 @@ seen to pass on its own tree ends once its tree changes: a repair, or the base
 fixing it.
 """
 
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -34,7 +35,8 @@ import land_start as lsg
 import land_state as lst
 from land_state import park, save
 
-_TESTS = re.compile(r"(?m)^(?:FAILED|ERROR) (\S+::\S+)|^(\S+::\S+) (?:FAILED|ERROR)\b")
+_ID = r"\S+::[^\s\[]+(?:\[[^\]\n]*\])?"     # a param may hold spaces: test_x[pytest -n 8]
+_TESTS = re.compile(rf"(?m)^(?:FAILED|ERROR) ({_ID})|^({_ID}) (?:FAILED|ERROR)\b")
 _FILES = re.compile(r"(?m)^ERROR ([^\s:]+)(?: - |\s*$)")   # pytest collection errors
 
 
@@ -87,7 +89,18 @@ def labels(pairs):
     return [n if len(gates[n]) == 1 else key(g, n) for g, n in pairs]
 
 
-def hold(st, gid, named, cwd=None):
+def _accepts(plan_dir):
+    """A digest of the land review's accept files (``_verify_state/land*.accepted.json``).
+    They sit in the plan record, which ``changed`` skips, yet they are a review
+    gate's input: a review that passes after the owner accepted its findings has
+    a new input, not a flake (2026-11-18: one acceptance parked a land twice)."""
+    h = hashlib.sha256()
+    for f in sorted((Path(plan_dir) / "_verify_state").glob("land*.accepted.json")):
+        h.update(f.name.encode() + b"\0" + f.read_bytes() + b"\0")
+    return h.hexdigest()
+
+
+def hold(st, gid, named, cwd=None, accepts=None):
     """Record one failure's names at the current plan head and base. A name already
     held stays held (a known flake stays known), and so does the gate's whole-gate
     hold: re-anchored, because a change made before this failure fixed nothing."""
@@ -95,7 +108,7 @@ def hold(st, gid, named, cwd=None):
     held = st.setdefault("plan_touched_flakes", {})
     other = st.setdefault("named_failures", {})
     at = {"gate": gid, "plan_head": st.get("plan_head"), "expected": st.get("expected"),
-          "at": lst.now()}
+          "at": lst.now(), "accepts": accepts}
     diff = lst.range_files(st["land_path"], st["expected"])
     land = Path(st["land_path"]).resolve()
     for name, f in named:
@@ -118,7 +131,8 @@ def hold(st, gid, named, cwd=None):
 def record(plan_dir, ctx, st, rec):
     """Every failing land-tree run, recorded and saved the moment it happens."""
     if rec["outcome"] == "fail":
-        hold(st, rec["gate_id"], _of(rec), rec.get("cwd"))
+        hold(st, rec["gate_id"], _of(rec), rec.get("cwd"),
+             _accepts(plan_dir) if rec.get("review") else None)
         save(plan_dir, ctx, st)
 
 
@@ -240,6 +254,9 @@ def flake_hold(plan_dir, ctx, st):
         st["named_failures"].pop(t, None)
     held = st.get("plan_touched_flakes") or {}
     for t, e in list(held.items()):
+        if e.get("accepts") is not None and e["accepts"] != _accepts(plan_dir):
+            del held[t]          # the owner accepted findings since: a new input
+            continue
         tree, own = changed(ctx, st, e)
         if not tree:
             _flake(st, e["gate"], e["name"])

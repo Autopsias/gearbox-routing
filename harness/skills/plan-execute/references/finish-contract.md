@@ -131,6 +131,10 @@ keeps decision 4 without a burst of unasked pushes across old plans.
    `ship_locks.our_lease` right before the record push and right before the
    first Checkout restore. A lost lease parks the record `lease-lost`, or
    blocks Checkout with `why: lease-lost`; nothing more is written.
+   A land reservation (plan-isolation-contract.md §17.2, R6) does not block this
+   lease, and §17.4's renewal and live-holder protection do not cover it. When
+   finish meets a live land lease on the same resource, it still obeys §17.4:
+   it takes the host mutex and never takes over a live land holder.
 
 ## The four steps, in order
 
@@ -184,7 +188,7 @@ keeps decision 4 without a burst of unasked pushes across old plans.
    is in flight. Comparing only this plan's row is a possible follow-up, and an
    operator decision.
 4. **CI.** `finish_ci.ci_verdict(root, ci_sha, branch=<default>, timeout_s=…,
-   base_sha=<pinned base_sha>)`. Report only. `red` names the failing
+   base_sha=<pinned base_sha>, carried=<the gate ids the land carried>)`. Report only. `red` names the failing
    workflows and checks, and says whether the base had them too. `pending`
    prints the re-run command.
 
@@ -250,7 +254,7 @@ Allowed values (no others):
 `skipped` means an earlier step parked. `would-*` values appear only in
 `report-only` mode.
 
-**`finish_ci.ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None)`**
+**`finish_ci.ci_verdict(root, sha, *, branch, timeout_s, gh="gh", base_sha=None, carried=())`**
 — the docstring in `scripts/finish_ci.py` is normative. It aggregates every
 workflow run for the sha: one green run never hides a red sibling.
 
@@ -273,7 +277,13 @@ cannot be read or parsed, is not a JSON object, or has a non-boolean
 error. It never silently drops an `at_land` gate. An absent project file
 means no project `at_land` gates. **Discovery reads the candidate merged tree's registry**
 (`<land_path>/.claude/eval-gates.json`), not the plan directory's, so a gate
-that arrived on origin while the plan ran is still found. An `at_land` gate is
+that arrived on origin while the plan ran is still found. **A gitignored registry
+is read from the main checkout instead** (`land_at_land._ignored_local`): the land
+worktree is a fresh checkout and never holds an ignored file, so without this a
+repo's overrides (profile-a-brain's HIGH-only `llm-review-high`) went unread at
+land. Only when the candidate has no file of its own AND git ignores the path; a
+tracked registry is unchanged. The same copy stands in for origin's in the
+plan-changes note, so it never reads as a plan change. An `at_land` gate is
 resolved from that same entry; a plan-declared gate keeps today's resolution.
 Each flagged gate joins the re-gate set and enters the gate digest. Argv
 abbreviated:
@@ -368,6 +378,20 @@ resolved gate's `timeout` exceeds 540 s, the orchestrator runs
 it in the foreground under the 600 s Bash cap. The land brief lists each
 gate's wall time per round, base runs included (`gates[].wall_s`), so a
 repeated 3000 s gate shows up as a cost.
+
+**Load-flaky tests (LND-14, `land_load.py`).** A gate may declare
+`rerun_tests: {"argv": [...], "timeout": s}` in its registry entry. When its
+first land-tree run fails, land re-runs only the failing pytest ids, appended to
+that argv, alone and serially, through govrun with a bounded wait, before any
+repair or park decision and whatever the other gates did. It runs only when every
+failing name is a test id, none is held (`land_flaky`'s rule, unchanged), pytest
+did not abort, and pytest's summary counts exactly those failures. Every id passes
+alone: the gate is `pass` for this candidate with a `load_flaky` record, the land
+brief names each id, and `~/.gearbox-state/land/load-flaky.ndjson` gets one line per id (an
+id seen there before is named as a fix task). Any id fails again: the first run's
+red, as before. govrun exit 75, a timeout or an exec error: `skipped` (undecided,
+never a pass). Declare it only on a gate where a failure that names test ids means
+nothing else failed; `make check` runs `test` last for `ci-check`.
 
 ```json
 {"action": "land-repair", "round": 1, "max_rounds": 3,
@@ -609,3 +633,17 @@ that session is already in the plan, the directive adds
   undecided re-run is not saved, so the next land re-runs it. (3) The kept
   remote branch note says the remote is gone, with no command, when the
   repository has no remote any more.
+
+### GAT-01 — gate classes, carried gates, a stronger CI check
+
+Registry field `phase2` (`fast` | `carry`; missing or unknown means `fast`). A review
+gate always carries. On a disjoint main move a carried gate keeps its recorded pass,
+copied with `carried_from` and never invoked (`land_gate_split.py`). A carried
+`ci-check` pass is reused at most 4 times in a row and never when its last full run
+(`full_at`, stamped by `land_gate` when the gate really ran; `land_gate_split.py` reads it)
+is over 24 hours old. The test-only helper `land_phase2.streak_ok` reads a separate
+`carry_streaks.<gate>.last_run_pass_at` and is not on the land path. The land brief lists "carried from M0", "ran on M1"
+and the files that moved since the ack. For a land that carried a gate, `ci_verdict(...,
+carried=<the carried gate ids>)` (non-empty) accepts only a run on the pushed sha (no descendant), and a red,
+missing, pending, cancelled or unknown result adds `follow_up`: a brief with the owner's
+action. Nothing is reverted or re-run.

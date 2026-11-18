@@ -19,6 +19,14 @@ def attach_to_infographic(spec, item_ids, group_name=None, session_id=None):
     if not item_ids or not isinstance(groups, list) or not groups:
         return None, None
     wanted = group_name
+    by_category = (not any(isinstance(g, dict) and (g.get("items") or g.get("sessions")) for g in groups)
+                   and all(isinstance(g, dict) and g.get("category") for g in groups))
+    if wanted is None and by_category:
+        # Groups keyed by category KEY: the item joins through its category.
+        by_id = {it["id"]: it for it in spec["items"]}
+        keys = {by_id[i]["category"] for i in item_ids if i in by_id}
+        hit = [g.get("name") for g in groups if g.get("category") in keys]
+        wanted = hit[0] if len(hit) == 1 else None
     if wanted is None:
         # Default: the item's own category LABEL, when a group is named for it.
         labels = {c["key"]: c.get("label", "") for c in spec["categories"]}
@@ -39,6 +47,10 @@ def attach_to_infographic(spec, item_ids, group_name=None, session_id=None):
                   and not any(isinstance(g, dict) and g.get("items") for g in groups))
     for g in groups:
         if str(g.get("name", "")).strip().lower() == str(wanted).strip().lower():
+            if by_category:
+                # An `items` list on one group would make the coverage check call
+                # every other item ungrouped and refuse the whole mutation.
+                return g.get("name"), None
             if by_session:
                 if session_id not in g.setdefault("sessions", []):
                     g["sessions"].append(session_id)

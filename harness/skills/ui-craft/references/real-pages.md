@@ -13,6 +13,7 @@ the pinned copy by `scripts/check_refs.py`, so a renamed upstream section fails 
 - Severity
 - Design ledger
 - What a real page needs that Stageshow does not cover
+- Slide decks
 
 ## Words that change meaning
 
@@ -106,3 +107,26 @@ known. Add every finding that survives step 5; change its state when its fix mer
 - Help text a reader needs once goes behind a fold after the first visit (Kuzushi).
 - A project's own design system wins on tokens and components; these rules decide how to use
   them.
+- The model's own default look is a choice, never a habit: a serif title, an off-white or cream
+  ground, the `#D97757` orange as the accent, a coloured bar on the left edge of a card. Use one
+  only when the project's design system asks for it; else it is a polish finding. The list is
+  from pages made to 2026-11-17 (the edge bar was on 197 of 319, plan pages apart); check it again
+  with each new model.
+
+## Slide decks
+
+A deck is a set of fixed pages, so three steps change:
+
+- Frames: one picture per slide from the PDF, not `shoot.mjs`:
+  `pdftoppm -scale-to-x 1280 -scale-to-y 720 -png deck.pdf <dir>/slide`. There is no phone
+  width. A slide is read from a distance: body text 16px or more at 1280 wide, nothing under 12px.
+- Box fit and contrast: use the deck's own build check when it has one (for example
+  `scripts/check_deck_layout.js`, which also measures text contrast, text size and leftover
+  placeholders such as TBD). Without one, measure
+  contrast on the frame pixels: the darkest text pixel against the fill around it. Do this
+  before the reviewers, not after.
+- The reviewers get every slide, in order, and one line on who reads the deck. Ask also: one
+  colour, one meaning across the deck? A chevron row only where there is an order? Does the
+  last content slide carry the ask? Do more than half of the slides share one pattern?
+- Words are content. A design fix keeps the words; a finding that needs new words (a column
+  heading, a source line) goes to the owner as a question.

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Plan isolation contract §18.5: a push to the default branch waits, at most
+# 300 s, while a land pushes main (the host-wide marker of §18.6). Fail-open by
+# design: whatever happens here, the push goes on (exit 0). Logs to
+# ~/.claude/.land-phase/writers.ndjson. Check it is active: scripts/hook-status.py
+d=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd) || exit 0
+python3 "$d/skills/plan-execute/scripts/land_writers.py" hook "$@" || true
+exit 0

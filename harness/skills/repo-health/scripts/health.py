@@ -7,6 +7,7 @@ Stdlib only. Subcommands:
              Probe results already recorded against this exact clean tree are
              carried over; --fresh discards them.
   set      — record a probe result:  set sec.secrets-history pass "no leaks"
+  scan-secrets — run the capped, ranged gitleaks probe and record it
   render   — delegate to health_render.py: score, write HEALTH.html, append history
   fix-routes — one JSON line per check FAILING or UNMEASURED: the fix dispatch
              (subagent + prompt), an operator row, or the probe still to run.
@@ -31,12 +32,12 @@ from pathlib import Path
 # answers "what is in this repo", probes.py holds the checks a model runs by
 # hand, card.py owns the scorecard file, quality_checks.py the two size gates;
 # each imports common and none imports back, so the graph stays a tree.
-from card import (CHECK_FIELDS, HEALTH_REL, health_dir, load_card,  # noqa: F401
+from card import (CHECK_FIELDS, HEALTH_REL, card_lock, health_dir, load_card,  # noqa: F401
                   recorded_probes, save_card, staleness, still_fresh, tree_key)
 from common import (JUNK_PARTS, LAYERS, STATUSES, check,  # noqa: F401  (LAYERS re-exported)
                     excluded, parse_json, quality_excludes, read, run, typed,
                     typed_items, unmeasured, pending_if_unread, read_or_unread)
-from probes import pending_checks, suite_command
+from probes import pending_checks
 from quality_checks import cq_file_size, cq_function_length
 import accepted
 from routes import fix_rows
@@ -301,21 +302,6 @@ def ai_agents_doc(repo, files):
                  unread, "agent instructions")
 
 
-def ai_verify(repo, shape, files=None):
-    unread = []
-    suite = suite_command(repo, shape, unread, files)
-    gate = shape["hooks"] or re.search(r"^(check|verify|lint):",
-                                       read_or_unread(repo, "Makefile", unread, files), re.M)
-    return pending_if_unread(
-        check("ai.verify-command", "ai_readiness", "advisory",
-              "One-command verification loop",
-              "pass" if suite and gate else ("warn" if suite or gate else "fail"),
-              f"suite: {suite or 'none'}; lint gate: {'hooks/make target' if gate else 'none found'}",
-              "" if suite and gate
-              else "add a single `make check` (lint+types+tests) agents can run"),
-        unread, "verification loop")
-
-
 def ai_lockfiles(repo, shape, files=None):
     locks = ", ".join(Path(x).name for x in shape["locks"])
     if not shape["manifests"]:
@@ -371,7 +357,7 @@ def collect(repo, fresh=False):
                ci_local_gate(shape), ci_server_gate(repo, shape),
                cq_file_size(repo, files), cq_function_length(repo, shape)]
     checks += list(hyg_junk(repo, files)) + list(hyg_docs(repo, files))
-    checks += [ai_agents_doc(repo, files), ai_verify(repo, shape, files),
+    checks += [ai_agents_doc(repo, files),
                ai_lockfiles(repo, shape, files)]
     probes = list(pending_checks(repo, shape, files))
     checks += probes
@@ -405,6 +391,11 @@ def collect(repo, fresh=False):
 
 
 def set_result(repo, cid, status, detail):
+    with card_lock(repo):
+        _set_result(repo, cid, status, detail)
+
+
+def _set_result(repo, cid, status, detail):
     # The operator types this status by hand. An unknown one used to be written
     # straight into the card, where it counted as a measured result, scored as
     # neither pass nor fail, and took render down with `KeyError: 'passs'`.
@@ -434,7 +425,8 @@ def main(argv):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("cmd", choices=["collect", "set", "render", "fix-routes", "accepted", "project",
-                                       "ci-median"])
+                                       "ci-median",
+                                       "scan-secrets"])
     ap.add_argument("args", nargs="*")
     ap.add_argument("--repo", default=".", help="target repo (default: cwd)")
     ap.add_argument("--fresh", action="store_true",
@@ -451,6 +443,9 @@ def main(argv):
         if len(ns.args) < 2:
             sys.exit("usage: health.py set <check-id> <status> [detail] [--repo PATH]")
         set_result(repo, ns.args[0], ns.args[1], " ".join(ns.args[2:]))
+    elif ns.cmd == "scan-secrets":
+        import secrets_scan
+        secrets_scan.record(repo, _set_result)
     elif ns.cmd == "fix-routes":
         # One JSON object per line: greppable, and each line is a complete
         # dispatch on its own. Silence means every check in scope was MEASURED

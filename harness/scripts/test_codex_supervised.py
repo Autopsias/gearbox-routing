@@ -47,3 +47,14 @@ def test_retry_without_id_restarts_fresh_instead_of_last():
     argv, mode = cs.attempt_argv(2, FLAGS, None)
     assert mode == "fresh"
     assert "--last" not in argv and "resume" not in argv
+
+
+def test_both_attempt_paths_turn_off_the_ref_plans_write_server():
+    from argparse import Namespace
+    a = Namespace(sandbox="read-only", idle_timeout=600, model="gpt-6.1-sol", effort="medium")
+    flags = cs.build_flags(a, "out.md")
+    for n, tid in ((1, None), (2, TID)):
+        argv, _ = cs.attempt_argv(n, flags, tid)
+        i = argv.index(cs.NO_REF_PLANS_WRITES[1])
+        assert argv[i - 1] == "-c" and "enabled=false" in argv[i]
+    assert 'sandbox_mode="read-only"' in flags and "model_reasoning_effort=medium" in flags

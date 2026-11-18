@@ -74,8 +74,50 @@ def suite_command(repo, shape, unread=None, tracked=None):
     py_names = "\n".join(shape["py"])
     if shape["py"] and (re.search(r"(^|/)test_[^/]+\.py$|_test\.py$", py_names, re.M)
                        or "tests/" in py_names):
-        return "python3 -m pytest -q"
+        # scripts/pytest-m exists in the harness repo only; other repos get the plain command.
+        return "scripts/pytest-m -q" if "scripts/pytest-m" in (tracked or ()) else "python3 -m pytest -q"
     return ""
+
+
+COLLECTS = re.compile(r"^(python3? -m pytest|pytest|scripts/pytest-m)\b")
+
+
+def collect_command(repo, suite, unread, tracked):
+    """(collect command, "") or ("", why there is none) for the suite command.
+
+    shortcut: only pytest recipes and jest scripts are recognised; any other
+    recipe stays pending as 'no collect form' -- add a form here when one recurs.
+    """
+    if suite == "make test":
+        m = re.search(r"^test:[^\n]*\n(?:[ \t]*\n)*\t[@+-]*([^\n]+)",
+                      read_or_unread(repo, "Makefile", unread, tracked), re.M)
+        first = m.group(1).strip() if m else ""
+        return (first + " --collect-only -q", "") if COLLECTS.match(first) else ("", "no collect form")
+    if suite == "npm test":
+        script = re.search(r'"test"\s*:\s*"([^"]*)"', read_or_unread(repo, "package.json", unread, tracked))
+        return ("npm test -- --listTests", "") if script and script.group(1).startswith("jest") else ("", "no collect form")
+    return suite + " --collect-only -q", ""
+
+
+def verify_check(repo, shape, suite, unread, tracked):
+    """ai.verify-command: a suite command that cannot start is no verify loop,
+    so a repo with a suite stays `pending` until the agent runs its collect form."""
+    gate = shape["hooks"] or re.search(r"^(check|verify|lint):",
+                                       read_or_unread(repo, "Makefile", unread, tracked), re.M)
+    note = f"lint gate: {'hooks/make target' if gate else 'none found'}"
+    title = "One-command verification loop"
+    if not suite:
+        return check("ai.verify-command", "ai_readiness", "advisory", title,
+                     "warn" if gate else "fail", f"suite: none; {note}",
+                     "add a single `make check` (lint+types+tests) agents can run")
+    cmd, why = collect_command(repo, suite, unread, tracked)
+    # Record: pass only on exit 0 AND >= 1 test collected; start failure -> fail with
+    # the first error line; timeout -> stay pending. Detail keeps suite and gate.
+    return check("ai.verify-command", "ai_readiness", "advisory", title, "pending",
+                 (f"run: {cmd}" if cmd else f"{why}; run the suite command by hand") +
+                 f" (suite: {suite}; {note}) -- pass only if it exits 0 and collects 1+ test; "
+                 "start failure -> fail with the first error line; timeout -> pending",
+                 "" if gate else "add a single `make check` (lint+types+tests) agents can run")
 
 
 def probe(cid, layer, tier, title, why_not, cmd):
@@ -126,6 +168,29 @@ def house_ratchet(repo):
                                "tools/check_file_sizes.py — this repo has no house ratchet")
 
 
+def suite_probes(repo, shape, files):
+    """The ai.verify-command and test.* probes, which all hang off the suite command."""
+    suite_unread = []
+    suite = suite_command(repo, shape, suite_unread, files)
+    no_suite = ("" if suite else "no test suite detected — looked for a `test:` target in "
+                                 "Makefile, a \"test\" script in package.json, and "
+                                 "test_*.py/*_test.py/tests/ among the tracked .py files")
+    yield pending_if_unread(verify_check(repo, shape, suite, suite_unread, files), suite_unread, "verification loop")
+    yield pending_if_unread(probe("test.suite", "tests", "blocking", "Test suite green", no_suite,
+                f"run: {suite}"), suite_unread, "test-suite presence")
+    yield pending_if_unread(probe("test.runtime", "tests", "advisory", "Suite runtime reasonable", no_suite,
+                "record wall-clock seconds of the suite run "
+                "(add --durations=15 to name the slow tests)"), suite_unread, "test-suite presence")
+    yield pending_if_unread(probe("test.collection-cost", "tests", "advisory",
+                "Collection is cheap", no_suite,
+                "run: time pytest --collect-only -q  — collection is paid by EVERY "
+                "invocation and by every parallel worker; warn over ~10 s or 15% of the run"), suite_unread, "test-suite presence")
+    yield pending_if_unread(probe("test.parallel-safety", "tests", "advisory",
+                "Suite is parallel-safe", no_suite,
+                "only if xdist is installed: pytest -p randomly (order) and ~/.claude/scripts/govrun --max-wait 0 pytest -n 2 (background), "
+                "twice each — both green twice => safe; else record na with the reason"), suite_unread, "test-suite presence")
+
+
 def pending_checks(repo, shape, files=None):
     no_manifest = ("" if shape["manifests"]
                    else "no dependency manifest tracked — " + MANIFEST_LOOKED_FOR)
@@ -155,11 +220,6 @@ def pending_checks(repo, shape, files=None):
                       else "this repo-health install has no vendor.json and no "
                            "vendor/ trees — it vendors no skills")
     ratchet_dir, no_ratchet = house_ratchet(repo)
-    suite_unread = []
-    suite = suite_command(repo, shape, suite_unread, files)
-    no_suite = ("" if suite else "no test suite detected — looked for a `test:` target in "
-                                 "Makefile, a \"test\" script in package.json, and "
-                                 "test_*.py/*_test.py/tests/ among the tracked .py files")
     no_workflows = ("" if shape["workflows"]
                     else "no .github/workflows/*.yml — this repo runs no GitHub Actions")
     pdir = project_dir(shape["manifests"]) or "."
@@ -210,19 +270,7 @@ def pending_checks(repo, shape, files=None):
                 "House quality ratchet green", no_ratchet,
                 f"run: python3 {ratchet_dir}/check_file_sizes.py && "
                 f"python3 {ratchet_dir}/check_function_lengths.py")
-    yield pending_if_unread(probe("test.suite", "tests", "blocking", "Test suite green", no_suite,
-                f"run: {suite}"), suite_unread, "test-suite presence")
-    yield pending_if_unread(probe("test.runtime", "tests", "advisory", "Suite runtime reasonable", no_suite,
-                "record wall-clock seconds of the suite run "
-                "(add --durations=15 to name the slow tests)"), suite_unread, "test-suite presence")
-    yield pending_if_unread(probe("test.collection-cost", "tests", "advisory",
-                "Collection is cheap", no_suite,
-                "run: time pytest --collect-only -q  — collection is paid by EVERY "
-                "invocation and by every parallel worker; warn over ~10 s or 15% of the run"), suite_unread, "test-suite presence")
-    yield pending_if_unread(probe("test.parallel-safety", "tests", "advisory",
-                "Suite is parallel-safe", no_suite,
-                "only if xdist is installed: pytest -p randomly (order) and ~/.claude/scripts/govrun pytest -n 2, "
-                "twice each — both green twice => safe; else record na with the reason"), suite_unread, "test-suite presence")
+    yield from suite_probes(repo, shape, files)
     yield probe("ci.wall-clock", "ci", "advisory", "CI wall-clock reasonable", no_workflows,
                 "run: gh run list --limit 20 --json startedAt,updatedAt,conclusion,workflowName"
                 " | python3 <skill>/scripts/health.py ci-median  (duration = updatedAt - startedAt)")

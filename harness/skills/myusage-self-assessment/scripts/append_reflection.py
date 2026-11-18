@@ -21,6 +21,17 @@ import datetime
 from pathlib import Path
 
 
+def _touch_review_stamp():
+    """Record the review time for hooks/routing-cadence-check.py (never fails the append)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
+        from dyno_paths import REVIEW_STAMP
+        os.makedirs(os.path.dirname(REVIEW_STAMP), exist_ok=True)
+        Path(REVIEW_STAMP).write_text(datetime.datetime.now().isoformat() + "\n")
+    except Exception as e:  # stamp is advisory
+        sys.stderr.write(f"[append] stamp not written: {e}\n")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--file", required=True)
@@ -57,6 +68,7 @@ def main(argv=None):
         except OSError:
             pass
     sys.stderr.write(f"[append] appended {len(block)} bytes to {target}\n")
+    _touch_review_stamp()
     return 0
 
 

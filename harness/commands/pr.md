@@ -1,7 +1,7 @@
 ---
 description: "Manages Git PR workflows: stage, commit, push, create PRs, check status, sync branches, and merge. Use when you say 'create PR', 'push changes', 'PR status', 'sync branch', or need '--fast' quick push. For committing with quality checks first, use /commit-orchestrate; for the full ship-to-CI-green chain, use /ship-tail."
 argument-hint: "[action] | update (default), status, sync, merge, create, --fast"
-allowed-tools: ["Task", "Bash", "SlashCommand", "AskUserQuestion"]
+allowed-tools: ["Task", "Bash", "Skill", "AskUserQuestion"]
 ---
 
 # PR Workflow Helper

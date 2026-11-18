@@ -57,6 +57,14 @@ run '{"tool_input":{"model":"opus","subagent_type":"tier-opus-high","description
 echo "$LOG" | grep -q '"drift": "pinned"'
 check "ALLOW CONTROL fully pinned -> pinned (no false drift)" $? "got: $LOG"
 
+# --- purpose tag: plant one per class, plus the unknown -> other control ---------
+for pair in 'epic-code-reviewer|x|verify' 'Explore|x|research' 'tier-sonnet-low|implement the parser|build' 'tier-sonnet-low|Run session s09|other'; do
+  IFS='|' read -r st ds want <<< "$pair"
+  run "{\"tool_input\":{\"subagent_type\":\"$st\",\"description\":\"$ds\"}}"
+  echo "$LOG" | grep -q "\"purpose\": \"$want\""
+  check "purpose: $st / $ds -> $want" $? "got: $LOG"
+done
+
 # --- RT-02(b): unpinned_generic flag + its one stderr line -----------------------
 # PLANT — no model, no subagent_type at all: the exact ad-hoc fan-out a hook cannot
 # pin (Claude Code silently ignores a hook's attempt to change model/subagent_type).

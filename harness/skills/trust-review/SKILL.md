@@ -125,7 +125,7 @@ An invalid waiver does **not** move its finding — it's recorded with `applied:
 
 ## TR-03 — the model split (Agent override)
 
-Builder and reviewer run on **different models** via the Agent `model` override. The default is **builder = `opus`, reviewer = `sonnet`** (Agent aliases — Opus 5.5 and Sonnet 5 as of 2026-09-22); pass `reviewer_model=`/`builder_model=` to change it. The pair is recorded in `manifest.routing.{builder_model,reviewer_model}` (name + version) and per round in `manifest.rounds[].model`. The live mechanism is proven in `fixtures/_trust_review_modelsplit_proof.txt` (a real Sonnet reviewer subagent enumerating cold) and `fixtures/_agent_modelsplit_proof.txt` (the S01 probe).
+Builder and reviewer run on **different models** via the Agent `model` override. The default is **builder = `opus`, reviewer = `sonnet`** (Agent aliases; the served model ids are recorded in `manifest.routing`); pass `reviewer_model=`/`builder_model=` to change it. The pair is recorded in `manifest.routing.{builder_model,reviewer_model}` (name + version) and per round in `manifest.rounds[].model`. The live mechanism is proven in `fixtures/_trust_review_modelsplit_proof.txt` (a real Sonnet reviewer subagent enumerating cold) and `fixtures/_agent_modelsplit_proof.txt` (the S01 probe).
 
 **Cost trade-off.** Two contexts + a second model cost more than a single self-review. The reviewer is the cheaper model (Sonnet) and sees only redacted excerpts; the expensive builder context is reused. For `internal` travel class a single-model split (or `local_only`) is acceptable; **Board/Regulatory should always use the two-model split** — the blind-spot risk dominates the token cost.
 

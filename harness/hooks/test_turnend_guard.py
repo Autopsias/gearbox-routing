@@ -184,3 +184,89 @@ def test_final_notification_after_interim_ends_it(tmp_path):
     plant(tmp_path)
     t = _with_notes(tmp_path, INTERIM_NOTE, FINAL_NOTE)
     assert run(tmp_path, payload(tmp_path, transcript_path=str(t))).returncode == 2
+
+
+def reply_transcript(tmp_path, text):
+    t = tmp_path / "reply.jsonl"
+    t.write_text(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}) + "\n")
+    return t
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Done.\nThe four follow-ups are not filed.\nNext: x. Needs you: nothing", 2),
+    ("Done.\nNext: x. Needs you: nothing", 0),
+    ("Still open: the cleanup.\nNext: x. Needs you: the OAuth key", 0),
+    ("Done.\nNext: x. Needs you: nothing\nState: committed no (uncommitted until the gate passes)", 0),
+    ("The cleanup is still open.\nNext: x. Needs you: nothing\nState: committed no", 2),
+    # A decision in 'Needs you' with no pick blocks; the same with a pick, or "nothing, unless … or …", passes.
+    ("Done.\nNext: wait. Needs you: run the plan now, both, or neither?", 2),
+    ("Done.\nNext: wait. Needs you: run the plan now, or wait? My pick: run it now.", 0),
+    ("Done.\nNext: x. Needs you: nothing, unless you want the PR or a look at the failure.", 0),    # A merge a gate script runs, handed to the owner, blocks (the 2026-11-18 13:35 reply).
+    ("## What you can do\n1. Merge example-project PR 886 with `scripts/merge-pr.sh 886`.\n"
+     "Next: on your yes, I deploy. Needs you: the deploy card and the two example-project merges (the numbered list above).", 2),
+    ("I merged PR 886 with `scripts/merge-pr.sh 886`.\nNext: x. Needs you: the deploy card", 0),
+    ("PR 890 waits on `merge_when_green.py 890`.\nNext: x. Needs you: nothing", 0),
+])
+def test_reply_contradiction_blocks_once(tmp_path, text, expected):
+    t = reply_transcript(tmp_path, text)
+    pl = payload(tmp_path, transcript_path=str(t))
+    assert run(tmp_path, pl).returncode == expected
+    assert run(tmp_path, pl).returncode == 0  # once per reply
+
+
+def test_reply_guard_reads_the_hook_input_before_a_lagging_transcript(tmp_path):
+    """The transcript can still hold the previous reply when Stop fires; the input has this one."""
+    bad, good = "The cleanup is still open.\nNext: x. Needs you: nothing", "Done.\nNext: x. Needs you: nothing"
+    old_bad = payload(tmp_path, transcript_path=str(reply_transcript(tmp_path, bad)), last_assistant_message=good)
+    assert run(tmp_path, old_bad).returncode == 0      # the old reply in the file is not this turn's
+    old_good = payload(tmp_path, transcript_path=str(reply_transcript(tmp_path, good)), last_assistant_message=bad)
+    assert run(tmp_path, old_good).returncode == 2     # this turn's reply blocks though the file lags
+
+
+def test_reply_guard_waits_while_background_work_runs(tmp_path):
+    """The reply names open work, but a background command still runs: a wait, not an end."""
+    t = reply_transcript(tmp_path, "The gate run is not done.\nNext: x. Needs you: nothing")
+    bg = [{"type": "assistant", "message": {"content": [
+              {"type": "tool_use", "id": "toolu_bg", "name": "Bash", "input": {"run_in_background": True}}]}},
+          {"type": "user", "message": {"content": [
+              {"type": "tool_result", "tool_use_id": "toolu_bg", "content": "Command running in background"}]}}]
+    reply = t.read_text()
+    t.write_text("".join(json.dumps(x) + "\n" for x in bg) + reply)
+    pl = payload(tmp_path, transcript_path=str(t))
+    assert run(tmp_path, pl).returncode == 0
+    t.write_text(reply)                       # control: the same reply with nothing running blocks
+    assert run(tmp_path, pl).returncode == 2
+
+
+def test_a_background_command_taskstop_ended_does_not_hold_the_guard_open(tmp_path):
+    """A stopped launch gets no task-notification; it must not count as running."""
+    reply = reply_transcript(tmp_path, "The gate run is not done.\nNext: x. Needs you: nothing").read_text()
+    launch = [{"type": "assistant", "message": {"content": [
+                  {"type": "tool_use", "id": "toolu_bg", "name": "Bash", "input": {"run_in_background": True}}]}},
+              {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_bg",
+                  "content": "Command running in background with ID: bb8ber8am. Output is being written to: /tmp/x"}]}}]
+    stop = [{"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "id": "toolu_stop", "name": "TaskStop", "input": {"task_id": "bb8ber8am"}}]}}]
+    t = tmp_path / "reply.jsonl"
+    pl = payload(tmp_path, transcript_path=str(t))
+    t.write_text("".join(json.dumps(x) + "\n" for x in launch) + reply)
+    assert run(tmp_path, pl).returncode == 0           # control: still running, a wait
+    t.write_text("".join(json.dumps(x) + "\n" for x in launch + stop) + reply)
+    assert run(tmp_path, pl).returncode == 2           # stopped: the reply is an end, and it blocks
+
+
+def test_a_notification_with_only_the_task_id_ends_the_agent(tmp_path):
+    """A final notification can carry the task id and no tool-use-id; it still ends the launch."""
+    reply = reply_transcript(tmp_path, "The gate run is not done.\nNext: x. Needs you: nothing").read_text()
+    launch = [{"type": "assistant", "message": {"content": [
+                  {"type": "tool_use", "id": "toolu_ag", "name": "Agent", "input": {}}]}},
+              {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_ag",
+                  "content": "Async agent launched successfully.\nagentId: a296fa (internal ID)"}]}}]
+    note = [{"type": "user", "message": {"content":
+             "<task-notification>\n<task-id>a296fa</task-id>\n<status>completed</status>\n</task-notification>"}}]
+    t = tmp_path / "reply.jsonl"
+    pl = payload(tmp_path, transcript_path=str(t))
+    t.write_text("".join(json.dumps(x) + "\n" for x in launch) + reply)
+    assert run(tmp_path, pl).returncode == 0           # control: no notification yet, a wait
+    t.write_text("".join(json.dumps(x) + "\n" for x in launch + note) + reply)
+    assert run(tmp_path, pl).returncode == 2

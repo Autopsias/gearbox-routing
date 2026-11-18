@@ -10,8 +10,10 @@ health.py re-exports every name, so health_render.py and the tests keep resolvin
 
 Imports common + probes; health.py imports this, never the other way round.
 """
+import fcntl
 import json
 import re
+from contextlib import contextmanager
 from datetime import date
 
 from common import (CHECK_FIELDS, MEASURED, certified,  # noqa: F401  (re-exported)
@@ -51,6 +53,20 @@ def load_card(repo):
         raise ValueError(f"{p} is not a JSON object — re-run: health.py collect")
     card["checks"] = [certified(c) for c in typed_items(card.get("checks"))]
     return card
+
+
+@contextmanager
+def card_lock(repo):
+    """Hold an exclusive lock on scorecard.json across a load_card..save_card.
+
+    scan-secrets runs in the background while other probes record results; two
+    unlocked read-modify-writes drop one of them. flock is per open file, so
+    never nest this in one process."""
+    d = health_dir(repo)
+    d.mkdir(parents=True, exist_ok=True)
+    with open(d / "scorecard.json", "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
 
 
 def save_card(repo, card):

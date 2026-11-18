@@ -11,7 +11,9 @@ Reads scripts/deploy.pathspec (see that file for the policy itself), runs
     {"harness": [...],          # loud: real drift, ABORTS a deploy
      "live_state": [...],       # routine: auto-harvested, never blocks
      "churn": [...],            # routine: machine-written, never blocks
-     "live_untracked": [...],   # new runtime files: harvestable, never auto-added
+     "live_untracked": [...],   # new runtime files: harvestable by `gearbox harvest`
+     "live_auto": [...],        # subset of live_untracked deploy may stage: memory notes
+                                # and plan files outside _evidence/, each < 200 KB
      "triage_untracked": [...], # new paths outside every known surface: report only
      "detail": {"<path>": {"churn": [...], "harness": [...]}},
      "errors": [...]}           # inspection failures -> caller must treat as harness
@@ -30,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 
@@ -127,16 +130,15 @@ def is_churn_key(keypath, churn_keys):
     return any(_pattern_matches(pattern, parts) for pattern in churn_keys)
 
 
-def classify_settings(claude_dir, relpath, churn_keys, errors):
-    """-> ('churn'|'harness', {'churn': [...], 'harness': [...]})  fail-closed."""
+def classify_settings(old_text, new_text, churn_keys, errors, relpath="settings.json"):
+    """-> ('churn'|'harness', {'churn': [...], 'harness': [...]})  fail-closed.
+
+    `old_text` / `new_text` are the file before and after. None means it could
+    not be read (missing, deleted): uninspectable, so harness."""
     try:
-        head = subprocess.run(
-            ["git", "-C", claude_dir, "show", f"HEAD:{relpath}"],
-            capture_output=True, check=True,
-        ).stdout
-        old = json.loads(head)
-        with open(os.path.join(claude_dir, relpath), encoding="utf-8") as fh:
-            new = json.load(fh)
+        if old_text is None or new_text is None:
+            raise FileNotFoundError("no text on one side")
+        old, new = json.loads(old_text), json.loads(new_text)
     except Exception as exc:  # unparseable / missing / deleted -> loud
         errors.append(f"{relpath}: cannot compare against HEAD ({exc.__class__.__name__}: {exc})")
         return "harness", {"churn": [], "harness": ["<uninspectable>"]}
@@ -147,6 +149,56 @@ def classify_settings(claude_dir, relpath, churn_keys, errors):
     if not churn and not harness:  # whitespace-only / key-reordering rewrite
         churn.append("<formatting-only>")
     return ("harness" if harness else "churn"), {"churn": churn, "harness": harness}
+
+
+def classify_paths(paths, old_settings, new_settings, spec, untracked=()):
+    """The ONE per-path classification, pure: paths in, classes out.
+
+    `spec` is `load_pathspec(...)`. `old_settings` / `new_settings` are the
+    settings.json text before and after (None = unreadable). `untracked` names
+    the paths that are new files. `main()` calls it for the dirty tree, and
+    plan-execute's land_carry calls it for each commit of a main move, so the two
+    can never classify one path differently. Anything not named is harness.
+    """
+    live_res = [glob_to_re(g) for g in spec.get("live-state", [])]
+    churn_keys = set(spec.get("settings-churn-keys", []))
+    res: dict = {"harness": [], "live_state": [], "churn": [],
+                 "live_untracked": [], "triage_untracked": [],
+                 "detail": {}, "errors": []}
+    untracked = set(untracked)
+    for path in dict.fromkeys(paths):
+        live = any(r.match(path) for r in live_res)
+        if path in untracked:
+            (res["live_untracked"] if live else res["triage_untracked"]).append(path)
+        elif live:
+            res["live_state"].append(path)
+        elif path == "settings.json":
+            klass, detail = classify_settings(old_settings, new_settings, churn_keys, res["errors"])
+            res["detail"][path] = detail
+            res[klass].append(path)
+        else:
+            res["harness"].append(path)
+    for k in ("harness", "live_state", "churn", "live_untracked", "triage_untracked"):
+        res[k].sort()
+    return res
+
+
+def _settings_pair(claude_dir):
+    """settings.json at HEAD and in the working tree, as text (None = unreadable)."""
+    head = subprocess.run(["git", "-C", claude_dir, "show", "HEAD:settings.json"],
+                          capture_output=True)
+    old = None
+    if head.returncode == 0:
+        try:  # strict: a replaced byte could still parse and pass as churn
+            old = head.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            old = None
+    try:
+        with open(os.path.join(claude_dir, "settings.json"), encoding="utf-8") as fh:
+            new = fh.read()
+    except (OSError, UnicodeDecodeError):
+        new = None
+    return old, new
 
 
 # --------------------------------------------------------------------------
@@ -177,6 +229,22 @@ def git_status(claude_dir):
     return out
 
 
+AUTO_RES = [glob_to_re("projects/*/memory/**.md"), glob_to_re("_plans/**")]
+AUTO_MAX_BYTES = 200 * 1024
+
+
+def is_auto(claude_dir, path):
+    """A new file deploy may version by itself: a memory note or a plan file, never
+    under an _evidence/ folder (those hold `claude -p` transcripts), small, regular."""
+    if not any(r.match(path) for r in AUTO_RES) or "_evidence" in path.split("/"):
+        return False
+    try:
+        st = os.lstat(os.path.join(claude_dir, path))
+    except OSError:
+        return False
+    return stat.S_ISREG(st.st_mode) and st.st_size < AUTO_MAX_BYTES
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--claude-dir", default=os.environ.get("CLAUDE_DIR") or os.path.expanduser("~/.claude"))
@@ -192,37 +260,18 @@ def main(argv=None):
         for entry in spec.get(args.section, []):
             print(entry)
         return 0
-    live_res = [glob_to_re(g) for g in spec.get("live-state", [])]
-    churn_keys = set(spec.get("settings-churn-keys", []))
-
     if args.from_json:
         res = json.load(open(args.from_json, encoding="utf-8"))
         return emit(res, args)
 
-    res: dict = {
-        "claude_dir": args.claude_dir,
-        "harness": [], "live_state": [], "churn": [],
-        "live_untracked": [], "triage_untracked": [],
-        "detail": {}, "errors": [],
-    }
-    seen = set()
-    for xy, path in git_status(args.claude_dir):
-        if path in seen:
-            continue
-        seen.add(path)
-        live = any(r.match(path) for r in live_res)
-        if xy == "??":
-            (res["live_untracked"] if live else res["triage_untracked"]).append(path)
-        elif live:
-            res["live_state"].append(path)
-        elif path == "settings.json":
-            klass, detail = classify_settings(args.claude_dir, path, churn_keys, res["errors"])
-            res["detail"][path] = detail
-            res[klass].append(path)
-        else:
-            res["harness"].append(path)
-    for k in ("harness", "live_state", "churn", "live_untracked", "triage_untracked"):
-        res[k].sort()
+    status = git_status(args.claude_dir)
+    paths = [p for _, p in status]
+    untracked = {p for xy, p in status if xy == "??"}
+    old, new = (_settings_pair(args.claude_dir)
+                if "settings.json" in paths and "settings.json" not in untracked else (None, None))
+    res = {"claude_dir": args.claude_dir,
+           **classify_paths(paths, old, new, spec, untracked)}
+    res["live_auto"] = sorted(p for p in res["live_untracked"] if is_auto(args.claude_dir, p))
     return emit(res, args)
 
 
@@ -242,7 +291,7 @@ def emit(res, args):
         ("harness", "HARNESS-CODE  (real drift — aborts a deploy, harvest with review)"),
         ("churn", "MACHINE-CHURN (binary-written — auto-harvested with provenance)"),
         ("live_state", "LIVE-STATE    (runtime output — routine, auto-harvested)"),
-        ("live_untracked", "LIVE-STATE/new (untracked runtime output — harvest adds it)"),
+        ("live_untracked", "LIVE-STATE/new (untracked runtime output — harvest adds it; deploy adds the live_auto subset)"),
         ("triage_untracked", "TRIAGE        (untracked, outside every known surface — never auto-added)"),
     ]
     for key, label in labels:

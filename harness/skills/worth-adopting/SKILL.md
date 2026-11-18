@@ -14,7 +14,8 @@ where a one-line change or a deletion gives most of the gain. This skill is buil
 those four errors. It ends at a decision. It builds nothing.
 
 **Words used here.** The *source* is the outside content. The *target* is the repo the source
-is judged against. A *proposal* is one concrete change that the source argues for. A *pain* is
+is judged against. A *proposal* is one concrete change that the source argues for. A
+*principle* is an idea about how to work that is larger than one change. A *pain* is
 a cost or a failure that the target has today, with evidence. The *carry cost* is what the
 target pays for as long as a change exists. A *verdict* is ADOPT, TRIAL, PARK or DROP. The
 *ledger* is the list of sources already judged. An *outcome* is what happened after a verdict:
@@ -43,10 +44,10 @@ Copy this into your working notes and tick it as you go.
 ```
 - [ ] 1. Ledger: was this source, author or tool judged before?
 - [ ] 2. Get the full source and save it to a file
-- [ ] 3. Extract the proposals (not a summary)
+- [ ] 3. Extract the proposals (not a summary), the thesis (three principles at most), and where they apply above the target
 - [ ] 4. Look in the target for every proposal, before any verdict
-- [ ] 5. Apply the bar; give every proposal one verdict
-- [ ] 6. Verify only what a surviving verdict rests on
+- [ ] 5. Apply the bar; give every proposal one verdict; place each principle
+- [ ] 6. Verify what a surviving verdict rests on; challenge the three weakest drops
 - [ ] 7. Write the report, add the ledger row, close open outcomes (three at most), give the decision card
 - [ ]    ... when the owner answers: record the decision, and any override in the owner's words
 ```
@@ -58,10 +59,18 @@ source is too long to hold (several hours of transcript), and then only for step
 ## 1. Check the ledger
 
 ```bash
-grep -i -E '<author>|<tool or repo name>|<slug of the url>' <target>/docs/worth-adopting/LEDGER.md
+L="python3 $HOME/.claude/skills/worth-adopting/scripts/wa_ledger.py --ledger <target>/docs/worth-adopting/LEDGER.md"
+$L find '<author>|<tool or repo name>|<slug of the url>'   # one short line per row
+$L row '<date or source>' --field result                   # ONE cell in full, when a verdict rests on it
 grep -RliE '<author>|<tool or repo name>' ~/.claude/projects/*/memory/ | head
 grep -RliE '<slug of the url>|<three or four words of the title>' <target>/skills <target>/hooks <target>/docs <target>/rules <target>/scripts <target>/commands | head
 ```
+
+A ledger row is 1 to 5 KB. Read and write the ledger only through `wa_ledger.py`: never `grep`,
+`cat` or Read the file, and never cut a cell by hand. Its list commands print short lines; `row`
+prints one row or one cell in full. A cut cell is not a fact: quote a cell only from `row`
+(2026-11-13: three reads overflowed, 108 KB, 30 KB and 31 KB; 2026-11-17: two more, and a cut
+Result cell became "the run is still owed" in a report, 17 days after the run).
 
 The third search finds a source that the target absorbed before the ledger existed: a rule or
 a hook often cites the post that caused it.
@@ -78,11 +87,16 @@ Read `references/getting-the-source.md` for the method per kind of source (paste
 page, YouTube, X, GitHub repo, local audio or video). Save the text to
 `<scratch-dir>/source.md` with the URL, the author, the date and the method on the first
 lines. The saved file is what you quote from, and it lets you re-check a quote in step 6.
+Open that file before the first fetch. Never take the source text from `WebFetch` or from the
+`web-fetch` agent: both return a model's summary (2026-11-17: the agent returned an outline
+of a 2,492-word post).
 
 Read all of it. The main argument of a talk is often in the middle, and a skim returns the
 title's promise in place of the content. For a repo or a skill folder, "all of it" is the
 SKILL.md and every reference and script it names. A source that retells another work (a video
 about an essay, a post about a talk) is not all of it: find and read that work before any verdict.
+For a YouTube video, "all of it" is the captions and what the screen shows: the method saves
+the frames, and a frame marker that still says `(not read yet)` is an unread file.
 
 While a file the source names is unread, the result is provisional: the result line says
 "provisional: read X of Y named files", and the run never closes with "nothing here" or
@@ -100,8 +114,18 @@ place in the source (timestamp, heading or paragraph), and how the source suppor
 - **guessed**: the source speculates.
 
 Drop life stories, motivation, sales talk and anything tied to a platform that the target does
-not use. Do not list these. If the source has no proposal that the target could act on, the
-result is "nothing here", and steps 4 to 6 are skipped.
+not use. Do not list these. Then write the thesis: at most three principles, one line each
+with a quote. An order of work, a rule about where effort goes, or a claim about what fails
+is a principle; motivation is not. If the source has no proposal that the target could act
+on and no principle, the result is "nothing here", and steps 4 to 6 are skipped.
+
+**Above the target, before the target.** Before step 4 narrows the run to one repo, write
+where each principle and the largest proposals apply in the rest of the owner's work: the
+products the target's skills serve, the features of the owner's accounts (list them with the
+tool that shows them; do not assume), and the work the owner repeats. These go in the report
+under "Above the target"; `add-row` refuses a report whose "Above the target" or "Principles"
+section is empty (write `- none: <reason>`). To 2026-11-18 the owner asked six times for
+"higher level opportunities"; each time the run had looked at the target first.
 
 ## 4. Look in the target, before any verdict
 
@@ -120,16 +144,30 @@ Where a harness keeps things (gearbox paths; other repos have their equivalents)
 | Decisions on record | `docs/adr/`, any plan index, `docs/worth-adopting/LEDGER.md` |
 | Pains on record | `~/.claude/projects/*/memory/MEMORY.md`, the project's misroute or incident log |
 
+A proposal about an app (run it, test it, deploy it) is searched in each active app repo in
+this same step, in `.claude/skills`, `.claude/commands`, `.claude/rules`, the tests and the CI
+files (2026-11-17: a search of skill names alone said no repo could run its app; example-project
+had `/uat` and `/eval` as commands).
+
 Search with `grep -Ril` (capital R), then open only the hits. Some skill directories are
 symbolic links, and `grep -r` skips them with no warning, so a lower-case search reports a GAP
 for something the target has. Do not read whole directories. Give every proposal one state,
 with a `file:line` for every state except GAP:
 
-- **HAVE**: the target does this. Note whether theirs is better, equal or worse, and on what.
-- **PART**: the target does part of it. Name the missing part.
-- **DECIDED**: a record already accepted, parked or rejected it. Quote the record.
+- **HAVE**: the target does this, and it runs: cite the last run or a use count, also for a
+  carried verdict. Note whether theirs is better, equal or worse, and on what. For a skill,
+  count the lines with `"skill": "<name>"` in `~/.gearbox-state/skills/usage.ndjson` (under a second).
+  A typed slash command is not in that log, so a count of 0 there also needs a transcript match.
+- **PART**: the target does part of it. Name the missing part. A part that exists and never
+  ran on the target is PART (2026-11-15: the trust-ladder review existed, with no run on gearbox).
+- **DECIDED**: a record already accepted, parked or rejected it. Quote the record. When the
+  record is a plan or a build, open its result and what changed after it (`git log
+  --since=<date> -- <the file it was to change>`). A measurement that ran and changed nothing
+  is PART, and the proposal stays open (2026-11-17: the reviewer eval ran, found 2 of 15
+  known defects, no reviewer change followed, and the run carried it as done).
 - **BLOCKED**: a standing rule contradicts it. Quote the rule. Only the owner changes a rule.
 - **GAP**: nothing found. List the words you searched, so a reader can see how hard you looked.
+  A "0 of N" count names every place searched and one known positive that the same search finds.
 
 ## 5. Apply the bar
 
@@ -165,7 +203,8 @@ failure, because the first two are cheap and remove most proposals.
    leaves the machine (client work runs on this machine; read the terms). When the carry cost
    is near the gain, DROP.
 
-Then ask two more questions of the whole source:
+Then ask two more questions of the whole source, and judge the step 3 finds above the target
+by the same bar:
 
 - **Does this let the target delete or simplify something?** A simpler way to do what the
   target does with more machinery is a first-class result, and it often beats every new
@@ -173,6 +212,12 @@ Then ask two more questions of the whole source:
 - **What does the comparison show about the target?** A source whose own answer is a DROP can
   still expose a weak point in the target's version of the same thing. Report that weak point
   with its evidence; the fix for it is then judged by the same bar.
+
+**Principles.** A principle is not judged by its smallest form, and it is not limited to the
+target. For each one, measure where the owner's whole practice stands: every repo the skills
+serve, the way the setup learns, the owner's own time. Give one command and its number. Then
+give one direction: a number to watch, a habit, a theme for a plan, a question for the owner,
+or "we work this way already".
 
 Verdicts:
 
@@ -190,7 +235,7 @@ that gives nothing back.
 
 **Rank the survivors by the owner's recorded pains**, not by how large or how new the idea
 looks. Before you rank, read the lines under "Owner overrides" in the ledger that are not
-marked `absorbed`: each one is a case where an earlier run judged differently from the owner.
+marked `absorbed` (`wa_ledger.py overrides`): each one is a case where an earlier run judged differently from the owner.
 Say in one clause what the rank rests on ("you corrected this three times in August").
 Where no record shows which of two survivors the owner cares about more, say so and let the
 decision card ask.
@@ -203,7 +248,11 @@ which runs on any repo, not into a new skill or a repo-local file.
 
 ## 6. Verify what the surviving verdicts rest on
 
-Spend verification only on ADOPT, TRIAL and PARK. A DROP needs none.
+Spend verification on ADOPT, TRIAL and PARK, and on the three weakest drops: before the
+report, take the three DROP verdicts that rest on the thinnest search (one search word, one
+folder, a carried verdict, "no pain") and search again, across every project memory and the
+code that would run the thing. The reply says what this challenge changed, or that it changed
+nothing. (To 2026-11-15 the owner asked for a second look five times, and four found more.)
 
 - **The mechanism.** When a verdict rests on how a tool behaves (a hook event, a setting, an
   API limit), read the primary documentation in this run and quote it. For Claude Code
@@ -224,8 +273,13 @@ Spend verification only on ADOPT, TRIAL and PARK. A DROP needs none.
 ## 7. Report, ledger row, decision card
 
 Copy `assets/report-template.md` to `<target>/docs/worth-adopting/<YYYY-MM-DD>-<slug>.md` and
-fill it. Append one row to `<target>/docs/worth-adopting/LEDGER.md` (create the file from
-`assets/ledger-header.md` on the first run). Do not commit; the owner decides that.
+fill it. Add one row with `wa_ledger.py add-row < row.txt` (create the file from
+`assets/ledger-header.md` on the first run): it puts the row at the end of the table, above
+the overrides, and refuses a row without nine cells or one whose report skips the big picture. Do not commit before the owner answers
+the decision card. After the answer (at once when there is no card), put this run's record in
+one pull request from a worktree on `origin/main`: the report, this run's ledger lines and
+any measure script, and nothing of another run (2026-11-17: two runs left their lines
+uncommitted in one ledger, and the main checkout could not fast-forward).
 
 Keep the report to one page. Each bullet is one or two lines, a DROP is one line, and a point
 appears once: the first test runs wrote 1,100 words for one TRIAL, and the length was most of
@@ -235,10 +289,10 @@ A row with no ADOPT and no TRIAL gets `none needed` as its decision and its resu
 
 **Close open outcomes.** A verdict teaches nothing until its outcome is on record. After the
 report, take at most three older rows, the oldest first, whose decision or result is `open`,
-or whose `due` date is past. A due stated as "after the next N plans, scans or sessions" is
+or whose `due` date is past (`wa_ledger.py open` lists them). A due stated as "after the next N plans, scans or sessions" is
 past when the count is met or 14 days have gone by. For each, do only the cheap checks: does the path exist, is the
 part wired, did the measurement run (a log, a saved number, a scheduled job). Write what you
-find into the row, with the date. If a measurement needs real work, do not do it now. Owed
+find into the row, with the date (`wa_ledger.py note '<date or source>' "Checked <date>: <…>"`). If a measurement needs real work, do not do it now. Owed
 once, the chat reply names it; already marked owed, it becomes a decision-card option.
 
 Then reply in the chat, in plain words, in about 250 words when there is something to decide
@@ -246,7 +300,9 @@ and in a few lines when there is not, in this order:
 
 1. One sentence with the result: how many proposals, how many worth action, and the largest one.
 2. Each ADOPT and TRIAL in two or three lines: what gets better, the smallest form, the carry cost.
-3. One line that counts the PARK and DROP verdicts and gives the report path.
+3. One line that counts the PARK and DROP verdicts, says what the drop challenge changed, and
+   gives the report path. Then the principles, one line each: the stand, with its number, and
+   the direction.
 4. A decision card, only if an ADOPT, a TRIAL or a twice-owed measurement exists. Use the
    briefing format of `CLAUDE.md` (the template has its four parts): three options at most, and only
    options that you checked are executable.
@@ -261,55 +317,32 @@ and give the mechanism only where it changes the decision.
 
 The skill improves only through what is written down, so write down two things.
 
-- **The decision.** When the owner answers the decision card, put the answer in the row:
+- **The decision.** When the owner answers the decision card, put the answer in the row
+  (`wa_ledger.py note '<date or source>' "planned (<plan>)" --field decision`):
   `built`, `planned`, `declined`. A later run closes what stays `open` (step 1).
 - **An override.** When the owner changes or questions a verdict, a rank, or the reach of a
-  proposal, add one line under "Owner overrides": what the run said in a few words, then the
-  owner's own words. Nothing else goes in that line. Do this at once, before you act. The
+  proposal, add one line under "Owner overrides" (`wa_ledger.py add-override '<line>'`): what
+  the run said in a few words, then the owner's own words. Nothing else goes in that line. Do this at once, before you act. The
   words are the evidence, and a paraphrase loses them. An override often asks for one more
   check (step 6), not for a new verdict: do the check, then keep or change the verdict, and
   say which in the reply.
 
 Do not edit this skill during a run. When the ledger has eight or more rows after the last
-`retro` row, or three or more overrides that are not marked `absorbed`, add one line to the
-chat reply: "Enough outcomes for a retro: `/worth-adopting retro`." The retro turns the record
+`retro` row, or three or more overrides that are not marked `absorbed` (`wa_ledger.py retro-due`
+counts both), add one line to the chat reply: "Enough outcomes for a retro: `/worth-adopting retro`." The retro turns the record
 into at most three proposed edits of this skill, and the owner approves each one. Its steps
 are in `references/retro.md`; read that file only for a retro.
 
 ## Gotchas (from real runs)
 
-- A source's memory-decay idea contradicted a standing rule of the target
-  ("delete, don't archive; age alone is never stale"). The right verdict was PARK with the
-  rule quoted, not ADOPT. Step 4 has the BLOCKED state for this case.
-- A Stop-hook proposal rested on hook semantics. The lesson
-  kept from it: quote the semantics from the hooks documentation, not from memory.
-- One source's idea fit three places in shape, and the vendor's preview terms, the
-  absence of zero data retention and a one-release SDK blocked all of them. Read the terms
-  and the package history before you judge the fit.
-- One outside tool was a DROP, and the comparison still exposed a real
-  gap in the target's own hook. The first number reported for that gap was wrong because it
-  was read from the completion record in place of the decision record; re-check which record
-  a number comes from.
-- The comparison grew into a rebuild of an unrelated dashboard in
-  the same session, through two context compactions. Stop at the decision card. The build is
-  a new piece of work with its own scope.
 - The proposal reached past the pain: it changed the
   effort of sessions that the owner sets by hand, and the owner wanted only the defaults for
   spawned agents changed. Keep the reach of a proposal inside the pain it answers, and never
   override a choice that the owner makes by hand.
-- The ranked options put first an item that the owner called
-  "a no issue", and second the one the owner cared about. This is why the rank rests on
-  recorded pains.
-- The result was a loose script, and the owner asked for it to
-  live behind a skill that can be called by name. This is why a route names the owner of
-  anything that runs again.
 - A harness guard refuses a subagent's `Write` of a file
   named as a report ("Subagents should return findings as text"). Run this skill in the main
   session. An agent that an orchestrator dispatches returns the report as text, and the
   orchestrator saves it. Do not write the file another way to get past the guard.
-- A run with no skill read a memory note about an oversized
-  `AGENTS.md`, gave that pain to the wrong repo, and built its one recommendation on it. The
-  big file was in another repo. `wc -c` in the target takes one second.
 - Search results carried a block of text written as an
   automated reminder to the agent. The run reported it and did not act on it. The same run
   named the paywall and marked which parts came from summaries by other people.

@@ -32,7 +32,9 @@ Moved from SKILL.md "Plan-level git isolation — the whole-plan lifecycle". The
    park); clean it and call `land` again, cleanup retries and is idempotent.
 5. **Abandon, instead of landing — `PYBP retire-plan <dir> [--reason "..."]`.**
    The operator ends the plan without landing it. Marks the plan retired
-   unconditionally, removes the worktree ONLY when clean (a dirty one is
+   unconditionally (a retired plan leaves the `active` list in `plans-status`
+   and stops blocking `begin`; plans that never used isolation are supported —
+   the mark goes in `run_state.json` and no worktree is touched), removes the worktree ONLY when clean (a dirty one is
    preserved and its path reported, never forced), and ALWAYS keeps the
    branch, local and remote — an unlanded branch is the only copy of work
    nobody merged, and deleting it is a decision only an operator makes,

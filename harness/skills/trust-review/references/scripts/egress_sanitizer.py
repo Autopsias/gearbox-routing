@@ -77,13 +77,13 @@ EGRESS_WAIVER_REQUIRED_FIELDS = ("owner", "scope", "rationale", "signoff")
 def decide_egress(sensitivity: str, travel_class: str,
                   waiver: Optional[dict] = None) -> dict:
     """Decide whether — and how — a claim of this sensitivity may egress under this
-    travel class. Pure policy; no I/O. Returns
-    `{egress_allowed, mode, reason, waiver_valid}`."""
+    travel class. Pure policy; no I/O. Returns `{egress_allowed, mode, reason, waiver_valid}`."""
     sens = (sensitivity or "internal").lower()
     tc = (travel_class or "internal").lower()
-    if sens not in SENSITIVITY_CLASSES:
-        sens = "restricted"  # default-up on doubt (policy §2)
     waiver_valid, waiver_problems = _validate_egress_waiver(waiver)
+    if sens not in SENSITIVITY_CLASSES or tc not in TRAVEL_CLASSES:  # unknown class: refuse (policy §2)
+        return {"egress_allowed": False, "mode": MODE_SKIPPED, "waiver_valid": waiver_valid,
+                "reason": "unknown sensitivity %r or travel class %r — egress refused" % (sens, tc)}
 
     # restricted + Board/Regulatory: skipped unless a named-owner signed waiver.
     if sens == "restricted" and tc == "board-regulatory":

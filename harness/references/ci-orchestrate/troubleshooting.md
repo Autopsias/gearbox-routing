@@ -115,13 +115,13 @@ export SLASH_DEPTH=$((INVOCATION_DEPTH + 1))
 # If test failures were detected and fixed, run comprehensive test validation
 if [[ "$CI_ISSUES" =~ "test" ]] || [[ "$CI_ISSUES" =~ "pytest" ]]; then
     echo "Test-related CI issues were addressed. Running test orchestration for validation..."
-    SlashCommand(command="/test-orchestrate --run-first --fast")
+    Skill(skill="test-orchestrate", args="--run-first --fast")
 fi
 
 # If all CI issues resolved, check PR status
 if [[ "$CI_STATUS" == "passing" ]]; then
     echo "All CI checks passing. Checking PR status..."
-    SlashCommand(command="/pr status")
+    Skill(skill="pr", args="status")
 fi
 ```
 
