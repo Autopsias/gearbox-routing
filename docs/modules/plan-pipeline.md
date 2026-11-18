@@ -36,8 +36,9 @@ The full explanation, with a diagram, is in [the plan framework](../PLAN-FRAMEWO
 |---|---|---|
 | Plan helpers | `harness/scripts/repo-profile-cache.py`, `harness/references/shared/`, `harness/references/plan-harden/` | A cache of the repo profile, shared contracts, and the prompts that `/plan-harden` and the prior-art step use |
 | `/plan-harden` | `harness/commands/plan-harden.md` + the plan helpers | Pre-flight review of a plan |
-| Guard hooks | `harness/hooks/turnend-guard.py`, `harness/hooks/verify-state-guard.py` | Stop Claude from ending a turn while a plan session it started is still open, and stop subagents from writing the review record |
-| Codex lane | `harness/scripts/codex_supervised.py`, `harness/scripts/codex_watchdog.py` | Lets a plan send sessions or reviews to Codex |
+| Guard hooks | `harness/hooks/turnend-guard.py`, `harness/hooks/verify-state-guard.py` | Stop Claude from ending a turn while a plan session it started is still open, and stop subagents from writing the review record. `turnend-guard.py` also refuses a reply that says "Needs you: nothing" beside work it names as open ("still open", "not done", "uncommitted"), and a "Needs you" line that asks a decision but names no pick. |
+| Codex lane | `harness/scripts/codex_supervised.py`, `harness/scripts/codex_watchdog.py` | Lets a plan send sessions or reviews to Codex. Its runs start with the Ref `Plans` MCP server switched off: the read-only sandbox does not cover MCP servers, and one review run had published repo details as Ref documents. |
+| Git hook | `harness/githooks/pre-push` | Makes a push to the default branch wait, at most 300 s, while a `land` pushes it. It never blocks: whatever happens, the push goes on. It only works in a repo laid out like the harness itself (it calls `skills/plan-execute/scripts/land_writers.py` from the folder above the hook), so it is not for a project repo. |
 
 `harness/skills/plan-harden/` is **not** the Claude Code version. It holds only
 the Codex CLI version. The Claude Code `/plan-harden` is the command file.
@@ -107,6 +108,16 @@ rm ~/.claude/commands/plan-harden.md ~/.claude/hooks/turnend-guard.py ~/.claude/
 Keep `~/.claude/model-routing.yaml` and the scripts if another module uses them.
 Run `./install-module --remove plan-pipeline` to take the hook entries out of `settings.json`. Plans you built stay in each
 project's `_plans/` folder.
+
+## Halts, answers and landing
+
+These are the rules that decide where a run stops and who answers. They live in `harness/skills/plan-execute/SKILL.md`.
+
+- **A halted session takes your answer in a file.** Write your reply, word for word, to `<plan folder>/_decisions/<session>.halt-<n>.md`. Then run `run.py clear-halt <plan folder> --answer-file <that file>`. The session's next attempt starts with your words, once. A checkpoint works the same way: write `<plan folder>/_decisions/<session>.md`, then run `run.py plan <plan folder> --resume --answer-file <that file>`. A bare `--resume` past a checkpoint refuses.
+- **The tool counts the clears.** The second clear of the same session's halt needs `--cost-report '<elapsed, passes, what changed, the cut>'`. The third clear of a review halt takes only `--exit accept|split|escalate`; one more review round is not an exit. `harness/skills/plan-execute/references/verify-gates.md` has the three exits.
+- **Landing on a plan branch** (plans with `plan_schema_version` 7 or higher, or `begin --isolate`): `land` merges the default branch into the plan branch, merges the plan into a separate land worktree, and waits for your `land-ack`. `references/plan-isolation-contract.md` is the full rule. §17 says that your answers and the review passes carry over when every new commit on the default branch changes only live-state or machine-churn paths, none of them a file the plan changes, and the plan's diff is unchanged; that an owner stop leaves a reservation and not a lease; that the push runs in the same step as `land-ack`; and that a running land renews its lease, so a live holder is never taken over. §18 splits a land into a long phase with no hold and a short phase around the push, and takes gate classes from a registry, never from a duration.
+- **A closeout can arrive as bare JSON** with no tags, or HTML-escaped. `plan-execute` reads both.
+- **Write `$HOME`, never `~`, inside a shell variable** that holds the `run.py` command (`P="python $HOME/.claude/..."`). A `~` inside quotes does not expand, and the command fails.
 
 ## Cautions
 

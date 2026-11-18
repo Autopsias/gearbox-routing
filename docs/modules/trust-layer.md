@@ -23,7 +23,7 @@ All nine skills ship in this one module. Install the module and you have every
 skill `trust-run` calls.
 
 - `harness/skills/trust-run/` — the one-command orchestrator. It runs the steps in order and ends at a human gate that waits for you.
-- `harness/skills/trust-review/` — the hostile review. The reviewer runs in a fresh context on a different model, lists problems, and never edits. It repeats until no must-fix is open. Its `references/scripts/` folder holds the shared checks.
+- `harness/skills/trust-review/` — the hostile review. The reviewer runs in a fresh context on a different model, lists problems, and never edits. It repeats until no must-fix is open. The builder and the reviewer run on different models: by default the builder is `opus` and the reviewer is `sonnet` (Agent aliases). Pass `reviewer_model=` or `builder_model=` to change the pair; the run records the pair it used. Its `references/scripts/` folder holds the shared checks.
 - `harness/skills/travel-class-router/` — step 1, the front door. Sets the travel class, and raises it when the content looks risky.
 - `harness/skills/office-source-packet/` — the truth layer. Lists every source, splits claims into fact, assumption and estimate, and logs conflicts.
 - `harness/skills/office-update/` — the refresh branch. Re-checks only the claims that changed when you update a file you already reviewed.

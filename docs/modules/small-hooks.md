@@ -12,8 +12,8 @@ Single-purpose hooks. Only one of them is useful to most people as shipped.
 
 | File | What it does | Use it? |
 |---|---|---|
-| `harness/hooks/agent-elapsed-nag.py` | When a subagent runs for 30 minutes or more, it adds a reminder to Claude's context: report the elapsed time and a cheaper option. | **Yes**, if you run long subagents. Not wired in `harness/settings.json`; the entries are below. |
-| `harness/hooks/routing-cadence-check.py` | At session start, says when the routing outcome log has grown by about 30 records since the last analysis. | Only with the routing eval files of the original setup (`~/.claude/evals/routing/`), which this repo does not ship. Without them it prints nothing. Its `settings.json` entry checks that the file exists. |
+| `harness/hooks/agent-elapsed-nag.py` | When a subagent runs for 30 minutes or more, it adds a reminder to Claude's context: report the elapsed time and a cheaper option. It also tracks background `Bash` commands. No hook event marks the end of such a command, so a third entry (`Stop`, below) reads the list of running tasks that Claude Code sends at each stop. It nags once for each kind of background task in a session, and forgets a task after 24 hours. | **Yes**, if you run long subagents. Not wired in `harness/settings.json`; the entries are below. |
+| `harness/hooks/routing-cadence-check.py` | At session start, says when the routing outcome log has grown by about 30 records since the last analysis. It also prints one line when your last whole-history review of how you use Claude Code is more than 30 days old. It reads the date from `~/.dyno/last-whole-history-review`, or else from `~/.claude/reflection-notes.md`. `harness/scripts/dyno_paths.py` holds the stamp path; without it the hook uses the same default. | Only with the routing eval files of the original setup (`~/.claude/evals/routing/`), which this repo does not ship. Without them it prints nothing. Its `settings.json` entry checks that the file exists. |
 | `harness/hooks/audio-hooks.sh` | Plays a sound when a task ends or when Claude needs input. | Not as shipped: it needs sound files and a preferences file that this repo does not ship. |
 | `harness/hooks/skill-eval-hook.ts` | Adds a "check your skills first" reminder to prompts that contain words such as "implement" or "build". | Only if you use the [BMAD](bmad.md) workflow; the reminder names BMAD commands. Needs `npx tsx`. |
 | `harness/hooks/gearbox-drift-warn.sh` | Ran the original author's deploy check. | **No.** It expired on 2026-08-08 and now only prints "remove me". |
@@ -37,6 +37,9 @@ cp harness/hooks/agent-elapsed-nag.py ~/.claude/hooks/
     ],
     "SubagentStop": [
       {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stop", "timeout": 5}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stopbg", "timeout": 5}]}
     ]
   }
 }

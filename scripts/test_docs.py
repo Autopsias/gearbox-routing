@@ -9,6 +9,7 @@ that does not exist.
 2. Every `harness/...` path a module card names exists (braces and globs expanded).
 3. Every skill folder, command and agent under harness/ is named by some card.
 4. docs/CATALOG.md matches what scripts/build_catalog.py generates from harness/.
+5. CHANGELOG.md names the date of the last sync (harness/SYNCED-FROM exported_at).
 """
 import glob
 import re
@@ -91,3 +92,11 @@ def test_catalog_is_current():
     out = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_catalog.py"), "--check"],
                          capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
+
+
+def test_changelog_names_the_last_sync_date():
+    stamp = (ROOT / "harness" / "SYNCED-FROM").read_text(encoding="utf-8")
+    date = re.search(r"^exported_at:\s*(\d{4}-\d{2}-\d{2})", stamp, re.M).group(1)
+    assert f"(harness sync of {date})" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), (
+        f"CHANGELOG.md has no entry for the sync of {date}: describe what changed for users, "
+        "in the module cards and the changelog, before you commit the sync")

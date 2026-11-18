@@ -13,7 +13,7 @@ uncommitted work (`git reset --hard`, `git checkout .`, `git restore .`,
 ## What you get
 
 - `harness/hooks/git-tree-guard.py` — a `PreToolUse` hook for Bash. It blocks only when `git status` shows changed tracked files.
-- `harness/rules/git-safety.md` — rule text: no `git stash` without a clean-up path, no delete of a file you did not create without confirmation.
+- `harness/rules/git-safety.md` — rule text: no `git stash` without a clean-up path, no delete of a file you did not create without confirmation (a delete made reversible first, with a saved patch or a move to a kept folder, needs only a normal yes), read `origin/main` before you answer about the code, fast-forward your checkout after a merge, and never hide the output of `git commit` (a hook can block the commit while the rest of the command chain goes on).
 
 ## Install
 
@@ -56,3 +56,9 @@ Run `./install-module --remove git-safety` to take the `PreToolUse` entry out of
   script gets past it. It is a seat belt, not a security boundary.
 - To allow one reset on purpose, start the command with
   `GEARBOX_ALLOW_DIRTY_RESET=1`.
+- The entry above allows the command when the guard file is missing or when the
+  guard itself fails. The original setup wires the same file stricter: a shell
+  wrapper skips Python when the command has no `git` in its text, and
+  `"onFailure": "block"` refuses the command if the guard crashes, times out
+  or python3 is missing. That form can lock out every git command until you fix
+  python3 or remove the entry by hand, so the module does not install it.

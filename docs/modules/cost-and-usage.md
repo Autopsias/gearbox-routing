@@ -16,7 +16,8 @@ ranked list of what to build or fix in your setup.
 
 - `harness/skills/cost-audit/` — the skill and `scripts/cache_effort_baseline.py`, the measuring script. The script finds the harness three folders above itself, so it must live at `~/.claude/skills/cost-audit/scripts/`.
 - `harness/scripts/model_prices.py` — reads the prices for each model id from the policy file.
-- `harness/skills/myusage-self-assessment/` — five phases, a digest script (`digest_sessions.py`) and a safe-append script.
+- `harness/skills/myusage-self-assessment/` — five phases, a digest script (`digest_sessions.py`) and a safe-append script. The digest counts a session as interactive when you typed at least one message in the terminal or the desktop app, and it skips the temporary-folder checkouts that eval runs leave (`--include-temp-projects` reads them; on a large machine that takes about 9 minutes). Use `--since-days 60`, because Claude Code deletes older transcripts, so compare with the numbers the last report recorded and do not recount. The report now has an auto-mode refusal section, grouped by reason.
+- Trial until 2026-12-17: `/cost-audit` keeps one living report page. If the baseline note holds no `Data page:` link, it creates the page from the Artifact tool's Data type and saves the link. Later runs republish to the same link, so the trend stays on one page and each number shows its source. If the Data type is missing or the fill fails, it publishes the plain page as before and says so.
 
 ## Install
 

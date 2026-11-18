@@ -4,6 +4,63 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 [Keep a Changelog](https://keepachangelog.com); versioning rules are in
 `docs/VERSIONING.md`.
 
+## [Unreleased]
+
+### Changed (harness sync of 2026-11-18)
+This sync carries the private harness changes from 2026-11-12 to 2026-11-18.
+The routing policy (`claude/model-routing.yaml`) does not change. Each item
+below is also in the module card that it names, in `docs/modules/`.
+
+- **plan-execute:** answer a halted session by writing your reply to
+  `_decisions/<session>.halt-<n>.md` and running `clear-halt --answer-file`;
+  the session's next attempt starts with your words. The second clear of the
+  same session needs `--cost-report`, and the third clear of a review halt takes
+  only `--exit accept|split|escalate`. A closeout that arrives as bare JSON or
+  HTML-escaped is now read. A land keeps your answers and the review passes
+  when the default branch moved only in live-state or machine-churn files, a
+  running land renews its lease, and the push happens in the same step as
+  `land-ack`. A new git hook, `harness/githooks/pre-push`, makes a push to the
+  default branch wait up to 300 s while a land pushes. See
+  [plan pipeline](docs/modules/plan-pipeline.md).
+- **turnend-guard hook:** it refuses a reply that says "Needs you: nothing"
+  beside work the reply calls open, and a "Needs you" line that asks a decision
+  but names no pick.
+- **agent-elapsed-nag hook:** it also tracks background `Bash` commands, through
+  a new `Stop` entry. The entry is in the [small hooks](docs/modules/small-hooks.md) card.
+- **routing-cadence-check hook:** it prints one line when your last
+  whole-history usage review is more than 30 days old.
+- **repo-health:** the secrets-history check scans only the commits since the
+  last scan and stops after 900 s as `pending`. The verify-command check fails
+  when the test command cannot start. An unattended run never ends its turn
+  while a background command runs.
+- **worth-adopting:** the ledger is read and written only through
+  `scripts/wa_ledger.py`. The skill looks for where an idea applies above the
+  target repo, and `scripts/youtube_source.py` saves a video as a text source.
+- **routing-retro:** a new trial report, `followup_fix.py`, lists the fix,
+  revert and hotfix commits that follow each plan-session commit.
+- **cost-audit and myusage-self-assessment:** `/cost-audit` trials one living
+  report page. The usage digest counts only interactive sessions, skips
+  temporary eval checkouts, and reports auto-mode refusals by reason.
+- **trust-review:** the builder is `opus` and the reviewer is `sonnet` by
+  default, and you can change the pair.
+- **agent janitor:** a Codex broker counts as one process, and one with a
+  missing working folder counts as dead.
+- **codex_supervised:** Codex runs start with the Ref `Plans` MCP server off,
+  because a read-only run had published repo details through it.
+- **Git-safety rule:** it now says to read `origin/main` before you answer about
+  the code, to fast-forward your checkout after a merge, and never to hide the
+  output of `git commit`.
+
+### Fixed (export)
+- **Janitor install:** `agent_janitor.py` imports `janitor_codex_broker.py`, which
+  the export did not copy, so the janitor failed to start. All three missing
+  helpers are now exported (`janitor_codex_broker.py`, `improve_ask_picks.py`,
+  `dyno_paths.py`), and the install lines in the cards copy them.
+- **Quality checks:** `scripts/quality/check_types.py` was missing since
+  2026-10-17, so `test_quality_checks.py` could not load.
+- **Docs check:** `scripts/test_docs.py` now fails when `CHANGELOG.md` has no
+  entry for the date of the last sync.
+
 ## [1.1.0] - 2026-11-12
 
 ### Added

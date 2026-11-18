@@ -30,6 +30,12 @@ four design reviews:
 - `harness/skills/repo-health/references/` — the check catalogue and the review procedures.
 - `harness/skills/repo-health/scripts/` — the collector (`health.py`), the renderer and the fix routes.
 - `harness/skills/repo-health/assets/template.html` — the dashboard template.
+
+Three behaviours worth knowing before the first run:
+
+- **The secrets-history check is incremental.** `health.py scan-secrets --repo <repo>` runs `gitleaks` over the commits since the last scan only. The first run, or a run after a history rewrite, scans everything. It stops after `REPO_HEALTH_SECRETS_CAP_S` seconds (default 900) and records the check as `pending`, not as failed, so the rest of the run goes on. A leak fails the check and reports a count, never the secret. The old marker stays, so the failure repeats until you remove the secret from the history.
+- **The verify-command check fails when the test command cannot start.** It runs the printed collect command (`<suite command> --collect-only -q`, 120 s limit). It passes when the command exits 0 and collects at least one test. A missing module or a missing file is a failure, with the first error line.
+- **A scheduled or unattended run never ends its turn while a background command runs.** It polls in the same turn. When the command reaches its cap, the check stays `pending` with the reason and the run goes on to the dashboard. A pending check is a result; a missing history line is not.
 - `harness/skills/repo-health/vendor/` — a pinned copy of Sentry's `gha-security-review` skill (Apache-2.0) for the GitHub Actions review.
 
 ## Install

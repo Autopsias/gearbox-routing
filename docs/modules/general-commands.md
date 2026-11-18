@@ -26,7 +26,7 @@ mkdir -p ~/.claude/commands ~/.claude/references ~/.claude/agents ~/.claude/scri
 cp harness/commands/{review,research,wait-what,nextsession,pr}.md ~/.claude/commands/
 cp harness/commands/improve.md ~/.claude/commands/
 cp -R harness/references/improve ~/.claude/references/
-cp harness/scripts/improve_ask_classes.py ~/.claude/scripts/
+cp harness/scripts/improve_ask_classes.py harness/scripts/improve_ask_picks.py ~/.claude/scripts/
 cp harness/agents/pr-workflow-manager.md ~/.claude/agents/      # for /pr create and /pr merge
 ```
 
@@ -75,7 +75,7 @@ no tool runs. In a repo with no pull request, `/pr status` prints
 ```bash
 rm ~/.claude/commands/{review,research,wait-what,nextsession,improve,pr}.md
 rm -r ~/.claude/references/improve
-rm ~/.claude/scripts/improve_ask_classes.py
+rm ~/.claude/scripts/improve_ask_classes.py ~/.claude/scripts/improve_ask_picks.py
 rm ~/.claude/agents/pr-workflow-manager.md
 rm -f ~/.claude/hooks/improve-nudge.py ~/.claude/scripts/improve_digest.py   # the nudge, if installed
 ```
