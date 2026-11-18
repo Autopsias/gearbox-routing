@@ -30,7 +30,7 @@ mkdir -p ~/.claude/docs && cp harness/docs/reference_git_safety_playbook.md ~/.c
 {
   "hooks": {
     "PreToolUse": [
-      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10}]}
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; f(){ echo \"git-tree-guard: $p failed ($1) - the guard itself failed, not the command. Refusing this Bash call; the same command can be tried again.\" >&2; exit 2; }; in=$(cat) || f read; t=$(printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134') || f strip; [ -z \"$in\" ] || [ -n \"$t\" ] || f strip; case \"$t\" in *[gG][iI][tT]*) ;; *) case \"$in\" in *'\\u'*) ;; *) exit 0;; esac;; esac; printf '%s' \"$in\" | python3 \"$p\"; s=$?; [ $s -eq 0 ] && exit 0; [ $s -eq 2 ] && exit 2; f \"exit $s\"", "timeout": 10, "onFailure": "block"}]}
     ]
   }
 }
@@ -56,9 +56,10 @@ Run `./install-module --remove git-safety` to take the `PreToolUse` entry out of
   script gets past it. It is a seat belt, not a security boundary.
 - To allow one reset on purpose, start the command with
   `GEARBOX_ALLOW_DIRTY_RESET=1`.
-- The entry above allows the command when the guard file is missing or when the
-  guard itself fails. The original setup wires the same file stricter: a shell
-  wrapper skips Python when the command has no `git` in its text, and
-  `"onFailure": "block"` refuses the command if the guard crashes, times out
-  or python3 is missing. That form can lock out every git command until you fix
-  python3 or remove the entry by hand, so the module does not install it.
+- The entry above fails closed. A shell wrapper skips Python when the command
+  has no `git` in its text. When the guard crashes, times out or python3 is
+  missing, `"onFailure": "block"` refuses the command with one line that says the
+  guard failed, and you can try the same command again. A missing guard file
+  still allows the command. If python3 is gone, every command with `git` in its
+  text stays refused until you fix python3 or remove the entry from
+  `settings.json` by hand.

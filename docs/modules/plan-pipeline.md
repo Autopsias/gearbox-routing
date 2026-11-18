@@ -79,7 +79,7 @@ For the guard hooks: `./install-module plan-pipeline` adds this to `~/.claude/se
 {
   "hooks": {
     "Stop": [
-      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10, "statusMessage": "Turn-end guard: open plan work?"}]}
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10, "statusMessage": "Turn-end guard: open plan work?"}, {"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stopbg", "timeout": 5}]}
     ],
     "PreToolUse": [
       {"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/verify-state-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10}]}
@@ -137,6 +137,7 @@ These are the rules that decide where a run stops and who answers. They live in 
 - Three tier agents (`tier-opus-max`, `tier-sonnet-low`, `tier-sonnet-max`) are
   for a GLM / Z.ai setup. On an Anthropic account they matter only if a plan
   asks for those pairs.
+- The `Stop` entry above holds two hooks, `turnend-guard.py` and `agent-elapsed-nag.py`, because the harness wires them as one entry. The installer adds it once, whichever of the two modules you install first. `./install-module --remove` for either module removes the whole entry, so run `--remove` for one and re-add the other by hand if you keep it. Each command skips itself when its file is missing.
 - **Two policy files.** `install.sh` writes the routing policy to
   `~/.claude/claude/model-routing.yaml`; this module reads
   `~/.claude/model-routing.yaml`. They are meant to differ in one way:

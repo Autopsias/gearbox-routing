@@ -39,7 +39,7 @@ cp harness/hooks/agent-elapsed-nag.py ~/.claude/hooks/
       {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stop", "timeout": 5}]}
     ],
     "Stop": [
-      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stopbg", "timeout": 5}]}
+      {"hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/turnend-guard.py\"; [ -f \"$p\" ] || exit 0; exec python3 \"$p\"", "timeout": 10, "statusMessage": "Turn-end guard: open plan work?"}, {"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stopbg", "timeout": 5}]}
     ]
   }
 }
@@ -70,6 +70,7 @@ rm -rf ~/.gearbox-state/agent-nag
 
 ## Cautions
 
+- The `Stop` entry above holds two hooks, `turnend-guard.py` and `agent-elapsed-nag.py`, because the harness wires them as one entry. The installer adds it once, whichever of the two modules you install first. `./install-module --remove` for either module removes the whole entry, so run `--remove` for one and re-add the other by hand if you keep it. Each command skips itself when its file is missing.
 - The nag cannot match a start to a stop for each agent. On any `SubagentStop`
   it removes the oldest open dispatch, so it can remind you too often.
 - The nag message refers to a rule in the original author's `CLAUDE.md`. In
