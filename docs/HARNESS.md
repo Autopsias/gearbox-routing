@@ -47,10 +47,21 @@ the bottom).
     scripts/README.md §Provenance), then fails if either scan layer finds a
     hit. NEVER weaken the scan to make it pass — fix the manifest transform
     or the source file instead.
- 4. run the docs check: python3 -m pytest scripts/test_docs.py -q
-    It fails when a module card in docs/modules/ names a harness path that
-    the export renamed or dropped, or when a new skill, command or agent has
-    no card. Update docs/modules/ and docs/MODULES.md to match.
+ 4. document the sync, then run the docs check:
+    python3 -m pytest scripts/test_docs.py scripts/test_install_module.py -q
+    Every sync updates the documentation. For each changed or new module:
+    a) add a "### Changed (harness sync of YYYY-MM-DD)" section to
+       CHANGELOG.md that says what changes for a user, in plain words;
+    b) update the module card in docs/modules/: what it does, how to use
+       it, install and remove lines (copy every new helper file), cautions;
+    c) make each hook entry in a card's JSON block equal the entry in
+       harness/settings.json (test_install_module.py checks this);
+    d) add a card for each new skill, command or agent, and a line in
+       docs/MODULES.md;
+    e) keep private-only skills out, and say so if asked why.
+    The check fails when the changelog has no entry for the date in
+    harness/SYNCED-FROM, when a card names a harness path that the export
+    renamed or dropped, or when a new skill, command or agent has no card.
  5. review the diff (git diff / git status) — a human checkpoint
  6. commit and push to `origin` (the public remote), only after the review
 ```
