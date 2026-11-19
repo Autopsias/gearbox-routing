@@ -748,6 +748,22 @@ def copy_entries(manifest: dict, source_dir: Path, harness_dir: Path, scrub_rule
     # caller is not worth keeping armed.
     PROJECTED_SOURCES: set[str] = set()
 
+    # Check every source before the first copy: a stop mid-loop left earlier
+    # entries copied into harness/ with no scan run over them (2026-11-19).
+    missing = [
+        f"{(source_dir / _parse_rel_path(e['path'])).resolve()} (entry: {e['path']})"
+        for e in entries
+        if e.get("verdict") in ("publish", "scrub-then-publish")
+        and _parse_rel_path(e["path"]) not in PROJECTED_SOURCES
+        and not (source_dir / _parse_rel_path(e["path"])).resolve().exists()
+    ]
+    if missing:
+        raise fatal(
+            "manifest entry source path does not exist, nothing copied: " + "; ".join(missing)
+            + ". A relative symlink resolves against the --source folder's parent,"
+            " so put the source checkout directly in your home folder."
+        )
+
     copied: list[str] = []
     for entry in entries:
         verdict = entry.get("verdict")

@@ -123,3 +123,23 @@ def test_mirror_fails_closed_when_the_public_policy_is_missing(tmp_path):
 
     with pytest.raises(sync.SyncError):
         sync.mirror_public_files(tmp_path, tmp_path / "harness")
+
+
+def test_a_missing_source_stops_the_copy_before_anything_is_written(tmp_path):
+    source = tmp_path / "src"
+    (source / "skills" / "good").mkdir(parents=True)
+    (source / "skills" / "good" / "SKILL.md").write_text("ok\n")
+    harness = tmp_path / "harness"
+    harness.mkdir()
+    manifest = {"entries": [
+        {"path": "skills/good/", "verdict": "publish"},
+        {"path": "skills/gone/ (symlink -> ~/.agents/skills/gone/)", "verdict": "publish"},
+    ]}
+    try:
+        sync.copy_entries(manifest, source, harness, [])
+    except sync.SyncError as e:
+        assert "nothing copied" in str(e) and "skills/gone" in str(e)
+    else:
+        raise AssertionError("a missing source must stop the copy")
+    assert list(harness.iterdir()) == []
+
