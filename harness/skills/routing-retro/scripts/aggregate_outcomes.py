@@ -275,6 +275,7 @@ def run_deferred(ledger_path, ssot_path, since=None, last=None, now=None, adopti
     # regardless of which ledger this run is scanning, so a run against an
     # alternate ledger silently inherited production adoption state.
     adoptions = read_adoptions(adoptions_path or (ledger_path.parent / "adoptions.ndjson"))
+    rejected = read_adoptions(ledger_path.parent / "rejections.ndjson")  # same shape: JSON per line by proposal_id
 
     # [HARDENED finding 3] cohorts are built from the FULL deduped record set
     # first, then filtered as whole units — never filter raw attempt records
@@ -329,7 +330,7 @@ def run_deferred(ledger_path, ssot_path, since=None, last=None, now=None, adopti
 
     cell_entries = []
     for key, agg in sorted(cell_aggs.items()):
-        proposal, status = cell_proposal(key, agg, epoch, existing_canary_pids, _finished_pids)
+        proposal, status = cell_proposal(key, agg, epoch, existing_canary_pids, _finished_pids, rejected)
         task_class, model, reasoning, backend = key
         cell_entries.append({
             "task_class": task_class, "model_authored": model, "reasoning_authored": reasoning,
@@ -355,16 +356,43 @@ def run_deferred(ledger_path, ssot_path, since=None, last=None, now=None, adopti
         ledger_path=ledger_path, is_filtered=is_filtered, costs=costs)
 
 
+def reject(ledger_path, ssot_path, pid, reason, now=None):
+    """Append an operator rejection of a CURRENT cell proposal to
+    rejections.ndjson beside the ledger. Returns the record; raises
+    ValueError when pid is not a proposal the aggregator offers today."""
+    now = now or datetime.now(UTC)
+    out, _ = run_deferred(ledger_path, ssot_path, now=now)
+    prop = next((c["proposal"] for c in out.get("cells", [])
+                 if c["proposal"] and c["proposal"]["proposal_id"] == pid), None)
+    if prop is None:
+        raise ValueError(f"{pid} is not a current cell proposal")
+    rec = {"proposal_id": pid, "date": now.date().isoformat(), "kind": prop["kind"],
+           "class": prop["class"], "cell": prop["current_cell"], "n_at_rejection": prop["n"],
+           "ssot_version": prop["ssot_version"], "reason": reason, "action": "reject"}
+    with open(Path(ledger_path).parent / "rejections.ndjson", "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+    return rec
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("ledger", nargs="?", default=None, help="path to outcomes.ndjson (default: evals/routing/outcomes.ndjson)")
     ap.add_argument("--since", default=None, help="only records with ts on/after YYYY-MM-DD")
     ap.add_argument("--last", type=int, default=None, help="keep only the last N cohorts (sessions) by ts")
     ap.add_argument("--ssot", default=None, help="path to model-routing.yaml (default: the live repo file)")
+    ap.add_argument("--reject", metavar="PROPOSAL_ID", default=None,
+                    help="record an operator rejection of this proposal in rejections.ndjson, then exit")
+    ap.add_argument("--reason", default="", help="why the operator rejected it (with --reject)")
     args = ap.parse_args()
 
     ledger_path = Path(args.ledger) if args.ledger else default_ledger_path()
     ssot_path = Path(args.ssot) if args.ssot else default_ssot_path()
+    if args.reject:
+        try:
+            print(json.dumps(reject(ledger_path, ssot_path, args.reject, args.reason)))
+        except ValueError as e:
+            sys.exit(f"refused: {e}")
+        return
 
     out, commit = run_deferred(ledger_path, ssot_path, since=args.since, last=args.last)
     json.dump(out, sys.stdout, indent=1)

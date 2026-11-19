@@ -22,8 +22,18 @@ both: they have the same names.
 | | `claude/skills/` (installed by `install.sh`) | `harness/skills/` |
 |---|---|---|
 | Reads the policy at | `~/.claude/claude/model-routing.yaml` after `install.sh`; `claude/model-routing.yaml` in a clone of this repo | `~/.claude/model-routing.yaml` |
-| `routing-retro` | One scanner script. Works from any project. Writes only to the misroute ledger, after you confirm. | 16 scripts. Also reads the outcome logs that the [plan pipeline](plan-pipeline.md) and the [compaction policy](compaction.md) write. |
+| `routing-retro` | One scanner script. Works from any project. Writes only to the misroute ledger, after you confirm. | 16 scripts. Also reads the outcome logs that the [plan pipeline](plan-pipeline.md) and the [compaction policy](compaction.md) write. Also records a proposal you reject (see below). |
 | `routing-update` | Run it in your clone of this repo; then run `install.sh` again. | Needs the plan pipeline. Some steps assume the original author's deploy tool. |
+
+## Rejected proposals (`harness/` copy)
+
+When you reject a proposal that `routing-retro` offers, record it:
+
+```bash
+python3 ~/.claude/skills/routing-retro/scripts/aggregate_outcomes.py --reject <proposal_id> --reason "<why>"
+```
+
+It adds one line to `rejections.ndjson`, next to the outcome log. It refuses an id that the retro does not offer today. The retro then shows that cell as `rejected` and offers nothing for it until new evidence arrives: as many new verified sessions as opened the proposal. For a proposal to lower a model or effort, the newest 24 sessions of that cell must also pass on the first try at least 90% of the time. Without this record, the same proposal came back at every retro.
 
 ## Follow-up fixes (trial)
 

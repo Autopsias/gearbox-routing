@@ -28,6 +28,7 @@ UPGRADE_ESCALATION_MIN = 0.50
 MIN_N_DOWNGRADE_OPEN = 6            # deliberate call — see module docstring
 DOWNGRADE_OPEN_PASS_MIN = 0.90
 DOWNGRADE_OPEN_ESCALATION_MAX = 0.0
+REJECTION_RECENT_N = 24             # re-open window for a rejected downgrade (operator choice 2026-11-18)
 
 SMOKE_N = 3
 ADOPTION_MIN_N = 10
