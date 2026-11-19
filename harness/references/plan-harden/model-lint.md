@@ -194,8 +194,8 @@ re.I)`), the same test `run.py` itself uses:**
   declared `(model, reasoning)`. This is the SAME comparison machinery as s07's rule,
   applied with `openai` as the resolved provider rather than a separate code path — one
   flag per session, quoted the same way (*"session declares `task_class:
-  agentic_build` + `model: gpt-5.6-terra`, which resolves to `gpt-5.6-sol`/`xhigh` under
-  `openai` — recommend `gpt-5.6-sol`/`xhigh`, or correct `task_class`"*). 🟡
+  agentic_build` + `model: gpt-5.6-terra`, which resolves to `gpt-6.2-sol`/`xhigh` under
+  `openai` — recommend `gpt-6.2-sol`/`xhigh`, or correct `task_class`"*). 🟡
 - **`linchpin-pinned-to-codex`** — **(v8: only when the session declares a model override; an unpinned v8 linchpin session is resolved by the executor.)** Mirrors `run.py::_codex_harness_spec`'s own gate
   exactly (dual-harness-contract.md D4c/D4d), computed via the SAME functions, never a
   reimplementation: a session for which `run._session_barred(session)` returns non-`None`
@@ -294,7 +294,7 @@ no-oped; HARDENED:codex-verify-r2 — the fixed `< 3` threshold this replaced wa
   `rungs_to_apex(start_cell)` is that count — the number of REWORK ATTEMPTS from the
   session's own starting cell until the ladder reaches the apex rung (e.g. `opus@xhigh` on
   the Claude lane since SSOT v39 — the automatic fable rungs were withdrawn — or
-  `gpt-5.6-sol@max` on the Codex lane): one for the mandatory same-rung
+  `gpt-6.2-sol@max` on the Codex lane): one for the mandatory same-rung
   retry (`stuck_protocol` needs two same-signature failures before the first climb) plus one
   per `escalate()` call after that. Verified against the live SSOT v39:
   `opus@high` → 2, `opus@medium` → 3, `sonnet@high` → 3, `sonnet@low` → 5 — these are the same worked examples
@@ -348,7 +348,7 @@ integration/multi-file refactor/non-obvious debugging → `Sonnet`/`low`, climbi
 architecture/ambiguous-tradeoff/hard-root-cause → `Opus`/`medium` (`deep_reasoning`); the
 plan's one-shot/irreversible session → `Opus`/`high` (`linchpin`). Codex lane
 (`providers.openai`, s08 LN-01): `gpt-5.6-luna` never below `max` (curve collapses),
-`gpt-5.6-terra` never below `max` (effort-steep), `gpt-5.6-sol` at `xhigh` for
+`gpt-5.6-terra` never below `max` (effort-steep), `gpt-6.2-sol` at `xhigh` for
 `agentic_build`/`deep_reasoning` and `max` for `linchpin` — a barred session (`linchpin`/
 `irreversible_change`/`guards_irreversible`) explicitly pinned to any of these is a
 `run.py`-level BLOCK on both harnesses, not just a lint flag.

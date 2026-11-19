@@ -29,13 +29,14 @@ acceptance_review: missing-on-big-plan warning fires
 acceptance_review: warning silent when a session declares it
 acceptance_review: warning silent on a plan under 4 sessions
 build: manifest carries acceptance_review (default False)
-codex model: gpt-5.6-sol emits no dispatchable-token WARNING
+codex model: gpt-6.2-sol emits no dispatchable-token WARNING
 codex model: gpt-5.6-terra validates
 codex model: gpt-5.6-luna validates
 retired model: gpt-5.5 emits the dispatchable-token WARNING
+retired model: gpt-5.6-sol emits the dispatchable-token WARNING
 build: Codex session renders a model-codex chip; ESLint no-undef gate stays green
 retired model: gpt-5.5 still maps to the dot-free 'codex' chip class
-codex model: fork+gpt-5.6-sol still warns (fork ignores model)
+codex model: fork+gpt-6.2-sol still warns (fork ignores model)
 rebuild --preserve-state: mixed statuses + notes + ship badge survive; added s11 is TODO
 control: rebuild WITHOUT carry-over demonstrably wipes every status (test can fail)
 rebuild --preserve-state: a REMOVED session does not resurrect; survivors keep status

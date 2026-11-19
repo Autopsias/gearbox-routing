@@ -214,20 +214,20 @@ def _check_build_and_acceptance():
 def _check_codex_tokens():
     """Codex models as first-class dispatchable tokens (dual-harness S03, CL-01)."""
     # ── 12. Codex models are first-class dispatchable tokens (dual-harness S03, CL-01) ──
-    # gpt-5.6-sol/-terra/-luna must validate with NO warning (previously any
+    # gpt-6.2-sol/-terra/-luna must validate with NO warning (previously any
     # non-Claude model string triggered the "won't normalize" WARNING), and a built
     # dashboard must render a distinct model-codex chip while still passing the
     # no-undef ESLint gate (guards the 2026-06-06 "isOpus is not defined" class of bug —
     # see validate_dashboard_js docstring).
     s = copy.deepcopy(BASE)
-    sess(s, "s10")["model"] = "gpt-5.6-sol"
+    sess(s, "s10")["model"] = "gpt-6.2-sol"
     buf = io.StringIO()
     with contextlib.redirect_stderr(buf):
         build_plan.validate_spec(s)
     if "will not normalize to a dispatchable model token" in buf.getvalue():
-        bad("codex model: gpt-5.6-sol", "unexpected dispatchable-token WARNING")
+        bad("codex model: gpt-6.2-sol", "unexpected dispatchable-token WARNING")
     else:
-        ok("codex model: gpt-5.6-sol emits no dispatchable-token WARNING")
+        ok("codex model: gpt-6.2-sol emits no dispatchable-token WARNING")
 
     for tok in ("gpt-5.6-terra", "gpt-5.6-luna"):
         s2 = copy.deepcopy(BASE)
@@ -239,25 +239,26 @@ def _check_codex_tokens():
     # rather than sail through and only fail at dispatch. It still VALIDATES — an
     # already-built manifest is not retroactively unbuildable; it is blocked at dispatch
     # with guidance instead.
-    s2 = copy.deepcopy(BASE)
-    sess(s2, "s10")["model"] = "gpt-5.5"
-    buf = io.StringIO()
-    with contextlib.redirect_stderr(buf):
-        build_plan.validate_spec(s2)
-    if "will not normalize to a dispatchable model token" in buf.getvalue():
-        ok("retired model: gpt-5.5 emits the dispatchable-token WARNING")
-    else:
-        bad("retired model: gpt-5.5", "expected a dispatchable-token WARNING, got none")
+    for retired in ("gpt-5.5", "gpt-5.6-sol"):   # 5.6-sol retired 2026-11-19 (SSOT v44)
+        s2 = copy.deepcopy(BASE)
+        sess(s2, "s10")["model"] = retired
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            build_plan.validate_spec(s2)
+        if "will not normalize to a dispatchable model token" in buf.getvalue():
+            ok(f"retired model: {retired} emits the dispatchable-token WARNING")
+        else:
+            bad(f"retired model: {retired}", "expected a dispatchable-token WARNING, got none")
 
     s = copy.deepcopy(BASE)
-    sess(s, "s10")["model"] = "gpt-5.6-sol"
+    sess(s, "s10")["model"] = "gpt-6.2-sol"
     with tempfile.TemporaryDirectory() as td:
         out = Path(td) / "plan"
         try:
             build_plan.build(s, out)  # raises if the assembled dashboard JS fails no-undef
             html_text = (out / "PLAN.html").read_text()
             assert 'model-codex' in html_text, "no model-codex chip class in rendered HTML"
-            assert ">gpt-5.6-sol<" in html_text, "model label not rendered verbatim"
+            assert ">gpt-6.2-sol<" in html_text, "model label not rendered verbatim"
             ok("build: Codex session renders a model-codex chip; ESLint no-undef gate stays green")
         except AssertionError as e:
             bad("build: Codex session dashboard render", e)
@@ -269,7 +270,7 @@ def _check_codex_tokens():
     # `model-gpt-5.5` class cannot be selected by the dashboard CSS, which is the whole
     # reason the codex mapping exists.
     _css = build_plan._model_css_class
-    if _css("gpt-5.5") == "codex" and _css("gpt-5.6-sol") == "codex" and _css("opus") == "opus":
+    if _css("gpt-5.5") == _css("gpt-5.6-sol") == "codex" and _css("gpt-6.2-sol") == "codex" and _css("opus") == "opus":
         ok("retired model: gpt-5.5 still maps to the dot-free 'codex' chip class")
     else:
         bad("retired model chip class", f"gpt-5.5 -> {_css('gpt-5.5')!r} (want 'codex')")
@@ -278,15 +279,15 @@ def _check_codex_tokens():
     # tokens too: a fork ALWAYS runs the orchestrator's model, so pairing it with a
     # dispatchable Codex token is the same contradiction as pairing it with Opus/Sonnet.
     s = copy.deepcopy(BASE)
-    sess(s, "s10")["model"] = "gpt-5.6-sol"
+    sess(s, "s10")["model"] = "gpt-6.2-sol"
     sess(s, "s10")["dispatch"]["subagent_type"] = "fork"
     buf = io.StringIO()
     with contextlib.redirect_stderr(buf):
         build_plan.validate_spec(s)
     if "subagent_type is 'fork'" in buf.getvalue():
-        ok("codex model: fork+gpt-5.6-sol still warns (fork ignores model)")
+        ok("codex model: fork+gpt-6.2-sol still warns (fork ignores model)")
     else:
-        bad("codex model: fork+gpt-5.6-sol warning", "expected fork-pairing WARNING, got none")
+        bad("codex model: fork+gpt-6.2-sol warning", "expected fork-pairing WARNING, got none")
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "plan-execute" / "scripts"))

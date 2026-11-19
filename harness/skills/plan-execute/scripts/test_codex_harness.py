@@ -36,7 +36,7 @@ def test_harness_codex_emits_a_command_for_every_session(tmp_path, capsys, ssot,
     # codex is a per-run election. Left in place it would block 100% of sessions.
     ssot("anthropic", openai_status="lane_scoped")
     sessions = [
-        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol",
+        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol",
          "reasoning": "high"},                                    # Codex-pinned → passthrough
         {"id": "s02", "title": "S2", "items": ["i2"], "model": "Opus",
          "reasoning": "high", "task_class": "agentic_build",
@@ -71,7 +71,7 @@ def test_harness_codex_emits_a_command_for_every_session(tmp_path, capsys, ssot,
         assert m["verifier_mode"] == "on_box_human"   # D4e recommended default
 
     # gpt-pinned: passes through untranslated.
-    assert by_id["s01"]["codex_model"] == "gpt-5.6-sol"
+    assert by_id["s01"]["codex_model"] == "gpt-6.2-sol"
     assert by_id["s01"]["codex_effort"] == "xhigh"
     assert by_id["s01"]["translated_from"] is None
     # opus-pinned: translated via the SSOT, carrying the receipt. s03:
@@ -80,7 +80,7 @@ def test_harness_codex_emits_a_command_for_every_session(tmp_path, capsys, ssot,
     # Claude tier name `frontier_reasoner` against an OpenAI tier of the same name.
     # The tier-NAME fallback still covers a session that declares no task_class —
     # pinned by test_translation_receipt_names_what_was_lost below, whose s01 has none.
-    assert by_id["s02"]["codex_model"] == "gpt-5.6-sol"
+    assert by_id["s02"]["codex_model"] == "gpt-6.2-sol"
     assert by_id["s02"]["codex_effort"] == "xhigh"
     assert by_id["s02"]["translated_from"] == {"model": "Opus", "reasoning": "high"}
     assert "harness=codex  translate s02:" in err
@@ -132,12 +132,12 @@ def test_manifest_max_reaches_codex_natively(tmp_path, capsys, ssot):
     # Before CL-03 _INTENT_FROM_REASONING sent BOTH xhigh and max to `thorough`,
     # so a session asking for maximum thinking could only ever land on the tier's
     # `thorough` cell (sol xhigh). `max` is a REAL rung: `codex debug models` on
-    # codex-cli 0.145.0 lists low|medium|high|xhigh|max|ultra for gpt-5.6-sol.
+    # codex-cli 0.145.0 lists low|medium|high|xhigh|max|ultra for gpt-6.2-sol.
     ssot("anthropic")
     sessions = [
-        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol", "reasoning": "max"},
+        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol", "reasoning": "max"},
         {"id": "s02", "title": "S2", "items": ["i2"], "model": "Fable", "reasoning": "max"},
-        {"id": "s03", "title": "S3", "items": ["i3"], "model": "gpt-5.6-sol", "reasoning": "xhigh"},
+        {"id": "s03", "title": "S3", "items": ["i3"], "model": "gpt-6.2-sol", "reasoning": "xhigh"},
         {"id": "s04", "title": "S4", "items": ["i4"], "model": "Sonnet", "reasoning": "max",
          "task_class": "standard_build"},
     ]
@@ -145,7 +145,7 @@ def test_manifest_max_reaches_codex_natively(tmp_path, capsys, ssot):
     by_id, _, _ = _begin_codex(plan_dir, ["s01", "s02", "s03", "s04"], capsys)
 
     for sid in ("s01", "s02"):
-        assert by_id[sid]["codex_model"] == "gpt-5.6-sol"
+        assert by_id[sid]["codex_model"] == "gpt-6.2-sol"
         assert by_id[sid]["codex_effort"] == "max", sid
         assert "model_reasoning_effort=max" in by_id[sid]["dispatch_cmd"]
         assert by_id[sid]["effort_fidelity"] == "exact"   # no lower intent reaches max
@@ -177,7 +177,7 @@ def test_intent_rung_missing_from_effort_map_silently_downgrades(tmp_path, capsy
         "apex_reasoner:     { light: medium, standard: high, thorough: xhigh, "
         "exhaustive: xhigh, maximal: max   }",
         "apex_reasoner:     { light: medium, standard: high, thorough: xhigh }"))
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol",
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol",
                  "reasoning": "max"}]
     plan_dir = make_plan(tmp_path, sessions)
     by_id, _, _ = _begin_codex(plan_dir, ["s01"], capsys)
@@ -232,7 +232,7 @@ def test_retired_gpt55_pin_blocks_with_guidance(ssot):
     msg = str(ei.value)
     assert "RETIRED" in msg
     assert "amend-session" in msg                                  # the fix, named
-    for repl in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"):  # the replacements, named
+    for repl in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-6.2-sol"):  # the replacements, named
         assert repl in msg, f"block message does not name {repl}: {msg}"
 
 
@@ -283,7 +283,7 @@ def test_barred_session_checkpoints_before_dispatch_then_runs_on_resume(
     assert "barred from unsupervised Codex execution" in brief
     # linchpin -> apex_reasoner -> sol. `high` maps to thorough = xhigh, but the
     # linchpin row itself prescribes `maximal` = max and the class floors it there.
-    assert "gpt-5.6-sol · max" in brief            # names the model it WOULD run on
+    assert "gpt-6.2-sol · max" in brief            # names the model it WOULD run on
     assert "no `--harness`" in brief               # ...and the Claude-side alternative
     assert run._statuses(plan_dir)["s01"] == "AWAITS_REVIEW"   # NOT DOING
     # Nothing dispatched and no lock left behind.
@@ -328,7 +328,7 @@ def test_explicit_codex_pin_on_barred_work_still_blocks_under_codex_harness(
     # unsupervised Codex on work it declared unsafe for it contradicts itself,
     # and only the plan author can resolve that.
     ssot("anthropic")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol",
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol",
                  "task_class": "linchpin"}]
     plan_dir = make_plan(tmp_path, sessions)
     with pytest.raises(SystemExit):
@@ -401,7 +401,7 @@ def test_codex_sandbox_env_refuses_begin(tmp_path, capsys, ssot, monkeypatch):
     # CODEX_SANDBOX is set exactly in the mode where a nested codex exec dies
     # ("failed to initialize in-process app-server client", contract probe P2).
     ssot("anthropic")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
     plan_dir = make_plan(tmp_path, sessions)
     monkeypatch.setenv(run._CODEX_SANDBOX_ENV, "seatbelt")
     with pytest.raises(SystemExit) as exc:

@@ -94,4 +94,9 @@ def accept_note(plan_dir, session, accepted):
     note = f"accept_file={'+'.join(f.name for f in read if f.is_file() or f == read[0])} entries={len(accepted)}"
     if strays:
         note += f" WARNING other accept file(s) NOT read: {', '.join(strays)}"
+    sid, c = session.split(".")[0], Path(plan_dir) / "_closeouts"
+    closed = max((f.stat().st_mtime for f in [*c.glob(f"{sid}.json"), *c.glob(f"{sid}.r*.json")]), default=0)
+    early = [f.name for f in read if f.is_file() and f.stat().st_mtime < closed]
+    if early:  # the owner accepts AFTER the session closes out; an earlier write may be the session's own
+        note += f" WARNING accept file written BEFORE the session's last closeout: {', '.join(early)} (confirm you wrote it)"
     return note

@@ -44,7 +44,7 @@ def main():
 
     hardening_lines = [
         f"[HARDENED:codex-adversarial-r1] Reviewed by adversarial-review "
-        f"(gpt-5.6-sol · reasoning_effort=xhigh recommended; this fixture ran on "
+        f"(gpt-6.2-sol · reasoning_effort=xhigh recommended; this fixture ran on "
         f"a fallback rung — see harden-run.txt) — "
         f"{counts['blocking']} blocking / {counts['material']} material / "
         f"{counts['minor']} minor finding(s) in the Findings section.",

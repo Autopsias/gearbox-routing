@@ -138,6 +138,16 @@ These are the rules that decide where a run stops and who answers. They live in 
   for a GLM / Z.ai setup. On an Anthropic account they matter only if a plan
   asks for those pairs.
 - The `Stop` entry above holds two hooks, `turnend-guard.py` and `agent-elapsed-nag.py`, because the harness wires them as one entry. The installer adds it once, whichever of the two modules you install first. `./install-module --remove` for either module removes the whole entry, so run `--remove` for one and re-add the other by hand if you keep it. Each command skips itself when its file is missing.
+- **A retired Codex model is refused, not rerouted.** A session whose `model` is
+  `gpt-5.6-sol` (or `gpt-5.5...`) stops with a message that names the fix: re-pin it
+  with `plan-execute amend-session <PLAN_DIR> --session <SID> --model <M>`. Pick
+  `gpt-5.6-luna` for mechanical or standard builds, `gpt-5.6-terra` for an escalated
+  build, or `gpt-6.2-sol` for judgement work (the lane default). The ids are the
+  author's setup; use the ids your Codex plan offers.
+- **Write an accept file after the closeout.** When you accept a review finding
+  on record (`_verify_state/<session>.accepted.json`, see the review-halt exit above),
+  the gate warns on its convergence line if the file is older than the session's last
+  closeout, because a dispatched session could have written it. The warning does not block.
 - **Two policy files.** `install.sh` writes the routing policy to
   `~/.claude/claude/model-routing.yaml`; this module reads
   `~/.claude/model-routing.yaml`. They are meant to differ in one way:

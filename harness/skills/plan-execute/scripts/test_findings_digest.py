@@ -92,7 +92,7 @@ def test_codex_backend_dispatch_under_claude_harness_carries_digest(
     ssot("anthropic")
     monkeypatch.setattr(fd, "digest", lambda plan_dir, sid: "SENTINEL-CODEX-77\n\n")
     sessions = [{"id": "s02", "title": "S2", "items": ["w-02"],
-                 "model": "gpt-5.6-sol", "reasoning": "high", "prompt": "do s02"}]
+                 "model": "gpt-6.2-sol", "reasoning": "high", "prompt": "do s02"}]
     plan_dir = make_plan(tmp_path, sessions)
     run.cmd_begin(plan_dir, ["s02"])
     m = {mm["id"]: mm for mm in json.loads(capsys.readouterr().out)["batch"]}["s02"]

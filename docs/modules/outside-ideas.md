@@ -44,6 +44,8 @@ rm -r ~/.claude/skills/worth-adopting ~/.claude/skills/jev-fit-scan
 
 - `/worth-adopting` writes a report and a ledger file
   (`docs/worth-adopting/LEDGER.md`) in the target repo. It builds nothing.
+  Its step 1 makes a worktree from `origin/main` and works there, so a local
+  checkout that is behind cannot hide an earlier run from the ledger.
   Read and change the ledger with `wa_ledger.py`, never with `cat`, `grep` or
   an editor: a cell cut by hand is not a fact.
 - It mentions a placeholder repo name (`~/your-private-harness`) from the

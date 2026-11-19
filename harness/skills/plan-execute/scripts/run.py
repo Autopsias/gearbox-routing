@@ -470,7 +470,7 @@ _FALLBACK_LADDER = {
         # only work that rung could move is judgement work — which providers.openai's
         # escalation invariant forbids from landing on luna. A refused terra is NO-CODEX.
         "gpt-5.6-luna": "gpt-5.6-terra",
-        "gpt-5.6-sol": "gpt-5.6-terra",
+        "gpt-6.2-sol": "gpt-5.6-terra",
     },
     # zai (v1.21): Task-plane tokens; no fable row — the clamp remaps fable first.
     "zai": {"opus": "sonnet"},
@@ -550,7 +550,7 @@ _CODEX_WRAPPER_MODEL = "sonnet"
 #
 # UNCLAMPED at CL-03. This map used to send BOTH `xhigh` and `max`
 # to `thorough`, so a session that asked for maximum thinking silently landed on
-# whatever the tier's `thorough` cell held — `gpt-5.6-sol @ xhigh`, never `max`.
+# whatever the tier's `thorough` cell held — `gpt-6.2-sol @ xhigh`, never `max`.
 # That was a clamp invented HERE, not provider policy: `codex debug models` on
 # codex-cli 0.145.0 (re-verified) reports `max` as a real supported
 # reasoning level on sol, terra AND luna (`ultra` exists on sol/terra and stays
@@ -1029,7 +1029,7 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
     by_lower = {m.lower(): m for m in openai.models.values()}
     model = by_lower.get(raw.lower())
     class_cell = None          # the {model_id, native_effort} the task_class prescribes
-    if model is None and raw.lower().startswith("gpt-5.5"):
+    if model is None and raw.lower().startswith(("gpt-5.5", "gpt-5.6-sol")):
         # RETIRED-MODEL PIN (v1.15) — an already-built manifest can still carry a
         # `gpt-5.5` pin the operator retired. BLOCKED-WITH-GUIDANCE:
         # never silently rerouted onto a 5.6 model (the plan author did not choose
@@ -1041,11 +1041,11 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
         # and dispatched — turning a loud block into exactly the silent reroute the
         # directive forbids. Ordering is the whole guarantee here.
         raise UnroutableCodexSession(
-            f"session model {raw_model!r} is RETIRED (operator directive 2026-08-13: this lane is "
-            "gpt-5.6-only) and is never silently rerouted. Re-pin the session explicitly with "
-            "`plan-execute amend-session <PLAN_DIR> --session <SID> --model <M>`, choosing the 5.6 "
+            f"session model {raw_model!r} is RETIRED (operator directives 2026-08-13 and "
+            "2026-11-19) and is never silently rerouted. Re-pin the session explicitly with "
+            "`plan-execute amend-session <PLAN_DIR> --session <SID> --model <M>`, choosing the "
             "replacement for the work: gpt-5.6-luna (mechanical / standard_build), gpt-5.6-terra "
-            "(escalated build), gpt-5.6-sol (judgement work — the lane default)."
+            "(escalated build), gpt-6.2-sol (judgement work — the lane default)."
         )
     if model is None:
         model, class_cell = _translate_claude_token(raw, task_class, ssot_text, rr, openai)

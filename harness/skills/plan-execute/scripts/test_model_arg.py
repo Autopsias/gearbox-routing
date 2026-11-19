@@ -194,7 +194,7 @@ def test_fallback_for(token, expected):
     "token,expected",
     [
         # v1.15 5.6-ONLY lane: gpt-5.5 and the whole `workhorse` tier are retired.
-        ("gpt-5.6-sol", ("gpt-5.6-terra", "max")),
+        ("gpt-6.2-sol", ("gpt-5.6-terra", "max")),
         # terra is the SINK: nothing degrades onto the mechanical-only luna (v1.15
         # judgement floor), and that is also what keeps the rescue below from closing
         # a terra->luna->terra cycle. A refused terra means NO-CODEX.

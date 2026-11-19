@@ -28,6 +28,7 @@ import shlex
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 from card import card_lock, health_dir, load_card, save_card
 from common import parse_json, run
@@ -47,8 +48,21 @@ def cap_seconds():
     return cap if cap > 0 else DEFAULT_CAP_S
 
 
+def local_marker_file(repo):
+    """Where this clone records its own completed scan: inside .git, so no commit
+    can write it. history.jsonl is committed, so a commit can forge its marker."""
+    rc, out = run(["git", "rev-parse", "--git-path", "repo-health-secrets-marker"], repo)[:2]
+    return Path(repo) / out.strip() if rc == 0 and out.strip() else None
+
+
 def last_marker(repo):
-    """The newest `secrets_scanned` in history.jsonl, or "" (first run)."""
+    """The marker of this clone's own last completed scan, else (no local record yet,
+    e.g. a fresh clone) the newest `secrets_scanned` in history.jsonl, else "" (first run)."""
+    lf = local_marker_file(repo)
+    if lf and lf.is_file():
+        m = lf.read_text().strip()
+        if COMMIT_RE.fullmatch(m):
+            return m
     f = health_dir(repo) / "history.jsonl"
     if not f.exists():
         return ""
@@ -122,4 +136,6 @@ def record(repo, set_result):
             card = load_card(repo)
             card["secrets_scanned"] = scanned
             save_card(repo, card)
+            if lf := local_marker_file(repo):
+                lf.write_text(scanned + "\n")
     print(json.dumps({"status": status, "detail": detail}))

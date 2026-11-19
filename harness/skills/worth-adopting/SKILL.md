@@ -58,7 +58,12 @@ source is too long to hold (several hours of transcript), and then only for step
 
 ## 1. Check the ledger
 
+First make the run's worktree from `origin/main`, and use it as `<target>` in every step: a
+local checkout can be behind (2026-11-19: 21 commits behind, the ledger missed a run of the
+same source merged 2 minutes earlier, and the run fetched and read the whole source again).
+
 ```bash
+git -C <repo> fetch -q && git -C <repo> worktree add -q -b wa/<slug> <repo>/.plan-worktrees/wa-<slug> origin/main
 L="python3 $HOME/.claude/skills/worth-adopting/scripts/wa_ledger.py --ledger <target>/docs/worth-adopting/LEDGER.md"
 $L find '<author>|<tool or repo name>|<slug of the url>'   # one short line per row
 $L row '<date or source>' --field result                   # ONE cell in full, when a verdict rests on it
@@ -277,7 +282,7 @@ fill it. Add one row with `wa_ledger.py add-row < row.txt` (create the file from
 `assets/ledger-header.md` on the first run): it puts the row at the end of the table, above
 the overrides, and refuses a row without nine cells or one whose report skips the big picture. Do not commit before the owner answers
 the decision card. After the answer (at once when there is no card), put this run's record in
-one pull request from a worktree on `origin/main`: the report, this run's ledger lines and
+one pull request from the step 1 worktree (rebase it on `origin/main` first): the report, this run's ledger lines and
 any measure script, and nothing of another run (2026-11-17: two runs left their lines
 uncommitted in one ledger, and the main checkout could not fast-forward).
 

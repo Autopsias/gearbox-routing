@@ -724,7 +724,9 @@ is not an option. The decision card offers exactly these exits:
    finding's summary>", "reason": "<why>", "severity": "<optional>"}]}`. Every
    review gate of that session reads this file (and its own
    `<sid>.<level>.<reviewer>.accepted.json`). The match is by file and phrase,
-   never by finding id. With every open finding accepted, the gate passes on an
+   never by finding id. Write the file AFTER the session's closeout: the gate
+   warns when the file is older than the session's last closeout, because a
+   session could have written it. With every open finding accepted, the gate passes on an
    unchanged surface with no new reviewer run, prints each `ACCEPTED` line with
    its reason and records the status `accepted` in the ledger.
 2. **Split.** Give part of the surface to a new session (`add-session`), or

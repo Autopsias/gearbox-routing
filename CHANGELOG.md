@@ -23,6 +23,23 @@ example file, and its OpenAI ids stay examples.
   to `gpt-6.2-sol` (needs codex-cli 0.170.0). `codex_supervised.py` gains
   `--service-tier fast`; Codex drops a tier the account's plan does not offer,
   with one warning line.
+- **plan-execute, Codex sessions:** a session pinned to `gpt-5.6-sol` is now
+  refused as retired, never rerouted. Re-pin it with
+  `plan-execute amend-session <PLAN_DIR> --session <SID> --model <M>`: `gpt-5.6-luna`
+  for mechanical or standard builds, `gpt-5.6-terra` for an escalated build, and
+  `gpt-6.2-sol` for judgement work, which is the lane default.
+  See [plan pipeline](docs/modules/plan-pipeline.md).
+- **plan-execute, review accept file:** when you accept a review finding on
+  record (`_verify_state/<session>.accepted.json`), write the file after the
+  session's closeout. The gate now warns on the convergence line when the file
+  is older than the last closeout, because a dispatched session could have
+  written it. It only warns; nothing is blocked.
+- **repo-health:** the secrets-history check now starts each scan from a record
+  this clone keeps inside `.git`, not from the committed `history.jsonl`, so a
+  commit cannot move the start of the range. A fresh clone has no record and
+  still starts from `history.jsonl`. See [repo-health](docs/modules/repo-health.md).
+- **worth-adopting:** step 1 makes the run's worktree from `origin/main`, so a
+  local checkout that is behind cannot miss an earlier run in the ledger.
 
 ### Changed (harness sync of 2026-11-18)
 This sync carries the private harness changes from 2026-11-12 to 2026-11-18.

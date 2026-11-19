@@ -466,6 +466,17 @@ def test_the_convergence_line_always_names_the_accept_file(tmp_path):
     line = L.convergence_line(L.judge(ctx, [])[1])
     assert "accept_file=s01.medium.codex.accepted.json+s01.accepted.json entries=0" in line
     assert "NOT read: s01.high.codex.accepted.json" in line
+    assert "BEFORE the session's last closeout" not in line     # no closeout yet: nothing to compare
+    (d / "_closeouts").mkdir()
+    co = d / "_closeouts" / "s01.json"
+    co.write_text("{}")
+    os.utime(d / "_verify_state" / "s01.accepted.json", (1, 1))   # the accept predates the closeout
+    line = L.convergence_line(L.judge(L.context(str(d), "s01.medium.codex", str(tmp_path), ["a.py"]), [])[1])
+    assert "BEFORE the session's last closeout: s01.accepted.json" in line
+    os.utime(co, (1, 1))
+    os.utime(d / "_verify_state" / "s01.accepted.json", (2, 2))   # the owner accepts after the closeout
+    line = L.convergence_line(L.judge(L.context(str(d), "s01.medium.codex", str(tmp_path), ["a.py"]), [])[1])
+    assert "BEFORE the session's last closeout" not in line
 
 
 def test_an_open_priors_file_rides_along_even_when_the_fix_never_touched_it(tmp_path):

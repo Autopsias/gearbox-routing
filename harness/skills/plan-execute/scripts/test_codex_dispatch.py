@@ -28,7 +28,7 @@ import ssot_policy
 def test_codex_declared_session_emits_wrapper(tmp_path, capsys, ssot):
     ssot("anthropic")
     sessions = [
-        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol",
+        {"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol",
          "reasoning": "high"},
     ]
     plan_dir = make_plan(tmp_path, sessions)
@@ -40,10 +40,10 @@ def test_codex_declared_session_emits_wrapper(tmp_path, capsys, ssot):
     assert m["model_arg"] == run._CODEX_WRAPPER_MODEL
     # Bash layer: the concrete Codex model + native effort (high reasoning →
     # thorough intent → sol xhigh).
-    assert m["codex_model"] == "gpt-5.6-sol"
+    assert m["codex_model"] == "gpt-6.2-sol"
     assert m["codex_effort"] == "xhigh"
     for flag in ("--ignore-user-config", "--ignore-rules",
-                 "--sandbox workspace-write", "-m gpt-5.6-sol",
+                 "--sandbox workspace-write", "-m gpt-6.2-sol",
                  "model_reasoning_effort=xhigh", "-o "):
         assert flag in m["codex_cmd"], flag
     # The wrapper prompt embeds the command + the closeout relay contract.
@@ -119,7 +119,7 @@ def test_unreadable_ssot_blocks_codex_but_not_claude(tmp_path, capsys, monkeypat
     run.cmd_release(plan_dir)
 
     # ...but a Codex-declared session hard-fails on it.
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
     (tmp_path / "p2").mkdir()
     plan_dir2 = make_plan(tmp_path / "p2", sessions)
     with pytest.raises(SystemExit):
@@ -152,10 +152,10 @@ def test_openai_active_provider_translates_claude_tokens(tmp_path, capsys, ssot)
     assert by_id["s01"]["backend"] == "codex"
     assert by_id["s01"]["codex_model"] == "gpt-5.6-luna"
     assert by_id["s01"]["codex_effort"] == "max"
-    # deep_reasoning → apex_reasoner → gpt-5.6-sol. `low` maps to intent `light` =
+    # deep_reasoning → apex_reasoner → gpt-6.2-sol. `low` maps to intent `light` =
     # medium, but the CLASS row prescribes `thorough` = xhigh and translation never
     # routes below either signal, so the class floors it at xhigh.
-    assert by_id["s02"]["codex_model"] == "gpt-5.6-sol"
+    assert by_id["s02"]["codex_model"] == "gpt-6.2-sol"
     assert by_id["s02"]["codex_effort"] == "xhigh"
     run.cmd_release(plan_dir)
 
@@ -177,7 +177,7 @@ def test_dial_driven_translation_ignores_tier_name_symmetry(tmp_path, capsys, ss
     plan_dir = make_plan(tmp_path, sessions)
     by_id, _ = _begin(plan_dir, ["s01", "s02"], capsys)
     assert by_id["s01"]["codex_model"] == "gpt-5.6-luna"
-    assert by_id["s02"]["codex_model"] == "gpt-5.6-sol"
+    assert by_id["s02"]["codex_model"] == "gpt-6.2-sol"
     run.cmd_release(plan_dir)
 
 
@@ -208,7 +208,7 @@ def test_translation_never_routes_BELOW_either_signal(tmp_path, capsys, ssot):
     plan_dir = make_plan(tmp_path, sessions)
     by_id, _ = _begin(plan_dir, ["s01", "s02", "s03"], capsys)
     assert by_id["s01"]["codex_model"] == "gpt-5.6-terra", "the Opus pin was downgraded"
-    assert by_id["s02"]["codex_model"] == "gpt-5.6-sol", "deep_reasoning left the apex"
+    assert by_id["s02"]["codex_model"] == "gpt-6.2-sol", "deep_reasoning left the apex"
     assert by_id["s03"]["codex_model"] == "gpt-5.6-luna"
     run.cmd_release(plan_dir)
 
@@ -233,7 +233,7 @@ def test_the_class_effort_floor_holds_at_every_reasoning_tier(tmp_path, capsys, 
     out = json.loads(capsys.readouterr().out)
     briefs = out.get("checkpoint_briefs", {})
     for sid in ids:
-        assert "gpt-5.6-sol · max" in briefs[sid], (sid, briefs[sid])
+        assert "gpt-6.2-sol · max" in briefs[sid], (sid, briefs[sid])
     # ALLOW CONTROL: a class the row prescribes NO raise for keeps its own effort,
     # so the floor is a floor and not a blanket upgrade to max.
     (tmp_path / "ctl").mkdir()
@@ -241,7 +241,7 @@ def test_the_class_effort_floor_holds_at_every_reasoning_tier(tmp_path, capsys, 
         {"id": "s01", "title": "S1", "items": ["i1"], "model": "Opus",
          "reasoning": "high", "task_class": "deep_reasoning"}])
     by_id, _ = _begin(plan2, ["s01"], capsys, harness="codex")
-    assert (by_id["s01"]["codex_model"], by_id["s01"]["codex_effort"]) == ("gpt-5.6-sol", "xhigh")
+    assert (by_id["s01"]["codex_model"], by_id["s01"]["codex_effort"]) == ("gpt-6.2-sol", "xhigh")
     run.cmd_release(plan2)
 
 
@@ -258,9 +258,9 @@ def test_an_ABSENT_model_routes_on_task_class_while_a_BAD_one_still_blocks(tmp_p
         else Path(os.environ[run._SSOT_ENV]).read_text()
     # ABSENT model + a class that resolves -> routes on the class alone.
     assert run._resolve_codex_dispatch(None, "high", text,
-                                       task_class="deep_reasoning")[0] == "gpt-5.6-sol"
+                                       task_class="deep_reasoning")[0] == "gpt-6.2-sol"
     assert run._resolve_codex_dispatch("", "high", text,
-                                       task_class="deep_reasoning")[0] == "gpt-5.6-sol"
+                                       task_class="deep_reasoning")[0] == "gpt-6.2-sol"
     # WRITTEN but unresolvable -> still a loud block, class or no class.
     for tc in ("deep_reasoning", None):
         with pytest.raises(ssot_policy.UnroutableCodexSession):
@@ -289,7 +289,7 @@ def test_a_typo_in_task_class_loses_a_signal_it_does_not_halt_the_batch(
     assert "unroutable" not in out, out                          # the batch survives
     assert by_id["s02"]["codex_model"] == "gpt-5.6-terra"        # the MODEL still routes
     assert "does not resolve under providers.openai" in err      # ...and it is loud
-    assert by_id["s01"]["codex_model"] == "gpt-5.6-sol"          # the good one is unaffected
+    assert by_id["s01"]["codex_model"] == "gpt-6.2-sol"          # the good one is unaffected
     run.cmd_release(plan_dir)
 
     # ALLOW CONTROL: with NO usable signal at all it still blocks loudly, so the
@@ -324,16 +324,17 @@ def test_the_receipt_never_claims_an_SSOT_row_it_did_not_read(tmp_path, capsys, 
     run.cmd_release(plan_dir)
 
 
-def test_legacy_gpt55_pin_blocks_with_guidance_even_with_a_task_class(tmp_path, capsys, ssot):
+@pytest.mark.parametrize("retired", ["gpt-5.5", "gpt-5.6-sol"])  # 5.6-sol retired 2026-11-19
+def test_legacy_gpt55_pin_blocks_with_guidance_even_with_a_task_class(tmp_path, capsys, ssot, retired):
     """A retired `gpt-5.5` pin BLOCKS loudly — it is never silently rerouted onto
     a 5.6 model, and a `task_class` on the same session does not open that door.
 
     ORDERING IS THE WHOLE GUARANTEE: dial-driven translation resolves from
     task_class, so had the retired-pin check stayed BELOW it, this session would
-    have resolved to gpt-5.6-sol and dispatched — converting the one loudly
+    have resolved to gpt-6.2-sol and dispatched — converting the one loudly
     blocked case into exactly the silent reroute the operator directive forbids."""
     ssot("openai")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.5",
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": retired,
                  "reasoning": "high", "task_class": "agentic_build"}]
     plan_dir = make_plan(tmp_path, sessions)
     with pytest.raises(SystemExit):
@@ -342,7 +343,7 @@ def test_legacy_gpt55_pin_blocks_with_guidance_even_with_a_task_class(tmp_path, 
     why = out["unroutable"]["s01"]
     assert "RETIRED" in why
     assert "amend-session" in why                       # names the fix
-    for repl in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"):
+    for repl in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-6.2-sol"):
         assert repl in why                              # names the replacements
     assert run._statuses(plan_dir)["s01"] == "BLOCKED"
 
@@ -355,7 +356,7 @@ def test_lane_scoped_profile_blocks_dial_but_not_explicit_pin(tmp_path, capsys, 
     sessions = [
         {"id": "s01", "title": "S1", "items": ["i1"], "model": "Sonnet",
          "task_class": "standard_build"},                                        # dial-driven → block
-        {"id": "s02", "title": "S2", "items": ["i2"], "model": "gpt-5.6-sol"},  # explicit pin → ok
+        {"id": "s02", "title": "S2", "items": ["i2"], "model": "gpt-6.2-sol"},  # explicit pin → ok
     ]
     plan_dir = make_plan(tmp_path, sessions)
     with pytest.raises(SystemExit):
@@ -369,7 +370,7 @@ def test_lane_scoped_profile_blocks_dial_but_not_explicit_pin(tmp_path, capsys, 
     rsi.clear_halt(plan_dir)
     by_id, _ = _begin(plan_dir, ["s02"], capsys)
     assert by_id["s02"]["backend"] == "codex"
-    assert by_id["s02"]["codex_model"] == "gpt-5.6-sol"
+    assert by_id["s02"]["codex_model"] == "gpt-6.2-sol"
     run.cmd_release(plan_dir)
 
 
@@ -474,7 +475,7 @@ def test_security_sensitive_is_not_barred(tmp_path, capsys, ssot):
 
 def test_explicit_codex_pin_on_irreversible_blocks_loudly(tmp_path, capsys, ssot):
     ssot("anthropic")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol",
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol",
                  "prompt": "run /adversarial-review before finalizing",
                  "peer_triggers": ["irreversible_change"]}]
     plan_dir = make_plan(tmp_path, sessions)

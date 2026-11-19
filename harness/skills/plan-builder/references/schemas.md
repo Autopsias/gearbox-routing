@@ -252,7 +252,7 @@ research step silently while build and harden stay green.
 **Human layer:**
 - **`id`** (string, required) — Convention: `sNN` (e.g., `s01`).
 - **`title`** (string, required)
-- **`model`** (`"Haiku"|"Sonnet"|"Opus"|"Fable"` — or a Codex token `"gpt-5.6-sol"|"gpt-5.6-terra"|"gpt-5.6-luna"`, required below `plan_schema_version` 8; at v8 an optional override — see "Schema v8" below) — Drives the model chip color (teal / blue / amber / violet — Codex tokens all share one slate "Codex" color). Free-form tolerant at render time: any value gets a chip, but only these seven tokens have a dedicated color (unknown names fall back to Sonnet's) — and `build_plan.py` warns at build time when a value won't normalize to a dispatchable token (fable/opus/sonnet/haiku/gpt-5.6-sol/gpt-5.6-terra/gpt-5.6-luna), since `/plan-execute` would then omit `model` and the subagent inherits the orchestrator's model. A session pinned to a Codex token dispatches under `/plan-execute --harness codex` (Codex CLI) instead of the Cowork picker — see "Codex rubric" below for the model-per-kind map.
+- **`model`** (`"Haiku"|"Sonnet"|"Opus"|"Fable"` — or a Codex token `"gpt-6.2-sol"|"gpt-5.6-terra"|"gpt-5.6-luna"`, required below `plan_schema_version` 8; at v8 an optional override — see "Schema v8" below) — Drives the model chip color (teal / blue / amber / violet — Codex tokens all share one slate "Codex" color). Free-form tolerant at render time: any value gets a chip, but only these seven tokens have a dedicated color (unknown names fall back to Sonnet's) — and `build_plan.py` warns at build time when a value won't normalize to a dispatchable token (fable/opus/sonnet/haiku/gpt-6.2-sol/gpt-5.6-terra/gpt-5.6-luna), since `/plan-execute` would then omit `model` and the subagent inherits the orchestrator's model. A session pinned to a Codex token dispatches under `/plan-execute --harness codex` (Codex CLI) instead of the Cowork picker — see "Codex rubric" below for the model-per-kind map.
 - **`effort`** (string, optional) — Free-form **size / wall-clock** estimate, e.g. `"S"`, `"~2h"`, `"half day"`. This is *time weight*, NOT cognitive depth — for depth use `reasoning`.
 - **`reasoning`** (`"low"|"medium"|"high"|"xhigh"|"max"`, optional) — **Cognitive-effort tier**, orthogonal to `effort`. Renders as a `◐`-prefixed chip (grey / blue / amber / orange / pink) and is carried into `manifest.json` so the runner can size the dispatched model's thinking budget. Signals how much thinking depth the session needs: mechanical → `low`; standard build → `low` (SSOT v38 — the escalation ladder climbs it to `medium`, then `high`, on failure); coding / agentic / integration → `high` (**the coding/agentic default — on Sonnet, `xhigh` is a dead rung on our own calibration run (a small accuracy gain for materially higher cost); from `high`, escalate MODEL, not effort**); ambiguous design tradeoffs / deep reasoning → `Fable` at `low`; reserve `max` for open-ended or irreversible calls (never on Opus — see the rubric). `xhigh`/`extra` are synonyms; `Haiku` (5.5) takes the dial, but pair it with `low` — medium measured no better on real tasks and is slower.
 - **`human_summary`** (string, optional, *strongly recommended*) — One or two sentences in plain English about what this session achieves. Rendered in serif at 18px — the most prominent text on the card. The human reader reads this first.
@@ -340,7 +340,7 @@ Don't default every session to Sonnet / medium. Match the tier to the work. The 
 #### Codex rubric — the `gpt-5.6-*` lane (dual-harness; 5.6-ONLY since 2026-08-13)
 
 A session can be pinned to a **Codex model** instead of a Claude one. `build_plan.py`
-validates and renders `gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`
+validates and renders `gpt-6.2-sol` / `gpt-5.6-terra` / `gpt-5.6-luna`
 exactly like the four Claude tokens above (no warning, a dedicated chip color) — the
 only difference is the chip is slate "Codex" rather than teal/blue/amber/violet, and
 `/plan-execute --harness codex` dispatches the session through the Codex CLI instead of
@@ -352,9 +352,9 @@ the Cowork picker. Evidence: DeepSWE 2026-07-27
 |---|---|---|---|
 | Mechanical (rename sweep, formatting, codemod, doc edits) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — luna's ONLY usable rung; see the collapse warning below. |
 | Standard build (CRUD, wiring, templated features) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — moved off terra at v1.14 (operator-elected on price: 3 points for 6.5×). `gpt-5.6-terra`/`max` ($3.96, 70%) is the escalation, not the default. |
-| Integration / multi-file refactor / non-obvious debugging (agentic build) | `gpt-5.6-sol` | `xhigh` | $4.70, 71% DeepSWE — sol's proven escalation rung (matches `adversarial-review`'s own on-disk default). |
-| Architecture, ambiguous tradeoffs, hard root-cause (deep reasoning) | `gpt-5.6-sol` | `xhigh` | Same cell as agentic build — the lane has no cheaper dedicated deep-reasoning rung. |
-| Linchpin (one-shot irreversible, plan-foundational) | `gpt-5.6-sol` | `max` | $8.39, 73% DeepSWE — sol's ceiling; reserve for the rung that earns it. |
+| Integration / multi-file refactor / non-obvious debugging (agentic build) | `gpt-6.2-sol` | `xhigh` | No DeepSWE row yet (gpt-5.6-sol read 71% at $4.70 on this rung) — sol's proven escalation rung (matches `adversarial-review`'s own on-disk default). |
+| Architecture, ambiguous tradeoffs, hard root-cause (deep reasoning) | `gpt-6.2-sol` | `xhigh` | Same cell as agentic build — the lane has no cheaper dedicated deep-reasoning rung. |
+| Linchpin (one-shot irreversible, plan-foundational) | `gpt-6.2-sol` | `max` | No DeepSWE row yet (gpt-5.6-sol read 73% at $8.39 on this rung) — sol's ceiling; reserve for the rung that earns it. |
 
 **⚠ Luna collapses below `max`.** `gpt-5.6-luna`'s DeepSWE accuracy falls off a cliff
 as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair `gpt-5.6-luna`

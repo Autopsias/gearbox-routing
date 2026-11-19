@@ -169,7 +169,7 @@ thinking is still the most expensive combo in the table).
 **Corrected 2026-07-28 (dual-harness S03, CL-01/CL-02).** There is no separate
 `client: "codex"` field — that was an earlier, never-wired concept. The real
 mechanism: set a session's `model` directly to a Codex token —
-`gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` — and `build_plan.py`
+`gpt-6.2-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` — and `build_plan.py`
 validates + renders it exactly like Haiku/Sonnet/Opus/Fable (no warning, a
 dedicated chip color: slate "Codex," distinct from the four Claude colors).
 `/plan-execute --harness codex` then dispatches that session through the Codex
@@ -184,9 +184,9 @@ does not apply to a Codex-pinned session.
 |---|---|---|---|
 | Mechanical (rename sweep, formatting, codemod, doc edits) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — luna's ONLY usable rung; see the collapse warning below. |
 | Standard build (CRUD, wiring, templated features, test scaffolds) | `gpt-5.6-luna` | `max` | $0.61, 67% DeepSWE — moved off terra at v1.14 (operator-elected on price: 3 points for 6.5×). `gpt-5.6-terra`/`max` ($3.96, 70%) is the escalation, not the default. |
-| Integration / multi-file refactor / non-obvious debugging (agentic build) | `gpt-5.6-sol` | `xhigh` | $4.70, 71% DeepSWE — sol's proven escalation rung (matches `adversarial-review`'s own on-disk default). |
-| Architecture, ambiguous tradeoffs, hard root-cause (deep reasoning) | `gpt-5.6-sol` | `xhigh` | Same cell as agentic build — the lane has no cheaper dedicated deep-reasoning rung. |
-| Linchpin (one-shot irreversible, plan-foundational) | `gpt-5.6-sol` | `max` | $8.39, 73% DeepSWE — sol's ceiling (operator-approved 2026-08-13, SSOT v1.15 — see `model-routing.yaml` DECISION HISTORY); reserve for the rung that earns it. |
+| Integration / multi-file refactor / non-obvious debugging (agentic build) | `gpt-6.2-sol` | `xhigh` | No DeepSWE row yet (gpt-5.6-sol read 71% at $4.70 on this rung) — sol's proven escalation rung (matches `adversarial-review`'s own on-disk default). |
+| Architecture, ambiguous tradeoffs, hard root-cause (deep reasoning) | `gpt-6.2-sol` | `xhigh` | Same cell as agentic build — the lane has no cheaper dedicated deep-reasoning rung. |
+| Linchpin (one-shot irreversible, plan-foundational) | `gpt-6.2-sol` | `max` | No DeepSWE row yet (gpt-5.6-sol read 73% at $8.39 on this rung) — sol's ceiling (operator-approved 2026-08-13, SSOT v1.15 — see `model-routing.yaml` DECISION HISTORY); reserve for the rung that earns it. |
 
 **⚠ Luna collapses below `max`.** `gpt-5.6-luna`'s DeepSWE accuracy falls off a
 cliff as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair

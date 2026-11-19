@@ -149,7 +149,7 @@ def test_unmapped_tiers_do_not_resolve(tmp_path):
     )
     # An unrecognized model must not resolve either.
     assert run._tier_agent(None, "high", agent_dir=d) is None
-    assert run._tier_agent("gpt-5.6-sol", "high", agent_dir=d) is None
+    assert run._tier_agent("gpt-6.2-sol", "high", agent_dir=d) is None
 
 
 def test_fable_escalation_apex_pairs_resolve(tmp_path):

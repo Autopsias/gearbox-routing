@@ -483,10 +483,10 @@ The plan brief says *"Opus/high → sol/xhigh"*. **That is wrong.** Measured (P5
 | ~~`sonnet` @ low / medium / high~~ | ~~`workhorse`~~ | ~~`gpt-5.5`~~ | ~~`medium` / `high` / `xhigh`~~ | **RETIRED 2026-08-13 — no `workhorse` tier; resolves to nothing (unroutable)** |
 | ~~`sonnet` @ xhigh / max~~ | ~~`workhorse`~~ | ~~`gpt-5.5`~~ | ~~`xhigh`~~ | **RETIRED 2026-08-13 — same** |
 | `opus` @ any | `frontier_reasoner` | **`gpt-5.6-terra`** | `max` | **flat** — every tier maps to `max` |
-| `fable` @ low / medium / high | `apex_reasoner` | `gpt-5.6-sol` | `medium` / `high` / `xhigh` | exact |
-| `fable` @ xhigh / max | `apex_reasoner` | `gpt-5.6-sol` | `xhigh` | **clamped** |
+| `fable` @ low / medium / high | `apex_reasoner` | `gpt-6.2-sol` | `medium` / `high` / `xhigh` | exact |
+| `fable` @ xhigh / max | `apex_reasoner` | `gpt-6.2-sol` | `xhigh` | **clamped** |
 
-`gpt-5.6-sol` is the `apex_reasoner` — **Fable's** slot, not Opus's. Two independent
+`gpt-6.2-sol` is the `apex_reasoner` — **Fable's** slot, not Opus's. Two independent
 effects degrade fidelity:
 
 - **Flat effort maps.** `providers.openai.effort.map` sets
