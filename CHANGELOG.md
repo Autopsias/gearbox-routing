@@ -6,6 +6,24 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Changed (harness sync of 2026-11-19)
+This sync carries the private harness changes from 2026-11-18 to 2026-11-19.
+The routing policy (`claude/model-routing.yaml`) does not change: it is an
+example file, and its OpenAI ids stay examples.
+
+- **routing-retro:** a proposal you reject is now recorded
+  (`aggregate_outcomes.py --reject <id> --reason "..."`, into
+  `rejections.ndjson`). The cell reads `rejected` until new evidence arrives,
+  and a rejected downgrade also needs its newest 24 sessions at 90% or more
+  first-try passes. See [routing skills](docs/modules/routing-skills.md).
+- **CLAUDE.md:** a decision card now gives each option's outcome on today's
+  data (for a threshold: when it would fire), not only the fault.
+- **Codex runs:** the pin in the adversarial-review command, the memo-loop
+  critique guide and the plan verify-loop reference moves from `gpt-6.1-sol`
+  to `gpt-6.2-sol` (needs codex-cli 0.170.0). `codex_supervised.py` gains
+  `--service-tier fast`; Codex drops a tier the account's plan does not offer,
+  with one warning line.
+
 ### Changed (harness sync of 2026-11-18)
 This sync carries the private harness changes from 2026-11-12 to 2026-11-18.
 The routing policy (`claude/model-routing.yaml`) does not change. Each item

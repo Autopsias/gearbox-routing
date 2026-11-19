@@ -40,6 +40,7 @@ the poll loop. This script is for when nothing is guaranteed to be watching.
 
 Usage:
     codex_supervised.py --prompt-file P --out O [--effort xhigh] [--model M]
+        [--service-tier fast]
         [--cwd DIR] [--idle-timeout 600] [--max-attempts 3] [--total-deadline 5400]
         [--sandbox read-only] [--log L]
 
@@ -176,6 +177,9 @@ def build_flags(a, out):
         flags += ["-m", a.model]
     if a.effort:
         flags += ["-c", f"model_reasoning_effort={a.effort}"]
+    # Codex drops a tier the account's plan does not offer, with one warning line (measured).
+    if getattr(a, "service_tier", None):
+        flags += ["-c", f'service_tier="{a.service_tier}"']
     return flags
 
 
@@ -186,6 +190,7 @@ def main() -> int:
     ap.add_argument("--log", default=None, help="JSONL event log (default: <out>.jsonl)")
     ap.add_argument("--model", default=None)
     ap.add_argument("--effort", default="xhigh")
+    ap.add_argument("--service-tier", default=None, help="Codex speed tier, e.g. fast (default: none sent)")
     ap.add_argument("--cwd", default=os.getcwd())
     ap.add_argument("--sandbox", default="read-only")
     ap.add_argument("--idle-timeout", type=int, default=600)

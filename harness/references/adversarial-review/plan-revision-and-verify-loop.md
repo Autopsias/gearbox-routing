@@ -177,7 +177,7 @@ verify prompt now demands, and branch on it:
    python3 "$HOME/.claude/scripts/codex_supervised.py" \
      --prompt-file /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}.md \
      --out /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}-r{round}.md \
-     --model gpt-6.1-sol --effort medium --idle-timeout 600 --max-attempts 3 --total-deadline 5400
+     --model gpt-6.2-sol --effort medium --service-tier fast --idle-timeout 600 --max-attempts 3 --total-deadline 5400
    ```
    The verdict is the `--out` file (codex's last message, already free of `[codex]` progress lines); the
    JSONL event stream lands beside it at `<out>.jsonl`. The runner prints one JSON status object:
@@ -200,7 +200,7 @@ verify prompt now demands, and branch on it:
 
    **Resume-blocked fallback (REQUIRED -- a blocked resume is NOT a verdict).** The companion refuses `--resume-last` while any earlier Codex task is stuck in `running`/`queued`, emitting a line like `Task <id> is still running. Use /codex:status before continuing it.` -- output that contains no `VERDICT:`. If the raw output matches `still running|/codex:status|No resumable task`, the resume did NOT run: there is no second opinion yet. Do **not** fall through to step 3 and score it `REVISE` -- that silently burns a round and is exactly the bug this fallback fixes. Instead re-review with a FRESH thread for this round:
    ```bash
-   node "$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)" task --fresh --model gpt-6.1-sol --prompt-file /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}.md --effort medium > /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}-r{round}.raw.md 2>&1
+   node "$(ls "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)" task --fresh --model gpt-6.2-sol --prompt-file /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}.md --effort medium > /tmp/adversarial-review-verify-{REVIEW_TIMESTAMP}-r{round}.raw.md 2>&1
    ```
    A fresh thread cannot verify "its own" prior findings, but a genuine adversarial re-read beats a dead resume, and the verify prompt inlines the full revised plan so a fresh thread reviews correctly. Set `VERIFY_MODE = fresh-thread` and record `verifier=fresh-thread (resume blocked)` in this round's review-log entry. For later rounds keep using `--resume-last` (it now resumes the fresh thread); if it blocks again, use `--fresh` again. Only once a genuine review response comes back (resume or fresh) do you go to step 3.
 3. Parse the verdict (`grep -E '^VERDICT:'`) from the genuine review response produced in step 2. If that response has no parseable `VERDICT:` line -> treat as `REVISE` (fail-closed: never fabricate an approval). A resume-guard/CLI error is handled in step 2's fallback and is never itself a `REVISE` verdict.

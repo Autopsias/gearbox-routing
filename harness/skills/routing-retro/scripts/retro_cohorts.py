@@ -22,7 +22,7 @@ from retro_common import (
     ADMISSIBLE_SOURCES, ADOPTION_ATTEMPTS_PER_SUCCESS_MAX, ADOPTION_MIN_N,
     ADOPTION_PASS_MIN, DOWNGRADE_OPEN_ESCALATION_MAX, DOWNGRADE_OPEN_PASS_MIN,
     EXCLUDED_TERMINAL_RESULTS, MIN_N_DOWNGRADE_OPEN, MIN_N_UPGRADE,
-    PROPOSAL_ELIGIBLE_RESULTS, SMOKE_N, UPGRADE_ESCALATION_MIN,
+    PROPOSAL_ELIGIBLE_RESULTS, REJECTION_RECENT_N, SMOKE_N, UPGRADE_ESCALATION_MIN,
     UPGRADE_PASS_MAX, _norm_reasoning,
 )
 
@@ -336,6 +336,8 @@ def aggregate_cell(cohorts, epoch, value_floor=None):
         "attested_pool_n": len(attested_pool),
         "attested_share": attested_share,
         "attested_stats": _stats(attested_pool),
+        # every routing version, newest REJECTION_RECENT_N only: old weak runs age out
+        "recent_stats": _stats(sorted(facts_pool, key=lambda c: c["terminal"].get("ts") or "")[-REJECTION_RECENT_N:]),
     }
 
 
@@ -352,8 +354,21 @@ def _proposal_id(task_class, model, reasoning, backend, kind):
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
 
 
-def cell_proposal(key, agg, epoch, existing_canary_pids, dropped_pids=frozenset()):
+def _still_rejected(pid, n, rejected, min_n, full_cell_ok=True):
+    """An operator rejection holds until a FRESH sample of the size that opened
+    the proposal has accrued since (n >= n_at_rejection + min_n) AND the cell's
+    newest REJECTION_RECENT_N cohorts, attested or not, meet the bar (full_cell_ok).
+    Retro 2026-11-18: f3fb5ac00c14 was rejected because 8 attested cohorts at
+    1.0 disagreed with the full cell (N=24, 0.625)."""
+    rec = rejected.get(pid)
+    return rec is not None and (n < (rec.get("n_at_rejection") or 0) + min_n or not full_cell_ok)
+
+
+def cell_proposal(key, agg, epoch, existing_canary_pids, dropped_pids=frozenset(), rejected=None):
     """(proposal | None, status). status is always set, proposal only on fire.
+
+    rejected: {proposal_id: record} from rejections.ndjson. A rejected proposal
+    reports status "rejected" (no proposal) until new evidence re-opens it.
 
     dropped_pids: downgrade proposal_ids whose canary smoke-FAILED. The id is
     epoch-free, so re-opening one reuses the failed id: new tagged records join
@@ -372,6 +387,8 @@ def cell_proposal(key, agg, epoch, existing_canary_pids, dropped_pids=frozenset(
 
     if n >= MIN_N_UPGRADE and (pass_rate < UPGRADE_PASS_MAX or esc_rate >= UPGRADE_ESCALATION_MIN):
         pid = _proposal_id(task_class, model, reasoning, backend, "upgrade")
+        if _still_rejected(pid, n, rejected or {}, MIN_N_UPGRADE):
+            return None, "rejected"
         return {
             "proposal_id": pid, "kind": "upgrade", "class": task_class, "backend": backend,
             "current_cell": cell_label, "ssot_version": epoch, "n": n,
@@ -387,6 +404,10 @@ def cell_proposal(key, agg, epoch, existing_canary_pids, dropped_pids=frozenset(
         pid = _proposal_id(task_class, model, reasoning, backend, "downgrade")
         if pid in dropped_pids:
             return None, "downgrade-dropped"
+        full_pass = agg["recent_stats"]["first_attempt_pass_rate"] or 0.0
+        if _still_rejected(pid, n, rejected or {}, MIN_N_DOWNGRADE_OPEN,
+                           full_pass >= DOWNGRADE_OPEN_PASS_MIN):
+            return None, "rejected"
         already = pid in existing_canary_pids
         return {
             "proposal_id": pid, "kind": "downgrade", "stage": "smoke-in-progress" if already else "open",

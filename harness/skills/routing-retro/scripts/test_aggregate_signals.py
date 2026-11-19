@@ -441,6 +441,44 @@ def test_smoke_failed_canary_closes_its_downgrade_proposal(tmp_path, ssot_path):
     assert pid not in {p["proposal_id"] for p in out["proposals"]}
 
 
+def test_rejected_proposal_stays_closed_until_fresh_evidence(tmp_path, ssot_path):
+    # Retro 2026-11-18: the operator rejected linchpin downgrade f3fb5ac00c14,
+    # but nothing recorded it, so every retro offered it again. A rejection
+    # holds until a fresh MIN_N sample accrues on top of the N it was judged on.
+    recs = [r for i in range(6) for r in _cohort(f"ok{i}", result="passed")]
+    ledger = tmp_path / "outcomes.ndjson"
+    _write(ledger, recs)
+    pid = ao.run(ledger, ssot_path)["cells"][0]["proposal"]["proposal_id"]
+
+    rec = ao.reject(ledger, ssot_path, pid, "attested subset disagrees with the cell")
+    assert rec["n_at_rejection"] == 6
+    out = ao.run(ledger, ssot_path)
+    assert out["cells"][0]["status"] == "rejected"
+    assert pid not in {p["proposal_id"] for p in out["proposals"]}
+    # only a current proposal can be rejected
+    with __import__("pytest").raises(ValueError):
+        ao.reject(ledger, ssot_path, pid, "again")
+
+    recs += [r for i in range(6) for r in _cohort(f"new{i}", result="passed")]
+    # the attested subset is now big enough, but the FULL cell is weak: 6
+    # unattributed cohorts that needed a rework drop it to 12/18 first-try.
+    weak = [r for i in range(6) for r in _cohort(f"weak{i}", attempts=2, model_ran_source="unknown")]
+    out = _run(tmp_path, ssot_path, recs + weak)
+    assert out["cells"][0]["facts"]["first_attempt_pass_rate"] < 0.9
+    assert out["cells"][0]["status"] == "rejected"
+
+    # the weak runs age out of the newest-24 window: all-time pass stays < 0.9,
+    # but the recent window is clean, so the proposal re-opens.
+    newer = [r for i in range(24) for r in _cohort(f"late{i}", ts="2026-09-01T00:00:00+00:00")]
+    out = _run(tmp_path, ssot_path, recs + weak + newer)
+    assert out["cells"][0]["facts"]["first_attempt_pass_rate"] < 0.9
+    assert out["cells"][0]["status"] == "downgrade-open"
+
+    out = _run(tmp_path, ssot_path, recs)
+    assert out["cells"][0]["status"] == "downgrade-open"
+    assert out["cells"][0]["proposal"]["proposal_id"] == pid
+
+
 def test_adopted_canary_is_not_offered_again(tmp_path, ssot_path):
     # Retro 2026-11-07: an adoption-ready canary that /routing-update already
     # adopted kept appearing in proposals[] as "ADOPT", so the decision card

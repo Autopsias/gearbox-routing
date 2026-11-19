@@ -15,7 +15,8 @@ have run (SSOT `task_classes:`) against what DID run (transcript model mix + swi
 and turn mismatches into ledger entries and calibration proposals.
 
 **Read-only posture.** This skill writes NOTHING except (after explicit per-entry operator
-confirmation) appends to `~/.claude/evals/routing/MISROUTES.md`, plus `aggregate_outcomes.py`'s
+confirmation) appends to `~/.claude/evals/routing/MISROUTES.md` and, for a proposal the
+operator rejects, one `--reject` line in `evals/routing/rejections.ndjson` (step 1b), plus `aggregate_outcomes.py`'s
 own `.last-aggregated` bookkeeping stamp (a byte-offset/mtime marker next to the ledger,
 never the ledger or the SSOT itself — see step 1b). Calibration-level changes (a class
 default, an agent pin, an elasticity) are handed to `/routing-update` — one apply-path, one
@@ -90,6 +91,15 @@ python3 ~/.claude/skills/routing-retro/scripts/aggregate_outcomes.py > /tmp/aggr
 - **A fired proposal is evidence, not an instruction.** Carry its `proposal_id`,
   `first_attempt_pass_rate`/`escalation_rate`, and N into the judgment layer and the report —
   the apply path is always `/routing-update`, never this skill.
+- **A rejected proposal is recorded, never just remembered.** When the operator rejects a
+  fired cell proposal, run
+  `python3 ~/.claude/skills/routing-retro/scripts/aggregate_outcomes.py --reject <proposal_id> --reason "<why>"`.
+  It appends to `rejections.ndjson` beside the ledger (in `~/.claude`; `gearbox harvest`
+  versions the new file). The cell then reads `status: "rejected"` and offers nothing until a
+  fresh sample of the opening size (N at rejection + the class MIN_N) accrues and, for a
+  downgrade, the cell's newest 24 cohorts (`REJECTION_RECENT_N`, any routing version, attested or
+  not) have first-attempt pass >= 0.90. Report a
+  `rejected` cell as "rejected <date>", never as a new proposal.
 
 #### Downgrade canary protocol
 

@@ -51,10 +51,14 @@ def test_retry_without_id_restarts_fresh_instead_of_last():
 
 def test_both_attempt_paths_turn_off_the_ref_plans_write_server():
     from argparse import Namespace
-    a = Namespace(sandbox="read-only", idle_timeout=600, model="gpt-6.1-sol", effort="medium")
+    a = Namespace(sandbox="read-only", idle_timeout=600, model="gpt-6.2-sol", effort="medium",
+                  service_tier="fast")
     flags = cs.build_flags(a, "out.md")
     for n, tid in ((1, None), (2, TID)):
         argv, _ = cs.attempt_argv(n, flags, tid)
         i = argv.index(cs.NO_REF_PLANS_WRITES[1])
         assert argv[i - 1] == "-c" and "enabled=false" in argv[i]
     assert 'sandbox_mode="read-only"' in flags and "model_reasoning_effort=medium" in flags
+    assert 'service_tier="fast"' in flags
+    a.service_tier = None  # default: no tier is sent
+    assert not any("service_tier" in f for f in cs.build_flags(a, "out.md"))
