@@ -597,8 +597,8 @@ def test_a_codex_harness_session_is_announced_its_OWN_rung_not_a_claude_one(tmp_
     assert "escalation_next" in r2, r2
     nxt = r2["escalation_next"]
     # THE PROVIDER WALL, at the announcement: both halves of the pair are OpenAI.
-    assert nxt["authored"]["model"].startswith("gpt-5.6-"), nxt
-    assert nxt["ran"]["model"].startswith("gpt-5.6-"), nxt
+    assert nxt["authored"]["model"].startswith("gpt-"), nxt
+    assert nxt["ran"]["model"].startswith("gpt-"), nxt
     assert "fable" not in fb.read_text()
     assert "ABOVE the authored tier" in fb.read_text()
 

@@ -89,7 +89,7 @@ providers:
     models:
       cheap_fast:        gpt-5.6-luna
       frontier_reasoner: gpt-5.6-terra
-      apex_reasoner:     gpt-5.6-sol
+      apex_reasoner:     gpt-6.2-sol
     task_classes:
       mechanical:     {{ tier: cheap_fast,    effort: light    }}
       standard_build: {{ tier: cheap_fast,    effort: standard }}
@@ -170,7 +170,7 @@ def _begin_codex(plan_dir, sessions, capsys):
 
 
 def _codex_session():
-    return [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    return [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
 
 
 # The canonical DONE closeout payload. Shared: the receipt suite feeds it

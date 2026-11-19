@@ -42,7 +42,7 @@ MAX_BYTES = 2000  # raised 1638->1800, then 1800->2000 (v24).
                   # Each raise had the same cause: the cap saturated and forced real routing
                   # content out. v24 needed three facts the 1800 B cap could not hold at 5 B
                   # of headroom - the Codex-lane precedence pointer (the digest was hardcoding
-                  # gpt-5.6-sol, the third driftable copy the SSOT forbids), the fable alias
+                  # gpt-6.2-sol, the third driftable copy the SSOT forbids), the fable alias
                   # target, and the dated main-session canary. ~+50 tokens/session.
 
 # Target-file (CLAUDE.md) marker scan — ANCHORED to line-start/line-end (a plan session re-harden

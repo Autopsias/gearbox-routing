@@ -106,14 +106,14 @@ states for the Claude-side rung 1 — obtained by a different mechanism because 
 
 **Model pin: `opus` at effort `high`, explicit on every dispatch, never inherited** from
 the invoking session's own model or effort. This mirrors the Claude-side pin
-(`-m gpt-5.6-sol -c model_reasoning_effort=xhigh`) in shape — a fixed, judgment-tier
+(`-m gpt-6.2-sol -c model_reasoning_effort=xhigh`, OD-3) in shape — a fixed, judgment-tier
 critic, not the cheapest available and not the top dead rung either — but is a
 **separate decision**, made here: the design pins the `sol` side only and leaves the
 Claude-side critic model to this port. Grounds, cited rather than assumed: `~/.claude/model-routing.yaml` names
 Opus 5 "the standing-default tier for judgment work" and its escalation ladder stops at
 `high` — `xhigh` showed no gain in routing tests on Opus 5 at a large extra cost, and `max`
 was weak for its cost — so `high` is the ceiling worth paying for, exactly as `xhigh`
-is `gpt-5.6-sol`'s analogous ceiling before its own dead rung. Both `--model` and
+is `gpt-6.2-sol`'s analogous ceiling before its own dead rung. Both `--model` and
 `--effort` are verified-live flags in the version tested (`claude --help`).
 
 Timeout 900s, matching the Claude-side rung 1. A timeout is a **transport error** per
@@ -144,7 +144,7 @@ codex exec \
   - < "$RUN_DIR/critique/critic-prompt.md"
 ```
 
-`gpt-5.6-terra`, not `gpt-5.6-sol` again — the point of rung 3 is a genuinely different
+`gpt-5.6-terra`, not `gpt-6.2-sol` again — the point of rung 3 is a genuinely different
 model, mirroring the Claude-side rung 3's "a different model in the same family." `-s
 read-only` still makes "cannot edit" structural here, same as the Claude-side rung 1;
 unlike the nested-`claude` case there is no allow/deny-list to reason about because the

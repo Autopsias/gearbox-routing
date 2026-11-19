@@ -54,9 +54,9 @@ from codex_review_prompt import _norm, contract, prepared_paths  # noqa: F401
 INDETERMINATE = 2
 
 FAMILY = "codex"
-#: SSOT: agentic/deep-reasoning review rides gpt-5.6-sol. `ultra` is forbidden by
-#: policy and is not reachable from here at any level.
-MODEL = "gpt-5.6-sol"
+#: Review model (SSOT v43): the newest Sol on the Fast tier (see `flags`); the executor apex
+#: tier runs the same model at standard speed (v44). Needs codex-cli 0.170.0. `ultra` is forbidden and not reachable from here.
+MODEL = "gpt-6.2-sol"
 #: Gate level -> Codex reasoning effort. A review is a harder read than the work
 #: it reviews, so every rung sits one above the naive mapping.
 EFFORT = {"low": "medium", "medium": "high", "high": "xhigh"}
@@ -228,7 +228,7 @@ def flags(level, out, schema=None):
     `mcp_servers` program OUTSIDE the read-only sandbox. Both flags stopped both.
     """
     return ["--json", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
-            "-c", 'sandbox_mode="read-only"',
+            "-c", 'sandbox_mode="read-only"', "-c", 'service_tier="fast"',
             "-c", f"model_reasoning_effort={EFFORT.get(level, 'xhigh')}",
             "-m", MODEL,
             "--output-schema", str(schema or SCHEMA),

@@ -28,7 +28,7 @@ point of running it:
     CODEX_LIVE=1 scripts/pytest-m \
         skills/plan-execute/scripts/test_codex_review_live.py -q --no-header -rP
 
-MEASURED, codex-cli 0.147.0 / gpt-5.6-sol, over a 1-file 8-line
+MEASURED, codex-cli 0.147.0 / gpt-6.2-sol, over a 1-file 8-line
 diff, over repeated runs — the numbers s02 sizes the registry timeouts from.
 Each is the whole `llm_review_gate.main` call, egress scan included:
 

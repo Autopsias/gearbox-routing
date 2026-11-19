@@ -76,7 +76,7 @@ def test_openai_climb_ends_at_sol_max_and_never_crosses_providers():
         if cur == rr.EXHAUSTED:
             break
         walk.append(cur)
-    assert walk[-1] == {"model_id": "gpt-5.6-sol", "native_effort": "max"}
+    assert walk[-1] == {"model_id": "gpt-6.2-sol", "native_effort": "max"}
     # PROVIDER WALL: no Anthropic model may appear on an OpenAI walk, or vice versa.
     assert all(r["model_id"].startswith("gpt-") for r in walk)
     cur, awalk = {"model_id": "sonnet", "native_effort": "high"}, []

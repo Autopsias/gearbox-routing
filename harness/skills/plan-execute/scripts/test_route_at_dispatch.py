@@ -87,7 +87,7 @@ V7 = [
 ]
 GOLDEN_V7 = {
     "claude": "9e54791f5bb62035ada6312c7cce900c0a5a96a26d1750aa0221f744481af525",  # re-captured 2026-11-17: notified route arms no Monitor; load Monitor first
-    "codex": "a17f95af7ce8093a3fedec0f08fa020b903ef667b7c93515cff6b3c580f7018f",
+    "codex": "d75cd37669ebff5e0e9e749c3f072fab7c4a0064a1cad0f952539015c45d3783",  # re-captured 2026-11-19: apex model gpt-5.6-sol -> gpt-6.2-sol, no other byte moved
 }
 
 
@@ -265,9 +265,9 @@ def test_the_codex_paths_dispatch_the_frozen_cell_not_the_live_file(
     two-layer wrapper an opted-in class gets under the openai dial. A planted
     freeze that differs from the class default is the known positive."""
     plan_dir = _v8_plan(tmp_path, [_unpinned()])
-    assert _cell("standard_build", "openai", routing) != ("gpt-5.6-sol", "xhigh")
+    assert _cell("standard_build", "openai", routing) != ("gpt-6.2-sol", "xhigh")
     state = rsi.load_state(plan_dir)
-    state[rad.FREEZE_KEY] = {"s01": {"model": "gpt-5.6-sol", "reasoning": "xhigh",
+    state[rad.FREEZE_KEY] = {"s01": {"model": "gpt-6.2-sol", "reasoning": "xhigh",
                                      "provider": "openai", "generation": 0,
                                      "routing_version": 1, "task_class": "standard_build"}}
     rsi.save_state(plan_dir, state)
@@ -276,7 +276,7 @@ def test_the_codex_paths_dispatch_the_frozen_cell_not_the_live_file(
         monkeypatch.setattr(run, "_load_routing", lambda: ("openai", real()[1]))
         monkeypatch.setattr(run, "_executor_for", lambda _t: frozenset({"standard_build"}))
     by_id, _ = _begin(plan_dir, ["s01"], capsys, harness="codex" if path == "harness" else "claude")
-    assert (by_id["s01"]["codex_model"], by_id["s01"]["codex_effort"]) == ("gpt-5.6-sol", "xhigh")
+    assert (by_id["s01"]["codex_model"], by_id["s01"]["codex_effort"]) == ("gpt-6.2-sol", "xhigh")
     run.cmd_release(plan_dir)
 
 

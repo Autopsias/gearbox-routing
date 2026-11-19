@@ -198,6 +198,15 @@ def test_recorded_marker_gives_a_ranged_scan_and_a_completed_scan_moves_it(tmp_p
     assert f"--log-opts {first}..{_head(repo)}" in (tmp_path / "scanner.sh.argv").read_text()
     assert statuses(repo)["sec.secrets-history"] == "pass"
     assert _hist(repo)[-1]["secrets_scanned"] == _head(repo) != first
+    # the clone's own record, not a committed history line, sets where the next scan starts
+    two = _head(repo)
+    assert secrets_scan.local_marker_file(repo).read_text().strip() == two
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "three", "--allow-empty"], check=True)
+    with (hf / "history.jsonl").open("a") as f:      # a forged line that names the newest commit
+        f.write(json.dumps({"ts": "2026-02-01", "commit": "x", "secrets_scanned": _head(repo)}) + "\n")
+    _scan_and_render(repo, monkeypatch, scanner)
+    assert f"--log-opts {two}..{_head(repo)}" in (tmp_path / "scanner.sh.argv").read_text()
 
 
 def test_marker_that_is_not_an_ancestor_means_a_full_scan(tmp_path, monkeypatch):

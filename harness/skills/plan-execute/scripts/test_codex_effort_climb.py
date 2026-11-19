@@ -97,7 +97,7 @@ def test_terra_enters_sol_at_xhigh_never_at_sols_first_rung(tmp_path, capsys, ss
     assert (base["codex_model"], base["codex_effort"]) == ("gpt-5.6-terra", "max")
 
     m = _dispatch(plan_dir, capsys, arm=2)
-    assert (m["codex_model"], m["codex_effort"]) == ("gpt-5.6-sol", "xhigh")
+    assert (m["codex_model"], m["codex_effort"]) == ("gpt-6.2-sol", "xhigh")
     assert "model_reasoning_effort=high " not in m["codex_cmd"] + " "
 
 
@@ -106,20 +106,20 @@ def test_the_codex_climb_stops_at_sol_max_and_never_emits_ultra(tmp_path, capsys
     exists on sol/terra and is operator-opt-in only, so no automatic rung reaches
     it — and further failures buy nothing above the ceiling."""
     ssot("anthropic")
-    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-5.6-sol", reasoning="high")])
+    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-6.2-sol", reasoning="high")])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
 
     base = _dispatch(plan_dir, capsys)
-    assert (base["codex_model"], base["codex_effort"]) == ("gpt-5.6-sol", "xhigh")
+    assert (base["codex_model"], base["codex_effort"]) == ("gpt-6.2-sol", "xhigh")
 
     one = _dispatch(plan_dir, capsys, arm=2)
-    assert (one["codex_model"], one["codex_effort"]) == ("gpt-5.6-sol", "max")
+    assert (one["codex_model"], one["codex_effort"]) == ("gpt-6.2-sol", "max")
     assert one["escalated_from"]["rung"] == 1
 
     # ...and it STAYS there however many more times the same cause fails.
     for streak in (3, 4, 5):
         top = _dispatch(plan_dir, capsys, arm=streak)
-        assert (top["codex_model"], top["codex_effort"]) == ("gpt-5.6-sol", "max")
+        assert (top["codex_model"], top["codex_effort"]) == ("gpt-6.2-sol", "max")
         assert "ultra" not in top["codex_cmd"]
 
 
@@ -132,7 +132,7 @@ def test_an_escalated_codex_dispatch_moves_ONLY_the_model_and_effort_flags(
     ssot("anthropic")
     for pin, kw, moved in (
         ("gpt-5.6-luna", {}, {"gpt-5.6-luna"}),
-        ("gpt-5.6-sol", {"reasoning": "high"}, {"model_reasoning_effort=xhigh"}),
+        ("gpt-6.2-sol", {"reasoning": "high"}, {"model_reasoning_effort=xhigh"}),
     ):
         root = tmp_path / f"case-{pin[-4:]}{len(kw)}"
         root.mkdir()
@@ -218,17 +218,17 @@ def test_a_refused_escalated_codex_rung_falls_back_to_the_PREVIOUS_rung(
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
     _arm(plan_dir, "s01", consecutive=3, reworks=3)
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
-    assert by_id["s01"]["codex_model"] == "gpt-5.6-sol"       # 2 rungs up
+    assert by_id["s01"]["codex_model"] == "gpt-6.2-sol"       # 2 rungs up
     assert by_id["s01"]["codex_effort"] == "xhigh"
     run.cmd_release(plan_dir)
 
-    run.cmd_record_refusal(plan_dir, "s01", "gpt-5.6-sol", "xhigh",
+    run.cmd_record_refusal(plan_dir, "s01", "gpt-6.2-sol", "xhigh",
                            "codex exec: model not available", "wrapper")
     capsys.readouterr()
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
     m = by_id["s01"]
     assert (m["codex_model"], m["codex_effort"]) == ("gpt-5.6-terra", "max")
-    assert "gpt-5.6-sol" not in m["codex_cmd"]
+    assert "gpt-6.2-sol" not in m["codex_cmd"]
     run.cmd_release(plan_dir)
 
     # PLANT: a rung that is not on THIS session's openai ladder is refused loudly,
@@ -301,14 +301,14 @@ def test_an_escalated_receipt_attributes_the_raise_to_the_CLIMB_not_the_task_cla
     task_class row that prescribes nothing of the sort — and a climb that changed
     the MODEL read as a passthrough of a model the session never pinned."""
     ssot("anthropic")
-    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-5.6-sol", reasoning="high")])
+    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-6.2-sol", reasoning="high")])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
 
     # CONTROL — the un-escalated receipt, unchanged: sol@thorough has its own cell.
     by_id, _, err = _begin_codex(plan_dir, ["s01"], capsys)
     ctl = by_id["s01"]
     assert ctl["effort_fidelity"] == "exact"
-    assert ctl["translation"]["base"] == {"model": "gpt-5.6-sol", "effort": "xhigh"}
+    assert ctl["translation"]["base"] == {"model": "gpt-6.2-sol", "effort": "xhigh"}
     assert ctl["translation"]["escalated_to"] is None
     assert "ESCALATION climb" not in err
     run.cmd_release(plan_dir)
@@ -318,13 +318,13 @@ def test_an_escalated_receipt_attributes_the_raise_to_the_CLIMB_not_the_task_cla
     capsys.readouterr()
     by_id, _, err = _begin_codex(plan_dir, ["s01"], capsys)
     m = by_id["s01"]
-    assert (m["codex_model"], m["codex_effort"]) == ("gpt-5.6-sol", "max")
+    assert (m["codex_model"], m["codex_effort"]) == ("gpt-6.2-sol", "max")
 
     tr = m["translation"]
     assert m["effort_fidelity"] == "raised_by_escalation"
     assert tr["effort_fidelity"] == "raised_by_escalation"
-    assert tr["base"] == {"model": "gpt-5.6-sol", "effort": "xhigh"}
-    assert tr["escalated_to"] == {"model": "gpt-5.6-sol", "effort": "max", "rung": 1}
+    assert tr["base"] == {"model": "gpt-6.2-sol", "effort": "xhigh"}
+    assert tr["escalated_to"] == {"model": "gpt-6.2-sol", "effort": "max", "rung": 1}
     # The row is printed as the SSOT writes it, and the raise is named as the CLIMB.
     assert "effort.map.apex_reasoner.thorough = xhigh" in tr["receipt"]
     assert "ESCALATION climb (rung 1" in tr["receipt"]
@@ -336,9 +336,9 @@ def test_an_escalated_receipt_attributes_the_raise_to_the_CLIMB_not_the_task_cla
     events = [json.loads(x) for x in (plan_dir / "run.ndjson").read_text().splitlines()]
     ev = [e for e in events if e["event"] == "codex_translation"][-1]
     assert ev["effort_fidelity"] == "raised_by_escalation"
-    assert ev["base"] == {"model": "gpt-5.6-sol", "effort": "xhigh"}
-    assert ev["escalated_to"] == {"model": "gpt-5.6-sol", "effort": "max", "rung": 1}
-    assert (ev["codex_model"], ev["codex_effort"]) == ("gpt-5.6-sol", "max")
+    assert ev["base"] == {"model": "gpt-6.2-sol", "effort": "xhigh"}
+    assert ev["escalated_to"] == {"model": "gpt-6.2-sol", "effort": "max", "rung": 1}
+    assert (ev["codex_model"], ev["codex_effort"]) == ("gpt-6.2-sol", "max")
     run.cmd_release(plan_dir)
     ab.apply_mutation(plan_dir / "PLAN.html", "s01", status="TODO", note=None)
 
@@ -364,7 +364,7 @@ def test_a_v5_manifest_never_escalates_a_CODEX_member(tmp_path, capsys, ssot):
     its codex members byte-for-byte as it did — including the fallback rung, which
     an escalated member suppresses."""
     ssot("anthropic")
-    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-5.6-sol", reasoning="high")])
+    plan_dir = make_plan(tmp_path, [_codex_sess("gpt-6.2-sol", reasoning="high")])
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA - 1)
     frozen = _dispatch(plan_dir, capsys)
     armed = _dispatch(plan_dir, capsys, arm=3)
@@ -375,7 +375,7 @@ def test_a_v5_manifest_never_escalates_a_CODEX_member(tmp_path, capsys, ssot):
 
     # ALLOW CONTROL: the SAME state on a v6 plan climbs.
     _stamp(plan_dir, esca.ESCALATION_MIN_SCHEMA)
-    assert _dispatch(plan_dir, capsys, arm=3)["codex_model"] == "gpt-5.6-sol"
+    assert _dispatch(plan_dir, capsys, arm=3)["codex_model"] == "gpt-6.2-sol"
     assert _dispatch(plan_dir, capsys, arm=3)["codex_effort"] == "max"
 
 
@@ -461,7 +461,7 @@ def test_no_derivable_codex_dispatch_ever_names_a_retired_model(monkeypatch):
     # retired model, or it is checking nothing.
     assert "gpt-5.5" in codex_command._codex_cmd("gpt-5.5", "xhigh", "/p/s01.prompt.md",
                                        "/tmp/lm.txt", workdir="/repo")
-    assert seen_models == {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}
+    assert seen_models == {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-6.2-sol"}
 
 
 def test_a_ladder_that_revisits_one_cell_FAILS_instead_of_conflating_rungs():
@@ -495,8 +495,8 @@ def test_a_ladder_that_revisits_one_cell_FAILS_instead_of_conflating_rungs():
     # ALLOW CONTROL: the same walk with the duplicate removed resolves normally.
     class _Distinct(_Conflated):
         rungs = [{"model_id": "gpt-5.6-terra", "native_effort": "max"},
-                 {"model_id": "gpt-5.6-sol", "native_effort": "xhigh"}]
+                 {"model_id": "gpt-6.2-sol", "native_effort": "xhigh"}]
 
     rungs, hit_top = esca._ladder(_Distinct(), "standard_build", "openai", authored)
-    assert [r["model_id"] for r in rungs] == ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]
+    assert [r["model_id"] for r in rungs] == ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-6.2-sol"]
     assert hit_top

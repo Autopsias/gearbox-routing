@@ -186,10 +186,10 @@ def test_the_floor_skips_a_cross_provider_override(monkeypatch):
     # Codex linchpin default is sol@max; sol@high would climb to it, but on the Claude tree
     # it is cross-provider -> allowed. Same-provider below-floor is still refused.
     monkeypatch.setenv("PLAN_EXECUTE_ROUTING_PROVIDER", "anthropic")
-    bp.validate_spec(_spec(s02={"model": "gpt-5.6-sol", "reasoning": "high"}))
+    bp.validate_spec(_spec(s02={"model": "gpt-6.2-sol", "reasoning": "high"}))
     monkeypatch.setenv("PLAN_EXECUTE_ROUTING_PROVIDER", "openai")
-    _refused(_spec(s02={"model": "gpt-5.6-sol", "reasoning": "high"}), "on openai")
-    bp.validate_spec(_spec(s02={"model": "gpt-5.6-sol", "reasoning": "max"}))
+    _refused(_spec(s02={"model": "gpt-6.2-sol", "reasoning": "high"}), "on openai")
+    bp.validate_spec(_spec(s02={"model": "gpt-6.2-sol", "reasoning": "max"}))
 
 
 @needs_source_repo
@@ -198,7 +198,7 @@ def test_the_floor_refuses_the_default_model_at_a_lower_effort(monkeypatch):
     # sol@low and sol@medium through under a sol@max linchpin default.
     monkeypatch.setenv("PLAN_EXECUTE_ROUTING_PROVIDER", "openai")
     for effort in ("low", "medium"):
-        _refused(_spec(s02={"model": "gpt-5.6-sol", "reasoning": effort}), "BELOW")
+        _refused(_spec(s02={"model": "gpt-6.2-sol", "reasoning": effort}), "BELOW")
 
 
 def test_every_item_declares_touches_at_v8():

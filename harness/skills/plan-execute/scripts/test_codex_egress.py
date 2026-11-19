@@ -425,7 +425,7 @@ def test_commented_or_out_of_block_opt_in_never_authorizes(tmp_path, capsys, sso
     (egress_root / ".env").write_text("K=1")
     commented = "      # " + _opt_in_line(str(egress_root)).strip()
     ssot("anthropic", opt_ins=commented)
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
     plan_dir = make_plan(tmp_path, sessions)
     with pytest.raises(SystemExit):
         run.cmd_begin(plan_dir, ["s01"])
@@ -448,7 +448,7 @@ def test_codex_cmd_pins_scanned_root(tmp_path, capsys, ssot, egress_root):
     # The scanned egress root is bound into the command (`cd <root> && ...`) so
     # the scanned tree and the shipped tree are the same path by construction.
     ssot("anthropic")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
     plan_dir = make_plan(tmp_path, sessions)
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
     assert by_id["s01"]["codex_cmd"].startswith(f"cd {egress_root} && ")
@@ -457,7 +457,7 @@ def test_codex_cmd_pins_scanned_root(tmp_path, capsys, ssot, egress_root):
 
 def test_egress_opt_in_allows_and_expiry_is_enforced(tmp_path, capsys, ssot, egress_root):
     (egress_root / ".env").write_text("KEY=1")
-    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-5.6-sol"}]
+    sessions = [{"id": "s01", "title": "S1", "items": ["i1"], "model": "gpt-6.2-sol"}]
 
     # Unexpired per-repo opt-in → dispatches.
     ssot("anthropic", opt_ins=_opt_in_line(str(egress_root)))

@@ -738,7 +738,7 @@ def test_begin_stamps_the_field_on_every_dispatch_started(tmp_path, monkeypatch)
     ("agentic_build", "claude", "opus", "high", "pinned_override"),     # the pre-v40 default
     ("standard_build", "claude", "sonnet", "low", "default_resolved"),       # v38: workhorse.light -> low
     ("mechanical", "claude", "haiku", "low", "default_resolved"),       # cheap_fast.light -> low
-    ("agentic_build", "codex", "gpt-5.6-sol", "xhigh", "default_resolved"),
+    ("agentic_build", "codex", "gpt-6.2-sol", "xhigh", "default_resolved"),
     ("mechanical", "claude", "sonnet", "max", "pinned_override"),      # zai cell, claude lane
     ("deep_reasoning", "claude", "opus", "low", "pinned_override"),    # canary rung
 ])

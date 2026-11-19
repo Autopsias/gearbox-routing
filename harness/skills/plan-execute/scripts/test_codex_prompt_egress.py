@@ -90,7 +90,7 @@ def test_begin_blocks_codex_session_whose_digest_holds_a_secret(tmp_path, capsys
     and the plan halts, the same way the tree scan refuses it."""
     ssot("anthropic")
     sessions = [{"id": "s02", "title": "S2", "items": ["w-02"],
-                 "model": "gpt-5.6-sol", "reasoning": "high", "prompt": "do s02"}]
+                 "model": "gpt-6.2-sol", "reasoning": "high", "prompt": "do s02"}]
     plan_dir = make_plan(tmp_path, sessions)
     _plant_answer(plan_dir, f"Leaked {FAKE_PAT}.")
     with pytest.raises(SystemExit) as exc:

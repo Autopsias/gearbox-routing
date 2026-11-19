@@ -248,8 +248,8 @@ def _parse_provider_task_classes(provider_block: str) -> dict:
                class (`{**neutral, **provider}` — see `_load`).
 
     WHY THE AXIS SPLITS: the two line-ups are not parallel. OpenAI's TOP tier
-    is its EVERYDAY judgement default, while Anthropic's TOP tier (fable) is
-    escalation-apex-only — one
+    (apex_reasoner = gpt-6.2-sol) is its EVERYDAY judgement default, while
+    Anthropic's TOP tier (apex_reasoner = fable) is escalation-apex-only — one
     shared tier per task class cannot be right for both. Splitting the axis also
     lets two classes that share a neutral cell (agentic_build / linchpin) take
     different intents under one provider.

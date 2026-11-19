@@ -134,17 +134,17 @@ of it. A second copy is how the renderer and the gate drift apart.
 # `/plan-execute --harness codex` instead of the Cowork picker. Both families
 # validate identically; only the dashboard chip color/CSS class differs (every
 # Codex token shares one "codex" class — see _model_css_class below, since a raw
-# token like "gpt-5.6-sol" contains dots that are invalid in a bare CSS class
+# token like "gpt-6.2-sol" contains dots that are invalid in a bare CSS class
 # selector).
 CLAUDE_MODEL_TOKENS = ("fable", "opus", "sonnet", "haiku")
-CODEX_MODEL_TOKENS = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
+CODEX_MODEL_TOKENS = ("gpt-6.2-sol", "gpt-5.6-terra", "gpt-5.6-luna")
 # RETIRED Codex tokens — NOT dispatchable (a spec pinning one is refused at build,
 # see validate_spec) but still RENDERABLE: an already-built plan pinned to a retired
 # model can be re-rendered at any time, and its chip needs a dot-free CSS class
 # exactly as much as a live one. Dropping a token from CODEX_MODEL_TOKENS without
 # landing it here emits `class="chip model-gpt-5.5"` — a class the dashboard CSS
 # cannot select, which is the precise breakage the mapping exists to prevent.
-RETIRED_CODEX_MODEL_TOKENS = ("gpt-5.5",)
+RETIRED_CODEX_MODEL_TOKENS = ("gpt-5.5", "gpt-5.6-sol")
 
 
 def _is_codex_model(model_low):
@@ -1683,7 +1683,7 @@ def _validate_session_model(s, model_low):
     """The session's model token must name a Claude model or a declared Codex one."""
     print(
         f"WARNING: Session {s['id']}.model {s['model']!r} will not normalize to a "
-        "dispatchable model token (fable/opus/sonnet/haiku/gpt-5.6-sol/"
+        "dispatchable model token (fable/opus/sonnet/haiku/gpt-6.2-sol/"
         "gpt-5.6-terra/gpt-5.6-luna) — /plan-execute will "
         "omit `model` and the subagent inherits the orchestrator's model.",
         file=sys.stderr,

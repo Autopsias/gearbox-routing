@@ -179,7 +179,7 @@ def test_codex_dispatch_really_cds_into_the_plan_worktree(iso):
     body = Path(effective).read_text()
     assert str(tree) in body and BRANCH in body and "# session work" in body
 
-    cmd = cc._codex_cmd("gpt-5.6-sol", "high", effective, str(runtime_dir / "lm.txt"),
+    cmd = cc._codex_cmd("gpt-6.2-sol", "high", effective, str(runtime_dir / "lm.txt"),
                         workdir=str(tree))
     assert cmd.startswith(f"cd {shlex.quote(str(tree))} && ")
 

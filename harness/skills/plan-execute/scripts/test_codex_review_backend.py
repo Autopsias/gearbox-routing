@@ -182,7 +182,7 @@ def test_a_planted_defect_fails_the_gate_and_names_the_file(tmp_path, monkeypatc
     assert "--output-schema" in argv and "--skip-git-repo-check" in argv, argv
     # The reviewed tree must not configure its own reviewer (see `crb.flags`).
     assert "--ignore-user-config" in argv and "--ignore-rules" in argv, argv
-    assert crb.MODEL in argv, argv
+    assert crb.MODEL in argv and 'service_tier="fast"' in argv, argv
     # level medium -> effort high (a review reads harder than the work it reviews)
     assert f"model_reasoning_effort={crb.EFFORT['medium']}" in argv, argv
     schema = json.loads(open(argv[argv.index("--output-schema") + 1]).read())
@@ -784,7 +784,7 @@ def test_the_claude_path_is_unchanged_by_the_flag(tmp_path, monkeypatch):
 
 def test_the_effort_ladder_is_the_SSOT_one():
     assert crb.EFFORT == {"low": "medium", "medium": "high", "high": "xhigh"}
-    assert crb.MODEL == "gpt-5.6-sol" and "ultra" not in crb.EFFORT.values()
+    assert crb.MODEL == "gpt-6.2-sol" and "ultra" not in crb.EFFORT.values()
 
 
 def test_the_prompt_carries_the_prepared_paths_verbatim():

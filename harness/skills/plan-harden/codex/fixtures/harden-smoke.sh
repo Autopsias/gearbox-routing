@@ -11,12 +11,12 @@
 # BOTH sessions/s02.prompt.md and spec.json, (4) the rebuild-to-temp-dir diff
 # is byte-identical, (5) the whole transcript audits clean of Claude model ids.
 #
-# Model/effort: tries the recommended production rung (gpt-5.6-sol/xhigh)
+# Model/effort: tries the recommended production rung (gpt-6.2-sol/xhigh)
 # first, then falls back once to gpt-5.6-luna/medium with a tighter review
 # scope — the same one-shot-fallback discipline run.py's session dispatch
-# already uses (dual-harness-contract.md § 3.3). `gpt-5.6-sol` can return
-# "Selected model is at capacity", so the fallback path is a real branch,
-# not a theoretical one.
+# already uses (dual-harness-contract.md § 3.3). `gpt-6.2-sol` returned
+# "Selected model is at capacity" on this box at build time; the fallback
+# path is exercised routinely here, not a theoretical branch.
 set -u
 HERE=${0:A:h}                                          # skills/plan-harden/codex/fixtures
 ROOT=${HERE:h:h:h:h}                                    # harness root (holds skills/, scripts/, model-routing.yaml)
@@ -73,7 +73,7 @@ EOF
   print -r -- "exit code: $?"
 }
 
-dispatch_review gpt-5.6-sol xhigh ""
+dispatch_review gpt-6.2-sol xhigh ""
 if [[ ! -s $FINDINGS ]]; then
   print -r -- "  primary rung produced no output (see $STDERR tail below) — one fallback retry, tighter scope"
   tail -5 $STDERR

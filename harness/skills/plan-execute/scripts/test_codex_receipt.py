@@ -228,7 +228,7 @@ def test_claude_harness_closeouts_need_no_receipt(tmp_path, capsys, ssot, egress
     # transcript, never as a file path.
     ssot("anthropic")
     plan_dir = make_plan(tmp_path, [{"id": "s01", "title": "S1", "items": ["i1"],
-                                     "model": "gpt-5.6-sol"}])
+                                     "model": "gpt-6.2-sol"}])
     by_id, _ = _begin(plan_dir, ["s01"], capsys)
     assert by_id["s01"]["backend"] == "codex"          # Codex model, Claude harness
     relayed = tmp_path / "closeout-s01.txt"            # what the orchestrator writes
