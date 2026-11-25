@@ -98,6 +98,7 @@ matches this repo.
 [The trust layer →](docs/modules/trust-layer.md)
 
 ### Repo health and quality
+- `/repo-review` (installed by `install.sh` for Claude, Codex and Antigravity) gives any repo a candid Good / Bad / Ugly review across architecture, ways of working, agentic surfaces (`AGENTS.md`, skills, hooks), evals, and modern frontier LLM fit, read-only.
 - `/repo-health` scores a repo from 0 to 100 on a dashboard, splits findings into BLOCKING and ADVISORY, and keeps the history.
 - `/code-quality` holds file-size, function-length and complexity limits as a ratchet that only lets debt go down.
 - Test and CI fixers sort failures and send specialist subagents; `/ship-tail` takes a branch to a pull request with green CI, and never merges.

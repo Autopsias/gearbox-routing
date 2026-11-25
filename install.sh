@@ -192,6 +192,7 @@ declare -a COPY_PAIRS=(
   "claude/model-routing.digest.md:claude/model-routing.digest.md"
   "claude/skills/routing-update:skills/routing-update"
   "claude/skills/routing-retro:skills/routing-retro"
+  "claude/skills/repo-review:skills/repo-review"
   "claude/scripts/verify-routing.sh:claude/scripts/verify-routing.sh"
   "claude/scripts/render-routing-digest.py:claude/scripts/render-routing-digest.py"
   "claude/scripts/resolve_route.py:claude/scripts/resolve_route.py"

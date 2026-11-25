@@ -22,7 +22,7 @@ def test_skills_land_where_claude_code_loads_them(tmp_path):
     home = tmp_path / "home"
     first = _install(home)
     assert first.returncode == 0, first.stdout + first.stderr
-    for name in ("routing-update", "routing-retro"):
+    for name in ("routing-update", "routing-retro", "repo-review"):
         assert (home / "skills" / name / "SKILL.md").is_file(), name
     assert (home / "claude" / "model-routing.yaml").is_file()
 
@@ -146,7 +146,7 @@ def test_codex_and_antigravity_platforms_install_agents_md_and_default_providers
         text = agents_md.read_text()
         assert "BEGIN ROUTING" in text
         assert f"active_provider={expected_provider}" in text
-        for name in ("routing-update", "routing-retro"):
+        for name in ("routing-update", "routing-retro", "repo-review"):
             assert (home / "skills" / name / "SKILL.md").is_file(), name
 
         second = _run_raw("--platform", platform, "--target-home", str(home), "--accept-example-profile")
