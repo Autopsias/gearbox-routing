@@ -13,12 +13,12 @@ modules read the routing policy; their cards say so.
 
 ## Before you start
 
-- **Claude Code**, or another agent that reads a `CLAUDE.md` file.
+- **Claude Code**, **OpenAI Codex**, **Google Antigravity**, or another agent that reads `CLAUDE.md` or `AGENTS.md`.
 - **bash**, **git** and **Python 3**. The scripts use only the Python standard
   library. CI tests them on Python 3.12.
-- **A backup of the parts of `~/.claude` you will change.** `~/.claude` also
-  holds your session history, which can be large, so back up only the
-  configuration folders:
+- **A backup of the parts of your agent home you will change.** For Claude Code,
+  `~/.claude` also holds your session history, which can be large, so back up
+  only the configuration folders:
 
   ```bash
   mkdir -p ~/claude-backup
@@ -31,21 +31,26 @@ modules read the routing policy; their cards say so.
 
 ### Step 1: try it in a scratch folder
 
-The installer never touches your real `~/.claude` unless you ask for it twice.
-Run it into a new folder first. With no `--claude-home`, it makes a new
+The installer never touches your real `~/.claude`, `~/.codex`, or
+`~/.gemini/config` unless you ask for it twice. Run it into a new folder first.
+With no `--target-home` (or `--claude-home`), it makes a new
 `./gearbox-install-<timestamp>` folder:
 
 ```bash
 git clone https://github.com/Autopsias/gearbox-routing.git
 cd gearbox-routing
 ./install.sh --accept-example-profile
+# Or for Codex / Antigravity:
+./install.sh --platform codex --accept-example-profile
+./install.sh --platform antigravity --accept-example-profile
 ```
 
 The last lines of the output tell you if it worked:
 
 ```
 install.sh summary
-  target home:     /path/to/gearbox-routing/gearbox-install-20261030082043
+  platform:         claude (CLAUDE.md)
+  target home:      /path/to/gearbox-routing/gearbox-install-20261030082043
   active_provider:  anthropic
   files copied:     30
   files backed up:  0
@@ -57,17 +62,18 @@ drift between the policy file and the files made from it.
 
 | Flag | Why you need it |
 |---|---|
-| `--claude-home DIR` | The target folder. Without it, the installer makes a new `./gearbox-install-<timestamp>` folder. |
+| `--platform NAME` | Target agent platform: `claude` (default, writes `CLAUDE.md`, defaults `--provider` to `anthropic`), `codex` (writes `AGENTS.md`, defaults `--provider` to `openai`), or `antigravity` (writes `AGENTS.md`, defaults `--provider` to `gemini`). |
+| `--target-home DIR` | The target folder (`--claude-home DIR` is kept as an alias). Without it, the installer makes a new `./gearbox-install-<timestamp>` folder. |
 | `--accept-example-profile` | The shipped model ids, prices and effort maps are dated **examples**, not a researched policy. This flag says you know that. Use `--profile FILE` instead when you have your own policy file. |
-| `--provider NAME` | Which shipped profile becomes active: `anthropic` (default), `openai`, `gemini` or `zai`. See [`PROVIDERS.md`](PROVIDERS.md). |
+| `--provider NAME` | Which shipped profile becomes active: `anthropic`, `openai`, `gemini` or `zai` (overrides the `--platform` default). See [`PROVIDERS.md`](PROVIDERS.md). |
 | `--force` | Lets the installer replace a target policy file it would otherwise keep: one with a higher version, or the same version without `EXAMPLE` markers. The old file is still backed up. |
-| `--i-understand-this-mutates-live-claude` | Needed in addition to `--claude-home "$HOME/.claude"` before the installer writes to your real Claude home. |
+| `--i-understand-this-mutates-live-home` | Needed in addition to `--target-home` before the installer writes to a real live agent home (`~/.claude`, `~/.codex`, `~/.gemini`, or `~/.gemini/config`). Legacy alias: `--i-understand-this-mutates-live-claude`. |
 | `--uninstall` | Restores the files the installer backed up and removes the routing block. See [Remove](#remove). |
 
 Exit codes: `0` installed and the check passed · `1` installed, but the check
 found drift · `2` refused before it wrote anything (bad flag, missing opt-in,
-version guard, a missing source file, or `ROUTING` markers in `CLAUDE.md` that
-the renderer refuses — it tries the render on a scratch copy first). A tool
+version guard, a missing source file, or `ROUTING` markers in the rules file
+that the renderer refuses — it tries the render on a scratch copy first). A tool
 failure after the first write also exits `2`; the ledger below then lists what
 was already written, and `--uninstall` reverts it.
 
@@ -78,43 +84,57 @@ Every backup the installer makes and every file it creates is listed in
 
 ```
 <target>/claude/model-routing.yaml        the policy file (--provider sets active_provider:)
-<target>/claude/model-routing.digest.md   the template for the CLAUDE.md routing block
+<target>/claude/model-routing.digest.md   the template for the routing block
 <target>/claude/scripts/                  verify-routing.sh (drift check), resolve_route.py (resolver),
-                                          render-routing-digest.py (writes the CLAUDE.md block)
+                                          render-routing-digest.py (writes the routing block)
 <target>/skills/routing-update/           /routing-update: researches a model change and updates the policy
 <target>/skills/routing-retro/            /routing-retro: reads past sessions and reports misroutes (read-only)
 <target>/claude/evals/routing/            runbook and an empty misroute ledger (MISROUTES.md)
 <target>/claude/fixtures/                 test fixtures for the check and the resolver
-<target>/CLAUDE.md                        gets a <!-- BEGIN ROUTING --> … <!-- END ROUTING --> block
+<target>/CLAUDE.md or <target>/AGENTS.md  gets a <!-- BEGIN ROUTING --> … <!-- END ROUTING --> block
 ```
 
 The installer backs up every existing file that it changes to
 `<file>.bak-<timestamp>`. A second run with the same flags changes nothing.
 
-The two skills land in `<target>/skills/`, which is where Claude Code loads
-personal skills when the target is `~/.claude`
-([Claude Code docs: skills](https://code.claude.com/docs/en/skills)). After an
-install into `~/.claude`, start a new session and `/routing-retro` and
-`/routing-update` are available. Run `/routing-update` in your clone of this
-repo: it edits the policy and the changelog there, and you then run `install.sh`
-again. See the [routing skills](modules/routing-skills.md) card.
+The two skills land in `<target>/skills/`:
 
-### Step 3: install into your Claude home
+- **Claude Code** (`~/.claude/skills/`): loaded automatically as personal skills ([Claude Code docs: skills](https://code.claude.com/docs/en/skills)).
+- **Google Antigravity** (`~/.gemini/config/skills/`): loaded automatically in both Antigravity App and Antigravity CLI, alongside `~/.gemini/config/AGENTS.md`.
+- **OpenAI Codex** (`~/.codex/skills/`): loaded by Codex for backward compatibility alongside `~/.codex/AGENTS.md` (symlink into `~/.agents/skills/` if you prefer Codex's shared user skills path).
 
-When the scratch install looks right, run the same command against your real
-home. It needs both opt-in flags:
+After an install, start a new session and `/routing-retro` and `/routing-update`
+are available. Run `/routing-update` in your clone of this repo: it edits the
+policy and the changelog there, and you then run `install.sh` again. See the
+[routing skills](modules/routing-skills.md) card.
+
+### Step 3: install into your live agent home
+
+When the scratch install looks right, run the matching command for your
+platform. Every live home needs both `--target-home` and the opt-in flag:
 
 ```bash
-./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude \
-  --accept-example-profile
+# Claude Code (~/.claude/CLAUDE.md + ~/.claude/skills/)
+./install.sh --platform claude --target-home "$HOME/.claude" \
+  --i-understand-this-mutates-live-home --accept-example-profile
+
+# OpenAI Codex (~/.codex/AGENTS.md + ~/.codex/skills/)
+./install.sh --platform codex --target-home "$HOME/.codex" \
+  --i-understand-this-mutates-live-home --accept-example-profile
+
+# Google Antigravity (~/.gemini/config/AGENTS.md + ~/.gemini/config/skills/)
+./install.sh --platform antigravity --target-home "$HOME/.gemini/config" \
+  --i-understand-this-mutates-live-home --accept-example-profile
 ```
 
-Your existing `~/.claude/CLAUDE.md` keeps its content. The installer adds the
-routing block, or replaces an existing one in place, and backs up the old file.
+Your existing `CLAUDE.md` or `AGENTS.md` keeps its content. The installer adds
+the routing block, or replaces an existing one in place, and backs up the old
+file.
 
 ### Check it works later
 
-Run these from the install target (`~/.claude` or your scratch folder):
+Run these from the install target (`~/.claude`, `~/.codex`, `~/.gemini/config`,
+or your scratch folder):
 
 ```bash
 CLAUDE_HOME="$PWD" SSOT="$PWD/claude/model-routing.yaml" bash claude/scripts/verify-routing.sh --full
@@ -165,14 +185,16 @@ first case.
 ### Remove
 
 ```bash
-./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude --uninstall
+# Claude Code (pass --target-home "$HOME/.codex" or "$HOME/.gemini/config" for Codex / Antigravity)
+./install.sh --target-home "$HOME/.claude" --i-understand-this-mutates-live-home --uninstall
 ```
 
 - It restores each file the installer backed up to its state before your
   first install, from the list in `claude/.gearbox-install-ledger`. It does not
   touch `.bak-*` files that other tools made. The `.bak-*` files stay in place.
-- It removes the routing block from `CLAUDE.md` when the installer created
-  that file; a `CLAUDE.md` you had before is restored from its backup instead.
+- It removes the routing block from `CLAUDE.md` or `AGENTS.md` when the
+  installer created that file (auto-detected from the ledger); a rules file you
+  had before is restored from its backup instead.
 - It does **not** delete files that the installer added new. The ledger lists
   them as `created`; delete those files yourself if you want them gone. Do not
   delete whole folders: a folder can also hold files that uninstall just

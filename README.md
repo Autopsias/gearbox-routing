@@ -141,9 +141,10 @@ The model ids and prices were checked against each vendor's own pages on
 | Harness | What works |
 |---|---|
 | **Claude Code** | Everything. Gearbox is built and used daily on Claude Code. Hooks, the status line and subagent files are Claude Code features, so those parts work only here. |
-| **OpenAI Codex CLI** | The plan runner can run a plan from Codex (`--harness codex`). `/adversarial-review`, `/plan-harden` and the memo critic ship Codex versions. A sync script mirrors the other skills into Codex's skill folder, and another script renders your global rules into Codex's `AGENTS.md`. |
+| **OpenAI Codex CLI** | `./install.sh --platform codex` installs the routing framework into `~/.codex/AGENTS.md` and `~/.codex/skills/`. The plan runner can run a plan from Codex (`--harness codex`). `/adversarial-review`, `/plan-harden` and the memo critic ship Codex versions. A sync script mirrors the other skills into Codex's skill folder, and another script renders your global rules into Codex's `AGENTS.md`. |
+| **Google Antigravity** | `./install.sh --platform antigravity` installs the routing framework into `~/.gemini/config/AGENTS.md` and `~/.gemini/config/skills/` (loaded by both Antigravity App and CLI). |
 | **Claude Code on other models** | The plan runner has a lane that runs plans on Z.ai's GLM models from a separate Claude Code config. A guide shows how to run Claude Code against a Gemini model through a proxy (experimental). |
-| **Any other agent or CI job** | The routing policy is a plain YAML file and the resolver is a standard-library Python function, so any tool can read the policy or ask it for a route ([`docs/INTEGRATION.md`](docs/INTEGRATION.md)). The routing table also renders into any `CLAUDE.md`-style instruction file. |
+| **Any other agent or CI job** | The routing policy is a plain YAML file and the resolver is a standard-library Python function, so any tool can read the policy or ask it for a route ([`docs/INTEGRATION.md`](docs/INTEGRATION.md)). The routing table renders into any `AGENTS.md` or `CLAUDE.md` instruction file. |
 
 ## Routing at a glance
 
@@ -187,7 +188,8 @@ The long flag is on purpose: the installer writes to your real `~/.claude` only
 when you say so twice.
 
 ```bash
-./install.sh --claude-home "$HOME/.claude" --i-understand-this-mutates-live-claude --accept-example-profile
+# Claude Code (or --platform codex --target-home "$HOME/.codex", or --platform antigravity --target-home "$HOME/.gemini/config")
+./install.sh --target-home "$HOME/.claude" --i-understand-this-mutates-live-home --accept-example-profile
 ```
 
 It backs up every file it changes, and `--uninstall` puts them back

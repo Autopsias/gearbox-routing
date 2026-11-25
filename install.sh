@@ -2,16 +2,19 @@
 # install.sh — one-command Gearbox installer (REL-01).
 #
 # Copies the routing framework (SSOT + guard + resolver + renderer + skills +
-# fixtures + evals) into a TARGET home (the two skills go to <home>/skills/, where
-# Claude Code loads personal skills when <home> is ~/.claude), sets --provider, splices the CLAUDE.md
-# routing digest, and runs the final all-artifact guard (verify-routing.sh).
+# fixtures + evals) into a TARGET home for Claude Code, OpenAI Codex, or Google
+# Antigravity (skills land in <home>/skills/), sets --provider, splices the
+# routing digest into CLAUDE.md (claude) or AGENTS.md (codex/antigravity), and
+# runs the final all-artifact guard (verify-routing.sh).
 # Safe to re-run: running it twice with the same flags produces no diff and no
 # duplicate ROUTING block.
 #
 # SAFETY (non-negotiable, per adversarial review 2026-07-05):
 #   - The default target is a FRESH directory, never the operator's real
-#     ~/.claude. Touching the live ~/.claude requires BOTH --claude-home
-#     "$HOME/.claude" AND --i-understand-this-mutates-live-claude.
+#     ~/.claude, ~/.codex, or ~/.gemini/config. Touching any live home requires
+#     BOTH --target-home/--claude-home pointing at it AND
+#     --i-understand-this-mutates-live-home (or the legacy alias
+#     --i-understand-this-mutates-live-claude).
 #   - --provider anthropic (or any shipped example provider) installs EXAMPLE
 #     profiles (see model-routing.yaml's own "EXAMPLE" markers) — installing
 #     one as if it were live policy requires --accept-example-profile, unless
@@ -22,13 +25,16 @@
 #     real (non-example) production policy, is refused unless --force.
 #
 # Usage:
-#   ./install.sh [--claude-home DIR] [--provider NAME] [--accept-example-profile]
-#                [--profile FILE] [--force] [--i-understand-this-mutates-live-claude]
+#   ./install.sh [--platform claude|codex|antigravity]
+#                [--target-home DIR | --claude-home DIR]
+#                [--provider NAME] [--accept-example-profile]
+#                [--profile FILE] [--force]
+#                [--i-understand-this-mutates-live-home]
 #                [--uninstall] [-h|--help]
 #
 # Exit codes: 0 = installed clean, guard PASS. 1 = guard FAIL (installed but
 # drift found). 2 = refused before installing anything (bad flags, missing
-# opt-in, version/force guard tripped, a missing source file, CLAUDE.md markers
+# opt-in, version/force guard tripped, a missing source file, routing markers
 # the renderer refuses — all checked before the first write), or a tooling
 # failure after the first write (the ledger then lists what was written).
 #
@@ -40,8 +46,12 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP="$(date +%Y%m%d%H%M%S)"
 
-PROVIDER="anthropic"
-CLAUDE_HOME=""
+PLATFORM="claude"
+PLATFORM_EXPLICIT=0
+PROVIDER=""
+TARGET_HOME=""
+CLAUDE_HOME_ARG=""
+TARGET_HOME_ARG=""
 ACCEPT_EXAMPLE=0
 PROFILE_FILE=""
 FORCE=0
@@ -50,70 +60,134 @@ UNINSTALL=0
 
 usage() {
   cat <<'EOF'
-usage: install.sh [--claude-home DIR] [--provider NAME] [--accept-example-profile]
-                   [--profile FILE] [--force] [--i-understand-this-mutates-live-claude]
+usage: install.sh [--platform claude|codex|antigravity]
+                   [--target-home DIR | --claude-home DIR]
+                   [--provider NAME] [--accept-example-profile]
+                   [--profile FILE] [--force]
+                   [--i-understand-this-mutates-live-home]
                    [--uninstall] [-h|--help]
 
-  --claude-home DIR                     install target (default: ./gearbox-install-<timestamp>
-                                         under the current directory — NEVER ~/.claude unless
-                                         you pass it explicitly + the opt-in flag below)
-  --provider NAME                       active_provider to set (default: anthropic).
-                                         Must name a provider already in model-routing.yaml,
-                                         or be paired with --profile supplying your own.
+  --platform NAME                       target agent platform: claude (default), codex,
+                                         or antigravity. Selects the rules file (CLAUDE.md
+                                         for claude; AGENTS.md for codex/antigravity) and
+                                         default --provider (anthropic/openai/gemini).
+  --target-home DIR                     install target (default: ./gearbox-install-<timestamp>
+                                         under the current directory — NEVER ~/.claude,
+                                         ~/.codex, or ~/.gemini/config unless passed
+                                         explicitly with the live-home opt-in flag below).
+  --claude-home DIR                     alias for --target-home DIR (backward-compatible)
+  --provider NAME                       active_provider to set (defaults per --platform:
+                                         claude->anthropic, codex->openai,
+                                         antigravity->gemini). Must name a provider in
+                                         model-routing.yaml, or be paired with --profile.
   --accept-example-profile              required when installing a shipped EXAMPLE provider
-                                         profile (anthropic/openai/gemini/zai) as if it were live
-                                         policy. Omit this by supplying --profile instead.
+                                         profile (anthropic/openai/gemini/zai) as if it were
+                                         live policy. Omit this by supplying --profile instead.
   --profile FILE                        use FILE as the installed model-routing.yaml instead
                                          of this repo's copy (your own researched profile) —
                                          satisfies the accept-example-profile requirement.
   --force                               allow overwriting a target model-routing.yaml whose
                                          version >= this package's, or that looks like
                                          non-example (production) policy
-  --i-understand-this-mutates-live-claude
-                                         required IN ADDITION to --claude-home "$HOME/.claude"
-                                         before this script will touch the real live home
+  --i-understand-this-mutates-live-home required IN ADDITION to --target-home before this
+                                         script will touch a real live agent home
+                                         (~/.claude, ~/.codex, ~/.gemini, ~/.gemini/config).
+                                         Alias: --i-understand-this-mutates-live-claude
   --uninstall                           restore each file install.sh backed up to its state
                                          before the first install (read from the install
-                                         ledger), and strip the ROUTING block from a CLAUDE.md
-                                         that install.sh created; never touches backups other
-                                         tools made, and does not delete newly created files
+                                         ledger), and strip the ROUTING block from a rules
+                                         file (CLAUDE.md or AGENTS.md) that install.sh
+                                         created; never touches backups other tools made,
+                                         and does not delete newly created files
   -h, --help                            this message
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --claude-home) CLAUDE_HOME="$2"; shift 2 ;;
+    --platform) PLATFORM="$2"; PLATFORM_EXPLICIT=1; shift 2 ;;
+    --target-home) TARGET_HOME_ARG="$2"; shift 2 ;;
+    --claude-home) CLAUDE_HOME_ARG="$2"; shift 2 ;;
     --provider) PROVIDER="$2"; shift 2 ;;
     --accept-example-profile) ACCEPT_EXAMPLE=1; shift ;;
     --profile) PROFILE_FILE="$2"; shift 2 ;;
     --force) FORCE=1; shift ;;
-    --i-understand-this-mutates-live-claude) UNDERSTAND_LIVE=1; shift ;;
+    --i-understand-this-mutates-live-home|--i-understand-this-mutates-live-claude) UNDERSTAND_LIVE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "FATAL: unknown flag: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-if [[ -z "$CLAUDE_HOME" ]]; then
-  CLAUDE_HOME="$(pwd)/gearbox-install-${TIMESTAMP}"
+case "$PLATFORM" in
+  claude)
+    RULES_FILE="CLAUDE.md"
+    DEFAULT_PROVIDER="anthropic"
+    ;;
+  codex)
+    RULES_FILE="AGENTS.md"
+    DEFAULT_PROVIDER="openai"
+    ;;
+  antigravity)
+    RULES_FILE="AGENTS.md"
+    DEFAULT_PROVIDER="gemini"
+    ;;
+  *)
+    echo "FATAL: unknown --platform '$PLATFORM' (expected: claude, codex, antigravity)" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -z "$PROVIDER" ]]; then
+  PROVIDER="$DEFAULT_PROVIDER"
+fi
+
+if [[ -n "$TARGET_HOME_ARG" && -n "$CLAUDE_HOME_ARG" && "$TARGET_HOME_ARG" != "$CLAUDE_HOME_ARG" ]]; then
+  echo "FATAL: --target-home ('$TARGET_HOME_ARG') and --claude-home ('$CLAUDE_HOME_ARG') disagree." >&2
+  exit 2
+fi
+TARGET_HOME="${TARGET_HOME_ARG:-$CLAUDE_HOME_ARG}"
+
+if [[ -z "$TARGET_HOME" ]]; then
+  TARGET_HOME="$(pwd)/gearbox-install-${TIMESTAMP}"
 fi
 # Resolve to an absolute, symlink-free path (target may not exist yet), so a
-# symlink to ~/.claude under another name cannot slip past the live-home check.
-if [[ -d "$CLAUDE_HOME" ]]; then
-  CLAUDE_HOME="$(cd "$CLAUDE_HOME" && pwd -P)"
+# symlink to a real live agent home under another name cannot slip past the guard.
+if [[ -d "$TARGET_HOME" ]]; then
+  TARGET_HOME="$(cd "$TARGET_HOME" && pwd -P)"
 else
-  CLAUDE_HOME="$(cd "$(dirname "$CLAUDE_HOME")" 2>/dev/null && pwd -P)/$(basename "$CLAUDE_HOME")" || {
-    echo "FATAL: --claude-home parent directory does not exist: $CLAUDE_HOME" >&2; exit 2;
+  TARGET_HOME="$(cd "$(dirname "$TARGET_HOME")" 2>/dev/null && pwd -P)/$(basename "$TARGET_HOME")" || {
+    echo "FATAL: --target-home parent directory does not exist: $TARGET_HOME" >&2; exit 2;
   }
 fi
+CLAUDE_HOME="$TARGET_HOME"
 
-REAL_HOME_CLAUDE="$(cd "$HOME" && pwd -P)/.claude"
-[[ -d "$REAL_HOME_CLAUDE" ]] && REAL_HOME_CLAUDE="$(cd "$REAL_HOME_CLAUDE" && pwd -P)"
+resolve_live_path() {
+  local p="$1"
+  if [[ -d "$p" ]]; then
+    (cd "$p" && pwd -P)
+  elif [[ -d "$(dirname "$p")" ]]; then
+    printf '%s/%s\n' "$(cd "$(dirname "$p")" && pwd -P)" "$(basename "$p")"
+  else
+    printf '%s\n' "$p"
+  fi
+}
+
+REAL_HOME="$(cd "$HOME" && pwd -P)"
 LEDGER="$CLAUDE_HOME/claude/.gearbox-install-ledger"
 
+# On --uninstall without explicit --platform, auto-detect AGENTS.md from the
+# install ledger so uninstalling a Codex/Antigravity install works even when
+# the caller only passes --target-home ... --uninstall.
+if [[ $UNINSTALL -eq 1 && $PLATFORM_EXPLICIT -eq 0 && -f "$LEDGER" ]]; then
+  if awk -F'\t' '$2 == "AGENTS.md" { f = 1 } END { exit !f }' "$LEDGER" \
+     && ! awk -F'\t' '$2 == "CLAUDE.md" { f = 1 } END { exit !f }' "$LEDGER"; then
+    RULES_FILE="AGENTS.md"
+  fi
+fi
+
 # Every path install.sh writes (src in this repo : dst under the target home).
-# claude/model-routing.yaml and CLAUDE.md are handled separately below.
+# claude/model-routing.yaml and $RULES_FILE are handled separately below.
 declare -a COPY_PAIRS=(
   "claude/model-routing.digest.md:claude/model-routing.digest.md"
   "claude/skills/routing-update:skills/routing-update"
@@ -129,7 +203,7 @@ declare -a COPY_PAIRS=(
 
 managed_rels() {
   # The files install.sh writes, relative to the target home, one per line.
-  printf '%s\n' "claude/model-routing.yaml" "CLAUDE.md"
+  printf '%s\n' "claude/model-routing.yaml" "$RULES_FILE"
   local pair src_rel dst_rel
   for pair in "${COPY_PAIRS[@]}"; do
     src_rel="${pair%%:*}"; dst_rel="${pair##*:}"
@@ -152,15 +226,24 @@ legacy_backups() {
   done < <(managed_rels)
   return 0
 }
-if [[ "$CLAUDE_HOME" == "$REAL_HOME_CLAUDE" && $UNDERSTAND_LIVE -ne 1 ]]; then
-  echo "FATAL: --claude-home resolves to your real $HOME/.claude." >&2
-  echo "This installer refuses to touch the live Claude home without an explicit opt-in." >&2
-  echo "Re-run with --i-understand-this-mutates-live-claude if that is really what you want." >&2
-  exit 2
-fi
+
+for live_candidate in \
+  "$REAL_HOME/.claude" \
+  "$REAL_HOME/.codex" \
+  "$REAL_HOME/.gemini" \
+  "$REAL_HOME/.gemini/config"; do
+  resolved_live="$(resolve_live_path "$live_candidate")"
+  if [[ "$CLAUDE_HOME" == "$resolved_live" && $UNDERSTAND_LIVE -ne 1 ]]; then
+    echo "FATAL: target home resolves to your real $live_candidate." >&2
+    echo "This installer refuses to touch a real live agent home without an explicit opt-in." >&2
+    echo "Re-run with --i-understand-this-mutates-live-home if that is really what you want." >&2
+    exit 2
+  fi
+done
 
 echo "install.sh — Gearbox installer"
 echo "  repo:        $REPO_DIR"
+echo "  platform:    $PLATFORM ($RULES_FILE)"
 echo "  target home: $CLAUDE_HOME"
 echo "  provider:    $PROVIDER"
 echo
@@ -173,8 +256,8 @@ if [[ $UNINSTALL -eq 1 ]]; then
     echo "FATAL: nothing to uninstall — $CLAUDE_HOME does not exist" >&2
     exit 2
   fi
-  claude_md="$CLAUDE_HOME/CLAUDE.md"
-  claude_md_had_backup=0
+  rules_md="$CLAUDE_HOME/$RULES_FILE"
+  rules_md_had_backup=0
   restored=0
   if [[ -f "$LEDGER" ]]; then
     echo "== uninstall: restoring the files install.sh backed up (ledger: $LEDGER) =="
@@ -182,8 +265,8 @@ if [[ $UNINSTALL -eq 1 ]]; then
     # `created` = the file did not exist before install.sh wrote it.
     while IFS=$'\t' read -r kind rel bak; do
       if [[ "$kind" == "backup" ]]; then
-        # CLAUDE.md existed before install.sh: never strip it, even if its backup is gone.
-        [[ "$CLAUDE_HOME/$rel" == "$claude_md" ]] && claude_md_had_backup=1
+        # $RULES_FILE existed before install.sh: never strip it, even if its backup is gone.
+        [[ "$CLAUDE_HOME/$rel" == "$rules_md" ]] && rules_md_had_backup=1
         if [[ -f "$CLAUDE_HOME/$bak" ]]; then
           cp -p "$CLAUDE_HOME/$bak" "$CLAUDE_HOME/$rel"
           echo "  restored: $CLAUDE_HOME/$rel (from $bak)"
@@ -200,24 +283,24 @@ if [[ $UNINSTALL -eq 1 ]]; then
     while IFS=$'\t' read -r rel bak; do
       cp -p "$CLAUDE_HOME/$bak" "$CLAUDE_HOME/$rel"
       echo "  restored: $CLAUDE_HOME/$rel (from $bak)"
-      [[ "$rel" == "CLAUDE.md" ]] && claude_md_had_backup=1
+      [[ "$rel" == "$RULES_FILE" ]] && rules_md_had_backup=1
       restored=$((restored + 1))
     done < <(legacy_backups)
   fi
   echo "  restored $restored file(s) from backup."
   echo
-  # Only strip the ROUTING block from CLAUDE.md if it had NO backup — a
+  # Only strip the ROUTING block from $RULES_FILE if it had NO backup — a
   # restored backup already reflects the correct pre-install content (which
   # may legitimately contain its own routing block from before this tool ever
   # touched it) and must be left exactly as restored, never re-mutated. A
-  # CLAUDE.md with no backup means install.sh created it fresh (--install
+  # rules file with no backup means install.sh created it fresh (--install
   # bootstrap onto a missing/markerless file), so stripping is the correct
   # undo for THAT file only.
-  if [[ $claude_md_had_backup -eq 1 ]]; then
-    echo "== CLAUDE.md had a pre-existing backup — restored as-is, not stripping =="
-  elif [[ -f "$claude_md" ]]; then
-    echo "== stripping ROUTING block from $CLAUDE_HOME/CLAUDE.md (no backup existed — this file was created by install.sh) =="
-    python3 - "$claude_md" <<'PY'
+  if [[ $rules_md_had_backup -eq 1 ]]; then
+    echo "== $RULES_FILE had a pre-existing backup — restored as-is, not stripping =="
+  elif [[ -f "$rules_md" ]]; then
+    echo "== stripping ROUTING block from $CLAUDE_HOME/$RULES_FILE (no backup existed — this file was created by install.sh) =="
+    python3 - "$rules_md" <<'PY'
 import re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as f:
@@ -231,7 +314,7 @@ else:
     print(f"  no ROUTING block found in {path} — nothing to strip")
 PY
   else
-    echo "  no CLAUDE.md at $claude_md — nothing to strip"
+    echo "  no $RULES_FILE at $rules_md — nothing to strip"
   fi
   echo
   echo "Uninstall complete. Files install.sh created new were left in place; the ledger"
@@ -389,17 +472,17 @@ for pair in "${COPY_PAIRS[@]}"; do
   fi
 done
 
-# Pre-flight: render CLAUDE.md onto a scratch copy first, so marker states the
+# Pre-flight: render $RULES_FILE onto a scratch copy first, so marker states the
 # renderer refuses (duplicate or malformed ROUTING markers) stop the run before
 # anything under the target home is written — exit 2 then really means "nothing
 # changed".
 preflight_dir="$(mktemp -d)"
-[[ -f "$CLAUDE_HOME/CLAUDE.md" ]] && cp -p "$CLAUDE_HOME/CLAUDE.md" "$preflight_dir/CLAUDE.md"
+[[ -f "$CLAUDE_HOME/$RULES_FILE" ]] && cp -p "$CLAUDE_HOME/$RULES_FILE" "$preflight_dir/$RULES_FILE"
 if ! python3 "$REPO_DIR/claude/scripts/render-routing-digest.py" \
      --repo-dir "$REPO_DIR" --yaml "$staged_ssot" \
      --source "$REPO_DIR/claude/model-routing.digest.md" \
-     --target "$preflight_dir/CLAUDE.md" --install >/dev/null; then
-  echo "FATAL: render-routing-digest.py would refuse $CLAUDE_HOME/CLAUDE.md (see message above) —" >&2
+     --target "$preflight_dir/$RULES_FILE" --install >/dev/null; then
+  echo "FATAL: render-routing-digest.py would refuse $CLAUDE_HOME/$RULES_FILE (see message above) —" >&2
   echo "nothing was written. Fix the ROUTING markers in that file and re-run." >&2
   rm -rf "$preflight_dir" "$staged_ssot"
   exit 2
@@ -451,47 +534,47 @@ echo "== chmod +x applied to ported scripts =="
 echo
 
 # ---------------------------------------------------------------------------
-# Wire CLAUDE.md: render + splice via render-routing-digest.py --install
+# Wire $RULES_FILE: render + splice via render-routing-digest.py --install
 # (marker-state handling — absent file / zero markers / one pair / corrupt —
 # is entirely owned by render-routing-digest.py's own safety invariants; see
 # its module docstring. --install covers "create if missing" and "bootstrap
 # on zero markers"; an existing single pair is replaced in place; duplicate/
 # malformed markers make it refuse with a clear message, never blind-append.)
 # ---------------------------------------------------------------------------
-target_claude_md="$CLAUDE_HOME/CLAUDE.md"
+target_rules_md="$CLAUDE_HOME/$RULES_FILE"
 # Snapshot pre-render content (if any) so we can back it up ONLY if the render
 # actually changes it (render-routing-digest.py does its own atomic write; we
 # back up before calling it since it may overwrite in place).
 pre_render_snapshot=""
-if [[ -f "$target_claude_md" ]]; then
+if [[ -f "$target_rules_md" ]]; then
   pre_render_snapshot="$(mktemp)"
-  cp -p "$target_claude_md" "$pre_render_snapshot"
+  cp -p "$target_rules_md" "$pre_render_snapshot"
 else
-  ledger_note created "$target_claude_md"
+  ledger_note created "$target_rules_md"
 fi
 
-echo "== rendering + splicing CLAUDE.md routing digest =="
+echo "== rendering + splicing $RULES_FILE routing digest =="
 set +e
 python3 "$CLAUDE_HOME/claude/scripts/render-routing-digest.py" \
   --repo-dir "$CLAUDE_HOME" \
   --claude-home "$CLAUDE_HOME" \
   --yaml "$target_ssot" \
   --source "$CLAUDE_HOME/claude/model-routing.digest.md" \
-  --target "$target_claude_md" \
+  --target "$target_rules_md" \
   --install
 RENDER_RC=$?
 set -e
 if [[ $RENDER_RC -ne 0 ]]; then
-  echo "FATAL: render-routing-digest.py refused to write CLAUDE.md (exit $RENDER_RC) — see message above." >&2
+  echo "FATAL: render-routing-digest.py refused to write $RULES_FILE (exit $RENDER_RC) — see message above." >&2
   [[ -n "$pre_render_snapshot" ]] && rm -f "$pre_render_snapshot"
   exit 2
 fi
-if [[ -n "$pre_render_snapshot" ]] && ! cmp -s "$pre_render_snapshot" "$target_claude_md"; then
-  bak="${target_claude_md}.bak-${TIMESTAMP}"
+if [[ -n "$pre_render_snapshot" ]] && ! cmp -s "$pre_render_snapshot" "$target_rules_md"; then
+  bak="${target_rules_md}.bak-${TIMESTAMP}"
   cp -p "$pre_render_snapshot" "$bak"
-  backups+=("$target_claude_md -> $(basename "$bak")")
-  ledger_note backup "$target_claude_md" "$bak"
-  echo "  backed up pre-existing CLAUDE.md -> $(basename "$bak")"
+  backups+=("$target_rules_md -> $(basename "$bak")")
+  ledger_note backup "$target_rules_md" "$bak"
+  echo "  backed up pre-existing $RULES_FILE -> $(basename "$bak")"
 fi
 [[ -n "$pre_render_snapshot" ]] && rm -f "$pre_render_snapshot"
 echo
@@ -504,6 +587,7 @@ set +e
 CLAUDE_HOME="$CLAUDE_HOME" \
 SSOT="$target_ssot" \
 AGENTS_DIR="$CLAUDE_HOME/claude/agents" \
+DIGEST_TARGET="$target_rules_md" \
 bash "$CLAUDE_HOME/claude/scripts/verify-routing.sh" --full
 GUARD_RC=$?
 set -e
@@ -511,12 +595,16 @@ echo
 
 echo "==================================================================="
 echo "install.sh summary"
-echo "  target home:     $CLAUDE_HOME"
+echo "  platform:         $PLATFORM ($RULES_FILE)"
+echo "  target home:      $CLAUDE_HOME"
 echo "  active_provider:  $PROVIDER"
 echo "  files copied:     ${#copies[@]}"
 echo "  files backed up:  ${#backups[@]}"
 if [[ ${#backups[@]} -gt 0 ]]; then
   for b in "${backups[@]}"; do echo "    - $b"; done
+fi
+if [[ "$PLATFORM" == "codex" ]]; then
+  echo "  skills note:      installed under $CLAUDE_HOME/skills/ (loaded by Codex; symlink into ~/.agents/skills/ if preferred)"
 fi
 if [[ $GUARD_RC -eq 0 ]]; then
   echo "  guard:            PASS"
