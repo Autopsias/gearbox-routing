@@ -148,26 +148,27 @@ python3 claude/scripts/resolve_route.py
 ### Change the provider
 
 **On the shipped example policy,** run `install.sh` again with the same flags
-and the new `--provider`. It sets `active_provider:`, renders the `CLAUDE.md`
-block and runs the check. It also replaces the installed policy file with this
-repo's copy (the old one is backed up), so use the next steps instead if you
-edited the installed policy.
+and the new `--provider`. It sets `active_provider:`, renders the routing
+block (`CLAUDE.md` or `AGENTS.md`) and runs the check. It also replaces the
+installed policy file with this repo's copy (the old one is backed up), so use
+the next steps instead if you edited the installed policy.
 
 **On a policy you edited,** run these from the install target:
 
 1. Set `active_provider:` in `claude/model-routing.yaml`. This is the only line
    a provider change edits.
-2. Render the `CLAUDE.md` block from the edited policy:
+2. Render the routing block from the edited policy (omitting `--target`
+   auto-detects `AGENTS.md` or `CLAUDE.md`):
 
    ```bash
    python3 claude/scripts/render-routing-digest.py --repo-dir "$PWD" \
      --yaml "$PWD/claude/model-routing.yaml" \
-     --source "$PWD/claude/model-routing.digest.md" --target "$PWD/CLAUDE.md"
+     --source "$PWD/claude/model-routing.digest.md"
    ```
 
 3. Run `verify-routing.sh --full` (above). It fails if the new provider cannot
    serve every task class. Run it after step 2: before the render, the
-   `CLAUDE.md` block still shows the old provider and the check fails.
+   routing block still shows the old provider and the check fails.
 
 Details: [`PROVIDERS.md`](PROVIDERS.md).
 

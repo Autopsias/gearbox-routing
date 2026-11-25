@@ -19,15 +19,18 @@ and fill in* a provider (including a brand-new one), see
 ./install.sh --accept-example-profile --provider zai           # an effort-steep example (see below)
 ```
 
-Add `--claude-home DIR` to choose the target (see [`INSTALL.md`](INSTALL.md)).
+Add `--platform claude|codex|antigravity` and `--target-home DIR` (or
+`--claude-home DIR`) to choose the platform and target (see
+[`INSTALL.md`](INSTALL.md)).
 `--accept-example-profile` is required because the shipped profiles are dated
 examples; pass `--profile FILE` instead once you have your own.
 
 `--provider` sets `active_provider:` in the installed copy of
-`claude/model-routing.yaml` and re-renders the routing digest so
-`CLAUDE.md`'s `BEGIN/END ROUTING` block shows resolved model names for that
-provider, not abstract tier labels. Omit the flag to install with the
-`anthropic` default.
+`claude/model-routing.yaml` and re-renders the routing digest so your rules
+file's (`CLAUDE.md` or `AGENTS.md`) `BEGIN/END ROUTING` block shows resolved
+model names for that provider, not abstract tier labels. Omit the flag to use
+the platform default (`anthropic` for `claude`, `openai` for `codex`, `gemini`
+for `antigravity`).
 
 ## Switching later
 
@@ -39,7 +42,8 @@ changes when you switch). To switch:
 2. Confirm the target profile's `calibration.status` is `researched`, not
    `unresearched` — an unresearched profile as the *active* one is a hard
    validation error (see below), not a soft warning.
-3. Re-render the digest so `CLAUDE.md` reflects the new provider's resolved
+3. Re-render the digest so `CLAUDE.md` / `AGENTS.md` reflects the new
+   provider's resolved
    model names: run `claude/scripts/render-routing-digest.py` on the edited
    policy (the exact command is in
    [INSTALL.md § Change the provider](INSTALL.md#change-the-provider)). Do not
@@ -50,9 +54,9 @@ changes when you switch). To switch:
    that every `task_classes[*].tier` resolves under the new
    `providers[active_provider].models`, that `version:` is present and
    semver-shaped, that `resolve_route.py` resolves every task class for every
-   provider, and that the `CLAUDE.md` block matches the policy — so run it after
-   step 3. It does not check other consumers you may have registered in the
-   policy's `consumers:` block; keep those in sync yourself.
+   provider, and that the `CLAUDE.md` / `AGENTS.md` block matches the policy —
+   so run it after step 3. It does not check other consumers you may have
+   registered in the policy's `consumers:` block; keep those in sync yourself.
 
 There is no partial-switch state: either the guard is green on the new
 provider, or you haven't actually switched.

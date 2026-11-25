@@ -20,9 +20,10 @@ an agent pin, an elasticity, a price row) are handed to `/routing-update` — on
 apply-path, one guard, one approval protocol.
 
 **Where the files are.** The policy is `claude/model-routing.yaml` in a clone of the
-Gearbox repo, and `~/.claude/claude/model-routing.yaml` after `install.sh` installs into
-`~/.claude`. The scanner finds it on its own (`--ssot` overrides); read the same file it
-reports. "The policy" below means that file.
+Gearbox repo, and `<target-home>/claude/model-routing.yaml` after `install.sh` installs
+into your agent home (e.g. `~/.claude`, `~/.codex`, or `~/.gemini/config`). The scanner
+finds it on its own (`--ssot` overrides); read the same file it reports. "The policy"
+below means that file.
 
 **Read, never hardcode.** Expected classes, default pairs, and prices come from
 the policy AT RUN TIME — specifically `prices.<active_provider>` and
