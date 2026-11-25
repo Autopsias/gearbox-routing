@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CARDS = [ROOT / "docs" / "MODULES.md", *sorted((ROOT / "docs" / "modules").glob("*.md"))]
 DOCS = [
     *[ROOT / n for n in ("README.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "GENERICIZATION.md",
-                         "SECURITY.md", "CHANGELOG.md", "CLAUDE.md")],
+                         "SECURITY.md", "CHANGELOG.md", "AGENTS.md", "CLAUDE.md")],
     *sorted((ROOT / "docs").rglob("*.md")),
     *sorted((ROOT / "claude").rglob("README.md")),
     ROOT / "scripts" / "README.md",
@@ -100,3 +100,30 @@ def test_changelog_names_the_last_sync_date():
     assert f"(harness sync of {date})" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), (
         f"CHANGELOG.md has no entry for the sync of {date}: describe what changed for users, "
         "in the module cards and the changelog, before you commit the sync")
+
+
+def test_cross_platform_agent_context():
+    """AGENTS.md is the cross-platform SSOT; CLAUDE.md is a thin @AGENTS.md adapter."""
+    agents_md = ROOT / "AGENTS.md"
+    claude_md = ROOT / "CLAUDE.md"
+    gemini_md = ROOT / "GEMINI.md"
+
+    assert agents_md.is_file() and not agents_md.is_symlink(), "AGENTS.md must be a regular file"
+    assert claude_md.is_file() and not claude_md.is_symlink(), (
+        "CLAUDE.md must be a regular file (not a symlink) so Windows checkouts and Edit tools work")
+    assert not gemini_md.exists(), (
+        "GEMINI.md must not coexist with AGENTS.md at repo root (Antigravity loads both cumulatively)")
+
+    agents_bytes = agents_md.read_bytes()
+    assert len(agents_bytes) <= 24_000, (
+        f"AGENTS.md is {len(agents_bytes)} bytes, exceeding Antigravity's 24,000-byte per-file cap")
+    agents_text = agents_bytes.decode("utf-8")
+    assert "<!-- BEGIN ROUTING -->" in agents_text and "<!-- END ROUTING -->" in agents_text
+    assert not re.search(r"^\s*@\S+", agents_text, re.M), (
+        "AGENTS.md must not use @path imports (Codex and OpenCode do not expand them)")
+
+    claude_lines = [line.strip() for line in claude_md.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert claude_lines and claude_lines[0] == "@AGENTS.md", (
+        "CLAUDE.md must start with @AGENTS.md so Claude Code imports AGENTS.md without duplication")
+    assert "<!-- BEGIN ROUTING -->" not in claude_md.read_text(encoding="utf-8"), (
+        "Routing digest belongs only in AGENTS.md, not duplicated in CLAUDE.md")

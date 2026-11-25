@@ -388,6 +388,24 @@ def _assert_no_old_markers_anywhere(*texts: str) -> None:
                         "semver or drop it; the guard/renderer no longer recognize the integer shape")
 
 
+def _default_target_path(repo_dir: str) -> str:
+    """Resolve the default routing-digest target under repo_dir.
+
+    Prefer AGENTS.md when present and carrying the routing markers (or when
+    CLAUDE.md does not), so repos using AGENTS.md as their cross-platform SSOT
+    with a thin `@AGENTS.md` CLAUDE.md adapter validate without extra flags,
+    while CLAUDE.md-only repos stay backward compatible.
+    """
+    agents_md = os.path.join(repo_dir, "AGENTS.md")
+    claude_md = os.path.join(repo_dir, "CLAUDE.md")
+    if os.path.isfile(agents_md):
+        if BEGIN_RE.search(read(agents_md)):
+            return agents_md
+        if not os.path.isfile(claude_md) or not BEGIN_RE.search(read(claude_md)):
+            return agents_md
+    return claude_md
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--variant", choices=["v0", "full"], default="full")
@@ -397,7 +415,7 @@ def main(argv=None) -> int:
                      help="unused by default paths below; kept for parity with verify-routing.sh's env override")
     ap.add_argument("--yaml", default=None, help="override SSOT path (default: <repo-dir>/claude/model-routing.yaml)")
     ap.add_argument("--source", default=None, help="override digest source template (default: <repo-dir>/claude/model-routing.digest.md)")
-    ap.add_argument("--target", default=None, help="override install target (default: <repo-dir>/CLAUDE.md)")
+    ap.add_argument("--target", default=None, help="override install target (default: <repo-dir>/AGENTS.md if present, else <repo-dir>/CLAUDE.md)")
     ap.add_argument("--install", action="store_true", help="allow bootstrap onto a target with zero existing markers")
     ap.add_argument("--check", action="store_true", help="dry-run: report drift, write nothing")
     args = ap.parse_args(argv)
@@ -406,7 +424,7 @@ def main(argv=None) -> int:
     os.environ["_RRD_REPO_DIR"] = repo_dir  # threaded through to _load_resolve_route
     yaml_path = args.yaml or os.path.join(repo_dir, "claude", "model-routing.yaml")
     source_path = args.source or os.path.join(repo_dir, "claude", "model-routing.digest.md")
-    target_path = args.target or os.path.join(repo_dir, "CLAUDE.md")
+    target_path = args.target or _default_target_path(repo_dir)
 
     try:
         _assert_no_old_markers_anywhere(read(yaml_path), read(source_path))

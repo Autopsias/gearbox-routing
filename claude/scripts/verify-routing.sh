@@ -59,6 +59,7 @@ SSOT="${SSOT:-$REPO_DIR/claude/model-routing.yaml}"
 # to wherever THEIR agents live.
 AGENTS_DIR="${AGENTS_DIR:-$REPO_DIR/claude/agents}"
 DIGEST_RENDERER="$REPO_DIR/claude/scripts/render-routing-digest.py"
+DIGEST_TARGET="${DIGEST_TARGET:-}"
 STALE_DAYS="${ROUTING_STALE_DAYS:-180}"   # as_of staleness WARN threshold (days)
 
 DEFAULT_MODE="core"
@@ -73,7 +74,8 @@ for arg in "$@"; do
     -h|--help)
       echo "usage: verify-routing.sh [--core|--full] [--strict]"
       echo "  env: CLAUDE_HOME (default ~/.claude), SSOT (default <repo>/claude/model-routing.yaml),"
-      echo "       AGENTS_DIR (default <repo>/claude/agents), ROUTING_STALE_DAYS (default 180)"
+      echo "       AGENTS_DIR (default <repo>/claude/agents), DIGEST_TARGET (default AGENTS.md/CLAUDE.md),"
+      echo "       ROUTING_STALE_DAYS (default 180)"
       exit 0
       ;;
     *)
@@ -509,11 +511,15 @@ set -e
 [[ $RESOLVER_RC -eq 0 ]] || _note_fail "$RESOLVER_RC"
 echo
 
-# ---- (e) CLAUDE.md digest re-render diff clean — --full mode only ---------
+# ---- (e) routing digest re-render diff clean — --full mode only ----------
 if [[ "$MODE" == "full" ]]; then
-  echo "== (e) CLAUDE.md digest re-render diff (ssot=$SSOT) =="
+  echo "== (e) routing digest re-render diff (ssot=$SSOT) =="
+  DIGEST_ARGS=(--claude-home "$CLAUDE_HOME" --repo-dir "$REPO_DIR" --yaml "$SSOT" --check)
+  if [[ -n "$DIGEST_TARGET" ]]; then
+    DIGEST_ARGS+=(--target "$DIGEST_TARGET")
+  fi
   set +e
-  python3 "$DIGEST_RENDERER" --claude-home "$CLAUDE_HOME" --repo-dir "$REPO_DIR" --yaml "$SSOT" --check
+  python3 "$DIGEST_RENDERER" "${DIGEST_ARGS[@]}"
   DIGEST_RC=$?
   set -e
   if [[ $DIGEST_RC -ne 0 ]]; then
