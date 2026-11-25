@@ -19,51 +19,50 @@ if _SCRIPT_DIR not in sys.path:
 import inventory_checks as ic  # noqa: E402
 
 
+def _collect_hooks(root: Path) -> list[str]:
+    hooks_found: list[str] = []
+    for hp in ic.HOOK_PATHS:
+        p = root / hp
+        if p.is_dir():
+            hooks_found.extend(
+                ic.rel_path(c, root) for c in sorted(p.iterdir()) if c.is_file() or c.is_symlink()
+            )
+        elif p.is_file():
+            hooks_found.append(hp)
+    return hooks_found
+
+
 def _collect_ci_and_hooks(root: Path) -> dict[str, Any]:
     ci_workflows: list[dict[str, Any]] = []
     extracted_commands: list[dict[str, str]] = []
 
     gh_wf_dir = root / ".github" / "workflows"
-    if gh_wf_dir.is_dir():
-        for wf in sorted(gh_wf_dir.iterdir()):
-            if wf.suffix.lower() in {".yml", ".yaml"} and wf.is_file():
-                rel_wf = ic.rel_path(wf, root)
-                text = ic.read_text_safe(wf) or ""
-                ci_workflows.append({
-                    "path": rel_wf,
-                    "mentions_agentic_surfaces": bool(ic.CI_AGENTIC_SIGNAL_RE.search(text)),
-                })
-                extracted_commands.extend(ic.extract_verify_commands(rel_wf, text))
-
+    wf_paths = [
+        wf for wf in sorted(gh_wf_dir.iterdir())
+        if wf.suffix.lower() in {".yml", ".yaml"} and wf.is_file()
+    ] if gh_wf_dir.is_dir() else []
     for alt_ci in (".gitlab-ci.yml", ".circleci/config.yml", "Jenkinsfile"):
-        p = root / alt_ci
-        if p.is_file():
-            text = ic.read_text_safe(p) or ""
-            ci_workflows.append({
-                "path": alt_ci,
-                "mentions_agentic_surfaces": bool(ic.CI_AGENTIC_SIGNAL_RE.search(text)),
-            })
-            extracted_commands.extend(ic.extract_verify_commands(alt_ci, text))
+        if (root / alt_ci).is_file():
+            wf_paths.append(root / alt_ci)
+
+    for wf in wf_paths:
+        rel_wf = ic.rel_path(wf, root)
+        text = ic.read_text_safe(wf) or ""
+        ci_workflows.append({
+            "path": rel_wf,
+            "mentions_agentic_surfaces": bool(ic.CI_AGENTIC_SIGNAL_RE.search(text)),
+        })
+        extracted_commands.extend(ic.extract_verify_commands(rel_wf, text))
 
     for task_file in ("Makefile", "justfile", "package.json"):
         p = root / task_file
         if p.is_file():
             extracted_commands.extend(ic.extract_verify_commands(task_file, ic.read_text_safe(p) or ""))
 
-    hooks_found: list[str] = []
-    for hp in ic.HOOK_PATHS:
-        p = root / hp
-        if p.is_dir():
-            for child in sorted(p.iterdir()):
-                if child.is_file() or child.is_symlink():
-                    hooks_found.append(ic.rel_path(child, root))
-        elif p.is_file():
-            hooks_found.append(hp)
-
     return {
         "workflows": ci_workflows,
         "extracted_commands": extracted_commands[:25],
-        "hooks": hooks_found,
+        "hooks": _collect_hooks(root),
     }
 
 
@@ -112,19 +111,65 @@ def _check_root_context_hygiene(root: Path) -> list[dict[str, str]]:
     return warnings
 
 
+def _inspect_text(
+    path: Path,
+    root: Path,
+    broken_links: list[dict[str, str]],
+    model_signals: set[str],
+) -> None:
+    text = ic.read_text_safe(path)
+    if text is None:
+        return
+    broken_links.extend(ic.find_broken_md_links(path, root, text))
+    for m in ic.MODEL_SIGNAL_RE.finditer(text):
+        model_signals.add(m.group(1).lower())
+
+
+def _collect_nested_context(
+    root: Path,
+    all_files: list[Path],
+    broken_links: list[dict[str, str]],
+    model_signals: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    surfaces, warnings = [], []
+    root_ctx_set = {str(root / rel_ctx) for rel_ctx in ic.ROOT_CONTEXT_FILES}
+    for f in all_files:
+        if str(f) in root_ctx_set:
+            continue
+        rel_f = ic.rel_path(f, root)
+        if f.name in {"AGENTS.md", "CLAUDE.md", "GEMINI.md"}:
+            rec = ic.measure_surface(f, root, kind="context_nested", auto_loaded=False)
+            surfaces.append(rec)
+            _inspect_text(f, root, broken_links, model_signals)
+            if rec["lines"] >= 50 and rec["caution_caps_per_100_lines"] >= 10.0:
+                warnings.append({
+                    "code": "high_caution_caps_density", "path": rel_f,
+                    "detail": f"{rec['caution_caps_count']} all-caps NEVER/ALWAYS/MUST markers ({rec['caution_caps_per_100_lines']}/100 lines — over-scaffolding risk)",
+                })
+        elif rel_f.startswith((".agents/rules/", ".cursor/rules/", ".claude/rules/")) and f.suffix in {".md", ".mdc"}:
+            surfaces.append(ic.measure_surface(f, root, kind="rules", auto_loaded=False))
+    return surfaces, warnings
+
+
+def _collect_mcp_configs(root: Path, model_signals: set[str]) -> list[str]:
+    found: list[str] = []
+    for rel_cfg in ic.MCP_AND_HARNESS_CONFIGS:
+        p = root / rel_cfg
+        if not p.is_file():
+            continue
+        found.append(rel_cfg)
+        text = ic.read_text_safe(p) or ""
+        for m in ic.MODEL_SIGNAL_RE.finditer(text):
+            model_signals.add(m.group(1).lower())
+    return found
+
+
 def _collect_agentic_surfaces(root: Path, all_files: list[Path]) -> tuple[dict[str, Any], dict[str, Any], set[str]]:
     surfaces: list[dict[str, Any]] = []
     broken_links: list[dict[str, str]] = []
     broken_symlinks: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     model_signals: set[str] = set()
-
-    def _inspect_text(path: Path, text: str | None) -> None:
-        if text is None:
-            return
-        broken_links.extend(ic.find_broken_md_links(path, root, text))
-        for m in ic.MODEL_SIGNAL_RE.finditer(text):
-            model_signals.add(m.group(1).lower())
 
     for rel_ctx in ic.ROOT_CONTEXT_FILES:
         p = root / rel_ctx
@@ -134,47 +179,25 @@ def _collect_agentic_surfaces(root: Path, all_files: list[Path]) -> tuple[dict[s
             surfaces.append(rec)
             if rec["symlink_broken"]:
                 broken_symlinks.append({"path": rel_ctx, "reason": "broken root context symlink"})
-            _inspect_text(p, ic.read_text_safe(p))
+            _inspect_text(p, root, broken_links, model_signals)
 
-    root_ctx_set = {str(root / rel_ctx) for rel_ctx in ic.ROOT_CONTEXT_FILES}
-    for f in all_files:
-        if str(f) in root_ctx_set:
-            continue
-        rel_f = ic.rel_path(f, root)
-        if f.name in {"AGENTS.md", "CLAUDE.md", "GEMINI.md"}:
-            rec = ic.measure_surface(f, root, kind="context_nested", auto_loaded=False)
-            surfaces.append(rec)
-            _inspect_text(f, ic.read_text_safe(f))
-            if rec["lines"] >= 50 and rec["caution_caps_per_100_lines"] >= 10.0:
-                warnings.append({
-                    "code": "high_caution_caps_density", "path": rel_f,
-                    "detail": f"{rec['caution_caps_count']} all-caps NEVER/ALWAYS/MUST markers ({rec['caution_caps_per_100_lines']}/100 lines — over-scaffolding risk)",
-                })
-        elif rel_f.startswith((".agents/rules/", ".cursor/rules/", ".claude/rules/")) and f.suffix in {".md", ".mdc"}:
-            surfaces.append(ic.measure_surface(f, root, kind="rules", auto_loaded=False))
+    nested_surfaces, nested_warnings = _collect_nested_context(root, all_files, broken_links, model_signals)
+    surfaces.extend(nested_surfaces)
+    warnings.extend(nested_warnings)
 
     skill_entries, skill_broken, skill_warnings = ic.collect_skill_entries(root)
     surfaces.extend(skill_entries)
     broken_symlinks.extend(skill_broken)
     warnings.extend(skill_warnings)
     for sk in skill_entries:
-        _inspect_text(root / sk["path"], ic.read_text_safe(root / sk["path"]))
+        _inspect_text(root / sk["path"], root, broken_links, model_signals)
         if sk["lines"] > 500:
             warnings.append({
                 "code": "skill_md_over_500_lines", "path": sk["path"],
                 "detail": f"{sk['lines']} lines (exceeds 500-line ceiling; split reference material)",
             })
 
-    mcp_and_configs: list[str] = []
-    for rel_cfg in ic.MCP_AND_HARNESS_CONFIGS:
-        p = root / rel_cfg
-        if p.is_file():
-            mcp_and_configs.append(rel_cfg)
-            text = ic.read_text_safe(p)
-            if text is not None:
-                for m in ic.MODEL_SIGNAL_RE.finditer(text):
-                    model_signals.add(m.group(1).lower())
-
+    mcp_and_configs = _collect_mcp_configs(root, model_signals)
     warnings.extend(_check_root_context_hygiene(root))
     auto_surfaces = [s for s in surfaces if s["auto_loaded"]]
     auto_tokens = sum(s["est_tokens"] for s in auto_surfaces)
@@ -182,8 +205,7 @@ def _collect_agentic_surfaces(root: Path, all_files: list[Path]) -> tuple[dict[s
         warnings.append({"code": "auto_loaded_tokens_high", "path": ".", "detail": f"Auto-loaded context ~{auto_tokens} tokens ({ic.TOKENIZER_LABEL}) exceeds 8,000-token redline"})
     elif auto_tokens > 4_000:
         warnings.append({"code": "auto_loaded_tokens_warn", "path": ".", "detail": f"Auto-loaded context ~{auto_tokens} tokens ({ic.TOKENIZER_LABEL}) exceeds 4,000-token target"})
-    for bs in broken_symlinks:
-        warnings.append({"code": "broken_symlink", "path": bs["path"], "detail": bs["reason"]})
+    warnings.extend({"code": "broken_symlink", "path": bs["path"], "detail": bs["reason"]} for bs in broken_symlinks)
 
     agentic = {
         "files": surfaces,
@@ -197,8 +219,7 @@ def _collect_agentic_surfaces(root: Path, all_files: list[Path]) -> tuple[dict[s
         },
         "warnings": warnings,
     }
-    rot = {"broken_markdown_links": broken_links, "broken_symlinks": broken_symlinks}
-    return agentic, rot, model_signals
+    return agentic, {"broken_markdown_links": broken_links, "broken_symlinks": broken_symlinks}, model_signals
 
 
 def _collect_evals_and_tests(root: Path, all_files: list[Path], ci_workflows: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, str]]]:

@@ -283,6 +283,57 @@ def extract_verify_commands(source_path: str, text: str) -> list[dict[str, str]]
     return cmds
 
 
+def _check_skill_metadata(child: Path, skill_md: Path, root: Path) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = []
+    rel_md = rel_path(skill_md, root)
+    text = read_text_safe(skill_md) or ""
+    fm = FRONTMATTER_RE.match(text)
+    has_name = bool(fm and re.search(r"(?m)^name:\s*\S+", fm.group(1)))
+    has_desc = bool(fm and re.search(r"(?m)^description:\s*\S+", fm.group(1)))
+    if not (has_name and has_desc):
+        warnings.append({
+            "code": "skill_missing_frontmatter",
+            "path": rel_md,
+            "detail": "SKILL.md missing required YAML frontmatter name/description",
+        })
+    refs_dir = child / "references"
+    if not refs_dir.is_dir():
+        return warnings
+    for ref_file in sorted(refs_dir.glob("*.md")):
+        ref_text = read_text_safe(ref_file)
+        if ref_text is None:
+            continue
+        ref_lines = len(ref_text.splitlines())
+        if ref_lines > 100 and "## Contents" not in ref_text and "## Table of Contents" not in ref_text:
+            warnings.append({
+                "code": "reference_missing_toc",
+                "path": rel_path(ref_file, root),
+                "detail": f"{ref_lines} lines (>100) without a '## Contents' TOC",
+            })
+    return warnings
+
+
+def _inspect_skill_child(
+    child: Path,
+    root: Path,
+    seen_paths: set[str],
+) -> tuple[dict[str, Any] | None, dict[str, str] | None, list[dict[str, str]]]:
+    if child.is_symlink() and not child.exists():
+        return None, {"path": rel_path(child, root), "reason": "broken skill symlink"}, []
+    skill_md = child / "SKILL.md" if child.is_dir() else None
+    if not skill_md or (not skill_md.exists() and not skill_md.is_symlink()):
+        return None, None, []
+    rel_md = rel_path(skill_md, root)
+    if rel_md in seen_paths:
+        return None, None, []
+    seen_paths.add(rel_md)
+    rec = measure_surface(skill_md, root, kind="skill", auto_loaded=False)
+    rec["parent_symlink"] = child.is_symlink()
+    if rec["symlink_broken"]:
+        return rec, {"path": rel_md, "reason": "broken SKILL.md symlink"}, []
+    return rec, None, _check_skill_metadata(child, skill_md, root)
+
+
 def collect_skill_entries(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[dict[str, str]]]:
     entries, broken_symlinks, warnings = [], [], []
     seen_paths: set[str] = set()
@@ -294,43 +345,12 @@ def collect_skill_entries(root: Path) -> tuple[list[dict[str, Any]], list[dict[s
         if not parent.is_dir():
             continue
         for child in sorted(parent.iterdir()):
-            if child.is_symlink() and not child.exists():
-                broken_symlinks.append({"path": rel_path(child, root), "reason": "broken skill symlink"})
-                continue
-            skill_md = child / "SKILL.md" if child.is_dir() else None
-            if not skill_md or (not skill_md.exists() and not skill_md.is_symlink()):
-                continue
-            rel_md = rel_path(skill_md, root)
-            if rel_md in seen_paths:
-                continue
-            seen_paths.add(rel_md)
-            rec = measure_surface(skill_md, root, kind="skill", auto_loaded=False)
-            rec["parent_symlink"] = child.is_symlink()
-            entries.append(rec)
-            if rec["symlink_broken"]:
-                broken_symlinks.append({"path": rel_md, "reason": "broken SKILL.md symlink"})
-                continue
-            text = read_text_safe(skill_md) or ""
-            fm = FRONTMATTER_RE.match(text)
-            if not fm or not re.search(r"(?m)^name:\s*\S+", fm.group(1)) or not re.search(r"(?m)^description:\s*\S+", fm.group(1)):
-                warnings.append({
-                    "code": "skill_missing_frontmatter",
-                    "path": rel_md,
-                    "detail": "SKILL.md missing required YAML frontmatter name/description",
-                })
-            refs_dir = child / "references"
-            if refs_dir.is_dir():
-                for ref_file in sorted(refs_dir.glob("*.md")):
-                    ref_text = read_text_safe(ref_file)
-                    if ref_text is None:
-                        continue
-                    ref_lines = len(ref_text.splitlines())
-                    if ref_lines > 100 and "## Contents" not in ref_text and "## Table of Contents" not in ref_text:
-                        warnings.append({
-                            "code": "reference_missing_toc",
-                            "path": rel_path(ref_file, root),
-                            "detail": f"{ref_lines} lines (>100) without a '## Contents' TOC",
-                        })
+            rec, broken, child_warnings = _inspect_skill_child(child, root, seen_paths)
+            if rec is not None:
+                entries.append(rec)
+            if broken is not None:
+                broken_symlinks.append(broken)
+            warnings.extend(child_warnings)
     return entries, broken_symlinks, warnings
 
 
