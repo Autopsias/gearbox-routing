@@ -103,7 +103,7 @@ try:
 
     _TIKTOKEN_ENC = tiktoken.get_encoding("cl100k_base")
     TOKENIZER_LABEL = "tiktoken(cl100k_base)"
-except Exception:
+except (ImportError, KeyError, ValueError, OSError):
     _TIKTOKEN_ENC = None
 
 
