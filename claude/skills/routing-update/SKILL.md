@@ -25,9 +25,9 @@ silently fall back to training-data knowledge of "what model X probably costs."
 **Where to run it.** This skill edits the policy, bumps its version and writes a
 CHANGELOG entry, so run it in your clone (or fork) of the Gearbox repo: the folder that
 holds `claude/model-routing.yaml` and `CHANGELOG.md`. If the current folder has no
-`claude/model-routing.yaml`, STOP and tell the operator to start Claude Code in that
+`claude/model-routing.yaml`, STOP and tell the operator to run the agent in that
 clone. After the change is committed, re-run `install.sh` to copy the new policy into
-`~/.claude`.
+your installed agent home (`~/.claude`, `~/.codex`, or `~/.gemini/config`).
 
 **Prime directive — read, never hardcode.** This skill reads `claude/model-routing.yaml`
 (the SSOT) at runtime for every tier value, price, agent pin, and trigger. Nothing in

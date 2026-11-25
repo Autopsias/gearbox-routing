@@ -20,9 +20,10 @@ describes the change instead. Pull requests to the module cards in
 
 ## Before you open a PR
 
-- Run `./install.sh --claude-home <tempdir> --accept-example-profile` and
-  confirm `verify-routing.sh --full` passes. Never touch your real
-  `~/.claude` while testing.
+- Run `./install.sh --target-home <tempdir> --accept-example-profile` (and
+  `--platform codex` / `--platform antigravity` if changing installer or digest
+  paths) and confirm `verify-routing.sh --full` passes. Never touch your real
+  `~/.claude`, `~/.codex`, or `~/.gemini/config` while testing.
 - Never assert a model id, price, or effort-dial behavior from memory —
   verify against the provider's current docs (`docs/METHODOLOGY.md` §2).
 - **First thing after cloning, run `git config core.hooksPath .githooks`.**
@@ -30,7 +31,11 @@ describes the change instead. Pull requests to the module cards in
   scans for confidential identifiers — CI cannot (see below). Confirm with
   `git config core.hooksPath`. That wires all three: pinned `gitleaks` at
   pre-commit, the no-trailers rule at commit-msg, and the full fail-closed
-  identifier sweep at pre-push.
+  identifier sweep at pre-push. If you work in a linked `git worktree` whose
+  shared `core.hooksPath` points to the main clone's `.githooks`, a PR that
+  edits `.githooks/pre-push` (for example adding a top-level path to `ALLOWED`)
+  must push with `git -c core.hooksPath=.githooks push ...` so git runs the
+  branch's updated hook, then fast-forward the main clone after merge.
 - If you change a doc or a module card, run
   `python3 -m pytest scripts/test_docs.py -q`. It fails on a broken relative
   link, on a card that names a `harness/` path that does not exist, and on a
