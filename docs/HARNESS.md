@@ -48,7 +48,7 @@ the bottom).
     hit. NEVER weaken the scan to make it pass — fix the manifest transform
     or the source file instead.
  4. document the sync, then run the docs check:
-    python3 -m pytest scripts/test_docs.py scripts/test_install_module.py -q
+    pytest scripts/test_docs.py scripts/test_install_module.py -q
     Every sync updates the documentation. For each changed or new module:
     a) add a "### Changed (harness sync of YYYY-MM-DD)" section to
        CHANGELOG.md that says what changes for a user, in plain words;

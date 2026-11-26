@@ -3,7 +3,7 @@
 > `harness/` is lost at the next export. Change the source, then re-run the
 > export (`docs/HARNESS.md` §The three tiers). Everything else in this repo —
 > `claude/`, the docs, `install.sh`, `scripts/` — is maintained here. When an
-> export changes `harness/`, run `python3 -m pytest scripts/test_docs.py -q` and
+> export changes `harness/`, run `pytest scripts/test_docs.py -q` and
 > update the module cards in `docs/modules/`.
 
 <!-- BEGIN ROUTING -->
