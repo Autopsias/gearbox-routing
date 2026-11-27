@@ -177,6 +177,12 @@ RAW_HOME="${HOME:-}"
 if [[ -z "$RAW_HOME" ]]; then
   RAW_HOME="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)' 2>/dev/null || true)"
 fi
+if [[ -z "$RAW_HOME" && $UNDERSTAND_LIVE -ne 1 ]]; then
+  echo "FATAL: cannot determine your home directory (HOME is unset/empty and pwd.getpwuid failed)." >&2
+  echo "Refusing to continue because the live-home safeguard cannot verify the target path." >&2
+  echo "Set HOME or re-run with --i-understand-this-mutates-live-home if that is really what you want." >&2
+  exit 1
+fi
 if [[ -n "$RAW_HOME" && -d "$RAW_HOME" ]]; then
   REAL_HOME="$(cd "$RAW_HOME" && pwd -P)"
 else

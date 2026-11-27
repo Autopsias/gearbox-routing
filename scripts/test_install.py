@@ -273,6 +273,7 @@ def test_unset_or_empty_home_still_guards_real_live_home():
         {k: v for k, v in os.environ.items() if k != "HOME"},
         {**os.environ, "HOME": ""},
     ):
-        refused = _run_raw("--target-home", str(target), "--accept-example-profile", env=env)
+        refused = _run_raw("--target-home", str(target), env=env)
         assert refused.returncode == 2, refused.stdout + refused.stderr
-        assert "real" in refused.stderr
+        assert "refuses to touch a real live agent home" in refused.stderr
+        assert "--i-understand-this-mutates-live-home" in refused.stderr

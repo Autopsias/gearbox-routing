@@ -49,16 +49,25 @@ jobs:
 
       - name: Guard against hand edits in harness/
         if: github.event_name == 'pull_request'
+        shell: bash
         run: |
           set -euo pipefail
-          CHANGED=$(git -c core.quotepath=false diff --name-only --no-renames "origin/${GITHUB_BASE_REF}...HEAD")
-          HARNESS_CHANGED=$(echo "$CHANGED" | grep -E '^harness/' || true)
-          if [ -n "$HARNESS_CHANGED" ] && ! echo "$CHANGED" | grep -qx 'harness/SYNCED-FROM'; then
+          HARNESS_CHANGED=()
+          SYNCED_FROM_CHANGED=0
+          while IFS= read -r -d '' path; do
+            if [[ "$path" == harness/* ]]; then
+              HARNESS_CHANGED+=("$path")
+            fi
+            if [[ "$path" == "harness/SYNCED-FROM" ]]; then
+              SYNCED_FROM_CHANGED=1
+            fi
+          done < <(git diff --name-only --no-renames -z "origin/${GITHUB_BASE_REF}...HEAD")
+          if (( ${#HARNESS_CHANGED[@]} > 0 )) && (( SYNCED_FROM_CHANGED == 0 )); then
             echo "FAIL: harness/ was modified without updating harness/SYNCED-FROM." >&2
             echo "harness/ is generated from the private source repo by scripts/sync-from-claude.py." >&2
             echo "Do not hand-edit harness/ in this repo; change the source and re-run sync-from-claude.py." >&2
             echo "Changed harness/ paths:" >&2
-            echo "$HARNESS_CHANGED" >&2
+            printf '%s\n' "${HARNESS_CHANGED[@]}" >&2
             exit 1
           fi
           echo "OK: harness/ guard clean."
