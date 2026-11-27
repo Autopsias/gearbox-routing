@@ -131,10 +131,12 @@ remove it.
 | Anthropic | Claude Haiku 5.5 | Claude Sonnet 5.5 | Claude Opus 5.5 (Fable 5.1 as escalation-only top) | `effort` |
 | OpenAI | `gpt-6-luna` | `gpt-6.1-sol` | `gpt-6-astra` | `reasoning.effort` |
 | Gemini | `gemini-3.5-flash-lite` | `gemini-3.8-flash` | `gemini-3.1-pro-preview` | `thinking_level` |
-| Z.ai | `glm-5.3-flash` | `glm-5.3-flash` | `glm-5.3` | `reasoning_effort` |
+| Z.ai | `glm-5.3-flash` | `glm-5.3-flash` | `glm-5.4` | `reasoning_effort` |
 
 The model ids and prices were checked against each vendor's own pages on
-2026-10-09. They are examples: check them before you rely on them
+2026-10-09 (Z.ai re-checked live on 2026-11-27: `glm-5.4` is the flagship and
+ships with no flash sibling, so the flash tiers stay on `glm-5.3-flash`). They
+are examples: check them before you rely on them
 ([`docs/PROVIDERS.md`](docs/PROVIDERS.md)).
 
 **Agent harnesses.**
