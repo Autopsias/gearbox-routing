@@ -261,3 +261,18 @@ def test_target_home_install_succeeds_when_home_dir_does_not_exist(tmp_path):
     out = _run_raw("--target-home", str(home), "--accept-example-profile", env=env)
     assert out.returncode == 0, out.stdout + out.stderr
     assert "BEGIN ROUTING" in (home / "CLAUDE.md").read_text(encoding="utf-8")
+
+
+def test_unset_or_empty_home_still_guards_real_live_home():
+    """Unsetting or emptying HOME must not bypass the live-home safeguard."""
+    import pwd
+
+    real_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+    target = real_home / ".claude"
+    for env in (
+        {k: v for k, v in os.environ.items() if k != "HOME"},
+        {**os.environ, "HOME": ""},
+    ):
+        refused = _run_raw("--target-home", str(target), "--accept-example-profile", env=env)
+        assert refused.returncode == 2, refused.stdout + refused.stderr
+        assert "real" in refused.stderr

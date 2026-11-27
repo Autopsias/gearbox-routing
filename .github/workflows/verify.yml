@@ -51,7 +51,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          CHANGED=$(git diff --name-only --no-renames "origin/${GITHUB_BASE_REF}...HEAD")
+          CHANGED=$(git -c core.quotepath=false diff --name-only --no-renames "origin/${GITHUB_BASE_REF}...HEAD")
           HARNESS_CHANGED=$(echo "$CHANGED" | grep -E '^harness/' || true)
           if [ -n "$HARNESS_CHANGED" ] && ! echo "$CHANGED" | grep -qx 'harness/SYNCED-FROM'; then
             echo "FAIL: harness/ was modified without updating harness/SYNCED-FROM." >&2

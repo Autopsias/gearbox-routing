@@ -57,6 +57,27 @@ def test_claude_md_exports_as_template_removes_stale_and_applies_scrub_rules(tmp
         "# Missing BEGIN marker\nprivate table\n<!-- END ROUTING -->\n",
         "# Missing END marker\n<!-- BEGIN ROUTING -->\nprivate table\n",
         "# Missing END marker with versioned BEGIN\n<!-- BEGIN ROUTING (model-routing.yaml v45) -->\nprivate table\n",
+        (
+            "# Complete block followed by an unfinished second BEGIN block\n"
+            "<!-- BEGIN ROUTING (model-routing.yaml v45) -->\n"
+            "first private table\n"
+            "<!-- END ROUTING -->\n"
+            "<!-- BEGIN ROUTING (model-routing.yaml v46) -->\n"
+            "leaked second private table\n"
+        ),
+        (
+            "# Complete block followed by a stray END marker\n"
+            "<!-- BEGIN ROUTING -->\n"
+            "first private table\n"
+            "<!-- END ROUTING -->\n"
+            "<!-- END ROUTING -->\n"
+        ),
+        (
+            "# Reversed END before BEGIN\n"
+            "<!-- END ROUTING -->\n"
+            "private table\n"
+            "<!-- BEGIN ROUTING -->\n"
+        ),
     ],
 )
 def test_scrub_claude_md_fails_closed_on_missing_begin_or_end_markers(bad_text):

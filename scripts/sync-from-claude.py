@@ -259,7 +259,6 @@ def apply_scrub_rules(text: str, rules: list, rel_path: str | None = None) -> st
 
 
 def _scrub_claude_md(text: str) -> str:
-    out = text
     # s06 finding SC-06 — THE ROUTING DIGEST IS REAL CALIBRATION DATA.
     # The source's CLAUDE.md carries a rendered digest of the PRIVATE
     # model-routing.yaml: concrete model generations, the measured effort
@@ -268,8 +267,30 @@ def _scrub_claude_md(text: str) -> str:
     # never publishes (only the hand-maintained, EXAMPLE-marked profiles under
     # claude/ do). Replace the whole block with a pointer to the public,
     # genericized SSOT rather than shipping a second, real one.
-    out, count = re.subn(
-        r"^<!-- BEGIN ROUTING.*?-->\n.*?^<!-- END ROUTING -->\n?",
+    begin_matches = re.findall(r"<!--\s*BEGIN ROUTING\b", text)
+    end_matches = re.findall(r"<!--\s*END ROUTING\s*-->", text)
+    if not begin_matches or len(begin_matches) != len(end_matches):
+        # Fail closed: missing or unmatched BEGIN/END marker pair means a
+        # private routing digest may be shipping unscrubbed.
+        raise fatal(
+            "CLAUDE.md scrub: unmatched or missing BEGIN/END ROUTING markers "
+            f"(found {len(begin_matches)} BEGIN, {len(end_matches)} END) — the private routing "
+            "digest may be shipping unscrubbed. Fix _scrub_claude_md before exporting."
+        )
+
+    block_re = r"^<!-- BEGIN ROUTING.*?-->\n.*?^<!-- END ROUTING -->\n?"
+    stripped, count = re.subn(block_re, "", text, flags=re.M | re.S)
+    if (
+        count == 0
+        or count != len(begin_matches)
+        or re.search(r"<!--\s*(?:BEGIN|END) ROUTING\b", stripped)
+    ):
+        raise fatal(
+            "CLAUDE.md scrub: malformed or stray BEGIN/END ROUTING markers — the private routing "
+            "digest may be shipping unscrubbed. Fix _scrub_claude_md before exporting."
+        )
+
+    placeholder = (
         "<!-- BEGIN ROUTING -->\n"
         "## Task routing — classify before you start\n"
         "\n"
@@ -282,18 +303,9 @@ def _scrub_claude_md(text: str) -> str:
         "Authority: `claude/model-routing.yaml` (EXAMPLE profiles — re-verify the model\n"
         "lineup, effort semantics and prices against live provider docs, then recalibrate\n"
         "with `/routing-update` before relying on any row).\n"
-        "<!-- END ROUTING -->\n",
-        out,
-        flags=re.M | re.S,
+        "<!-- END ROUTING -->\n"
     )
-    if count == 0:
-        # Fail closed: the source no longer carries a complete BEGIN/END marker
-        # pair (either marker missing), which means the real digest may be
-        # shipping unreplaced.
-        raise fatal(
-            "CLAUDE.md scrub: BEGIN/END ROUTING markers not found — the private routing "
-            "digest may be shipping unscrubbed. Fix _scrub_claude_md before exporting."
-        )
+    out, _ = re.subn(block_re, placeholder, text, flags=re.M | re.S)
     return out
 
 

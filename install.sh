@@ -173,10 +173,14 @@ resolve_live_path() {
   fi
 }
 
-if [[ -n "${HOME:-}" && -d "$HOME" ]]; then
-  REAL_HOME="$(cd "$HOME" && pwd -P)"
+RAW_HOME="${HOME:-}"
+if [[ -z "$RAW_HOME" ]]; then
+  RAW_HOME="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)' 2>/dev/null || true)"
+fi
+if [[ -n "$RAW_HOME" && -d "$RAW_HOME" ]]; then
+  REAL_HOME="$(cd "$RAW_HOME" && pwd -P)"
 else
-  REAL_HOME="${HOME:-}"
+  REAL_HOME="$RAW_HOME"
 fi
 LEDGER="$CLAUDE_HOME/claude/.gearbox-install-ledger"
 
