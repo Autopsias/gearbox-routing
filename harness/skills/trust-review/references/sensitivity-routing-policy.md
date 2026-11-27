@@ -1,5 +1,21 @@
 # Sensitivity & Model-Routing Policy + Artifact Manifest
 
+## Contents
+
+- [1. Design stance: local-first, least-exposure](#1-design-stance-local-first-least-exposure)
+- [2. Source sensitivity classification](#2-source-sensitivity-classification)
+  - [2.1 Retrieved internal evidence is sensitive by default (v2, finding #9)](#21-retrieved-internal-evidence-is-sensitive-by-default-v2-finding-9)
+- [3. Redaction (optional, local)](#3-redaction-optional-local)
+- [4. No-upload / local-only modes](#4-no-upload--local-only-modes)
+- [5. Model-routing rules by travel class](#5-model-routing-rules-by-travel-class)
+  - [5.1 Verification routing & the web-egress guard (v2, finding #8)](#51-verification-routing--the-web-egress-guard-v2-finding-8)
+  - [5.2 Run outputs are themselves sensitive (v2, finding #15)](#52-run-outputs-are-themselves-sensitive-v2-finding-15)
+- [6. Routing & sensitivity waivers](#6-routing--sensitivity-waivers)
+- [7. Retention](#7-retention)
+- [8. The per-run artifact manifest](#8-the-per-run-artifact-manifest)
+  - [8.1 Required keys (what the gate enforces)](#81-required-keys-what-the-gate-enforces)
+- [9. How components use this policy](#9-how-components-use-this-policy)
+
 **This file governs what sensitive material may be seen by which model, what stays on the local machine, what gets redacted, how long anything is kept, and — through the per-run manifest — what each model actually saw on each round.** It is the security half of the Trust Layer's front door; the [travel-class router](../commands/travel-class-router.md) is the other half. Together they decide *how hard to review* a file and *who is allowed to read it*.
 
 It reads its shared vocabulary, the command I/O contract, and the manifest's reserved keys from [`conventions.md`](conventions.md) (§3.2 reserves the manifest; this file defines it in full). The machine-readable manifest schema is [`manifest.schema.json`](manifest.schema.json); the runnable gate that enforces it is [`scripts/manifest_gate.py`](scripts/manifest_gate.py).

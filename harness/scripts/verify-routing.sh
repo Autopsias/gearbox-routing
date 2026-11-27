@@ -1082,6 +1082,38 @@ PY
   fi
 fi
 
+# ---- (k) model-nudge table vs SSOT prices (invariant I7, ADR 0007) ---------
+# Every model the nudge table names must be a key of the SSOT `prices:` block and every effort one of
+# low..max. MODEL_NUDGE_TABLE lets a test plant a bad table; unset, the real hooks/model_nudge_table.json.
+echo "== (k) model-nudge table models and efforts are known to the SSOT =="
+NUDGE_TABLE="${MODEL_NUDGE_TABLE:-$CLAUDE_DIR/hooks/model_nudge_table.json}"
+set +e
+python3 - "$SSOT" "$NUDGE_TABLE" "$CLAUDE_DIR/hooks" <<'PY'
+import json, re, sys
+ssot, table_path, hooks = sys.argv[1:4]
+sys.path.insert(0, hooks)
+try:
+    import model_nudge_lib as lib
+    table = lib.read_table_json(table_path)  # a repeated key is refused, never silently the last one
+    block = re.search(r"^prices:[ \t]*(?:#.*)?\n((?:[ \t].*\n|\n)+)", open(ssot).read(), re.M).group(1)
+    prices = set(re.findall(r"""^  ["']?([\w.-]+)["']?:""", block, re.M))
+    if not prices:
+        raise ValueError("no model keys found in the SSOT prices block")
+    bad = lib.validate_table(table, prices)
+except Exception as e:  # a missing table or an unreadable prices block is a tooling failure (exit 2), never a pass
+    print(f"  FAIL: cannot run the check: {type(e).__name__}: {e}")
+    sys.exit(2)
+for b in bad:
+    print(f"  FAIL: {b}")
+if bad:
+    sys.exit(1)
+print(f"  [OK ] {table_path}: every model is one of the {len(prices)} priced models, every effort is known")
+PY
+NUDGE_RC=$?
+set -e
+[[ $NUDGE_RC -eq 0 ]] || _note_fail "$NUDGE_RC"  # 1 = policy drift, 2 = tooling failure
+echo
+
 # ---- (f) verify-assignments.sh sub-check ----------------------------------
 echo "== (f) verify-assignments.sh sub-check =="
 set +e

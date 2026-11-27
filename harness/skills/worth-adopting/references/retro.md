@@ -51,6 +51,6 @@ deployed copy under `~/.claude`. Walk the skill-quality rubric
 
 ## 5. Close the record
 
-Mark each override that an edit absorbed with `absorbed <date>` at the end of its line. Add one
+Mark each override that an edit absorbed with `wa_ledger.py absorb '<text of that line>' "<the edit>"`, never by hand. Add one
 ledger row with the source `retro`, the four counts, and the edits applied. The next retro
 starts after this row.

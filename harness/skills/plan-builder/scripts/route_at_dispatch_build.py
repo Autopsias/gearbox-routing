@@ -19,10 +19,12 @@ import stat
 import sys
 from pathlib import Path
 
+import spec_coverage  # noqa: F401 — build_plan reaches it as rad.spec_coverage
+
 ROUTE_AT_DISPATCH_MIN_SCHEMA = 8
 """The spec version at which every rule in this module switches on (contract §1)."""
 
-SUPPORTED_MAX_SCHEMA = 8
+SUPPORTED_MAX_SCHEMA = 9
 """The highest spec version this builder understands. A spec above it is refused,
 never downgraded: stamping a lower version than the author declared would run the
 plan under rules the author did not write for (contract §1)."""

@@ -534,3 +534,18 @@ def test_cli_plans_status_survives_a_malformed_lock_value(tmp_path, bad_lock_con
     assert bad_row["lock"] == {
         "pid": None, "started_at": None, "host": None, "alive": False, "age_s": None,
     }  # marked as a degraded lock, not silently dropped from the report
+
+
+def test_memo_git_reads_answers_once_and_only_inside_the_scan(tmp_path):
+    """plans-status reuses the repo-root and shared-git-dir answers (622 of 747
+    git calls were repeats); outside the scan each call asks git."""
+    import ship_locks as sl
+    folder = tmp_path / "later-a-repo"
+    folder.mkdir()
+    with reg.memo_git_reads():
+        assert wt.repo_root(folder) is None and sl._git_common_dir(folder) is None
+        subprocess.run(["git", "init", "-q", str(folder)], check=True)
+        assert wt.repo_root(folder) is None, "inside the scan the first answer stays"
+        assert sl._git_common_dir(folder) is None
+    assert wt.repo_root(folder).resolve() == folder.resolve()
+    assert sl._git_common_dir(folder).resolve() == (folder / ".git").resolve()

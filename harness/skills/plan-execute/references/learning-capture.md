@@ -41,7 +41,7 @@ ONCE per run.
    `(open, started <date>: <name>, 3rd time)`. If a closed line exists, or
    the change differs, add a new `Remove-the-cause candidate (open): <change> --
    <plan slug> <date>` line as the last line of the note, saying in it what the
-   closed line said: a repeat is new evidence and the owner is asked again. 'Remove the cause' is defined in `commands/improve.md` section 4a. Only
+   closed line said: a repeat is new evidence and the owner is asked again. 'Remove the cause' is defined in `skills/improve/SKILL.md` section 4a. Only
    propose; never apply a candidate outside the plan's scope without the owner's yes.
 
 ## Memory maintenance (when capture touches existing memories)

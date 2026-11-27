@@ -24,7 +24,38 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 import probe_cases  # noqa: E402
 import probe_checks  # noqa: E402
+import probes  # noqa: E402
 from test_health_shape import ALL_CHECK_IDS  # noqa: E402
+
+
+def _verify_row(tmp_path, monkeypatch, skill, receipt=None, name="r"):
+    """Collect ai.verify-command on a repo with a suite; receipts come from a temp root, never ~/.gearbox-state."""
+    monkeypatch.setenv("REPLAY_PROOF_ROOT", str(tmp_path / "proofs"))
+    files = {"Makefile": "test:\n\tpytest\n", "t.py": "x = 1\n"}
+    if skill:
+        files[".claude/skills/verify/SKILL.md"] = skill
+    repo = probe_cases.make_repo(tmp_path, name, files)
+    if receipt:
+        h = subprocess.run(["git", "hash-object", ".claude/skills/verify/SKILL.md"], cwd=repo,
+                           capture_output=True, text=True, check=True).stdout.strip()
+        d = tmp_path / "proofs" / name
+        d.mkdir(parents=True)
+        (d / "1.json").write_text('{"verdict": "PROVEN", "skill_hash": "%s"}' % (h if receipt == "match" else "0" * 40))
+    return probes.verify_check(repo, {"hooks": False}, "make test", [], None)
+
+
+SKILL_OK = "# Verify\n## What this does not see\nthe UI\n"
+
+
+@pytest.mark.parametrize("skill,receipt,status,word", [
+    (None, None, "warn", "verify skill: none"),
+    (SKILL_OK, None, "warn", "proof: none"),
+    (SKILL_OK, "match", "pending", "proof: proven"),
+    (SKILL_OK, "other", "warn", "proof: stale"),
+])
+def test_verify_row_needs_skill_section_and_matching_proof(tmp_path, monkeypatch, skill, receipt, status, word):
+    c = _verify_row(tmp_path, monkeypatch, skill, receipt)
+    assert (c["status"], word in c["detail"]) == (status, True), c
 
 
 @pytest.fixture(scope="module")

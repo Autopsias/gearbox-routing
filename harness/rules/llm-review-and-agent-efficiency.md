@@ -1,65 +1,20 @@
 # Efficiency Rules for LLM Reviews, Gates, and Dispatched Agents
 
-These rules prevent silent, expensive waste in any step that runs
-an LLM review, a verification gate, or a dispatched subagent. Invariants only;
-the measurements behind each one, and the concrete fixes they imply, live in
-`~/.claude/docs/reference_llm_review_efficiency.md` — read that when you are
-tuning a gate, not on every session.
+Invariants only; measurements and incident history live in `~/.claude/docs/reference_llm_review_efficiency.md`.
 
 ## Core principle
 
-**A step that is slow, silent, and repeated is a cost you owe the user a report
-on — not a wait you absorb.** The cost of these steps is almost always knowable
-in one or two commands; the failure is never measuring.
+**A slow, silent, repeated step is a cost you owe the user a report on — not a wait you absorb.**
 
-- **NEVER hand a reviewer its own generated output.** A review payload is the
-  SOURCE under review. Captured logs, probe transcripts, run receipts and
-  evidence artifacts are output — list them by name and size so nothing is
-  hidden, but never instruct a model to read them in full as new code. An
-  executable artifact (a `.sh` or `.py` probe) IS source; discriminate on
-  "is this executable" versus "is this a captured log", not on "is this listed
-  as evidence".
-- **NEVER judge a long step hung-versus-slow without comparing parent and child
-  elapsed** (`ps -o etime` on both). A child much younger than its parent proves
-  an earlier attempt already died and you are watching a silent retry — which
-  doubles the wall time before anything is learned. No log will say so.
-- **NEVER make a dispatched subagent run a multi-minute quiet command.** A
-  stream watchdog kills an agent after ~600s with no OUTPUT while its turn stays
-  open — liveness does not count. Run a long command with `run_in_background`
-  and read the Bash reply (measured, Claude Code 2.1.319): on a
-  single Agent dispatch it says "You will be notified when it completes" — end
-  your turn with no closeout and return it after you wake (a silent 660 s
-  command survived this way). On the Workflow route it says the command "is
-  terminated when you give your final response" — the member returns without
-  waking, so stay in your turn and wait with Monitor and an until-loop
-  (`until <check>; do echo waiting; sleep 30; done`, which prints a line on each pass so the turn never goes 600 s with no output). Never write `sleep N` followed by a check:
-  Claude Code blocks it every time. Codex is not tested. Otherwise run test suites in the orchestrator, or as a gate, and
-  keep gaps between tool calls short.
-- **The echo-per-pass loop is for a Workflow member only. In the main session,
-  NEVER arm a Monitor on a command already started with `run_in_background`**:
-  its completion notice is the one event you need. Every Monitor stdout line
-  wakes the session, so a main-session until-loop prints nothing per pass
-  (`until <check>; do sleep 30; done; <report>`). Measured: a 60 s "waiting"
-  echo woke one session ~8 times (example-project 2026-11-14) and another ~16 times
-  (Trader 2026-11-16), each answered with "Still running."
-- **Resume a stalled agent ONCE.** If the resume produces little or nothing,
-  dispatch a FRESH agent with the on-disk state named in the prompt ("X and Y
-  already exist; verify, do not rebuild"). Successive resumes degrade — measured
-  4 resumes to zero output, then a fresh dispatch finished the same task in
-  4½ minutes.
-- **NEVER prescribe a workaround you have not verified.** Advice about a
-  mechanism is a claim about that mechanism, and the same rule applies as to any
-  other claim: verify it before handing it to an agent or the user. Telling two
-  agents to "run the tests in the foreground" is what killed them.
-- **NEVER put `&` inside a command that you already start with `run_in_background`.** The
-  wrapper exits, the inner job dies, and no log appears. Run the real command as the
-  background command. Before you arm a Monitor on a log, check that the log exists: an
-  `until` loop on a file that was never created never ends.
+- **NEVER hand a reviewer its own generated output.** Review payloads hold SOURCE only. List captured logs, probe transcripts, and receipts by name and size without instructing a full read. Executable artifacts (`.sh`, `.py` probes) ARE source; discriminate on executable vs captured log, not "listed as evidence".
+- **NEVER judge a long step hung vs slow without comparing parent and child elapsed** (`ps -o etime`). A much younger child proves a silent retry already occurred.
+- **NEVER make a dispatched subagent run a multi-minute quiet command.** A stream watchdog kills an agent after ~600 s with no output while its turn stays open. Run long commands with `run_in_background` and read the Bash reply:
+  - Single Agent dispatch ("You will be notified when it completes"): end your turn with no closeout and return after waking.
+  - Workflow route ("is terminated when you give your final response"): stay in your turn and wait with Monitor and `until <check>; do echo waiting; sleep 30; done`.
+  - Never write `sleep N` followed by a check (Claude Code blocks it; Codex untested). Otherwise run test suites in the orchestrator or as a gate and keep gaps between tool calls short.
+- **Echo-per-pass loops are for Workflow members only. In the main session, NEVER arm a Monitor on a `run_in_background` command** (its completion notice is enough). Every Monitor stdout line wakes the session, so main-session until-loops must print nothing per pass (`until <check>; do sleep 30; done; <report>`).
+- **Resume a stalled agent ONCE.** If resume yields little or nothing, dispatch a FRESH agent naming the existing on-disk state ("X and Y already exist; verify, do not rebuild").
+- **NEVER prescribe a workaround you have not verified.** Verify any mechanism claim before handing it to an agent or the user.
+- **NEVER put `&` inside a `run_in_background` command** (the wrapper exits and kills the inner job). Run the real command directly, and verify a log file exists before arming a Monitor on it.
 
-Cost reporting itself is a Behavior rule, not repeated here: see the
-"repeated step's cost visibly compounds" bullet in `~/.claude/CLAUDE.md`.
-
-*Why:* in one plan session, roughly six verification cycles
-ran at 10–60 minutes each. One gate invocation burned its full 1800s timeout without
-returning a verdict, then silently restarted. Five subagent attempts died to the
-watchdog. Every one of those costs was visible in advance to anyone who measured.
+Cost reporting itself is in `~/.claude/CLAUDE.md` ("repeated step's cost visibly compounds").

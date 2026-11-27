@@ -89,3 +89,23 @@ def warn_missing_task_class(task_class):
             "excluded from routing proposals (task_class unknown)",
             file=sys.stderr,
         )
+
+
+def apply_post_session(session, spec, post_session, bp):
+    """Give an added session a git step: the explicit value, else the plan's most
+    common one, so a repair session commits and pushes like its siblings. Only
+    `git` is carried over, never a deploy; "none" opts out; nothing to inherit
+    leaves the session without a block."""
+    if post_session is None:
+        phases = {p["id"]: p for p in spec.get("phases", []) if "id" in p}
+        counts = {}
+        for s in spec["sessions"]:
+            g = (bp.resolve_post_session(s, phases) or {}).get("git", "none")
+            if g != "none":
+                counts[g] = counts.get(g, 0) + 1
+        post_session = max(counts, key=lambda g: counts[g]) if counts else None
+    elif post_session not in bp.VALID_GIT:
+        raise ValueError(f"--post-session must be one of {', '.join(sorted(bp.VALID_GIT))}, "
+                         f"got {post_session!r}")
+    if post_session and post_session != "none":
+        session["post_session"] = {"git": post_session}

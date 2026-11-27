@@ -36,7 +36,7 @@ failure or a genuinely new decision discovered mid-apply comes back to the opera
 - [ ] **Impact diff** — map findings onto SSOT blocks + consumer surfaces (incl. the three skills' prose CONTENT, not just their stamps)
 - [ ] **Changeset proposal** — write the changeset file, get operator approval (the one gate)
 - [ ] **Apply** — run the full checklist top to bottom, guard-verified
-- [ ] **Post-apply** — eval re-run scope, nudge retro, owner-gate check, memory pointer, decay pass (generation change only)
+- [ ] **Post-apply** — eval re-run scope, nudge retro, owner-gate check, memory pointer, decay pass (generation change, or 90 days since the last pass)
 
 ## Flow
 
@@ -155,8 +155,9 @@ is only for retro-sourced proposal adopt/rollback decisions.
 - **Memory pointer**: if key facts changed (SSOT version, default pairs, new operating
   commands), update `~/.claude/projects/-Users-USER-DeveloperFolder-example-project/memory/reference_model_effort_routing_system_20260703.md`
   and its MEMORY.md index line.
-- **Instruction-decay pass — model-generation changes only.** When the trigger was a new
-  family or a major version of a lineup model, run `references/instruction-decay.md`:
+- **Instruction-decay pass — model-generation changes, or 90 days since the last pass.**
+  When the trigger was a new family or a major version of a lineup model, or the newest
+  `evals/routing/results/*/RETIRED-RULES.md` is more than 90 days old, run `references/instruction-decay.md`:
   probe whether the failure-derived rules in CLAUDE.md and the skills' gotcha sections
   still earn their context on the new model, and propose retirements through the same
   changeset gate. Skip for price/deprecation/binary-bump triggers — those change costs

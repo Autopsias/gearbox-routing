@@ -76,6 +76,8 @@ Prefer junitxml for any worker-correlation or pass/fail extraction. Treat grep/a
 
 ---
 
+> **Every `-n` command below (including `-n0`) runs as `~/.claude/scripts/govrun --max-wait 0 $PYTEST_CMD ...` in a background Bash call.** The governor hook refuses it otherwise. The prefix is left out of the blocks below for brevity.
+
 ## Step 1 — Worker count differential
 
 **What you're testing.** Whether parallelism itself triggers the failure.

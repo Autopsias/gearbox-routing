@@ -24,6 +24,7 @@ import build_canary
 import explainer as expl
 import plan_limits as pl
 import route_at_dispatch_build as rad
+import spec_warnings as sw
 import hashlib
 import html
 import json
@@ -221,7 +222,7 @@ def _validate_checkpoint_brief(brief, where):
 # `require_evidence` (Vista ③) asserts the closeout carries an `evidence` list of
 # paths that exist + are non-empty before DOING→DONE — a structural form of the
 # "verify mechanism engagement" discipline.
-VERIFY_KEYS = {"gates", "on_fail", "max_rework", "require_evidence", "checks", "locked"}
+VERIFY_KEYS = {"gates", "on_fail", "max_rework", "require_evidence", "checks", "locked", "blocking_rule"}
 VALID_ON_FAIL = {"rework", "halt"}
 # dispatch.depends_on_policy — how a session treats an upstream that terminally
 # failed. "all" (default) = today's hard-AND: every dep must complete or the
@@ -350,6 +351,7 @@ def _validate_verify_block(block, where):
     on_fail = block.get("on_fail", "rework")
     if on_fail not in VALID_ON_FAIL:
         raise ValueError(f"{where}.on_fail must be one of {sorted(VALID_ON_FAIL)}, got {on_fail!r}")
+    sw.check_blocking_rule(block, where)
     mr = block.get("max_rework", pl.DEFAULT_MAX_REWORK)
     if not isinstance(mr, int) or mr < 0 or mr > pl.MAX_REWORK_CEILING:
         raise ValueError(f"{where}.max_rework must be an int 0..{pl.MAX_REWORK_CEILING}, got {mr!r}")
@@ -438,6 +440,16 @@ def validate_peer_triggers(spec):
             )
 
 
+# The registry is read from the main checkout, and a plan merges only after its
+# last session, so a plan cannot register a gate for its own sessions.
+_GATE_ROUTE_HINT = (
+    "The builder and the gate runner read this registry from the main checkout, and "
+    "a plan merges only after its last session, so no session of this plan can add "
+    "the entry for its own use. Add the entry to .claude/eval-gates.json on main "
+    "first (its own PR), then rebuild; or use an evidence check instead."
+)
+
+
 def validate_verify_resolves(spec, project_root):
     """Build-time guard: every verify gate id must resolve in the project's
     eval-gates registry or the skill-bundled defaults (same registry as
@@ -464,7 +476,7 @@ def validate_verify_resolves(spec, project_root):
                 raise ValueError(
                     f"Session {s['id']} verify gate {gate!r} is not in the project's "
                     f".claude/eval-gates.json nor the skill-bundled defaults "
-                    f"{sorted(bundled_gates)}."
+                    f"{sorted(bundled_gates)}. {_GATE_ROUTE_HINT}"
                 )
             # Probe probe_flags of skill-kind verify gates — fails loud on drift.
             if _ship_adapter is not None and gate in merged_gates:
@@ -539,7 +551,7 @@ def _resolve_shipping_steps(_ship_adapter, bundled_gates, full_reg, probe_roots,
             raise ValueError(
                 f"{where}: pre_deploy_gate {gate!r} is not in the project's "
                 f".claude/eval-gates.json nor the skill-bundled defaults "
-                f"{sorted(bundled_gates)}."
+                f"{sorted(bundled_gates)}. {_GATE_ROUTE_HINT}"
             )
         # Probe probe_flags of skill-kind gates — fails loud on drift.
         if _ship_adapter is not None and gate in merged_gates:
@@ -841,45 +853,6 @@ def _width_warning(spec, rep):
     )
 
 
-# CALIBRATED, not guessed. Measured across 207 sessions in 25 plans
-# on disk: p50 = 2,486 chars of `prompt`, p75 = 4,133, p90 = 6,409, p95 = 8,088.
-# The threshold is p90, so this fires on roughly one session in ten.
-#
-# Why it is worth a warning at all: on the adaptive-routing plan, s02 (1,486
-# chars) finished in 26 minutes and s03 (7,708) took five and a half hours
-# across two attempts. Both declared ONE item, so nothing else in the builder
-# could tell them apart — item count is the progress unit and it does not track
-# work at all.
-#
-# Why it WARNS and never refuses: size predicts cost only loosely. s09 on that
-# same plan sat at p84 and finished in six minutes, because most of its time was
-# spent waiting on trials rather than writing code. This flags a card worth a
-# second look; it does not know how long the work takes. A deliberately large
-# session is a legitimate choice, so there is no flag to silence it — the plan
-# author reads the line and decides.
-_SESSION_PROMPT_P90 = 6400
-
-
-def _oversized_session_warning(spec):
-    """Warn on any session whose `prompt` exceeds the corpus p90 (see above)."""
-    big = [
-        (s["id"], len(s.get("prompt") or ""))
-        for s in spec.get("sessions", [])
-        if len(s.get("prompt") or "") > _SESSION_PROMPT_P90
-    ]
-    if not big:
-        return
-    listed = ", ".join(f"{sid} ({n:,} chars)" for sid, n in sorted(big, key=lambda x: -x[1]))
-    print(
-        f"WARNING: {len(big)} session(s) carry a work brief above the {_SESSION_PROMPT_P90:,}-char "
-        f"p90 of every plan measured on this machine: {listed}. A brief this size usually means "
-        "several sessions' worth of work on one card — the largest measured case ran 12x longer "
-        "than the smallest, and both declared one item, so item count cannot warn you. Consider "
-        "splitting at an item boundary. This is advisory: a deliberately large session is fine.",
-        file=sys.stderr,
-    )
-
-
 def _integration_session_id(pg, taken):
     """A stable, ID_REGEX-legal id for an auto-emitted integration session."""
     base = (slugify(f"{pg}-integration") or "integration")[:64].rstrip("-")
@@ -1112,7 +1085,7 @@ def _read_json_quietly(path):
     build failure, so every read here is best-effort."""
     try:
         return json.loads(Path(path).read_text())
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open: best-effort config probe returns None on any read or parse failure
         return None
 
 
@@ -1851,7 +1824,8 @@ def _validate_plan_items(cat_keys, spec):
     if not acceptance and len(spec["sessions"]) >= 4:
         _warn_no_acceptance_review(spec)
 
-    _oversized_session_warning(spec)
+    sw.oversized_session_warning(spec)
+    sw.warn_missing_blocking_rule(spec, resolve_verify)
     pl.warn_plan_risks(spec, _declared_writes(spec))
 
     # Optional top-level phases carrying phase_closer defaults that sessions
@@ -1923,6 +1897,7 @@ def validate_spec(spec):
     # validates exactly as it did before this feature existed. Conservative
     # reading, deliberately: unset/unknown version = pre-bump = unenforced.
     _validate_plan_items(cat_keys, spec)
+    rad.spec_coverage.check(spec)
 
     _validate_dispatch_graph(spec["sessions"])
     _validate_infographic_and_hooks(spec)
@@ -2458,7 +2433,7 @@ def gen_session_context_md(session, items_by_id):
     return "\n".join(sections)
 
 
-PLAN_SCHEMA_VERSION = 8
+PLAN_SCHEMA_VERSION = 9
 """The highest stamp this builder writes (a spec below v8 keeps 7: `rad.fresh_stamp`),
 and the ONE constant every version-gated executor feature keys off (`closeout_pipeline.plan_impact`,
 `closeout_pipeline.decision_brief`, `plan_version_gate.ISOLATION_MIN_SCHEMA`).
@@ -2628,11 +2603,11 @@ def gen_manifest(spec, plan_schema_version=None):
                 # tree-protecting rules were keyed on a field the builder never
                 # wrote. Emitted only when declared (at v8 `[]` is a declaration),
                 # so a pre-v8 manifest is unchanged. parallel-group-contract.md §2 M2a.
-                **rad.manifest_touches(it, spec),
+                **rad.manifest_touches(it, spec), **rad.spec_coverage.item_covers(it),
             }
             for it in spec["items"]
         ],
-        "sessions": sessions,
+        "sessions": sessions, **rad.spec_coverage.top(spec),
     }
     # Scope boundary + fog register. Structured so plan-harden's
     # decision-debt lint and the closing acceptance review read them from the
@@ -3460,7 +3435,8 @@ def build(spec, out_path, project_root=None, preserve_state=False):
         resolved_ps = resolve_post_session(s, phases_by_id)
         resolved_vb = resolve_verify(s, phases_by_id)
         write_clean_text(sessions_dir / f"{sid}.prompt.md", gen_session_prompt_md(
-            s, plan_dir.name, items_by_id, post_session=resolved_ps, verify=resolved_vb))
+            s, plan_dir.name, items_by_id, post_session=resolved_ps, verify=resolved_vb,
+            plan_schema_version=stamp, project_root=reg_root))
         write_clean_text(sessions_dir / f"{sid}.context.md", gen_session_context_md(s, items_by_id))
 
     # 6. _closeouts/ directory placeholder

@@ -14,6 +14,8 @@ Classify impact independently from evidence strength.
 
 Do not inflate impact because a claim is easy to prove.
 
+These labels are raw input: a synthesizing orchestrator grades each finding again, so do not add a CRITICAL/HIGH grade of your own.
+
 ### Evidence Strength
 
 - `verified`: Directly demonstrated by the artifact, execution, authoritative
@@ -27,6 +29,8 @@ separate Open Questions section.
 
 Use these exact labels. Do not translate them to `critical`, `high`, `medium`,
 `low`, or numeric scores.
+
+A finding about a missing or weak test asks to add or change one named test (file and test name, and what it must assert), not for more coverage in general.
 
 ## Admission Test
 

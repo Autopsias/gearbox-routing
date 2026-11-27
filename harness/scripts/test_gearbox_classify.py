@@ -145,8 +145,71 @@ def _end_to_end_on_a_throwaway_repo():
         assert "settings.json" in r["harness"] and r["errors"], r
 
 
+def test_restore_orca_hook_timeout():
+    """Orca's PreToolUse timeout 30->10 downgrade restores cleanly; real hook edits still abort."""
+    with tempfile.TemporaryDirectory() as d:
+        def run(*c):
+            return subprocess.run(["git", "-C", d, *c], check=True, capture_output=True)
+        run("init", "-q", "-b", "main")
+        run("config", "user.email", "t@t")
+        run("config", "user.name", "t")
+        orca_cmd = '/bin/sh "${HOME}/.orca/agent-hooks/claude-hook.sh"'
+        base = {
+            "model": "opus[1m]",
+            "hooks": {
+                "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": orca_cmd, "timeout": 30}]}],
+                "SessionStart": [],
+            },
+        }
+        spath = os.path.join(d, "settings.json")
+        open(spath, "w", encoding="utf-8").write(json.dumps(base, indent=2) + "\n")
+        run("add", "settings.json")
+        run("commit", "-qm", "base")
+
+        # 1. Narrow Orca downgrade (30 -> 10) + unrelated /model churn: restores 30, keeps churn.
+        downgraded = json.loads(json.dumps(base))
+        downgraded["model"] = "sonnet"
+        downgraded["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 10
+        open(spath, "w", encoding="utf-8").write(json.dumps(downgraded, indent=2) + "\n")
+        proc = subprocess.run(
+            [sys.executable, os.path.join(HERE, "gearbox-classify.py"),
+             "--claude-dir", d, "--restore-orca-timeout"],
+            capture_output=True, text=True, check=True,
+        )
+        assert "10 -> 30" in proc.stdout, proc.stdout
+        after = json.loads(open(spath, encoding="utf-8").read())
+        assert after["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] == 30
+        assert after["model"] == "sonnet"
+        head, now = gc._settings_pair(d)
+        cls = gc.classify_paths(["settings.json"], head, now, SPEC)
+        assert cls["harness"] == [] and cls["churn"] == ["settings.json"], cls
+
+        # 2. Orca downgrade PLUS another hook edit: must refuse (fail-closed) and stay harness.
+        plus_hook = json.loads(json.dumps(base))
+        plus_hook["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 10
+        plus_hook["hooks"]["SessionStart"] = [{"command": "evil.sh"}]
+        open(spath, "w", encoding="utf-8").write(json.dumps(plus_hook, indent=2) + "\n")
+        assert gc.restore_orca_hook_timeout(d) is None
+        head, now = gc._settings_pair(d)
+        assert gc.classify_paths(["settings.json"], head, now, SPEC)["harness"] == ["settings.json"]
+
+        # 3. Orca command modified alongside timeout drop: must refuse.
+        bad_cmd = json.loads(json.dumps(base))
+        bad_cmd["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 10
+        bad_cmd["hooks"]["PreToolUse"][0]["hooks"][0]["command"] = orca_cmd + " && evil"
+        open(spath, "w", encoding="utf-8").write(json.dumps(bad_cmd, indent=2) + "\n")
+        assert gc.restore_orca_hook_timeout(d) is None
+
+        # 4. Timeout raised (30 -> 45) is not an Orca downgrade: must refuse.
+        raised = json.loads(json.dumps(base))
+        raised["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 45
+        open(spath, "w", encoding="utf-8").write(json.dumps(raised, indent=2) + "\n")
+        assert gc.restore_orca_hook_timeout(d) is None
+
+
 def main():
     test_snap_paths_terminates_last_record()
+    test_restore_orca_hook_timeout()
 
     # --- [live-state] globs: * stays in a segment, ** crosses them -------------
     assert is_live("projects/-Users-x-example-project/memory/note.md")

@@ -139,7 +139,7 @@ def _small_stack(fn):
     def go():
         try:
             res["rc"] = fn()
-        except BaseException as e:      # reported to the test, not swallowed
+        except BaseException as e:  # noqa: BLE001 — captured and handed back to the test, not swallowed
             res["error"] = e
     old = threading.stack_size(1024 * 1024)
     try:

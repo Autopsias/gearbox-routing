@@ -47,6 +47,7 @@ import land_at_land as lal
 import land_broker as lbk
 import land_carry as lc
 import land_flaky as lfk
+import land_regate as lrg
 import lease_guard as lg
 import land_load as lld
 import land_repair as lrp
@@ -437,12 +438,13 @@ def step_gate(plan_dir, ctx, st):
                     "passing one are the same exit code.")
     set_key = _gate_set_digest(gates)
     key = f"{st['expected']}:{st.get('plan_head')}:{st.get('merge_sha')}:{set_key}"
+    if (early := lrg.precheck(plan_dir, ctx, st, key)) is not None:
+        return early                    # main's new tests, red: the long gates never start
     if st.get("gate_key") != key:
-        # The key is written WITH the reset (or carry), and saved, before any park
-        # below: left stale, `land_record` would stamp a verdict with the OLD key.
-        # R6 §17.1: a runtime-only main move keeps settled review passes and owner
-        # answers; anything else empties all three tables, as before.
-        lc.apply(plan_dir, ctx, st, gates, key, lc.decide(plan_dir, ctx, st, set_key))
+        # The key is written WITH the reset (or carry or reuse), and saved, before any park below:
+        # left stale, `land_record` would stamp a verdict with the OLD key. R6 §17.1: a main move
+        # keeps what `land_carry` or `land_regate` allows; anything else empties all three tables.
+        lrg.apply_or_reuse(plan_dir, ctx, st, gates, key, set_key)
     lsg.settle(plan_dir, st)        # LND-13: start_pending ends with its session only
     surface = _surface(st, ctx)
     st["files_examined"] = None if surface is None else len(surface)

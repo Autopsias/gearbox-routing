@@ -13,6 +13,8 @@ Run: pytest skills/routing-retro/scripts/test_aggregate_signals.py -q
 import json
 from datetime import UTC, datetime
 
+import pytest
+
 import aggregate_outcomes as ao
 import retro_cohorts
 import retro_common
@@ -554,7 +556,29 @@ def test_did_it_help_compares_by_ssot_version_ran_not_calendar_date(tmp_path, ss
     row = next(e for e in out["did_it_help"] if e["proposal_id"] == "pidY")
     assert row["before"]["n"] == 6
     assert row["after"]["n"] == 6
-    assert row["verdict"] == "no_improvement"  # both pools are 100% pass, no delta
+    assert row["verdict"] == "held"  # cheaper switch, both pools 100% pass: quality held
+
+
+@pytest.mark.parametrize("old_rung,new_rung,after_passes,verdict", [
+    ("opus@high", "sonnet@low", 6, "held"),           # cheaper, flat
+    ("opus@high", "sonnet@low", 0, "dropped"),        # cheaper, significant fall
+    ("opus@high", "sonnet@low", 4, "unclear"),        # cheaper, 100%->67% at N=6: not provably held
+    ("sonnet@high", "opus@high", 6, "no_improvement"),  # dearer, flat: did not pay off
+    ("gpt-5.6-sol@high", "sonnet@low", 6, "no_improvement"),  # off-ladder: old wording
+])
+def test_did_it_help_judges_cheaper_switch_by_held_not_improved(
+        tmp_path, ssot_path, old_rung, new_rung, after_passes, verdict):
+    _write_adoptions(tmp_path, [{
+        "proposal_id": "pidD", "action": "adopt", "class": "agentic_build",
+        "old_rung": old_rung, "new_rung": new_rung, "ssot_version": 100,
+        "date": "2026-08-01",
+    }])
+    recs = [r for i in range(6) for r in _cohort(f"b{i}", result="passed", ssot_version_ran=99)]
+    recs += [r for i in range(6) for r in _cohort(
+        f"a{i}", result=("passed" if i < after_passes else "exhausted"), ssot_version_ran=100)]
+    out = _run(tmp_path, ssot_path, recs)
+    row = next(e for e in out["did_it_help"] if e["proposal_id"] == "pidD")
+    assert row["verdict"] == verdict
 
 
 def test_did_it_help_reports_helped_when_after_pass_rate_improves(tmp_path, ssot_path):

@@ -111,6 +111,12 @@ def last_surface(records):
     return (surf[-1].get("hashes") or {}) if surf else {}
 
 
+def last_rule(records):
+    """The trimmed blocking rule the last surface record was reviewed under ('' = none)."""
+    surf = [r for r in records if r.get("kind") == "surface"]
+    return (surf[-1].get("rule") or "") if surf else ""
+
+
 def surface_hashes(cwd, paths):
     """Content hash per surface file. Content, not mtime or git: the tree is
     uncommitted and a rework may touch a file without changing it."""
@@ -148,6 +154,21 @@ def blocks(severity, floor=None):
     return sev in (floor or BLOCKING_SEVERITY)
 
 
+def rule_blocks(r):
+    """A recorded finding the blocking rule tied to a rule number (or left unreadable):
+    the severity floor never lowers it. Only a record written under a rule has the key."""
+    return "rule" in r and str(r["rule"] or "").strip().lower() != "none"
+
+
+def left_surface(p, inside, before):
+    """A prior whose file is not in `inside` (this attempt's surface). A rule-blocked
+    prior counts only when its file was in the `before` surface and LEFT it: a file the
+    surface never held, or no file at all, cannot leave it, so it stays judged and
+    blocking (a finding naming no surface file must never retire itself to a PASS)."""
+    f = _norm(p.get("file") or "")
+    return f not in inside and (not rule_blocks(p) or f in before)
+
+
 def open_priors(records, floor=None):
     """Findings not yet marked fixed. The LATEST status per id wins.
 
@@ -156,7 +177,7 @@ def open_priors(records, floor=None):
     a rule it was never judged under. They stay in the file and stay printed.
     """
     return _latest_findings(records, lambda r: r.get("status", "open") in ("open", "unverifiable")
-                            and blocks(r.get("severity"), floor))
+                            and (blocks(r.get("severity"), floor) or rule_blocks(r)))
 
 
 def latest_by_id(records):
@@ -186,7 +207,8 @@ def review_focus(ctx):
     `unverifiable`, does not block, so an unfixed HIGH finding would clear
     itself the moment the agent stopped touching its file.
     """
-    if ctx is None or ctx.attempt < 2:
+    # A changed blocking rule is a new question: the saved pass answered the old one.
+    if ctx is None or ctx.attempt < 2 or ctx.rule != last_rule(ctx.records):
         return None
     delta = set(ctx.delta)
     if not delta:
@@ -197,8 +219,8 @@ def review_focus(ctx):
 class Context:
     """Everything the gate needs from the ledger for ONE run, computed once."""
 
-    def __init__(self, plan_dir, session, cwd, surface_paths, floor=None):
-        self.plan_dir, self.session = plan_dir, session
+    def __init__(self, plan_dir, session, cwd, surface_paths, floor=None, rule=""):
+        self.plan_dir, self.session, self.rule = plan_dir, session, rule
         self.floor = floor or BLOCKING_SEVERITY
         self.records = load(plan_dir, session)
         self.attempt = last_attempt(self.records) + 1
@@ -211,7 +233,8 @@ class Context:
         # A prior whose file left the surface (removed, reverted) is moot: retire it
         # so it neither blocks nor is listed to the reviewer (2026-11-10, s02).
         inside = {_norm(x) for x in surface_paths}
-        self.retired = [p for p in self.priors if inside and _norm(p.get("file") or "") not in inside]
+        before = {_norm(x) for x in last_surface(self.records)}
+        self.retired = [p for p in self.priors if inside and left_surface(p, inside, before)]
         self.priors = [p for p in self.priors if p not in self.retired]
         self.accepted = load_accepted(plan_dir, session)
         # A prior the owner accepted does not block an UNCHANGED surface. It did:
@@ -227,11 +250,11 @@ class Context:
         self.section = prompt_section(self.attempt, self.priors, self.delta, unchanged)
 
 
-def context(plan_dir, session, cwd, surface_paths, floor=None):
+def context(plan_dir, session, cwd, surface_paths, floor=None, rule=""):
     """None when the gate has no plan context -- the ledger is opt-in."""
     if not plan_dir or not session:
         return None
-    return Context(plan_dir, session, cwd, surface_paths, floor)
+    return Context(plan_dir, session, cwd, surface_paths, floor, rule)
 
 
 def parse_floor(raw):
@@ -307,10 +330,26 @@ def _open_or_accepted(ctx, p, counts):
     return {"status": "accepted", "accept_reason": hit["reason"]} if hit else {"status": "open"}
 
 
-def judge(ctx, parsed, floor=None):
-    """-> (fail, counts, records). With no ctx: the old rule, any finding fails."""
+def rule_noted(f):
+    """True only for an explicit `"rule": "none"`. A number, garbage, null or a missing
+    field is False, so under a blocking rule the finding blocks (fails closed)."""
+    v = f.get("rule")
+    return isinstance(v, str) and v.strip().lower() == "none"
+
+
+def not_blocking_block(parsed):
+    """The findings a blocking rule set aside, printed so none is lost from the output."""
+    rows = [f for f in parsed if rule_noted(f)]
+    return "".join(f"\n[llm-review-gate] not blocking: {f.get('file')}:{f.get('line')} "
+                   f"[{f.get('severity')}] {f.get('summary')}" for f in rows)
+
+
+def judge(ctx, parsed, floor=None, rule_on=False):
+    """-> (fail, counts, records). With no ctx: the old rule, any finding fails
+    (under a blocking rule: any finding the reviewer did not mark `none`).
+    `rule_on`: the rule number decides, not the severity floor."""
     if ctx is None:
-        return bool(parsed), {}, []
+        return any(not (rule_on and rule_noted(f)) for f in parsed), {}, []
     a = ctx.attempt
     prior_by_id = {p["fid"]: p for p in ctx.priors}
     known = latest_by_id(getattr(ctx, "records", []) or [])
@@ -324,18 +363,23 @@ def judge(ctx, parsed, floor=None):
         # NOT a fixed HIGH echoed by id, nor one re-raised past the floor.
         k = known.get(pid) if pid not in prior_by_id else None
         if k and (k.get("status") == "accepted" or not (
-                blocks(k.get("severity"), floor) or blocks(f.get("severity") or k.get("severity"), floor))):
+                blocks(k.get("severity"), floor) or blocks(f.get("severity") or k.get("severity"), floor)
+                or rule_blocks(k) or (rule_on and not rule_noted(f)))):
             counts["noted"] += 1
-            recs.append({**k, "kind": "finding", "attempt": a,
-                         "status": "noted", "evidence": f.get("summary")})
+            recs.append({**k, "kind": "finding", "attempt": a, "status": "noted",
+                         **({"rule": f.get("rule")} if rule_on else {}), "evidence": f.get("summary")})
             continue
         if pid and pid in prior_by_id:
             fixed = str(f.get("prior", "")).lower() == "fixed"
             seen.add(pid)
             counts["prior_fixed"] += fixed
-            st = {"status": "fixed"} if fixed else _open_or_accepted(ctx, prior_by_id[pid], counts)
+            # under a rule the reviewer's CURRENT tag decides, never the one recorded before
+            noted = not fixed and rule_on and rule_noted(f)
+            counts["noted"] += noted
+            st = ({"status": "fixed"} if fixed else {"status": "noted"} if noted
+                  else _open_or_accepted(ctx, prior_by_id[pid], counts))
             recs.append({**prior_by_id[pid], "kind": "finding", "attempt": a, **st,
-                         "evidence": f.get("summary")})
+                         **({"rule": f.get("rule")} if rule_on else {}), "evidence": f.get("summary")})
             continue
         path = _norm(f.get("file", ""))
         sev = str(f.get("severity", "")).lower()
@@ -348,7 +392,8 @@ def judge(ctx, parsed, floor=None):
         new_in = ("first" if a == 1 else
                   ("delta" if path in ctx.delta else f.get("new_in") or "outside"))
         # THE FLOOR IS THE WHOLE RULE. Severity decides blocking; location does not.
-        status = "open" if blocks(sev, floor) else "noted"
+        status = ("noted" if rule_noted(f) else "open") if rule_on else (
+            "open" if blocks(sev, floor) else "noted")
         # ... unless the operator declared this one, by file and phrase, with a
         # reason. Only a BLOCKING finding is worth accepting, and the reason rides
         # in the ledger beside it so the clearance is never anonymous.
@@ -362,8 +407,10 @@ def judge(ctx, parsed, floor=None):
         recs.append({"kind": "finding", "attempt": a, "fid": fingerprint(f),
                      "file": f.get("file"), "line": f.get("line"), "severity": f.get("severity"),
                      "summary": f.get("summary"), "status": status, "new_in": new_in,
+                     **({"rule": f.get("rule")} if rule_on else {}),
                      **({"accept_reason": hit["reason"]} if hit else {})})
     surface = {_norm(x) for x in (ctx.hashes or ())}
+    before = {_norm(x) for x in last_surface(getattr(ctx, "records", []) or [])}
     for pid, p in prior_by_id.items():
         if pid in seen:
             continue
@@ -373,7 +420,7 @@ def judge(ctx, parsed, floor=None):
         # narrowing `review_scope` does to priors raised before the narrowing
         # (found by the example-isolation-plan session). Recorded,
         # counted and printed, never silently dropped.
-        if surface and _norm(p.get("file") or "") not in surface:
+        if surface and left_surface(p, surface, before):
             counts["prior_unverifiable"] += 1
             recs.append({**p, "kind": "finding", "attempt": a, "status": "unverifiable",
                          "evidence": "outside this attempt's reviewed surface; not judged"})
@@ -385,6 +432,10 @@ def judge(ctx, parsed, floor=None):
         recs.append({**p, "kind": "finding", "attempt": a, "status": "retired",
                      "evidence": "its file left the reviewed surface; kept in the ledger, not judged"})
     counts["accept_note"] = getattr(ctx, "accept_note", "")
+    # One id, one verdict per round: two findings with the same file and words share a fid, and the
+    # later record wins on read, so a `noted` twin would hide the open one. The open one stays.
+    opened = {r["fid"] for r in recs if r["status"] == "open"}
+    recs = [r for r in recs if r["status"] == "open" or r["fid"] not in opened]
     return any(r["status"] == "open" for r in recs), counts, recs
 
 
@@ -394,7 +445,8 @@ def record(ctx, recs):
     with open(p, "a", encoding="utf-8") as fh:
         for r in recs:
             fh.write(json.dumps(r) + "\n")
-        fh.write(json.dumps({"kind": "surface", "attempt": ctx.attempt, "hashes": ctx.hashes}) + "\n")
+        fh.write(json.dumps({"kind": "surface", "attempt": ctx.attempt, "hashes": ctx.hashes,
+                             **({"rule": ctx.rule} if ctx.rule else {})}) + "\n")
 
 
 def accepted_block(recs):

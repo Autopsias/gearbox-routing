@@ -28,7 +28,7 @@ def _touch_review_stamp():
         from dyno_paths import REVIEW_STAMP
         os.makedirs(os.path.dirname(REVIEW_STAMP), exist_ok=True)
         Path(REVIEW_STAMP).write_text(datetime.datetime.now().isoformat() + "\n")
-    except Exception as e:  # stamp is advisory
+    except Exception as e:  # noqa: BLE001 — best effort: stamp is advisory; the handler only tries to warn on stderr
         sys.stderr.write(f"[append] stamp not written: {e}\n")
 
 

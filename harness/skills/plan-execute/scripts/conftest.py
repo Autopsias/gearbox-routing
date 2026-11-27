@@ -8,6 +8,7 @@ import outcomes as outc
 import provider_lane  # noqa: E402
 import egress
 import run
+from dyno_guard import pytest_sessionstart, pytest_sessionfinish  # noqa: F401  (the ~/.gearbox-state leak guard)
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +31,15 @@ def isolated_outcome_ledger(tmp_path, monkeypatch):
     contaminates the seeded source-tree file with throwaway fixture data
     (measured: a full-suite run left 23 fixture records in the real file)."""
     monkeypatch.setenv(outc.LEDGER_PATH_ENV, str(tmp_path / "outcomes-test.ndjson"))
+
+
+@pytest.fixture(autouse=True)
+def isolated_land_hold_dir(tmp_path, monkeypatch):
+    """EVERY test writes the land-hold pointer (land._take_lease -> publish_pointer) into a
+    temporary folder, never the real ~/.gearbox-state/land-holds. Measured: one full run
+    left about 170 test_*__origin.json files there. A test that checks the pointer sets
+    LAND_HOLD_DIR itself, after this runs."""
+    monkeypatch.setenv("LAND_HOLD_DIR", str(tmp_path / "land-holds"))
 
 
 @pytest.fixture(autouse=True)

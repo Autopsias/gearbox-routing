@@ -30,7 +30,7 @@ def tracked_files(repo):
 # by the literal string "requirements.txt" — which is why this repo's
 # requirements-ci.txt used to read as "no dependencies at all" and took five
 # dependency checks off the scorecard with it (observed).
-# Source: docs.renovatebot.com/modules/manager/pip_requirements
+# Source: docs.renovatebot.com/modules/manager/pip_requirements  # noqa: ERA001 — doc source reference, not code
 REQ_NAME = re.compile(r"^[\w-]*requirements([-._]\w+)?\.(txt|pip)$")
 # Dependabot's companion filenames — the ones a basename regex cannot express.
 PLAIN_MANIFESTS = ("package.json", "setup.py", "Pipfile")

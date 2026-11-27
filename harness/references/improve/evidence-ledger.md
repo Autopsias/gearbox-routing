@@ -62,8 +62,9 @@ Both top-level keys are always present, both are always arrays. An empty ledger 
 | `gaps[].sightings[].session` | The session this sighting came from. Prefer the real Claude Code session id. Fall back to the run date (`YYYY-MM-DD`) only when no id is available — see "Session identity" below, because the fallback can under-count. |
 | `gaps[].sightings[].quote` | The verbatim excerpt that evidenced the gap in that session — a transcript quote, or the cited config text (`path:line`) for a file-derived finding. Word-for-word, not paraphrased. This is what gate 1 produced; storing it is what lets gate 3 later judge "materially new". |
 | `gaps[].sightings[].seen` | Date the sighting was recorded, `YYYY-MM-DD`. Drives the 90-day expiry. |
+| `gaps[].built` | Optional. Set with `layer` when a plan built the fix; the plan's slug, e.g. `dyno-test-leak-guard-2026-11-22`. |
 | `gaps[].retired` | `null` while the gap is live. Set to `YYYY-MM-DD` once a rule covers it. A retired gap is not presented again, with two exceptions: a `standing-default-` key and an open candidate line (see "Matching a finding to a gap key" and "The candidate line"). |
-| `gaps[].layer` | Written with `retired`, never before: where the lesson was stored. `shape` = the cause was removed (a tool fix), `check` = a row in `hooks/command_rules.json`, `text` = a rule in a config file or skill. Old retired gaps have no `layer`: never rewrite them; a reader counts a missing value as unmarked (shown as text for display only, with the unmarked count beside it). |
+| `gaps[].layer` | Written with `retired`, never before: where the lesson was stored. `shape` = the cause was removed (a tool fix), `check` = a row in `hooks/command_rules.json`, `text` = a rule in a config file or skill. Old retired gaps have no `layer`: never back-fill them (a gap closed by a new fix gets its `layer` when that fix lands); a reader counts a missing value as unmarked (shown as text for display only, with the unmarked count beside it). |
 | `rejections[].edit` | One-line summary of the exact edit the user rejected, naming the target file. Specific enough that a later run can tell whether it is proposing the same thing. |
 | `rejections[].rejected` | Date of the rejection, `YYYY-MM-DD`. |
 | `rejections[].evidence_then` | The verbatim quotes that supported the edit *at the moment it was rejected*. This is the baseline "materially new evidence" is measured against. |
@@ -177,7 +178,7 @@ a class that passes the bar again after it is an 'Ignored default' finding.
 
 ### The candidate line
 
-One line grammar, written here once; `learning-capture.md`, `commands/improve.md`
+One line grammar, written here once; `learning-capture.md`, `skills/improve/SKILL.md`
 section 4a and `full-scope-history-agents.md` cite it. A memory note carries the
 line `Remove-the-cause candidate (<state>): <change> -- <plan slug> <date>`. All
 waiting forms keep the prefix `Remove-the-cause candidate (open`, so a yes cannot hide

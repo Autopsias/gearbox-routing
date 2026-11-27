@@ -714,6 +714,12 @@ the full status removes a file nobody decided to remove.
 
 ### 4.8 — Land in a repo with NO REMOTE (a first-class path, not an exception)
 
+A remote with only `DISABLED://` push URLs is fetch-only for plan closeout.
+Land and finish exclude it when choosing a remote. If no writable remote
+remains, they use the local protocol below. The Git remote stays configured.
+If Git ignores the entire untracked plan folder, the local closeout keeps
+the record in that folder. The durable ref still preserves the code commit.
+
 Everything above assumes an `origin`. §7.2 keeps non-remote targets supported, so
 the no-remote land needs its own protocol rather than a sentence — without one,
 §4.2 has no `origin/main` to capture, §8.c has no push for the record to ride,
@@ -1782,7 +1788,12 @@ reserving plan's `run.ndjson`.
 3. **It blocks only land's lease acquisition:** `land.land` (land.py:151, :173).
    Worktree setup (plan_worktree.py:353), `ship-begin`, `push:` and `deploy:`
    leases, and `finish`'s `git:` lease (finish.py:135), ignore it. (The test
-   fixture `_land_lease_holder.py` is not a production lease taker.)
+   fixture `_land_lease_holder.py` is not a production lease taker.) One other
+   reader exists: `scripts/merge_when_green.py` finds the lock folder through the
+   pointer file `~/.gearbox-state/land-holds/<owner>__<repo>.json` and waits, inside its
+   `--timeout`, while a reservation or a land lease there is live (`--no-land-wait`
+   skips it). It only reads. A manual `gh pr merge` or `git push` does not read the
+   hold, and the hold ends at `expires_at`, so a later owner answer meets an open main.
 4. **The reserving plan passes its own reservation**, and ends it
    (`why: own-land`) when its next land run takes the lease.
 5. **The owner's answer ends it, with no gap.** `land-ack`, `land-record` and

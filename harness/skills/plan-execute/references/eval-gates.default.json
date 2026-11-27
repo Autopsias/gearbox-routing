@@ -46,12 +46,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --timeout 1200"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --require-repro --timeout 1200"
     ],
     "cwd": ".",
     "timeout": 2400,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -74,12 +75,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --timeout 1800"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --require-repro --timeout 1800"
     ],
     "cwd": ".",
     "timeout": 4000,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -102,12 +104,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level high --timeout 1500"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level high --require-repro --timeout 1500"
     ],
     "cwd": ".",
     "timeout": 3120,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -130,12 +133,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --reviewer codex --timeout 1200"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level low --reviewer codex --require-repro --timeout 1200"
     ],
     "cwd": ".",
     "timeout": 2400,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -158,12 +162,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --reviewer codex --timeout 1800"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level medium --reviewer codex --require-repro --timeout 1800"
     ],
     "cwd": ".",
     "timeout": 4000,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -185,12 +190,13 @@
     "argv": [
       "/bin/sh",
       "-c",
-      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level high --reviewer codex --timeout 1500"
+      "p=\"$HOME/.claude/skills/plan-execute/scripts/llm_review_gate.py\"; [ -f \"$p\" ] || p=skills/plan-execute/scripts/llm_review_gate.py; exec python3 \"$p\" --level high --reviewer codex --require-repro --timeout 1500"
     ],
     "cwd": ".",
     "timeout": 3120,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -218,6 +224,7 @@
     "timeout": 2400,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -245,6 +252,7 @@
     "timeout": 4000,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -272,6 +280,7 @@
     "timeout": 2400,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",
@@ -299,6 +308,7 @@
     "timeout": 4000,
     "env_allowlist": [
       "PLAN_EXECUTE_INTENT_FILE",
+      "PLAN_EXECUTE_BLOCKING_RULE",
       "PLAN_EXECUTE_REVIEW_BASE",
       "PLAN_EXECUTE_PLAN_DIR",
       "PLAN_EXECUTE_SESSION",

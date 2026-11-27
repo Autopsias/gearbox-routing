@@ -88,7 +88,7 @@ def gate(manifest: dict) -> dict:
 def _maybe_schema_validate(manifest: dict, schema_path: str) -> str | None:
     try:
         import jsonschema  # type: ignore
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open: any import failure skips the optional schema validation
         return "jsonschema not installed; skipped full schema validation (gate is independent of it)"
     try:
         with open(schema_path, encoding="utf-8") as fh:

@@ -72,7 +72,7 @@ def _event(plan_dir, **fields):
     rsi.log_event(plan_dir, "checkpoint_reached", session_ids=["s01"], **fields)
 
 
-# (a)
+# (a)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_answer_file_records_and_the_digest_opens_with_the_block(parked, capsys):
     out = _resume(parked, capsys, file=_answer_file(parked, "Hold. Do it on Friday."))
     assert out["action"] == "dispatch" and out["checkpoint_answer"]["given"] is True
@@ -86,7 +86,7 @@ def test_answer_file_records_and_the_digest_opens_with_the_block(parked, capsys)
     assert d.startswith(BEGIN + "\n  Hold. Do it on Friday.\n") and END in d
 
 
-# (b) + (i)
+# (b) + (i)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_bare_resume_refuses_then_passes_after_an_answer(parked, capsys):
     with pytest.raises(SystemExit) as e:
         _resume(parked, capsys)
@@ -100,7 +100,7 @@ def test_bare_resume_refuses_then_passes_after_an_answer(parked, capsys):
     assert out["action"] == "dispatch" and (parked / FILE).read_bytes() == before
 
 
-# (c)
+# (c)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_no_answer_appends_given_false_and_says_not_agreement(parked, capsys):
     _resume(parked, capsys, no_answer=True)
     row = _lines(parked)[0]
@@ -110,7 +110,7 @@ def test_no_answer_appends_given_false_and_says_not_agreement(parked, capsys):
     assert "NOT agreement" in d and "no answer was given" in d
 
 
-# (d)
+# (d)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_no_checkpoint_no_entry_and_digest_empty(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, _sessions())
     out = _resume(plan_dir, capsys, file=_answer_file(plan_dir, "x"))
@@ -119,7 +119,7 @@ def test_no_checkpoint_no_entry_and_digest_empty(tmp_path, capsys):
     assert fd.digest(plan_dir, "s02") == ""
 
 
-# (e)
+# (e)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_hostile_changelog_does_not_stop_the_digest_or_the_record(parked, capsys):
     (parked / "_changelog.ndjson").write_bytes(b'not json\n[]\nnull\n{"op": "x", "at": "\xff\xfe"}\n\xff\xfe\n')
     assert fd.digest(parked, "s01") == ""
@@ -129,7 +129,7 @@ def test_hostile_changelog_does_not_stop_the_digest_or_the_record(parked, capsys
     assert "ok" in (parked / "PLAN.html").read_text()
 
 
-# (f)
+# (f)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_unreadable_answer_lines_give_the_stop_block(parked, capsys):
     _resume(parked, capsys, file=_answer_file(parked, "fine"))
     good = (parked / FILE).read_bytes()
@@ -143,7 +143,7 @@ def test_unreadable_answer_lines_give_the_stop_block(parked, capsys):
     assert "could not be read" in d and "ab" not in d.split("Stop and flag", 1)[0].split("read:", 1)[1]
 
 
-# (f2)
+# (f2)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_concurrent_appends_keep_both_and_a_changelog_rewrite_does_not_erase(parked, capsys):
     code = ("import sys; sys.path.insert(0, {s!r}); import checkpoint_answer as ca; "
             "[ca._append({p!r}, {{'session': 's01', 'n': '%s' + str(i), 'given': True}}) for i in range(200)]")
@@ -159,14 +159,14 @@ def test_concurrent_appends_keep_both_and_a_changelog_rewrite_does_not_erase(par
     assert "keep me" in fd.digest(parked, "s01")
 
 
-# (g)
+# (g)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_flag_on_a_non_qualifying_resume_records_nothing(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, _sessions())
     out = _resume(plan_dir, capsys, no_answer=True, resume=False)
     assert "ignored" in out["checkpoint_answer_note"] and not (plan_dir / FILE).exists()
 
 
-# (h)
+# (h)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_second_explicit_answer_wins(parked, capsys):
     _resume(parked, capsys, file=_answer_file(parked, "first"))
     _resume(parked, capsys, file=_answer_file(parked, "second"))
@@ -175,7 +175,7 @@ def test_second_explicit_answer_wins(parked, capsys):
     assert "second" in d and "first" not in d
 
 
-# (j)
+# (j)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_retire_barred_park_and_older_checkpoint(parked, capsys):
     _resume(parked, capsys, file=_answer_file(parked, "go"))
     assert fd.digest(parked, "s01").startswith(BEGIN)
@@ -197,7 +197,7 @@ def test_retire_barred_park_and_older_checkpoint(parked, capsys):
         assert fd.digest(parked, "s01") == "", op
 
 
-# (k)
+# (k)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_batch_peer_does_not_get_a_record(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, _sessions(peer=True))
     run.cmd_checkpoint(str(plan_dir), "s01")
@@ -208,7 +208,7 @@ def test_batch_peer_does_not_get_a_record(tmp_path, capsys):
     assert fd.digest(plan_dir, "s02") == ""
 
 
-# (l)
+# (l)  # noqa: ERA001 — test-case label letter matching the spec, not code
 @pytest.mark.parametrize("kind", ["codex", "post", "verifier", "legacy"])
 def test_other_parks_do_not_qualify(tmp_path, capsys, kind):
     plan_dir = make_plan(tmp_path, _sessions())
@@ -227,7 +227,7 @@ def test_other_parks_do_not_qualify(tmp_path, capsys, kind):
     assert "ignored" in out["checkpoint_answer_note"] and not (plan_dir / FILE).exists()
 
 
-# (m)
+# (m)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_awkward_text_round_trips_verbatim(parked, capsys):
     text = f"it's $(rm -rf x) fine\n- leading dash\n{END}\nno answer given\n"
     _resume(parked, capsys, file=_answer_file(parked, text))
@@ -241,7 +241,7 @@ def test_awkward_text_round_trips_verbatim(parked, capsys):
     assert _lines(parked)[-1]["given"] is True
 
 
-# (n)
+# (n)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_secret_in_answer_is_refused(parked, capsys):
     if not shutil.which("gitleaks"):
         pytest.skip("gitleaks is not installed")
@@ -250,7 +250,7 @@ def test_secret_in_answer_is_refused(parked, capsys):
     assert _FAKE_AWS_KEY not in str(e.value) and not (parked / FILE).exists()
 
 
-# (o)
+# (o)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_missing_gitleaks_is_refused(parked, capsys, monkeypatch):
     monkeypatch.setattr(egress, "_text_hit", lambda text, name: egress._NO_GITLEAKS)
     with pytest.raises(SystemExit) as e:
@@ -258,7 +258,7 @@ def test_missing_gitleaks_is_refused(parked, capsys, monkeypatch):
     assert "gitleaks" in str(e.value) and not (parked / FILE).exists()
 
 
-# (p)
+# (p)  # noqa: ERA001 — test-case label letter matching the spec, not code
 @pytest.mark.parametrize("content", [b"", b"  \n\t\n", b"\xff\xfe bad"])
 def test_empty_or_undecodable_file_is_refused(parked, capsys, content):
     with pytest.raises(SystemExit):
@@ -268,7 +268,7 @@ def test_empty_or_undecodable_file_is_refused(parked, capsys, content):
         _resume(parked, capsys, file=parked / "_decisions" / "missing.md")
 
 
-# (q)
+# (q)  # noqa: ERA001 — test-case label letter matching the spec, not code
 def test_resume_hints_name_the_flags(tmp_path, capsys):
     plan_dir = make_plan(tmp_path, _sessions())
     act = _resume(plan_dir, capsys, resume=False)
@@ -279,6 +279,15 @@ def test_resume_hints_name_the_flags(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert f"{plan_dir}/_decisions/s01.md" in out["resume_with"] and "--answer-file" in out["resume_with"]
     assert json.loads((plan_dir / "run.ndjson").read_text().splitlines()[-1])["kind"] == "pre_dispatch"
+
+
+def test_plain_plan_parks_so_the_answer_is_recorded(tmp_path, capsys):
+    plan_dir = make_plan(tmp_path, _sessions())
+    act = _resume(plan_dir, capsys, resume=False)  # no separate `checkpoint` call
+    assert act["action"] == "checkpoint" and act["parked"] is True
+    out = _resume(plan_dir, capsys, file=_answer_file(plan_dir, "go with 2"))
+    assert out["checkpoint_answer"] == {"session": "s01", "given": True}
+    assert [x["answer"] for x in _lines(plan_dir)] == ["go with 2"]
 
 
 def test_module_exports():

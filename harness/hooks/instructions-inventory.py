@@ -46,7 +46,7 @@ try:
     from compact_store import append_line, iso_utc, kill_switch, root
 
     IMPORT_ERROR = ""
-except Exception as _exc:  # pragma: no cover - exercised by a dedicated test
+except Exception as _exc:  # noqa: BLE001 — fail open: any import error is recorded and the hook degrades to a no-op
     IMPORT_ERROR = "%s: %s" % (type(_exc).__name__, _exc)
 
 # The closed set the binary's own schema declares. Kept as data because the

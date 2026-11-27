@@ -2,8 +2,9 @@
 
 A land that stops to ask the owner releases its ``git:`` lease but leaves
 ``<plan-locks>/<resource-slug>.reservation.json`` (default 60 minutes). Another plan's
-LAND lease acquisition parks ``land-reserved`` while it is live. Nothing else reads it:
-worktree setup, ship-begin, ``push:``/``deploy:`` and ``finish`` leases ignore it.
+LAND lease acquisition parks ``land-reserved`` while it is live. Only land lease
+acquisition reads it here (worktree setup, ship-begin, ``push:``/``deploy:`` and ``finish`` leases ignore it);
+``merge_when_green.py`` also reads the lock folder, found through the pointer below.
 Every read-check-write runs inside the lease file's host mutex (``lease_guard.mutex``,
 re-entrant per thread), so no plan can acquire between A's reservation and A's release.
 Nothing ever extends ``expires_at``.
@@ -11,9 +12,16 @@ Nothing ever extends ``expires_at``.
 The owner's answer (``land-ack``/``land-record``/``land-verify``) ends it in the same mutex
 hold that takes the lease, in the same process that goes on with the land (``acquire`` with
 ``why="answered"``); any other land run ends it when it takes the lease (``own-land``).
+
+``publish_pointer`` writes ``~/.gearbox-state/land-holds/<owner>__<repo>.json`` (folder: ``LAND_HOLD_DIR``) so a process
+in any folder can find this land's lock folder from the GitHub name of the repo. The land never
+deletes it: the reader checks the lock folder itself, so a stale pointer is harmless.
 """
 
 import json
+import os
+import re
+import subprocess
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -149,6 +157,40 @@ def reserve(plan_dir, resource, reason, seconds=SECONDS):
         rsi.log_event(plan_dir, "land_reserved", reason=reason, token=rec["token"],
                       expires_at=rec["expires_at"])
         return rec
+
+
+def _repo_name(plan_dir):
+    """``owner/repo`` from the origin URL (https or ssh), or raise ValueError."""
+    url = subprocess.run(["git", "-C", str(plan_dir), "remote", "get-url", "origin"],
+                         capture_output=True, text=True, timeout=30, check=False).stdout.strip()
+    m = re.search(r"[:/]([^/:]+)/([^/:]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise ValueError(f"no owner/repo in origin url {url!r}")
+    return m.group(1), m.group(2)
+
+
+def publish_pointer(plan_dir, resource):
+    """Point any process on this Mac at this land's lock folder. Never raises, never deletes."""
+    try:
+        owner, repo = (re.sub(r"[^A-Za-z0-9._-]", "_", s) for s in _repo_name(plan_dir))
+        d = Path(os.environ.get("LAND_HOLD_DIR") or Path.home() / ".gearbox-state" / "land-holds")
+        pf = d / f"{owner}__{repo}.json"
+        rec = {"hold_version": 1, "repo": f"{owner}/{repo}",
+               "locks_dir": str(sl._ship_lock_path(plan_dir, resource).parent.resolve()),
+               "resource": str(resource)}
+        try:
+            old = json.loads(pf.read_text())
+        except (OSError, ValueError):
+            old = None
+        if isinstance(old, dict) and {k: old.get(k) for k in rec} == rec:
+            return
+        d.mkdir(parents=True, exist_ok=True)
+        rec["written_at"] = datetime.now(UTC).isoformat()
+        tmp = pf.with_name(f"{pf.name}.{uuid.uuid4().hex}.tmp")
+        tmp.write_text(json.dumps(rec, indent=2))
+        os.replace(tmp, pf)
+    except Exception as e:  # noqa: BLE001 — a pointer must never fail the land
+        rsi.log_event(plan_dir, "land_pointer_failed", why=str(e)[:200])
 
 
 def owner_stop(out):

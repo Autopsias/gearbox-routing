@@ -100,6 +100,7 @@ import article_block as ab  # noqa: E402
 import build_plan as bp  # noqa: E402
 import closeout_pipeline as cp  # noqa: E402
 import dispatch as dsp  # noqa: E402
+import harden_block as hb  # noqa: E402
 import safe_json as sj  # noqa: E402
 import session_fields as sess_help  # noqa: E402
 import structural_gate as sg  # noqa: E402
@@ -314,13 +315,13 @@ def builder_drift(spec_before, plan_dir, prior_html):
     """
     import difflib
 
-    rendered = render_html_for(spec_before, plan_dir, prior_html)
-    if rendered == prior_html:
+    rendered = hb.without(render_html_for(spec_before, plan_dir, prior_html))
+    if rendered == (prior := hb.without(prior_html)):
         return []
     return [
         line
         for line in difflib.unified_diff(
-            prior_html.splitlines(), rendered.splitlines(), lineterm="", n=0
+            prior.splitlines(), rendered.splitlines(), lineterm="", n=0
         )
         if line[:1] in "+-" and line[:3] not in ("---", "+++")
     ]
@@ -360,9 +361,9 @@ def build_generation(plan_dir, spec, *, touched_sessions, status_ops, log_entry)
     changelog = [*read_changelog(plan_dir), log_entry]
 
     targets = {
-        "PLAN.html": render_html_for(
+        "PLAN.html": hb.carry(prior_html, render_html_for(
             spec, plan_dir, prior_html, status_ops, validate_js=True, changelog=changelog
-        ).encode("utf-8"),
+        )).encode("utf-8"),
         "spec.json": (json.dumps(spec, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
         "manifest.json": (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
     }
@@ -374,6 +375,8 @@ def build_generation(plan_dir, spec, *, touched_sessions, status_ops, log_entry)
             items_by_id,
             post_session=bp.resolve_post_session(s, phases_by_id),
             verify=bp.resolve_verify(s, phases_by_id),
+            plan_schema_version=manifest.get("plan_schema_version"),
+            project_root=project_root_for(plan_dir),
         ).encode("utf-8")
         targets[f"sessions/{sid}.context.md"] = bp.gen_session_context_md(
             s, items_by_id
@@ -796,7 +799,7 @@ def _new_session(*, sid, title, model, item_ids, prompt, reasoning, human_summar
 def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
                 model=None, reasoning=None, gates=(), require_evidence=False,
                 prompt=None, human_summary=None, parallel_group=None,
-                infographic_group=None, allow_builder_drift=False, task_class=None):
+                infographic_group=None, allow_builder_drift=False, task_class=None, post_session=None):
     spec = load_spec(plan_dir)
     after = json.loads(json.dumps(spec))
     if any(s["id"] == sid for s in after["sessions"]):
@@ -814,6 +817,11 @@ def add_session(plan_dir, *, sid, title, items=(), new_items=(), depends_on=(),
         sid=sid, title=title, model=model, item_ids=item_ids, prompt=prompt,
         reasoning=reasoning, human_summary=human_summary, depends_on=depends_on, gates=gates,
         parallel_group=parallel_group, require_evidence=require_evidence, task_class=task_class)
+
+    try:
+        sess_help.apply_post_session(session, after, post_session, bp)
+    except ValueError as e:
+        raise MutationError(f"add-session {sid}: {e}") from e
 
     after["items"].extend(parsed_new)
     # Appended, not inserted: document order drives the dashboard's UP-NEXT panel,
@@ -1030,7 +1038,7 @@ def consistency_report(plan_dir):
     spec = load_spec(plan_dir)
     bad = []
     prior_html = (plan_dir / "PLAN.html").read_bytes().decode("utf-8")
-    if render_html_for(spec, plan_dir, prior_html) != prior_html:
+    if hb.without(render_html_for(spec, plan_dir, prior_html)) != hb.without(prior_html):
         bad.append("PLAN.html does not match a render of spec.json")
 
     manifest = sj.as_dict(json.loads((plan_dir / "manifest.json").read_text()))

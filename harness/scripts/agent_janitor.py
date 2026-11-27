@@ -725,7 +725,7 @@ def notify(message: str):
              f'display notification {json_str(message)} with title "agent-janitor"'],
             capture_output=True, timeout=10,
         )
-    except Exception:  # notification failure must never block the reaper
+    except Exception:  # noqa: BLE001 — best-effort notification: a notification error must not change the caller result
         pass
 
 

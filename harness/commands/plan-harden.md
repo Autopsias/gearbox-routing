@@ -601,7 +601,11 @@ If `PLAN_FILE` lives in a **plan-builder plan directory** (a sibling `spec.json`
 
 1. For each edited session, set `spec.json` session `prompt` = the current prompt-file body between `## Work` and the first of `## Verification gates` / `## Post-session actions` / `## Closeout` (stripped).
 2. Write `spec.json` back (preserve JSON shape: `json.dump(..., indent=2, ensure_ascii=False)` + trailing newline).
-3. **Verify the round-trip:** rebuild to a TEMP dir (`build_plan.py spec.json /tmp/<x>`) and diff
+3. **Verify the round-trip:** rebuild to a NEW temp dir INSIDE the project's `_plans/` folder
+   (`build_plan.py spec.json <repo>/_plans/zz-rt-<slug>-<ts>`), remove that dir after the diff, and diff
+   [2026-11-21: a build under `/tmp` cannot find the project's `.claude/eval-gates.json` and exits 1
+   on any project-only gate; never fix that with `--register-in`, which also writes the project's
+   `.gitignore` and `_plans_index.md`]
    the regenerated prompt bodies against the live ones. They must match **after normalising the
    plan-directory path** — `build_plan.py` stamps the output directory into a header line
    (*"The plan dashboard is at the sibling `PLAN.html` in this directory: `<dir>/`"*), so a

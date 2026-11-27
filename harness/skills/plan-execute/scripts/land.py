@@ -65,6 +65,7 @@ from pathlib import Path
 
 import plan_teardown as pt
 import land_answer as la
+import land_brief as lb
 import land_cost as lc
 import land_env as lev
 import land_gate as lgt
@@ -105,8 +106,10 @@ def _preflight(plan_dir, ctx):
                          "remote nobody chose. Name the intended one:\n\n"
                          "  git remote rename <the-one-you-push-to> origin\n"
                          f"  run.py land-resume {ctx['plan_dir']}"}
-    rc, out, _ = git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], ctx["root"])
-    live = out.split("/", 1)[1] if rc == 0 and out.startswith("origin/") else None
+    remote_ref = f"refs/remotes/{ctx['remote']}/"
+    rc, out, _ = (git(["symbolic-ref", remote_ref + "HEAD"], ctx["root"])
+                  if ctx["remote"] else (1, "", ""))
+    live = out.removeprefix(remote_ref) if rc == 0 and out.startswith(remote_ref) else None
     if live and live != ctx["default"]:
         return {"action": "land-parked", "kind": "default-renamed",
                 "brief": f"LAND PARKED — this plan pinned `{ctx['default']}` as the default "
@@ -137,7 +140,7 @@ def _take_lease(plan_dir, ctx, why="own-land"):
     except rsi.LockError as e:
         return {"action": "land-locked", "resource": ctx["resource"], "message": str(e),
                 **lr.retry_fields(plan_dir, ctx["resource"])}
-    return None
+    return lr.publish_pointer(plan_dir, ctx["resource"])    # None: it never raises
 
 
 def _early_park_end(plan_dir, ctx, answered, park):
@@ -250,10 +253,7 @@ def land_ack(plan_dir, note=None):
         return {"action": "error", "message": f"{plan_dir} is not an isolated plan"}
     st = load(plan_dir, ctx) or {}
     if st.get("state") != "awaiting_review" or not st.get("candidate"):
-        return {"action": "error", "state": st.get("state"),
-                "message": "there is no land candidate awaiting review. Run "
-                           f"`run.py land {plan_dir}` first — it merges, records and "
-                           "re-gates, and only then asks."}
+        return lb.no_candidate(plan_dir, st)
     cand = st["candidate"]
     st["ack"] = {"plan_head": cand["plan_head"], "main_head": cand["main_head"],
                  "gate_digest": cand["gate_digest"], "merge_sha": cand.get("merge_sha"),

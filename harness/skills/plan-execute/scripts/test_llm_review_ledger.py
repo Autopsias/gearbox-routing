@@ -760,3 +760,41 @@ def test_a_surface_path_the_gate_cannot_hash_never_inherits_a_pass(tmp_path):
     # control: the deleted path alone does not block the pass
     L.record(L.context(str(d), "ok", str(tmp_path), ["a.py", "deleted.py"]), [])
     assert L.reviewed_unchanged(L.context(str(d), "ok", str(tmp_path), ["a.py", "deleted.py"]))
+
+
+def _rule_rec(**kw):
+    return {"kind": "finding", "attempt": 1, "fid": "a1", "file": "x.py", "severity": "low",
+            "summary": "s", "status": "open", "rule": "1", **kw}
+
+
+def test_a_rule_blocked_low_finding_stays_a_prior_on_retry():
+    assert [p["fid"] for p in L.open_priors([_rule_rec()])] == ["a1"]
+    # control: noted by rule "none", or no rule at all, is still floored out
+    assert not L.open_priors([_rule_rec(rule="none")]) and not L.open_priors([{k: v for k, v in _rule_rec().items() if k != "rule"}])
+
+
+def test_a_known_rule_blocked_finding_re_raised_stays_blocking(tmp_path):
+    ctx = _ctx(tmp_path)
+    ctx.records = [_rule_rec(status="fixed")]
+    fail, _, recs = L.judge(ctx, [{"prior_id": "a1", "severity": "low", "rule": "1", "summary": "s", "file": "x.py"}], rule_on=True)
+    assert fail is True and recs[0]["status"] != "noted"
+
+
+def test_an_open_prior_takes_the_reviewers_current_rule_tag(tmp_path):
+    ctx = _ctx(tmp_path, files=("x.py",))
+    ctx.priors = [_rule_rec()]
+    still = {"prior_id": "a1", "prior": "open", "summary": "still there", "file": "x.py"}
+    fail, _, recs = L.judge(ctx, [{**still, "rule": "none"}], rule_on=True)
+    assert fail is False and recs[0]["rule"] == "none" and recs[0]["status"] == "noted"
+    fail, _, recs = L.judge(ctx, [{**still, "rule": "2"}], rule_on=True)
+    assert fail is True and recs[0]["rule"] == "2" and recs[0]["status"] == "open"
+    # no rule field now: fails closed, never inherits the old tag
+    fail, _, recs = L.judge(ctx, [still], rule_on=True)
+    assert fail is True and recs[0]["rule"] is None
+    # a rule-blocked prior naming no surface file is not "outside the surface": omitted, it stays open
+    ctx.priors = [_rule_rec(file="")]
+    fail, _, recs = L.judge(ctx, [], rule_on=True)
+    assert fail is True and recs[0]["status"] == "open"
+    # control (I3): the same prior with no rule is unverifiable, as before
+    ctx.priors = [{k: v for k, v in _rule_rec(file="").items() if k != "rule"}]
+    assert L.judge(ctx, [])[2][0]["status"] == "unverifiable"

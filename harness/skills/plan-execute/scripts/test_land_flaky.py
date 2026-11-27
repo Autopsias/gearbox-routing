@@ -21,6 +21,7 @@ import plan_mutate as pm  # noqa: E402
 import pytest  # noqa: E402
 from _land_fixture import record_only  # noqa: E402
 from _land_fixture import build_repo, isolate, main_side, work  # noqa: E402
+from land_test_support import _inproc_session  # noqa: E402,F401
 from test_land_repair import _flaky, _gate, _land, _seq, _state  # noqa: E402
 from worktree import git  # noqa: E402
 
@@ -294,3 +295,11 @@ def test_a_failing_gate_re_runs_only_its_failing_tests_alone(tmp_path, monkeypat
         assert len(led.read_text().splitlines()) == 1     # nothing load-flaky was logged
         assert {"fail": "still red", "queue": "Undecided, never a pass"}.get(
             then, "a failing test is in a file this plan changed") in said, said
+
+
+def test_a_copied_fixture_repo_is_independent_of_its_template(tmp_path):
+    a, b = build_repo(tmp_path / "a"), build_repo(tmp_path / "b")
+    (a["root"] / "shared.txt").write_text("changed\n")
+    assert (b["root"] / "shared.txt").read_text() == "base\n"
+    assert git(["remote", "get-url", "origin"], b["root"], check=True)[1] == str(b["origin"])
+    assert git(["ls-remote", "origin"], b["root"], check=True)[1].endswith("refs/heads/main")

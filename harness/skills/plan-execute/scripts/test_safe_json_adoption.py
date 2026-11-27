@@ -50,6 +50,7 @@ ALLOWLIST = {
     "_evidence_ship_scoping.py": "one-off evidence script; a wrong-shape crash is a red result",
     "finish_ci.py": "parses gh output whose valid shape is a list or object; each caller checks it",
     "llm_review_gate.py": "parses model output whose valid shape is a list or object; each site checks it",
+    "review_finding_lines.py": "moved out of llm_review_gate.py: parses model output, and the site checks for a list",
     "codex_review_backend.py": "a non-object codex answer is refused with its own message",
     "codex_review_events.py": "a non-object event is told apart from stderr text in _errorish",
     "plan_version_gate.py": "reports UNREADABLE and NOT-AN-OBJECT as two distinct values",

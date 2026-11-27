@@ -414,6 +414,7 @@ def prepare_surface(args, scope, exclude=()):
         return base
     changed = diff_stat(args.cwd, base, scope, exclude) or []
     import llm_review_ledger as ledger  # local: keeps this module import-light
+    import review_size_check as size_check
     # One ledger per (session, LEVEL, REVIEWER). A session can declare two review
     # levels -- `land` always does, because it re-runs the UNION of every session's
     # gates -- and on a shared ledger the second gate to run reads the first one's
@@ -430,7 +431,10 @@ def prepare_surface(args, scope, exclude=()):
     sid, rev = args.session.strip(), getattr(args, "reviewer", "claude")
     led = ledger.context(args.plan_dir.strip(), f"{sid}.{args.level}.{rev}" if sid else "",
                          args.cwd, changed + list(new_files),
-                         ledger.parse_floor(args.blocking_severity))
+                         ledger.parse_floor(args.blocking_severity),
+                         (getattr(args, "blocking_rule", "") or "").strip())
+    if (halt := size_check.check(led, args, base, changed, new_files)) is not None:
+        return halt
     focus, changed, new_files, note = ledger.narrow_to_delta(led, changed, new_files)
     if note:
         print(note, file=sys.stderr if focus == set() else sys.stdout)

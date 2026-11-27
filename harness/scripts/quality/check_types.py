@@ -41,6 +41,10 @@ EXC_FILE = ".type-exceptions"
 LINE = re.compile(r"^(?P<file>[^:\n]+):\d+:\d+: (?:error|warning)\[(?P<rule>[a-z0-9-]+)\] ")
 
 Key = tuple[str, str]
+# Rules whose count depends on the interpreter's installed packages. --staged runs on a
+# developer machine, not in the CI venv the baseline was recorded in, so it skips them.
+# shortcut: other rules can shift a little with missing packages; CI stays the full judge.
+ENV_BOUND = {"unresolved-import"}
 
 
 def find_ty() -> str | None:
@@ -74,7 +78,7 @@ def count_diagnostics(output: str) -> Counter[Key]:
 def parse_exceptions(source: str) -> dict[Key, int]:
     try:
         return {(e["file"], e["rule"]): e["count"] for e in json.loads(source).get("exceptions", [])}
-    except Exception:
+    except (ValueError, RecursionError, AttributeError, KeyError, TypeError):
         return {}
 
 
@@ -101,8 +105,17 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--project", default=".")
     ap.add_argument("--generate-baseline", action="store_true")
+    ap.add_argument("--staged", action="store_true",
+                    help="Judge only staged .py files; skip unresolved-import (see ENV_BOUND)")
     args = ap.parse_args()
     project = Path(args.project).resolve()
+
+    staged: set[str] | None = None
+    if args.staged:
+        import ratchetlib
+        staged = set(ratchetlib.staged_py_files(project))
+        if not staged:
+            return 0
 
     ty = find_ty()
     if ty is None:
@@ -117,6 +130,9 @@ def main() -> int:
     exc = project / EXC_FILE
     baseline = parse_exceptions(exc.read_text()) if exc.exists() else {}
     blocking, stale = judge(counts, baseline)
+    if staged is not None:
+        blocking = [x for x in blocking if x[0] in staged and x[1] not in ENV_BOUND]
+        stale = []
     for f, r, n, b in blocking:
         print(f"BLOCK {f}: {n} x {r} (baseline {b})")
     for f, r, b, n in stale:

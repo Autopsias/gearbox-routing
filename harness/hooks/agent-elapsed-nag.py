@@ -69,7 +69,7 @@ def load(path):
         with open(path, encoding="utf-8") as fh:
             d = json.load(fh)
         return list(d.get("starts") or []), int(d.get("bucket") or 0)
-    except Exception:
+    except (OSError, ValueError, TypeError, AttributeError, OverflowError, RecursionError):
         return [], 0
 
 
@@ -112,7 +112,7 @@ def bg_load(path):
         with open(path, encoding="utf-8") as fh:
             d = json.load(fh)
         return d if isinstance(d, dict) else {}
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return {}
 
 
@@ -171,6 +171,18 @@ def _keep_running(bg, tasks):
     return keep
 
 
+def _drop_ended(bg, transcript_path):
+    """Drop entries whose finished notice is in the transcript. A command that ends mid-turn
+    stays listed until the next Stop; its <task-notification> carries the tool-use id, which
+    is the entry key. 2026-11-20: 4 reminders (53 to 274 minutes) named commands that had ended."""
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except (OSError, TypeError):
+        return bg
+    return {k: v for k, v in bg.items() if f"<tool-use-id>{k}</tool-use-id>" not in text}
+
+
 def _run_bg_locked(mode, ev, path):
     bg = bg_load(path)
     now = time.time()
@@ -192,8 +204,10 @@ def _run_bg_locked(mode, ev, path):
             k, v = min(bg.items(), key=lambda kv: kv[1]["t"])
             current = int((now - v["t"]) // BUCKET_SECONDS)
             if current >= 1 and current > v.get("bucket", 0):
-                v["bucket"] = current
-                text = bg_reminder(v, int((now - v["t"]) // 60))
+                bg = _drop_ended(bg, ev.get("transcript_path"))  # read only when about to speak
+                if k in bg:
+                    v["bucket"] = current
+                    text = bg_reminder(v, int((now - v["t"]) // 60))
     if text or len(bg) != n or mode == "stopbg":
         bg_save(path, bg)
     return text
@@ -251,7 +265,7 @@ def main():
             }
             sys.stdout.write(json.dumps(out) + "\n")
             sys.stdout.flush()
-    except Exception:
+    except Exception:  # noqa: BLE001 — hook must fail open: an observer never fails the tool call
         pass  # an observer never fails the tool call it observes
 
 

@@ -22,7 +22,7 @@ target pays for as long as a change exists. A *verdict* is ADOPT, TRIAL, PARK or
 the owner's decision, and the result of the measurement. An *override* is a change that the
 owner makes to a verdict, a rank, or the reach of a proposal.
 
-**Target.** The target is the repo of the working directory, unless the owner names another.
+**Target.** The target is gearbox unless the owner names another repo (2026-11-19: "target gearbox obviously").
 "Gearbox" or "the harness" means `~/your-private-harness`, the source repo. `~/.claude` is only its
 deployed copy, so read and cite the source repo.
 
@@ -64,9 +64,9 @@ same source merged 2 minutes earlier, and the run fetched and read the whole sou
 
 ```bash
 git -C <repo> fetch -q && git -C <repo> worktree add -q -b wa/<slug> <repo>/.plan-worktrees/wa-<slug> origin/main
-L="python3 $HOME/.claude/skills/worth-adopting/scripts/wa_ledger.py --ledger <target>/docs/worth-adopting/LEDGER.md"
-$L find '<author>|<tool or repo name>|<slug of the url>'   # one short line per row
-$L row '<date or source>' --field result                   # ONE cell in full, when a verdict rests on it
+L() { python3 "$HOME/.claude/skills/worth-adopting/scripts/wa_ledger.py" --ledger "<target>/docs/worth-adopting/LEDGER.md" "$@"; }
+L find '<author>|<tool or repo name>|<slug of the url>'   # one short line per row
+L row '<date or source>' --field result                   # ONE cell in full, when a verdict rests on it
 grep -RliE '<author>|<tool or repo name>' ~/.claude/projects/*/memory/ | head
 grep -RliE '<slug of the url>|<three or four words of the title>' <target>/skills <target>/hooks <target>/docs <target>/rules <target>/scripts <target>/commands | head
 ```
@@ -82,7 +82,11 @@ a hook often cites the post that caused it.
 
 A hit in any of the three means that part of the work is done. Read the hit, then judge only
 what is new since its date: a new release, new terms, a PARK whose unblock condition is now
-true, a proposal that the earlier run did not cover. Say in the report which verdicts you
+true, a proposal that the earlier run did not cover. This holds only when the earlier run read
+every file the source names. If its result says "provisional", or it read only part of a repo or
+skill pack, read the whole source again and say why in the report (2026-11-22: a pstack update
+judged 5 new commits on top of a run that had read part of the pack, and the owner asked for the
+whole pack). Say in the report which verdicts you
 carried over and which you re-opened. If the ledger file does not exist, this is
 the first run in this target: create it in step 7.
 
@@ -138,33 +142,22 @@ The most common error is a verdict of ADOPT for what the target already has unde
 name. For each proposal, derive two to five search words (their word for the thing,
 and the words the target would use) and search before you judge.
 
-Where a harness keeps things (gearbox paths; other repos have their equivalents):
-
-| What | Where |
-|---|---|
-| Skills and commands | `skills/*/SKILL.md`, `commands/*.md` (the `description:` line is the index) |
-| Hooks and what fires them | `hooks/`, the `hooks` block of `settings.json` |
-| Agents and model routing | `agents/`, `model-routing.yaml` |
-| Standing rules and their reasons | `CLAUDE.md`, `rules/`, any rules-rationale doc |
-| Decisions on record | `docs/adr/`, any plan index, `docs/worth-adopting/LEDGER.md` |
-| Pains on record | `~/.claude/projects/*/memory/MEMORY.md`, the project's misroute or incident log |
-
-A proposal about an app (run it, test it, deploy it) is searched in each active app repo in
-this same step, in `.claude/skills`, `.claude/commands`, `.claude/rules`, the tests and the CI
-files (2026-11-17: a search of skill names alone said no repo could run its app; example-project
-had `/uat` and `/eval` as commands).
+Read `references/target-map.md` for where a harness keeps each kind of part, and for how to
+search app repos.
 
 Search with `grep -Ril` (capital R), then open only the hits. Some skill directories are
 symbolic links, and `grep -r` skips them with no warning, so a lower-case search reports a GAP
-for something the target has. Do not read whole directories. Give every proposal one state,
-with a `file:line` for every state except GAP:
+for something the target has. Do not read whole directories. Before a HAVE verdict, list every
+skill, agent and command that does the same job, one search per verb of the source. When a
+count comes from a sample, state what share of it is clean after the last fix. Give every
+proposal one state, with a `file:line` for every state except GAP:
 
 - **HAVE**: the target does this, and it runs: cite the last run or a use count, also for a
   carried verdict. Note whether theirs is better, equal or worse, and on what. For a skill,
   count the lines with `"skill": "<name>"` in `~/.gearbox-state/skills/usage.ndjson` (under a second).
   A typed slash command is not in that log, so a count of 0 there also needs a transcript match.
 - **PART**: the target does part of it. Name the missing part. A part that exists and never
-  ran on the target is PART (2026-11-15: the trust-ladder review existed, with no run on gearbox).
+  ran on the target is PART.
 - **DECIDED**: a record already accepted, parked or rejected it. Quote the record. When the
   record is a plan or a build, open its result and what changed after it (`git log
   --since=<date> -- <the file it was to change>`). A measurement that ran and changed nothing
@@ -194,7 +187,10 @@ failure, because the first two are cheap and remove most proposals.
    and the owner's re-check found Opus at 82% of spend.
 2. **Does the target already cover it?** HAVE and equal or worse: DROP, and the line names
    the part of ours that covers each part of theirs; "the same idea" is not a comparison, and
-   an idea at the centre of the source gets a full row, never a one-line DROP. HAVE and theirs
+   an idea at the centre of the source gets a full row, never a one-line DROP. ALWAYS read
+   the main file of every skill or module of a repo source in full before its verdict; a
+   verdict from a catalogue line or a README is not a read (2026-11-20: a whole spec-writing
+   method was judged from its catalogue and the owner had to point at it). HAVE and theirs
    is better: the proposal becomes a change to the existing part. Never add a second mechanism
    beside the first one.
 3. **What is the smallest form?** Go down this list and stop at the first form that gives
@@ -216,7 +212,9 @@ by the same bar:
   function in the same source.
 - **What does the comparison show about the target?** A source whose own answer is a DROP can
   still expose a weak point in the target's version of the same thing. Report that weak point
-  with its evidence; the fix for it is then judged by the same bar.
+  with its evidence; the fix for it is then judged by the same bar. When the weak point is a
+  part with three or more fix commits in 30 days, or one of several similar loops, judge its
+  redesign or its sibling parts in this run (2026-11-18, 2026-11-19: the owner asked for both).
 
 **Principles.** A principle is not judged by its smallest form, and it is not limited to the
 target. For each one, measure where the owner's whole practice stands: every repo the skills
@@ -229,7 +227,11 @@ Verdicts:
 - **ADOPT**: passes the bar, and the evidence is in hand. State the smallest form.
 - **TRIAL**: probably passes, and one measurement decides it. State the measurement and the
   result that would make it an ADOPT. If it takes minutes and reads only this machine, run it
-  in step 6 and give the verdict it supports; else option 1 of the card is "run it now".
+  in step 6 and give the verdict it supports; else option 1 of the card is "run it now". When the
+  measurement takes more than 14 days, the card also offers to build the smallest form now and
+  measure after it (2026-11-08, 2026-11-19: the owner refused to wait). A trigger or check
+  names what starts it. A test that decides a verdict uses cases that were not used to build
+  the thing tested.
 - **PARK**: good, and blocked (a standing rule, vendor terms, an unverified mechanism, a missing
   release). State the condition that re-opens it.
 - **DROP**: fails the bar. One line with the reason.
@@ -249,16 +251,19 @@ decision card ask.
 the owner says yes. A change that touches more than one file or skill goes to `/plan-builder`.
 Something that the owner will run again belongs to a named skill or command, and the smallest
 form says which one. A review or a check that fits one repo today goes into `/repo-health`,
-which runs on any repo, not into a new skill or a repo-local file.
+which runs on any repo, not into a new skill or a repo-local file. Name the place and the repos
+it serves. A change that serves several repos goes into gearbox as a general part with per-repo
+settings. Never put it in one app repo or tie it to one tool or IDE.
 
 ## 6. Verify what the surviving verdicts rest on
 
 Spend verification on ADOPT, TRIAL and PARK, and on the three weakest drops: before the
 report, take the three DROP verdicts that rest on the thinnest search (one search word, one
 folder, a carried verdict, "no pain") and search again, across every project memory and the
-code that would run the thing. The reply says what this challenge changed, or that it changed
-nothing. (To 2026-11-15 the owner asked for a second look five times, and four found more.)
-
+code that would run the thing. The report's `## Drop challenge` section names each of the three,
+its searches and its result (`add-row` refuses a report without it), and the reply says what
+the challenge changed.
+Never write "changed nothing" for a challenge that did not run.
 - **The mechanism.** When a verdict rests on how a tool behaves (a hook event, a setting, an
   API limit), read the primary documentation in this run and quote it. For Claude Code
   behaviour, ask the `claude-code-guide` agent or read the docs page. Memory of how a tool
@@ -273,81 +278,21 @@ nothing. (To 2026-11-15 the owner asked for a second look five times, and four f
   filtered by the pain's noun, because a fix often lands the day the note is written
   (2026-11-09: an ADOPT for a worktree audit that `scripts/worktree_report.py` already did).
   Open the file the smallest form names and the code that reads it, and state the real number
-  of files: a catalog row can need a collector, a route and tests.
+  of files: a catalog row can need a collector, a route and tests. Count the rules the change
+  lives under too: a version gate, a test that pins old output byte for byte. Search the target
+  for every step the change tells an agent or the owner to take; a step that does not exist is
+  a second change (2026-11-19: "about 3 files" became 8 behind a schema bump, and the refusal
+  told plan sessions to "schedule the re-dispatch", which plan-execute cannot do).
 
 ## 7. Report, ledger row, decision card
 
-Copy `assets/report-template.md` to `<target>/docs/worth-adopting/<YYYY-MM-DD>-<slug>.md` and
-fill it. Add one row with `wa_ledger.py add-row < row.txt` (create the file from
-`assets/ledger-header.md` on the first run): it puts the row at the end of the table, above
-the overrides, and refuses a row without nine cells or one whose report skips the big picture. Do not commit before the owner answers
-the decision card. After the answer (at once when there is no card), put this run's record in
-one pull request from the step 1 worktree (rebase it on `origin/main` first): the report, this run's ledger lines and
-any measure script, and nothing of another run (2026-11-17: two runs left their lines
-uncommitted in one ledger, and the main checkout could not fast-forward).
-
-Keep the report to one page. Each bullet is one or two lines, a DROP is one line, and a point
-appears once: the first test runs wrote 1,100 words for one TRIAL, and the length was most of
-the extra run time. The report is a record for the next run, not an essay for the owner.
-
-A row with no ADOPT and no TRIAL gets `none needed` as its decision and its result.
-
-**Close open outcomes.** A verdict teaches nothing until its outcome is on record. After the
-report, take at most three older rows, the oldest first, whose decision or result is `open`,
-or whose `due` date is past (`wa_ledger.py open` lists them). A due stated as "after the next N plans, scans or sessions" is
-past when the count is met or 14 days have gone by. For each, do only the cheap checks: does the path exist, is the
-part wired, did the measurement run (a log, a saved number, a scheduled job). Write what you
-find into the row, with the date (`wa_ledger.py note '<date or source>' "Checked <date>: <…>"`). If a measurement needs real work, do not do it now. Owed
-once, the chat reply names it; already marked owed, it becomes a decision-card option.
-
-Then reply in the chat, in plain words, in about 250 words when there is something to decide
-and in a few lines when there is not, in this order:
-
-1. One sentence with the result: how many proposals, how many worth action, and the largest one.
-2. Each ADOPT and TRIAL in two or three lines: what gets better, the smallest form, the carry cost.
-3. One line that counts the PARK and DROP verdicts, says what the drop challenge changed, and
-   gives the report path. Then the principles, one line each: the stand, with its number, and
-   the direction.
-4. A decision card, only if an ADOPT, a TRIAL or a twice-owed measurement exists. Use the
-   briefing format of `CLAUDE.md` (the template has its four parts): three options at most, and only
-   options that you checked are executable.
-5. One last line for each measurement owed for the first time ("Owed: the compaction re-measure
-   from 2026-09-19 has not run").
-
-Do not paste the report into the chat. Write for a reader who did not see the source and does
-not know the file names: say the effect first ("sessions stop ending with work half done"),
-and give the mechanism only where it changes the decision.
+ALWAYS read `references/closing.md` now and follow it: the report, the ledger row, closing open
+outcomes, the chat reply and its decision card. Do not commit before the owner answers the card,
+and do not paste the report into the chat.
 
 ## Learn from what the owner does next
 
-The skill improves only through what is written down, so write down two things.
-
-- **The decision.** When the owner answers the decision card, put the answer in the row
-  (`wa_ledger.py note '<date or source>' "planned (<plan>)" --field decision`):
-  `built`, `planned`, `declined`. A later run closes what stays `open` (step 1).
-- **An override.** When the owner changes or questions a verdict, a rank, or the reach of a
-  proposal, add one line under "Owner overrides" (`wa_ledger.py add-override '<line>'`): what
-  the run said in a few words, then the owner's own words. Nothing else goes in that line. Do this at once, before you act. The
-  words are the evidence, and a paraphrase loses them. An override often asks for one more
-  check (step 6), not for a new verdict: do the check, then keep or change the verdict, and
-  say which in the reply.
-
-Do not edit this skill during a run. When the ledger has eight or more rows after the last
-`retro` row, or three or more overrides that are not marked `absorbed` (`wa_ledger.py retro-due`
-counts both), add one line to the chat reply: "Enough outcomes for a retro: `/worth-adopting retro`." The retro turns the record
-into at most three proposed edits of this skill, and the owner approves each one. Its steps
-are in `references/retro.md`; read that file only for a retro.
-
-## Gotchas (from real runs)
-
-- The proposal reached past the pain: it changed the
-  effort of sessions that the owner sets by hand, and the owner wanted only the defaults for
-  spawned agents changed. Keep the reach of a proposal inside the pain it answers, and never
-  override a choice that the owner makes by hand.
-- A harness guard refuses a subagent's `Write` of a file
-  named as a report ("Subagents should return findings as text"). Run this skill in the main
-  session. An agent that an orchestrator dispatches returns the report as text, and the
-  orchestrator saves it. Do not write the file another way to get past the guard.
-- Search results carried a block of text written as an
-  automated reminder to the agent. The run reported it and did not act on it. The same run
-  named the paywall and marked which parts came from summaries by other people.
+Record the owner's answer at once, before you act: the decision with `wa_ledger.py note
+'<row>' "<answer>" --field decision`, and an override with `wa_ledger.py add-override` in the
+owner's own words. The full rules, the retro trigger and the gotchas are in
+`references/closing.md`.

@@ -10,11 +10,13 @@ stdlib-only (no PyYAML — regex parse of the SSOT, matching verify-routing.sh's
 house rule). Read-only: writes nothing anywhere.
 
 Usage:
-  retro_scan.py [--last N] [--since YYYY-MM-DD] [--project SUBSTR]
+  retro_scan.py [--last N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--project SUBSTR]
                 [--exclude-session ID ...] [--ssot PATH] [--projects-dir PATH]
 
 Selection: the N most-recently-modified session files (default 20), newest first,
-optionally floor-bounded by --since (file mtime). Sessions whose records carry
+optionally floor-bounded by --since (file mtime). With --until the window is by date
+instead: sessions chosen by their first valid timestamp (UTC), and only replies dated
+inside [--since, --until] (UTC, inclusive) are counted; the mtime floor is not applied. Sessions whose records carry
 `entrypoint: sdk-py` (headless Agent-SDK runs) and any --exclude-session id
 (pass the CURRENT session's id!) are skipped and reported in `skipped`.
 """
@@ -30,6 +32,7 @@ from pathlib import Path
 
 from compaction_ledger import autocompact_window as _ledger_autocompact_window
 from compaction_ledger import load_policy_types
+from retro_window import in_window, selection_digests, utc_date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))  # harness scripts/
 import model_prices  # noqa: E402
@@ -40,6 +43,8 @@ import model_prices  # noqa: E402
 CACHE_READ_X = 0.10
 CACHE_W5M_X = 1.25
 CACHE_W1H_X = 2.00
+
+SUFFIX_RX = re.compile(r"\[[^\]]*\]$")  # served-id suffix such as [1m]: same model, not a change
 
 SWITCH_RX = re.compile(r"(?:^|\s|>)(/model|/effort)\b\s*([\w.\-\[\]]*)")
 
@@ -69,6 +74,11 @@ def model_family(model_id):
         if fam in mid:
             return fam
     return None
+
+
+def base_model_id(model_id):
+    """The served id without a trailing [...] suffix, for change comparison."""
+    return SUFFIX_RX.sub("", model_id or "")
 
 
 def iter_text_blocks(content):
@@ -111,7 +121,12 @@ def _empty_session(path):
         "api_errors": 0,
         "max_tokens_truncations": 0,
         "agent_dispatches": [],
-        "model_effort_switches": [],
+        "model_effort_switches": [],  # typed /model and /effort commands only
+        "model_changes": [],          # change of served model id between main-chain replies (list capped at 100)
+        "model_change_count": 0,      # the full count, taken before the cap
+        "model_family_change_count": 0,  # changes that also cross a family (opus to sonnet)
+        "family_cost_exact": {},      # family -> unrounded cost, so shares do not round small spends to 0
+        "_last_model": None,
         "_seen_ids": set(),    # message ids already counted; dropped in _finalize_session
     }
     return s
@@ -120,6 +135,7 @@ def _empty_session(path):
 def _finalize_session(s, ts_first, ts_last):
     """Derived fields and the caps: duration, per-model mix, and the re-read share."""
     s.pop("_seen_ids", None)
+    s.pop("_last_model", None)
     if ts_first and ts_last:
         try:
             t0 = datetime.fromisoformat(ts_first.replace("Z", "+00:00"))
@@ -129,6 +145,7 @@ def _finalize_session(s, ts_first, ts_last):
         except ValueError:
             pass
     total_msgs = sum(r["messages"] for r in s["models"].values())
+    s["family_cost_exact"] = {f: r["cost_usd"] for f, r in s["models"].items()}
     for r in s["models"].values():
         r["mix_pct"] = round(100.0 * r["messages"] / total_msgs, 1) if total_msgs else 0.0
         r["cost_usd"] = round(r["cost_usd"], 4)
@@ -143,6 +160,7 @@ def _finalize_session(s, ts_first, ts_last):
     s["cost_usd"] = round(s["cost_usd"], 4)
     s["agent_dispatches"] = s["agent_dispatches"][:40]
     s["model_effort_switches"] = s["model_effort_switches"][:20]
+    s["model_changes"] = s["model_changes"][:100]  # counts were taken before this trim
     return s
 
 
@@ -183,6 +201,22 @@ def _scan_assistant_turn(d, msg, prices, s, model_rates=None):
         + (usage.get("cache_creation_input_tokens") or 0)
     )
     s["context_peak_tokens"] = max(s["context_peak_tokens"], ctx)
+    # Model changes come from the reply ids, not the typed /model command (typed
+    # commands found 28 in the 2026-11-09..18 window; reply ids show 72). Main chain only; synthetic
+    # error replies carry no real model.
+    served = msg.get("model")
+    if not d.get("isSidechain") and served and served != "<synthetic>":
+        prev, cur = s["_last_model"], base_model_id(served)
+        if prev and prev != cur:
+            s["model_change_count"] += 1
+            if (model_family(prev) or prev) != (model_family(cur) or cur):
+                s["model_family_change_count"] += 1
+            s["model_changes"].append({
+                "from": prev, "to": cur,
+                "reply_index": s["assistant_messages"] - 1,
+                "context_tokens_written": usage.get("cache_creation_input_tokens") or 0,
+            })
+        s["_last_model"] = cur
     if s["base_context_tokens"] is None and ctx:
         s["base_context_tokens"] = ctx
     if fam is None or fam not in prices:
@@ -257,7 +291,7 @@ def _scan_assistant_message(d, msg, prices, rtype, s, model_rates=None):
         _scan_assistant_turn(d, msg, prices, s, model_rates)
 
 
-def _scan_line(line, prices, s, ts_first, ts_last, model_rates=None):
+def _scan_line(line, prices, s, ts_first, ts_last, model_rates=None, window=None):
     """Fold ONE transcript line into the session record.
 
     Returns the running (ts_first, ts_last) pair — the only two values that
@@ -265,13 +299,15 @@ def _scan_line(line, prices, s, ts_first, ts_last, model_rates=None):
     """
     try:
         d = json.loads(line)
-    except Exception:
+    except (ValueError, RecursionError):  # JSONDecodeError is a ValueError
         return ts_first, ts_last
     ts = d.get("timestamp")
-    if isinstance(ts, str):
+    if isinstance(ts, str) and utc_date(ts):
         ts_first = ts_first or ts
         ts_last = ts
-    if s["entrypoint"] is None and d.get("entrypoint"):
+    # bounded mode: a record dated outside the window cannot set the entrypoint
+    # (it decides session selection, so it must not depend on data past --until)
+    if s["entrypoint"] is None and d.get("entrypoint") and in_window(ts, window):
         s["entrypoint"] = d["entrypoint"]
     if s["git_branch"] is None and d.get("gitBranch"):
         s["git_branch"] = d["gitBranch"]
@@ -290,6 +326,8 @@ def _scan_line(line, prices, s, ts_first, ts_last, model_rates=None):
     rtype = d.get("type")
     msg = d.get("message") or {}
 
+    if rtype == "assistant" and not in_window(ts, window):  # bounded mode: a reply outside the dates does not count
+        return ts_first, ts_last
     _scan_assistant_message(d, msg, prices, rtype, s, model_rates)
     return ts_first, ts_last
 
@@ -309,42 +347,30 @@ compaction_policy_types = load_policy_types
 autocompact_window = _ledger_autocompact_window
 
 
-def scan_session(path, prices, model_rates=None):
+def scan_session(path, prices, model_rates=None, window=None):
     s = _empty_session(path)
     ts_first = ts_last = None
     with open(path, encoding="utf-8") as f:
         for line in f:
-            ts_first, ts_last = _scan_line(line, prices, s, ts_first, ts_last, model_rates)
+            ts_first, ts_last = _scan_line(line, prices, s, ts_first, ts_last, model_rates, window)
 
     return _finalize_session(s, ts_first, ts_last)
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--last", type=int, default=20, help="max sessions to scan (default 20)")
-    ap.add_argument("--since", default=None, help="only sessions modified on/after YYYY-MM-DD")
-    ap.add_argument("--project", default=None, help="substring filter on the project dir name")
-    ap.add_argument("--exclude-session", action="append", default=[], help="session id to skip (pass the CURRENT session id)")
-    ap.add_argument("--ssot", default=os.path.expanduser("~/.claude/model-routing.yaml"))
-    ap.add_argument("--projects-dir", default=os.path.expanduser("~/.claude/projects"))
-    ap.add_argument("--include-sdk", action="store_true",
-                    help="keep entrypoint=sdk* (headless Agent-SDK) sessions. OFF by default "
-                         "for the routing retro; the COMPACTION retro turns it ON, because the "
-                         "compaction hooks fire in dispatched subagent sessions too and "
-                         "excluding them would hide most of the instrument's own denominator")
-    ap.add_argument("--policy-dir", default=os.path.expanduser("~/.gearbox-state/compaction/policy"),
-                    help="compaction-policy files, for each session's live type")
-    ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"),
-                    help="settings record the auto-compact window is read from")
-    args = ap.parse_args()
+def family_share(sessions):
+    """List-price share of main-chain reply spend by model family. The 14-day
+    check reruns this same function, so both windows use one method."""
+    cost = {f: 0.0 for f in ("fable", "opus", "sonnet", "haiku")}
+    for s in sessions:
+        # unrounded per-family cost; the rounded models[].cost_usd would zero small spends
+        for fam, c in s["family_cost_exact"].items():
+            cost[fam] = cost.get(fam, 0.0) + c
+    total = sum(cost.values())
+    return {f: round(c / total, 4) if total else 0.0 for f, c in cost.items()}
 
-    prices = parse_ssot_prices(args.ssot)
-    model_rates = model_prices.load(args.ssot)
 
-    since_ts = None
-    if args.since:
-        since_ts = datetime.strptime(args.since, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
-
+def _select_sessions(args, prices, model_rates, window, since_ts):
+    """Glob, filter and scan transcripts; return (sessions, skipped)."""
     files = glob.glob(os.path.join(args.projects_dir, "*", "*.jsonl"))
     if args.project:
         files = [f for f in files if args.project in os.path.basename(os.path.dirname(f))]
@@ -367,7 +393,7 @@ def main():
             skipped.append({"session_id": sid, "reason": "excluded (current session?)"})
             continue
         try:
-            s = scan_session(fp, prices, model_rates)
+            s = scan_session(fp, prices, model_rates, window)
         except FileNotFoundError:
             skipped.append({"session_id": sid, "reason": "deleted during scan"})
             continue
@@ -377,7 +403,47 @@ def main():
         if s["assistant_messages"] == 0:
             skipped.append({"session_id": sid, "reason": "no assistant messages"})
             continue
+        if args.until:
+            day = utc_date(s["started"] or "")
+            if not day or day > args.until or (args.since and day < args.since):
+                skipped.append({"session_id": sid, "reason": f"started {day or '?'} outside window"})
+                continue
         sessions.append(s)
+    return sessions, skipped
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--last", type=int, default=20, help="max sessions to scan (default 20)")
+    ap.add_argument("--since", default=None, help="only sessions modified on/after YYYY-MM-DD")
+    ap.add_argument("--until", default=None,
+                    help="bounded mode: keep sessions whose first valid timestamp is dated (UTC) from --since "
+                         "to --until, both inclusive, and count only replies dated in that range; "
+                         "no file-mtime floor. Without --until, --since stays a file-mtime floor")
+    ap.add_argument("--project", default=None, help="substring filter on the project dir name")
+    ap.add_argument("--exclude-session", action="append", default=[], help="session id to skip (pass the CURRENT session id)")
+    ap.add_argument("--ssot", default=os.path.expanduser("~/.claude/model-routing.yaml"))
+    ap.add_argument("--projects-dir", default=os.path.expanduser("~/.claude/projects"))
+    ap.add_argument("--include-sdk", action="store_true",
+                    help="keep entrypoint=sdk* (headless Agent-SDK) sessions. OFF by default "
+                         "for the routing retro; the COMPACTION retro turns it ON, because the "
+                         "compaction hooks fire in dispatched subagent sessions too and "
+                         "excluding them would hide most of the instrument's own denominator")
+    ap.add_argument("--policy-dir", default=os.path.expanduser("~/.gearbox-state/compaction/policy"),
+                    help="compaction-policy files, for each session's live type")
+    ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"),
+                    help="settings record the auto-compact window is read from")
+    args = ap.parse_args()
+
+    prices = parse_ssot_prices(args.ssot)
+    model_rates = model_prices.load(args.ssot)
+
+    since_ts = None
+    window = (args.since, args.until) if args.until else None
+    if args.since and not window:
+        since_ts = datetime.strptime(args.since, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
+
+    sessions, skipped = _select_sessions(args, prices, model_rates, window, since_ts)
 
     policy_types = compaction_policy_types(args.policy_dir)
     window = autocompact_window(args.settings)
@@ -394,11 +460,18 @@ def main():
             "Effort is NOT recorded in transcripts — it must be INFERRED "
             "(settings.json effortLevel + env overrides + /effort switches), never claimed as measured."
         ),
-        "params": {"last": args.last, "since": args.since, "project": args.project,
+        "params": {"last": args.last, "since": args.since, "until": args.until, "project": args.project,
                    "excluded": args.exclude_session},
         "prices_used": {k: {"in": v[0], "out": v[1]} for k, v in sorted(prices.items())},
         "model_prices_used": {k: {"in": v[0], "out": v[1], "cache_read": v[2]}
                               for k, v in sorted(model_rates.items())},
+        "selection": {
+            "filter": ("session start date (UTC, first valid timestamp), inclusive; only replies dated "
+                       "in the window are counted" if args.until
+                       else "file modification time floor (--since)"),
+            "files": len(sessions),
+            **selection_digests(sessions),
+        },
         "sessions": sessions,
         "skipped": skipped,
         "totals": {
@@ -410,6 +483,9 @@ def main():
             "max_tokens_truncations": sum(s["max_tokens_truncations"] for s in sessions),
             "compactions": sum(s["compactions"] for s in sessions),
             "typed_sessions": sum(1 for s in sessions if s["session_type"]),
+            "model_changes": sum(s["model_change_count"] for s in sessions),
+            "model_family_changes": sum(s["model_family_change_count"] for s in sessions),
+            "family_share": family_share(sessions),
         },
     }
     json.dump(out, sys.stdout, indent=1)

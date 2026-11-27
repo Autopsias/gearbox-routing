@@ -251,13 +251,31 @@ def review(candidate, gates, plan_dir, land_path, root, prior=None, warning=None
     return "\n".join(lines)
 
 
+def no_candidate(plan_dir, st):
+    """`land-ack`'s refusal: an `error` result saying why no ack was recorded. When an ack
+    already exists (state acked, landing or landed) it names that ack's time and note, because
+    the likeliest cause is another run of this plan that acked first and may be landing it
+    now; otherwise there is no candidate to approve yet."""
+    state, ack = st.get("state"), st.get("ack")
+    if ack and state in ("acked", "landing", "landed"):
+        msg = (f"this plan was already acked (state {state}) at {ack.get('at')} with the note "
+               f"{ack.get('note')!r}, so nothing was recorded now. Another run may be landing "
+               f"this plan now: read `run.py land-status {plan_dir}` before running "
+               f"`run.py land {plan_dir}`.")
+    else:
+        msg = ("there is no land candidate awaiting review. Run "
+               f"`run.py land {plan_dir}` first — it merges, records and "
+               "re-gates, and only then asks.")
+    return {"action": "error", "state": state, "message": msg}
+
+
 def landed(merge_sha, pushed_to, catch_up_info, extra=None):
     """§4.3 + §4.8's operator-facing close-out. ``pushed_to`` is None for a
     no-remote land, which says PLAINLY that the plan landed locally only."""
     if pushed_to:
         head = [f"LANDED. {merge_sha[:12]} is now on {pushed_to}.", ""]
     else:
-        head = ["LANDED LOCALLY ONLY — this repo has no remote. Nothing was pushed.",
+        head = ["LANDED LOCALLY ONLY — this repo has no writable remote. Nothing was pushed.",
                 f"The merge commit is {merge_sha}, kept alive by the durable ref "
                 f"{extra}.", "To bring it onto your default branch, run:",
                 f"  git merge --no-ff {extra}", ""]

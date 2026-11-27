@@ -59,8 +59,10 @@ RECENT_S = 120
 # A reply that says "Needs you: nothing" beside work it names as open contradicts itself:
 # CLAUDE.md "never write 'Next: nothing' beside open follow-ups you can do yourself".
 # Prose failed three times (2026-10-11, 2026-11-10), so the guard checks it.
+# "not checked" joined: a reply with a 'Not checked' list and 'Needs you: nothing'
+# left half of the owner's request as an outline (18 of 588 such replies carry the words).
 NOTHING_RE = re.compile(r"Needs you:\W*nothing", re.I)
-OPEN_RE = re.compile(r"\b(?:not (?:yet )?(?:filed|done)|still open|left open|uncommitted|open follow-?ups?)\b", re.I)
+OPEN_RE = re.compile(r"\b(?:not (?:yet )?(?:filed|done|checked)|still open|left open|uncommitted|open follow-?ups?)\b", re.I)
 # A 'Needs you' line that asks a decision must name a pick (per the output style).
 # The text rule failed twice ("what do you recommend?" came back), and
 # 25 of 1,467 'Needs you' replies in the 30 latest transcripts asked with no pick.

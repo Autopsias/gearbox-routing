@@ -57,3 +57,9 @@ out_of_scope/open_questions render on the dashboard
 out_of_scope: non-list rejected
 open_questions: blank entry rejected
 no scope fields => no scope keys in manifest.json
+blocking_rule: manifest holds the spec text
+blocking_rule: a number is refused
+blocking_rule: blank is refused
+blocking_rule: reviewed session without a rule warns
+blocking_rule: reviewed session without a rule still builds
+blocking_rule: no warning without a gate or with a rule

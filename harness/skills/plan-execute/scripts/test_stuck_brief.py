@@ -514,6 +514,12 @@ def test_allow_generated_prompt_carries_the_stuck_clause():
     assert "SAME root-cause signature" in md
     for needle in ("Perplexity", "Exa", "Ref", "decision_brief", "escalation ladder"):
         assert needle in md, needle
+    # owner_call is asked for only from v9, so an older plan's prompt is unchanged.
+    assert "owner_call" not in md
+    v9 = build_plan.gen_session_prompt_md(
+        {"id": "s01", "title": "T", "items": ["w-01"], "prompt": "do the thing"},
+        "fixture", {"w-01": {"title": "W"}}, plan_schema_version=cp.OWNER_CALL_MIN_SCHEMA)
+    assert '"owner_call"' in v9 and '"wait_for"' in v9
 
 
 # ==========================================================================
@@ -539,6 +545,8 @@ def test_plant_blocked_without_a_brief_is_refused_by_name(plan, tmp_path, capsys
         (lambda b: {**b, "recommendation": "  "}, "decision_brief.recommendation"),
         (lambda b: {**b, "next_steps": ["x"]}, "unknown key"),
         (lambda b: "stuck, please advise", "must be an object"),
+        (lambda b: {**b, "owner_call": "convenience"}, "decision_brief.owner_call"),
+        (lambda b: {**b, "owner_call": "wait"}, "decision_brief.wait_for"),
     ],
 )
 def test_plant_malformed_briefs_are_refused(plan, tmp_path, capsys, mutate, needle):
@@ -576,6 +584,29 @@ def test_allow_an_old_schema_plan_is_unaffected(plan, tmp_path, capsys):
     assert "decision_brief" not in printed
 
 
+@pytest.mark.parametrize("version,brief,ok", [
+    (9, GOOD_BRIEF, False),                                              # PLANT: no owner_call
+    (9, {**GOOD_BRIEF, "owner_call": "credentials"}, True),              # ALLOW
+    (9, {**GOOD_BRIEF, "owner_call": "wait", "wait_for": "v1.106.5"}, True),
+    (8, GOOD_BRIEF, True),                         # CONTROL: a v8 plan keeps its contract
+])
+def test_v9_blocked_brief_must_name_an_owner_call(version, brief, ok):
+    """Owner decision: from v9 a session stops only on a call that is
+    the owner's; any other choice it makes itself. Called at the semantic check
+    because a v9 apply also switches on v8 route-at-dispatch, which this
+    fixture's sessions do not meet."""
+    data = {"session": "s01", "result": "BLOCKED", "items_completed": [],
+            "items_blocked": ["w-01"], "notes": {"w-01": "x"}, "decision_brief": brief}
+    out = cp.semantic_verify(data, "s01", ["w-01"], ["s01"], plan_schema_version=version)
+    if ok:
+        assert out["status"] == "ok", out
+    else:
+        assert out["status"] == "semantic_error"
+        assert any("decision_brief.owner_call" in v for v in out["violations"]), out
+    if "owner_call" in brief:
+        assert f"OWNER CALL: {brief['owner_call']}" in cp.format_decision_brief(brief)
+
+
 def test_allow_a_brief_is_optional_on_done_and_on_a_checkpoint(plan, tmp_path, capsys):
     """Recommended, not required, when the session is not BLOCKED — and the miss
     leaves a trace rather than a refusal."""
@@ -605,6 +636,9 @@ def test_allow_the_builder_stamp_and_the_gate_move_together():
     enforced on plans that can never satisfy it. It must also not be ABOVE 0, i.e.
     the gate has to exist; both halves are asserted."""
     assert 0 < cp.DECISION_BRIEF_MIN_SCHEMA <= build_plan.PLAN_SCHEMA_VERSION
+    assert cp.OWNER_CALL_MIN_SCHEMA <= build_plan.PLAN_SCHEMA_VERSION
+    import session_bundle
+    assert session_bundle.OWNER_CALL_PROMPT_MIN_SCHEMA == cp.OWNER_CALL_MIN_SCHEMA
 
 
 def test_the_PRODUCTION_indeterminate_route_arms_and_still_charges_nothing(plan, tmp_path):

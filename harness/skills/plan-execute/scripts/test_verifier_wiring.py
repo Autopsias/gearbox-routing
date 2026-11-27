@@ -280,22 +280,12 @@ def test_a_restricted_tree_never_starts_codex_and_records_no_verdict(
 
 
 # ==========================================================================
-# WIRE-04 (s05) — harness-aware gates, the on-box park, and its resolution.
-#
-# The new fact every case below turns on: WHICH FAMILY BUILT THIS CODE. It is
-# read from the session's own `dispatch_started` / `dispatch_families` record in
-# run.ndjson — the durable record the SSOT names as the derivation source — and
-# never from a runner argument, because `verify.declared_env` calls `gate_env`
-# without a harness and no such parameter exists to read.
-# ==========================================================================
+# Harness-aware gates derive the executor from the dispatch record.
 LLM_GATE_ID = "llm-review-medium"
 LLM_GATE = f"gate:{LLM_GATE_ID}"
 CLAUDE_LEDGER = f"{SID}.medium.claude"
 
-#: A recorded `claude`. `llm_review_gate.run_once` invokes
-#: `claude -p <prompt> --output-format json` and parses stdout as the CLI's JSON
-#: envelope, so the shim answers in exactly that shape. MODE picks which of the
-#: three outcomes the gate is being shown.
+# The shim records requests and returns the real CLI JSON envelope.
 _CLAUDE_SHIM = '''#!/usr/bin/env python3
 import json, sys
 ARGV_FILE = {argv_file!r}
@@ -303,6 +293,12 @@ MODE = {mode!r}
 argv = sys.argv[1:]
 with open(ARGV_FILE, "a") as fh:
     fh.write(json.dumps(argv[:1]) + "\\n")
+if "--tools" in argv:
+    assert argv[argv.index("--tools") + 1] == ""
+    assert "--strict-mcp-config" in argv and "--no-session-persistence" in argv
+    prompt = sys.stdin.read()
+    assert "return n + 2" in prompt and "## Patch" in prompt
+    assert "VERSION = 1" not in prompt
 if MODE == "transport":
     sys.stderr.write("shim: reviewer could not start (transport)\\n")
     raise SystemExit(3)

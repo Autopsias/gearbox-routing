@@ -38,7 +38,7 @@ def git_changed_files(project_path: Path) -> set[str]:
         files = set(result.stdout.strip().splitlines())
         files.update(staged.stdout.strip().splitlines())
         return files
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError):
         return set()
 
 
@@ -46,7 +46,7 @@ def count_lines(filepath: Path) -> int:
     try:
         with open(filepath, encoding="utf-8", errors="replace") as f:
             return sum(1 for _ in f)
-    except Exception:
+    except (OSError, ValueError):
         return 0
 
 

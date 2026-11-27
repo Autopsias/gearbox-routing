@@ -282,8 +282,9 @@ def _git(root, *args):
 
 
 def _remote(root):
-    rc, out = _git(root, "remote")
-    names = out.split() if rc == 0 else []
+    from land_state import writable_remotes
+
+    names = writable_remotes(root, run_git=lambda args, path: _git(path, *args))
     return "origin" if "origin" in names else (names[0] if len(names) == 1 else None)
 
 

@@ -349,7 +349,7 @@ def main(argv=None):
     for f in files:
         try:
             sessions.append(digest_session(f, args.max_samples))
-        except Exception as e:  # never let one bad file abort the run
+        except Exception as e:  # noqa: BLE001 — report loop keeps going: a bad file is skipped with a stderr note
             skipped += 1
             sys.stderr.write(f"[digest] skipped {f}: {e}\n")
 

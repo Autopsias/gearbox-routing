@@ -135,7 +135,7 @@ def excerpt_hash(text: str) -> str:
 # Response normalisation — built around the REAL shapes confirmed live in-session.
 #
 #   Obsidian search (mcp__obsidian-connector__obsidian_search, profile=hybrid):
-#       {"result": "[{\"path\":…,\"title\":…,\"score\":0.33,\"snippet\":…}, …]"}
+#       {"result": "[{\"path\":…,\"title\":…,\"score\":0.33,\"snippet\":…}, …]"}  # noqa: ERA001 — expected output shape example, not code
 #       (a JSON STRING wrapped in a single-key {"result": …} envelope; on failure the
 #        string is an error object {"ok":false,…} or bare text "Vault not found.")
 #

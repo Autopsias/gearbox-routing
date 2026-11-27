@@ -43,6 +43,7 @@ SCOPE_ENV = "PLAN_EXECUTE_REVIEW_SCOPE"
 # plan's own record commit, and a scope (an INCLUDE list) cannot express
 # "everything except this".
 EXCLUDE_ENV = "PLAN_EXECUTE_REVIEW_EXCLUDE"
+RULE_ENV = "PLAN_EXECUTE_BLOCKING_RULE"   # the session's verify.blocking_rule, when it has one
 PLAN_DIR_ENV = "PLAN_EXECUTE_PLAN_DIR"    # the gate filters other plans' _plans/** on these
 SESSION_ENV = "PLAN_EXECUTE_SESSION"      # and other sessions' _evidence/
 # WHICH FAMILY BUILT the code under review. A cross-family gate that cannot
@@ -421,9 +422,13 @@ def gate_env(plan_dir, session_id, cwd=None):
     base = get_base(plan_dir, session_id, cwd)
     if base:
         env[BASE_ENV] = base
-    scope = get_scope(session_spec(plan_dir, session_id))
+    spec = session_spec(plan_dir, session_id)
+    scope = get_scope(spec)
     if scope:
         env[SCOPE_ENV] = ",".join(scope)
+    rule = (spec.get("verify") or {}).get("blocking_rule")
+    if isinstance(rule, str) and rule.strip():
+        env[RULE_ENV] = rule.strip()
     return env
 
 

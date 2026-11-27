@@ -2,6 +2,17 @@
 
 This document provides detailed solutions for common issues when using the `nlm` CLI.
 
+## Contents
+
+- [Quick Diagnosis](#quick-diagnosis)
+- [Authentication Issues](#authentication-issues)
+- [Network Issues](#network-issues)
+- [Source Issues](#source-issues)
+- [Research Issues](#research-issues)
+- [Generation Issues](#generation-issues)
+- [Command Syntax Issues](#command-syntax-issues)
+- [Getting More Help](#getting-more-help)
+
 ## Quick Diagnosis
 
 | Symptom | Likely Cause | Quick Fix |

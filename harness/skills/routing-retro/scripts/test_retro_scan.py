@@ -265,3 +265,146 @@ def test_a_transcript_deleted_mid_scan_is_skipped_not_fatal(tmp_path, monkeypatc
     retro_scan.main()
     out = json.loads(capsys.readouterr().out)
     assert [s["session_id"] for s in out["sessions"]] == ["alive"]
+
+
+def test_model_changes_come_from_reply_ids_and_typed_switches_stay_separate():
+    def reply(i, model):
+        return {"type": "assistant", "timestamp": f"2026-11-10T10:{i:02d}:00.000Z",
+                "message": {"id": f"m{i}", "model": model,
+                            "usage": {"input_tokens": 10, "cache_creation_input_tokens": 100 * i}}}
+    typed = {"type": "user", "timestamp": "2026-11-10T10:00:30.000Z",
+             "message": {"content": "/model opus"}}
+    side = {**reply(5, "claude-fable-5"), "isSidechain": True}
+    synth = reply(6, "<synthetic>")
+    dup = reply(3, "claude-sonnet-5")  # same message.id as an earlier line
+    s = _scan_raw([reply(1, "claude-opus-5"), typed, reply(2, "claude-sonnet-5"),
+                   reply(3, "claude-sonnet-5"), dup, reply(4, "claude-haiku-5"), side, synth])
+    assert len(s["model_changes"]) == 2
+    assert s["model_change_count"] == 2 and s["model_family_change_count"] == 2
+    assert [c["to"] for c in s["model_changes"]] == ["claude-sonnet-5", "claude-haiku-5"]
+    assert s["model_changes"][0]["context_tokens_written"] == 200
+    assert len(s["model_effort_switches"]) == 1
+    # control: one model only reads 0
+    assert _scan_raw([reply(1, "claude-opus-5"), reply(2, "claude-opus-5")])["model_changes"] == []
+
+
+def test_family_share_is_a_reply_cost_share_over_the_kept_sessions():
+    def sess(rep):
+        with tempfile.TemporaryDirectory() as td:
+            tp = os.path.join(td, "s.jsonl")
+            _write_transcript(tp, rep)
+            return retro_scan.scan_session(tp, {"sonnet": (3.00, 15.00), "haiku": (1.00, 5.00)})
+    one = {"input_tokens": 1_000_000, "output_tokens": 0}
+    share = retro_scan.family_share([sess([("claude-sonnet-5", one)]), sess([("claude-haiku-5", one)])])
+    assert share["sonnet"] == 0.75 and share["haiku"] == 0.25 and share["opus"] == 0.0
+
+
+def test_a_suffix_only_id_difference_is_not_a_model_change():
+    def reply(i, model):
+        return {"type": "assistant", "timestamp": f"2026-11-10T10:{i:02d}:00.000Z",
+                "message": {"id": f"m{i}", "model": model, "usage": {"input_tokens": 10}}}
+    s = _scan_raw([reply(1, "claude-opus-5"), reply(2, "claude-opus-5[1m]")])
+    assert s["model_change_count"] == 0 and s["model_changes"] == []
+
+
+def test_every_change_is_counted_before_the_per_session_list_is_trimmed():
+    def reply(i):
+        return {"type": "assistant", "timestamp": "2026-11-10T10:00:00.000Z",
+                "message": {"id": f"m{i}", "model": ("claude-opus-5", "claude-sonnet-5")[i % 2],
+                            "usage": {"input_tokens": 10}}}
+    s = _scan_raw([reply(i) for i in range(102)])
+    assert s["model_change_count"] == 101 and len(s["model_changes"]) == 100
+
+
+def test_tiny_equal_family_costs_keep_a_non_zero_share():
+    # 4 tokens at $3/MTok = $0.000012 each: rounds to 0.0 at 4 places, must still share 50/50
+    tiny = {"input_tokens": 4, "output_tokens": 0}
+    def sess(model, price):
+        with tempfile.TemporaryDirectory() as td:
+            tp = os.path.join(td, "s.jsonl")
+            _write_transcript(tp, [(model, tiny)])
+            return retro_scan.scan_session(tp, {"sonnet": (price, 0), "haiku": (price, 0)})
+    share = retro_scan.family_share([sess("claude-sonnet-5", 3.0), sess("claude-haiku-5", 3.0)])
+    assert share["sonnet"] == 0.5 and share["haiku"] == 0.5
+
+
+def test_until_selects_by_session_start_date_inclusive(tmp_path, monkeypatch, capsys):
+    proj = tmp_path / "-proj"
+    proj.mkdir()
+    for name, day in (("early", "2026-11-08"), ("first", "2026-11-09"), ("last", "2026-11-18"), ("late", "2026-11-19")):
+        (proj / f"{name}.jsonl").write_text(json.dumps({
+            "type": "assistant", "timestamp": f"{day}T23:59:00.000Z",
+            "message": {"id": name, "model": "claude-sonnet-5", "usage": {"input_tokens": 10}}}) + "\n")
+    ssot = tmp_path / "model-routing.yaml"
+    ssot.write_text(SSOT)
+    monkeypatch.setattr("sys.argv", ["retro_scan.py", "--projects-dir", str(tmp_path), "--ssot", str(ssot),
+                                     "--since", "2026-11-09", "--until", "2026-11-18",
+                                     "--policy-dir", str(tmp_path / "nopolicy"),
+                                     "--settings", str(tmp_path / "nosettings.json")])
+    retro_scan.main()
+    out = json.loads(capsys.readouterr().out)
+    assert sorted(s["session_id"] for s in out["sessions"]) == ["first", "last"]
+    assert out["selection"]["files"] == 2 and len(out["selection"]["sha256_of_sorted_file_paths"]) == 64
+
+
+def _bounded_run(tmp_path, monkeypatch, capsys, files, mtime=None):
+    """Write {name: [(timestamp, message_id, model[, entrypoint]), ...]} transcripts and run main() bounded."""
+    proj = tmp_path / "-proj"
+    proj.mkdir(exist_ok=True)
+    for name, replies in files.items():
+        p = proj / f"{name}.jsonl"
+        p.write_text("".join(json.dumps({
+            "type": "assistant", "timestamp": ts,
+            **({"entrypoint": r[3]} if len(r) > 3 else {}),
+            "message": {"id": r[1], "model": r[2], "usage": {"input_tokens": 1000}}}) + "\n"
+            for r in replies for ts in [r[0]]))
+        if mtime:
+            os.utime(p, (mtime, mtime))
+    ssot = tmp_path / "model-routing.yaml"
+    ssot.write_text(SSOT)
+    monkeypatch.setattr("sys.argv", ["retro_scan.py", "--projects-dir", str(tmp_path), "--ssot", str(ssot),
+                                     "--since", "2026-11-09", "--until", "2026-11-18",
+                                     "--policy-dir", str(tmp_path / "nopolicy"),
+                                     "--settings", str(tmp_path / "nosettings.json")])
+    retro_scan.main()
+    return json.loads(capsys.readouterr().out)
+
+
+def test_replies_after_until_are_not_counted_in_a_kept_session(tmp_path, monkeypatch, capsys):
+    out = _bounded_run(tmp_path, monkeypatch, capsys, {"s": [
+        ("2026-11-18T10:00:00.000Z", "m1", "claude-opus-5"),
+        ("2026-11-19T01:00:00.000Z", "m2", "claude-sonnet-5")]})
+    assert out["totals"]["model_changes"] == 0 and out["totals"]["family_share"]["sonnet"] == 0.0
+    assert out["sessions"][0]["assistant_messages"] == 1
+
+
+def test_start_time_with_an_offset_is_converted_to_utc(tmp_path, monkeypatch, capsys):
+    out = _bounded_run(tmp_path, monkeypatch, capsys, {"s": [
+        ("2026-11-08T23:00:00-02:00", "m1", "claude-opus-5"),  # 2026-11-09T01:00Z
+        ("2026-11-08T23:30:00-02:00", "m2", "claude-sonnet-5")]})
+    assert out["selection"]["files"] == 1 and out["totals"]["model_changes"] == 1
+    assert "first valid timestamp" in out["selection"]["filter"]
+
+
+def test_bounded_mode_ignores_the_file_mtime_floor(tmp_path, monkeypatch, capsys):
+    out = _bounded_run(tmp_path, monkeypatch, capsys, {"s": [
+        ("2026-11-09T01:00:00Z", "m1", "claude-opus-5")]}, mtime=1_700_000_000)  # long before --since
+    assert out["selection"]["files"] == 1
+
+
+def test_two_bounded_runs_agree_and_the_digest_moves_with_the_data(tmp_path, monkeypatch, capsys):
+    files = {"s": [("2026-11-10T10:00:00Z", "m1", "claude-opus-5"), ("2026-11-10T10:01:00Z", "m2", "claude-sonnet-5")]}
+    a = _bounded_run(tmp_path, monkeypatch, capsys, files)
+    b = _bounded_run(tmp_path, monkeypatch, capsys, files)
+    assert a["totals"] == b["totals"] and a["selection"] == b["selection"]
+    # a reply after --until leaves the digest alone; one inside the window moves it
+    after = _bounded_run(tmp_path, monkeypatch, capsys, {"s": files["s"] + [("2026-11-19T00:00:00Z", "m3", "claude-opus-5")]})
+    inside = _bounded_run(tmp_path, monkeypatch, capsys, {"s": files["s"] + [("2026-11-11T00:00:00Z", "m3", "claude-opus-5")]})
+    # a post-cutoff reply carrying the first sdk-cli entrypoint must not drop the session
+    sdk = _bounded_run(tmp_path, monkeypatch, capsys,
+                       {"s": files["s"] + [("2026-11-19T00:00:00Z", "m3", "claude-opus-5", "sdk-cli")]})
+    assert sdk["selection"] == after["selection"] == a["selection"]
+    assert sdk["totals"]["family_share"] == a["totals"]["family_share"] and not sdk["skipped"]
+    key = "sha256_of_sorted_path_and_in_window_reply_count"
+    assert after["selection"][key] == a["selection"][key] != inside["selection"][key]
+    assert after["selection"]["sha256_of_sorted_file_paths"] == inside["selection"]["sha256_of_sorted_file_paths"]

@@ -13,6 +13,7 @@ in a report. Every list command here prints short lines; `row` prints one row in
     wa_ledger.py retro-due               says when a retro is due
     wa_ledger.py add-row < row.txt       put a new row at the end of the table
     wa_ledger.py add-override "<line>"   put a line at the end of the overrides
+    wa_ledger.py absorb <text> "<why>"   mark the ONE open override that matches as absorbed today
     wa_ledger.py note <text> "<note>" [--field decision]
                                       add a note to the Result (or Decision) cell of one row;
                                       a cell that says only "open" is replaced
@@ -176,8 +177,9 @@ def cmd_retro_due(a, lines):
         print("Enough outcomes for a retro: `/worth-adopting retro`.")
 
 
-BIG_PICTURE = ("## Above the target", "## Principles")
-REPORT_PATH = re.compile(r"`(docs/worth-adopting/[^`]+\.md)`")
+BIG_PICTURE = ("## Above the target", "## Drop challenge", "## Principles")
+# backticks optional: 2026-11-20, 0 of 3 example-project rows and 12 of 74 gearbox rows had none, so the check never ran
+REPORT_PATH = re.compile(r"`?(docs/worth-adopting/[^`\s|]+\.md)`?")
 
 
 def check_big_picture(row, ledger_path):
@@ -215,6 +217,17 @@ def cmd_add_row(a, lines, path):
     print("row added at line %d, at the end of the table" % (at + 1))
 
 
+def cmd_absorb(a, lines, path):
+    hits = [(i, ln) for i, ln in override_lines(lines) if "absorbed" not in ln and a.text.lower() in ln.lower()]
+    if len(hits) != 1:
+        emit(["%d open overrides match '%s':" % (len(hits), a.text)] + ["  " + ln[:LINE_CAP] for _, ln in hits])
+        raise SystemExit(2)
+    i, ln = hits[0]
+    lines[i] = "%s · absorbed %s (%s)" % (ln.rstrip(), a.today or datetime.date.today().isoformat(), a.why.strip())
+    save(path, lines)
+    print("override marked absorbed: %s" % ln[:80])
+
+
 def cmd_add_override(a, lines, path):
     if not OVERRIDE.match(a.line) or "the owner said:" not in a.line:
         raise SystemExit("ledger: format is '- <date> · <source> · the run said: <…> · the owner said: \"<…>\"'")
@@ -233,7 +246,7 @@ def cmd_note(a, lines, path):
     head, decision, result = line.rstrip()[:-1].rstrip().rsplit(" | ", 2)
     cell = {"decision": decision, "result": result}
     old = cell[a.field].strip()
-    cell[a.field] = a.note.strip() if old.lower() == "open" else old + " " + a.note.strip()
+    cell[a.field] = a.note.strip() if old.lower() == "open" else old + " · " + a.note.strip()
     lines[i] = " | ".join([head, cell["decision"], cell["result"]]) + " |"
     save(path, lines)
     print("note added to the %s cell of the %s row" % (a.field, line[2:12]))
@@ -274,6 +287,10 @@ def main(argv=None):
     sub.add_parser("retro-due")
     sub.add_parser("add-row")
     sub.add_parser("add-override").add_argument("line")
+    s = sub.add_parser("absorb")
+    s.add_argument("text")
+    s.add_argument("why")
+    s.add_argument("--today")
     s = sub.add_parser("note")
     s.add_argument("text")
     s.add_argument("note")
@@ -286,7 +303,7 @@ def main(argv=None):
     if a.cmd in read_only:
         read_only[a.cmd](a, lines)
     else:
-        {"add-row": cmd_add_row, "add-override": cmd_add_override, "note": cmd_note,
+        {"add-row": cmd_add_row, "add-override": cmd_add_override, "absorb": cmd_absorb, "note": cmd_note,
          "normalize": cmd_normalize}[a.cmd](a, lines, a.ledger)
 
 

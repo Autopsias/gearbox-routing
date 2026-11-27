@@ -30,7 +30,7 @@ mkdir -p ~/.claude/docs && cp harness/docs/reference_git_safety_playbook.md ~/.c
 {
   "hooks": {
     "PreToolUse": [
-      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; f(){ echo \"git-tree-guard: $p failed ($1) - the guard itself failed, not the command. Refusing this Bash call; the same command can be tried again.\" >&2; exit 2; }; in=$(cat) || f read; t=$(printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134') || f strip; [ -z \"$in\" ] || [ -n \"$t\" ] || f strip; case \"$t\" in *[gG][iI][tT]*) ;; *) case \"$in\" in *'\\u'*) ;; *) exit 0;; esac;; esac; printf '%s' \"$in\" | python3 \"$p\"; s=$?; [ $s -eq 0 ] && exit 0; [ $s -eq 2 ] && exit 2; f \"exit $s\"", "timeout": 10, "onFailure": "block"}]}
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/git-tree-guard.py\"; [ -f \"$p\" ] || exit 0; f(){ echo \"git-tree-guard: $p failed ($1) - the guard itself failed, not the command. Refusing this Bash call; the same command can be tried again.\" >&2; exit 2; }; in=$(cat) || f read; t=$(printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134') || f strip; [ -z \"$in\" ] || [ -n \"$t\" ] || f strip; case \"$t\" in *[gG][iI][tT]*) ;; *) case \"$in\" in *'\\u'*) ;; *) exit 0;; esac;; esac; { printf '%s %s %s start\\n' \"$(date +%s)\" \"${p##*/}\" $$ >> \"$HOME/.gearbox-state/hook-timing.log\"; } 2>/dev/null; printf '%s' \"$in\" | python3 \"$p\"; s=$?; { printf '%s %s %s end %s\\n' \"$(date +%s)\" \"${p##*/}\" $$ $s >> \"$HOME/.gearbox-state/hook-timing.log\"; } 2>/dev/null; [ $s -eq 0 ] && exit 0; [ $s -eq 2 ] && exit 2; f \"exit $s\"", "timeout": 60, "onFailure": "block"}]}
     ]
   }
 }

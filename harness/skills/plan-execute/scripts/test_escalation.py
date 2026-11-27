@@ -210,7 +210,9 @@ def test_a_stamp_no_builder_could_write_registers_as_DRIFT(tmp_path):
     a forgery."""
     import plan_mutate as pm
     plan_dir = make_plan(tmp_path, [SESS])
-    _stamp(plan_dir, build_plan.PLAN_SCHEMA_VERSION - 1)     # ALLOW CONTROL: older
+    # ALLOW CONTROL: older than this undeclared spec's own fresh stamp (7). Not
+    # PLAN_SCHEMA_VERSION - 1: from v8 a stamp needs the spec to declare it.
+    _stamp(plan_dir, build_plan.rad.PRE_V8_STAMP - 1)
     assert not [b for b in pm.consistency_report(plan_dir)["problems"]
                 if "gen_manifest" in b], "an older stamp is history, not drift"
     _stamp(plan_dir, build_plan.PLAN_SCHEMA_VERSION + 7)     # PLANT: forged

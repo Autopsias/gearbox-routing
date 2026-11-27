@@ -63,7 +63,7 @@ try:
     )
 
     IMPORT_ERROR = ""
-except Exception as _exc:  # pragma: no cover - exercised by a dedicated test
+except Exception as _exc:  # noqa: BLE001 — fail open: any import error is recorded and the hook degrades to a no-op
     IMPORT_ERROR = "%s: %s" % (type(_exc).__name__, _exc)
 
 
@@ -430,7 +430,7 @@ def run_stdin_hook(sub):
         payload = read_payload()
         session = payload.get("session_id") or "unknown"
         return handlers[sub](payload)
-    except Exception as exc:  # FAIL OPEN, ALWAYS
+    except Exception as exc:  # noqa: BLE001 — fail open: try to record the handler error, then return allow
         ledger(sub, session, "hook-error", decision="allow", error=type(exc).__name__)
         return 0
 
@@ -477,7 +477,7 @@ def main(argv):
             return safepoint.cmd_safe_point(rest, lambda: new_policy(PROVISIONAL_TYPE, ""))
         except SystemExit:
             raise
-        except Exception as exc:  # FAIL OPEN, ALWAYS
+        except Exception as exc:  # noqa: BLE001 — best effort: try to record the error, then return success; the hold may not be saved
             ledger(sub, "unknown", "hook-error", decision="allow", error=type(exc).__name__)
             return 0
     if sub == "status":

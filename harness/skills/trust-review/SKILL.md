@@ -57,7 +57,7 @@ The reviewer judges the artifact against its **provenance record** (`conventions
 
 ## TR-01 — the reviewer contract + the independence manifest
 
-**The enumerate-only directive** (`review_contract.REVIEWER_DIRECTIVE`, assembled by `build_reviewer_prompt`) is the exact text the reviewer subagent receives. It is deterministic (so it hashes stably) and it is fed only the artifact label + a provenance summary. It forbids editing, rewriting, or asking for the builder's reasoning.
+**The enumerate-only directive** (`review_contract.REVIEWER_DIRECTIVE`, assembled by `build_reviewer_prompt`) is the exact text the reviewer subagent receives. It is deterministic (so it hashes stably) and it is fed only the artifact label + a provenance summary. It forbids editing, rewriting, or asking for the builder's reasoning. It also forbids scope exclusions: a claim whose cited source is not in the provenance comes back as a must-fix of type `source-not-provided`. When you assemble the provenance summary, never mark a source or a class of claims "out of scope" — add the source excerpt, or leave the claim for the reviewer to raise.
 
 **The edit-list schema** — every reviewer finding is exactly:
 
@@ -227,3 +227,4 @@ graduate per the contract §3.4.
 - **Reviewer returns an invalid edit list** → status `failed`; do not advance the loop on an unparseable review.
 - **Reviewer model rejected by the Agent override** → fall back to the parent model and record **reduced independence** in `manifest.routing.independence_note`.
 - **Round cap reached with anything open** → survivors `still-open` → `not-ready`; never converge by giving up.
+- **Review brief excluded a source class (seen)** → six review rounds passed a deck whose brief put every claim from a source outside the packet "out of scope"; one such claim was wrong and travelled to a senior reader. A claim the reviewer did not see against its source is unreviewed, however many rounds ran. The directive now returns it as `source-not-provided`; do not waive that type in bulk.

@@ -4,6 +4,24 @@ The build script expects a JSON file with this shape. All fields without "(optio
 
 The Aurora edition introduces **dual-layer authoring**: each item and session can carry both a *human-readable* layer (plain English, prominent on screen) and an *agent-readable* layer (technical spec, collapsed by default but always in the DOM for any Claude that opens the file). Every new field is optional; old specs continue to build identically except for the visual refresh.
 
+## Contents
+
+- [Field reference](#field-reference)
+  - [Top-level](#top-level)
+  - [Items — the dual-layer surface](#items--the-dual-layer-surface)
+  - [Prior-art decision](#prior-art-decision-item-level--mandatory-one-of-two-shapes-2026-08-12)
+  - [Sessions — same dual-layer pattern](#sessions--same-dual-layer-pattern)
+  - [Schema v8 — route at dispatch](#schema-v8--example-dispatch-plan-2026-09-29)
+  - [Model + reasoning rubric](#model--reasoning-rubric--steer-by-session-kind)
+  - [Codex rubric](#codex-rubric--the-gpt-56--lane-dual-harness-56-only-since-2026-08-13)
+  - [GLM (zai) resolution](#glm-zai-resolution--the-claude-glm-tree-v121-2026-08-30)
+  - [Build-time advisories](#build-time-advisories-on-a-plans-own-text-2026-08-21)
+  - [LLM review level by task class](#llm-review-level-by-task-class-s10-rv-02--steering-never-silent-auto-fill)
+  - [Closing acceptance review](#closing-acceptance-review-acceptance_review-optional--the-plan-level-gate)
+  - [Changelog — relation to ADR-027](#changelog--relation-to-adr-027)
+  - [Parallel groups](#parallel-groups--the-frozen-contract-and-what-the-builder-does-about-it)
+  - [Session / item IDs, Statuses, Authoring guidance, Infographics](#session--item-ids-validated-p10)
+
 ```json
 {
   "title": "Q4 Product Launch Plan",
@@ -132,7 +150,8 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
 - **`out_of_scope`** (array of strings, optional; 2026-08-01, wayfinder-derived) — work consciously ruled beyond this plan. Rendered as a static "Out of scope" dashboard section and carried into `manifest.json`. The rule that gives it teeth: an entry here **never graduates into a session** — it returns only as a fresh plan if the goal is redrawn. The closing acceptance review reads it to check nothing ruled out got built anyway, and accumulated closeout `deviations` are judged against it.
 - **`open_questions`** (array of strings, optional; 2026-08-01) — the fog register: decisions the interview surfaced but could not state sharply enough to resolve or assign to a decision session. Each entry should name the question plus what would sharpen it (e.g. "Which auth provider? — sharpens after the s02 spike"). Rendered as a static "Open decisions" dashboard section and carried into `manifest.json`, where plan-harden's `decision-debt` lint cross-checks it against session prompts. Prefer an explicit decision session over an entry here whenever the question can already be stated precisely — this list is for what genuinely can't be sharpened yet, not a parking lot for avoidable ambiguity.
 - **`serial_reason`** (string, optional; 2026-08-12, PL-03) — why this plan is a **chain** rather than a fan-out. Its only effect: it silences the pure-chain warning `validate_spec()` raises when every dependency layer is one session wide (see "Parallel groups" below). Non-empty or omitted — a blank string is refused, because it would silence the warning without answering it. Carried into `manifest.json`, so plan-harden's parallelization lint reads the author's stated reason instead of re-flagging a chain that was already justified. Good reasons: one hand on one interface, a migration that must land in order, a spike whose result reshapes the next session. Not a reason: "it was easier to write".
-- **`plan_schema_version`** (integer, optional; **a NEW spec should declare `plan_schema_version: 8`**, which also requires `task_class` on every session and `touches` on every item — see "Schema v8" below) — the spec's own opt-in. Build-time requirements key off it, each deliberately unenforced when it is absent so that specs written before the feature existed (and the live plans `plan_mutate` re-validates on every add/amend/retire) keep validating exactly as they did: the mandatory per-item **prior-art decision** at `>= 4` (`PRIOR_ART_MIN_SCHEMA`), the **parallel-group contract** at `>= 3` (`PARALLEL_CONTRACT_MIN_SCHEMA`), and the "Schema v8" rules at `8`. It also picks the stamp `gen_manifest` writes on the OUTPUT manifest: a fresh build stamps 8 only when the spec declares 8, and any other spec stamps 7. `--preserve-state` keeps the prior manifest's stamp and refuses a rebuild across the v8 boundary. A spec above 8 is refused.
+- **`plan_schema_version`** (integer, optional; **a NEW spec should declare `plan_schema_version: 9`** (9 = 8 plus a required `decision_brief.owner_call` on a BLOCKED closeout), which also requires `task_class` on every session and `touches` on every item — see "Schema v8" below) — the spec's own opt-in. Build-time requirements key off it, each deliberately unenforced when it is absent so that specs written before the feature existed (and the live plans `plan_mutate` re-validates on every add/amend/retire) keep validating exactly as they did: the mandatory per-item **prior-art decision** at `>= 4` (`PRIOR_ART_MIN_SCHEMA`), the **parallel-group contract** at `>= 3` (`PARALLEL_CONTRACT_MIN_SCHEMA`), and the "Schema v8" rules at `8`. It also picks the stamp `gen_manifest` writes on the OUTPUT manifest: a fresh build stamps the declared version when the spec declares 8 or 9, and any other spec stamps 7. `--preserve-state` keeps the prior manifest's stamp and refuses a rebuild across the v8 boundary. A spec above 9 is refused.
+- **`spec_ref`** (object, optional; 2026-11-20) — `{"path": "<SPEC.md, relative to the repository root>", "plan": "P<n>"}`: which plan line of an endeavour's SPEC.md this plan is. With it, the build warns (never refuses) on a requirement of that plan line that no item covers, an item `covers` id that SPEC.md does not define or marks WITHDRAWN, and a missing file or an unlisted plan. Without it no coverage check runs. A malformed value is a validation error. Carried into `manifest.json` when present. Contract: `skills/spec-builder/references/contract.md` section 7.
 - **`research_env`** (object, **written by the builder — never authored by hand**; RS-06) — the build-time research-environment record. `build_plan.build()` stamps it onto `spec.json` (and `gen_manifest` copies it into `manifest.json`) whenever *any* item carries a `research_status`, so the machine's own account of the environment sits beside the author's prose instead of the skip record being purely hand-written. Shape: `{available, signals[], sources[], method, probed_at}` — `signals` names each capability found (`mcp:exa`, `builtin:WebSearch`), `sources` names each config file actually read, `method` restates the probe's limits verbatim. Absent from a spec that makes no skip claim, which is every plan built before 2026-08-13 — that is what keeps `plan_mutate`'s "manifest.json == `gen_manifest(spec.json)`" check passing on existing plans. `gen_manifest` READS it off the spec and never re-probes, so regenerating a manifest on another machine reproduces the same bytes.
 - **`notify_on_complete`** (object, optional) — Symmetric companion to `notify_on_halt` for unattended (`--auto`) runs. Shape: `{"command": "<string>"}`. Fires ONCE when `/plan-execute` reports the plan complete (idempotent via a `complete_notified` run-state flag), same safety envelope (`shell=False`, ~10s, swallowed failures), with env vars `PLAN_DIR`, `PLAN_TITLE`, `PLAN_STATUS=complete`. The "you can stop watching now" ping — point it at a Slack/desktop/webhook script.
 - **`explainer`** (object, optional; 2026-08-24, eli5-derived) — renders "The plan, explained": a picture-first section that tells a newcomer what the plan does and where it stands. Content rules come from the eli5 skill (`../eli5/SKILL.md` → "Rules for the page"); validation + render live in `scripts/explainer.py`. The section's live half — step status colors, the "You are here" badge, and the "Where we are" paragraph — is repainted in the browser on every load from the sessions' `data-status`, exactly like the status card, so `/plan-execute` never writes it and it can never go stale. Shape:
@@ -147,6 +166,7 @@ The Aurora edition introduces **dual-layer authoring**: each item and session ca
 - **`id`** (string, required) — Unique. Convention: `cat-prefix-NN` (e.g., `eng-01`, `qw-01`). Lowercase.
 - **`title`** (string, required)
 - **`category`** (string, required) — Must match a `categories[].key`.
+- **`covers`** (array of strings, optional; 2026-11-20) — the SPEC.md requirement ids this item delivers, each matching `[A-Z][A-Z0-9]*-?\d+` (e.g. `["R1", "FR-3"]`). Carried into `manifest.json` whenever present; checked against SPEC.md only when the spec has a `spec_ref`. See `spec_ref` under Top-level.
 - **`human_summary`** (string, optional, *recommended*) — One or two plain-English sentences. Rendered above the deliverable callout at 14.5px. This is what the human reader sees when scanning the plan.
 - **`deliverable`** (string, optional, *recommended*) — Concrete outcome. Rendered as a green-tinted callout with eyebrow label "When done". Makes progress legible at a glance.
 - **`why`** (string, optional) — One sentence on the underlying problem. Rendered as italic "Why:" line.
@@ -563,6 +583,17 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   ]
   ```
 
+- **`blocking_rule`** (non-empty string, optional) — what blocks this session's automated
+  review, written when the plan is built and carried into `manifest.json` unchanged. With
+  it, a finding blocks only when it breaks one listed condition. `build_plan.py` prints one
+  warning naming each session that has an `llm-review-*`, `cross-family-review-*` or
+  `adversarial-review` gate and no rule; the plan still builds. Write two or three numbered
+  conditions, each a failure a test could show. A rule with a phase-level default is
+  overridden by the session's own. Example:
+  ```json
+  "blocking_rule": "1. an unreviewed session can reach DONE\n2. a blocking finding is dropped from the ledger\n3. a plan built before this change no longer builds"
+  ```
+
 - **`locked`** (array of strings, optional; `plan_schema_version` 8+) — repo-relative
   paths of check files the session must not edit (tests, fixtures, gate scripts). No
   leading `/`, no `..`, no glob characters. The build refuses a path that exists but is
@@ -691,11 +722,11 @@ choices:
 | `dispatch.requires_human_checkpoint` | `false` | That gate fires *before* dispatch. The decision comes from the closeout instead — see below. |
 
 **The verdict drives the checkpoint, conditionally.** Tell the session in its `prompt`:
-set `human_checkpoint_reason` **only when the review finds gaps**, phrased as the
-decision the human actually has to make (accept the gap as-is · dispatch a
-gap-closing session · descope it explicitly) — the harness's own rule is that a gate
-whose only sane answer is "proceed" should not exist. A clean `ACHIEVED` verdict
-therefore lets the plan complete without a halt, with the verdict recorded in the
+set `human_checkpoint_reason` **unless every result is `ACHIEVED`** (a `GAP` or a `NEVER CHECKED` result parks the plan; the one exception is the after-landing measurement criterion, which may stay `NEVER CHECKED` until its due date and is then reported with that date), phrased as the
+decision the human actually has to make (accept the gap or the unchecked result as-is · dispatch a
+gap-closing or checking session · descope it explicitly) — the harness's own rule is that a gate
+whose only sane answer is "proceed" should not exist. A clean verdict (every result `ACHIEVED`, none `GAP` or `NEVER CHECKED`)
+therefore lets the plan complete without a halt; only an all-`ACHIEVED` review does, and `GAP` and `NEVER CHECKED` both park it, with the verdict recorded in the
 session's notes and its report artifact. When it *does* park the plan, the operator
 acks it via the post-session-checkpoint procedure in
 `../plan-execute/SKILL.md` § "Operator gotcha" (`--resume` would re-dispatch it).
@@ -713,8 +744,10 @@ body should tell it to:
 2. **Verify each criterion against the repository/system itself**, not against the
    closeouts' claims. A closeout is a report; the criterion is about reality. Quote
    `file:line`, a command's output, or a test result per criterion.
-3. Return a verdict per criterion (`ACHIEVED` / `GAP` with the evidence) plus one
+3. Return a verdict per criterion (`ACHIEVED` / `GAP` / `NEVER CHECKED`, with the evidence) plus one
    overall verdict, and write it to the report path named in `verify.checks`.
+3a. **Three results.** `ACHIEVED`: a check ran against the criterion or requirement and passed. `GAP`: a check ran and failed or shows it part met. `NEVER CHECKED`: no check ran against it; a check that exists and did not run counts as never checked. It is not a pass and not a gap; the evidence says why none ran. Keep every other rule of this review.
+3b. **Write-back.** When the plan folder's `spec.json` has a `spec_ref`, append one line per requirement id of that plan line of SPEC.md into the `## Results` section of the file `spec_ref.path` names, in exactly this form (contract `skills/spec-builder/references/contract.md` section 8): `- <ID>: <ACHIEVED | GAP | NEVER CHECKED> — <YYYY-MM-DD> — <plan folder> — evidence: <path, command or the reason>`; regex `^- ([A-Z][A-Z0-9]*-?\d+): (ACHIEVED|GAP|NEVER CHECKED) — (\d{4}-\d{2}-\d{2}) — (\S+) — evidence: .+$`. Lines are appended, never edited, so a re-run adds a second line for an id and the newest line counts; change only `## Results` and the `updated` date.
 4. Ship it in the eval-deliverable shape `/plan-execute` § PS-02 requires — one
    rendered one-pager with the data inline, plus a decision card of **at most three**
    options. Never a narration wall, never a multi-page HTML maze.
@@ -730,7 +763,7 @@ body should tell it to:
   "effort": "~45m", "task_class": "deep_reasoning", "acceptance_review": true,
   "items": [],
   "human_summary": "Independent check that the plan actually delivered what it promised — not that each session said it was done.",
-  "deliverable": "A one-page acceptance report scoring all 5 plan criteria ACHIEVED or GAP, each with evidence, plus a decision card if any gap remains.",
+  "deliverable": "A one-page acceptance report scoring all 5 plan criteria ACHIEVED, GAP or NEVER CHECKED, each with evidence, plus a decision card if any gap remains.",
   "why_model": "Cross-session synthesis over ambiguous evidence (deep_reasoning -> Opus/medium); a fresh agent so it doesn't inherit the orchestrator's optimism.",
   "prompt": "Validate this plan against its acceptance criteria. ...\n\nCriteria:\n1. ...\n2. ...",
   "dispatch": {"subagent_type": null, "depends_on": ["s09", "s10", "s11"], "requires_human_checkpoint": false},

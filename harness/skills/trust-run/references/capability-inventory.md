@@ -1,5 +1,17 @@
 # Capability Inventory & Contract Validation
 
+## Contents
+
+- [M1 (Excel trust path) — gating dependencies](#m1-excel-trust-path--gating-dependencies)
+- [S02 components — travel-class router + policy gate (proven this session)](#s02-components--travel-class-router--policy-gate-proven-this-session)
+- [M1 — domain validators (availability confirmed; functional fixture at first use)](#m1--domain-validators-availability-confirmed-functional-fixture-at-first-use)
+- [M2 (PowerPoint path) — dependencies validated early where cheap](#m2-powerpoint-path--dependencies-validated-early-where-cheap)
+- [v2 (document trust path + source verification) — keyed to OPERATIONS, not tools](#v2-document-trust-path--source-verification--keyed-to-operations-not-tools)
+  - [Source-verification operations (conventions.md §2.2)](#source-verification-operations-conventionsmd-22)
+  - [Document reader / writer operations (one capability per `format`, conventions.md §1.6)](#document-reader--writer-operations-one-capability-per-format-conventionsmd-16)
+- [v3 (recurring update + governance) — keyed to OPERATIONS, not tools](#v3-recurring-update--governance--keyed-to-operations-not-tools)
+- [Contract deviations surfaced (impact flagged per finding 4)](#contract-deviations-surfaced-impact-flagged-per-finding-4)
+
 **Rule (review-1 finding 4): no downstream task may assume a tool until its contract is proven here.** Each dependency below records the required operation, the *actual* observed interface, the failure mode, the fallback, and a fixture that proves the contract. Re-run all proofs with:
 
 ```bash

@@ -38,7 +38,17 @@ fi
 # 44 functions were over the bound when it was first pointed here.
 _ratchet_root="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes.py" ]]; then
-  for _check in check_file_sizes check_function_lengths check_complexity; do
+  for _check in check_file_sizes check_function_lengths check_complexity check_subprocess_results; do
+    # A worktree cut before a checker existed has no such file: skip it. A checker that git tracks
+    # (in HEAD or the index) but that is missing from disk is a broken tree: block, never skip.
+    if [[ ! -f "$_ratchet_root/scripts/quality/$_check.py" ]]; then
+      if git cat-file -e "HEAD:scripts/quality/$_check.py" 2>/dev/null \
+         || git cat-file -e ":scripts/quality/$_check.py" 2>/dev/null; then
+        echo "COMMIT BLOCKED: $_check.py is tracked by git but missing from disk. Restore it (git checkout -- scripts/quality/$_check.py)." >&2
+        exit 1
+      fi
+      continue
+    fi
     if ! python3 "$_ratchet_root/scripts/quality/$_check.py" --staged --project "$_ratchet_root"; then
       echo "" >&2
       echo "COMMIT BLOCKED: $_check — this commit grows code past its bound." >&2
@@ -47,6 +57,28 @@ if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes
       exit 1
     fi
   done
+  # Always-loaded context bound (owner decision, STRATEGY.md "Small, plain and owned"):
+  # 200 raw lines per file, from Anthropic's memory docs.
+  if [[ -f "$_ratchet_root/scripts/quality/check_context_size.py" ]] && \
+     ! python3 "$_ratchet_root/scripts/quality/check_context_size.py" --staged --project "$_ratchet_root"; then
+    echo "COMMIT BLOCKED: check_context_size — this commit grows an always-loaded file past its bound. Prune first." >&2
+    exit 1
+  fi
+  # Type-error ratchet for the staged files (1.5 s whole-tree, measured). CI runs it
+  # too, but only after the push: a miss cost one failed CI run. Exit 2 (ty missing, or the script rejected its arguments) only warns, with the script's own message above.
+  _types_py=python3
+  if [[ -x "$_ratchet_root/scripts/pyres" ]]; then
+    _types_py="$("$_ratchet_root/scripts/pyres" pytest yaml jsonschema)" || _types_py=python3
+  fi
+  "$_types_py" "$_ratchet_root/scripts/quality/check_types.py" --staged --project "$_ratchet_root"; _rc=$?
+  if [[ $_rc -eq 1 ]]; then
+    echo "" >&2
+    echo "COMMIT BLOCKED: check_types — a staged file adds a type error (see BLOCK lines above)." >&2
+    echo "Fix the error. CI runs the same check on the whole tree." >&2
+    exit 1
+  elif [[ $_rc -ne 0 ]]; then
+    echo "WARNING: check_types exited $_rc and did NOT check this commit; read its message above (2 = ty missing or bad arguments). CI still runs it." >&2
+  fi
 fi
 
 # ============================================================================
@@ -235,7 +267,14 @@ if [[ $_partial -ne 0 ]]; then
   exit 1
 fi
 
-if ! CLAUDE_DIR="$CLAUDE_DIR" bash "$CLAUDE_DIR/scripts/verify-routing.sh"; then
+# A pass printed 289 lines (21 KB, measured) into every committing agent's context.
+# Print the whole report only on a failure; on a pass print its last 3 lines (the PASS banner).
+_vr_rc=0
+_vr_out=$(CLAUDE_DIR="$CLAUDE_DIR" bash "$CLAUDE_DIR/scripts/verify-routing.sh" 2>&1) || _vr_rc=$?
+if [[ $_vr_rc -eq 0 ]]; then
+  printf '%s\n' "$_vr_out" | tail -3
+else
+  printf '%s\n' "$_vr_out" >&2
   _routing_log "FATAL: verify-routing.sh failed — commit blocked. Fix the drifted source (or the SSOT if it is wrong). Recovery-only escapes: ROUTING_GUARD_ALLOW_FIX / ROUTING_GUARD_ALLOW_REVERT above — never --no-verify."
   exit 1
 fi

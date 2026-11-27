@@ -110,9 +110,11 @@ def retry(ctx, st, gid, g, rec):
         return lost
     load = round(os.getloadavg()[0], 1)
     t0 = time.monotonic()
+    env_extra = {"PYRES_VENV": os.environ["PYRES_VENV"]} if os.environ.get("PYRES_VENV") else None
     res = ssio.run_deploy_argv([*spec["argv"], *ids], cwd=rec["cwd"],
                                timeout=lst.timeout_for(spec.get("timeout", 900)),
-                               env_allowlist=g.get("env_allowlist", []))
+                               env_allowlist=g.get("env_allowlist", []),
+                               env_extra=env_extra)
     out = (res.get("stderr") or "") + (res.get("stdout") or "")
     rc, waited = res.get("returncode"), _WAITED.search(out)
     alone = {"tests": ids, "returncode": rc, "wall_s": round(time.monotonic() - t0, 1),

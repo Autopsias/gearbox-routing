@@ -375,12 +375,12 @@ def adapt(payload, prepared, led, level):
     out, matched = [], set()
     for f in payload["findings"]:
         rec = {"file": _norm(f.get("file")), "line": f.get("line"),
-               "severity": str(f.get("severity", "")).lower(), "summary": _summary(f)}
+               "severity": str(f.get("severity", "")).lower(), "summary": _summary(f),
+               **({"rule": f["rule"]} if f.get("rule") is not None else {})}  # id ignores rule
         fid = ledger.fingerprint(rec)
         if fid in priors:
-            # Codex emits no prior_id per finding, so the MATCH is made
-            # here, on the ledger's own fingerprint (file + summary, line
-            # excluded). Re-reported means still open.
+            # Codex emits no prior_id per finding, so the MATCH is made here, on the
+            # ledger's own fingerprint (file + summary, line excluded). Re-reported = still open.
             rec["prior_id"], rec["prior"] = fid, "open"
             matched.add(fid)
         out.append(rec)

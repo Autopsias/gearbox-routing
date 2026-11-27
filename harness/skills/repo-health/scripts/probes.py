@@ -7,6 +7,8 @@ silently shrinks reads healthier than the repo is.
 
 Imports common + shape: health.py imports this, never the other way round.
 """
+import json
+import os
 import re
 import tempfile
 import uuid
@@ -99,6 +101,29 @@ def collect_command(repo, suite, unread, tracked):
     return suite + " --collect-only -q", ""
 
 
+VERIFY_SKILL = ".claude/skills/verify/SKILL.md"
+BLIND_SPOTS = re.compile(r"^#+\s*What this does not see\b", re.M | re.I)
+
+
+def verify_proof(repo, skill_text):
+    """proven | stale | none: a PROVEN replay_verify.py receipt for this repo.
+
+    Receipts live in $REPLAY_PROOF_ROOT (default ~/.gearbox-state/verify-proofs)/<repo name>/;
+    proven only when its skill_hash is the git blob hash of the CURRENT SKILL.md.
+    """
+    root = Path(os.environ.get("REPLAY_PROOF_ROOT") or Path.home() / ".gearbox-state" / "verify-proofs")
+    rc, cur = run(["git", "hash-object", VERIFY_SKILL], repo)
+    proven = []
+    for f in sorted((root / repo.name).glob("*.json")) if skill_text is not None and rc == 0 else []:
+        try:
+            r = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(r, dict) and r.get("verdict") == "PROVEN":
+            proven.append(r.get("skill_hash"))
+    return "none" if not proven else "proven" if cur.strip() in proven else "stale"
+
+
 def verify_check(repo, shape, suite, unread, tracked):
     """ai.verify-command: a suite command that cannot start is no verify loop,
     so a repo with a suite stays `pending` until the agent runs its collect form."""
@@ -111,10 +136,24 @@ def verify_check(repo, shape, suite, unread, tracked):
                      "warn" if gate else "fail", f"suite: none; {note}",
                      "add a single `make check` (lint+types+tests) agents can run")
     cmd, why = collect_command(repo, suite, unread, tracked)
+    skill = repo / VERIFY_SKILL
+    text = skill.read_text(errors="replace") if skill.is_file() else None
+    sees = "found" if text is not None and BLIND_SPOTS.search(text) else "none"
+    proof = verify_proof(repo, text)
+    facts = (f"verify skill: {'found' if text is not None else 'none'}; "
+             f"'What this does not see' section: {sees}; proof: {proof}; ")
+    if text is None or sees == "none" or proof != "proven":
+        missing = [m for m, ok in (("a verify skill (.claude/skills/verify/SKILL.md)", text is not None),
+                                   ("a 'What this does not see' section in it", sees == "found"),
+                                   ("a PROVEN receipt matching the current SKILL.md", proof == "proven")) if not ok]
+        return check("ai.verify-command", "ai_readiness", "advisory", title, "warn",
+                     facts + (f"run: {cmd}" if cmd else why) + f" (suite: {suite}; {note})",
+                     "add " + "; add ".join(missing) + "; prove it with: python3 scripts/replay_verify.py "
+                     "--repo <repo> --fix <commit that fixed a real bug>")
     # Record: pass only on exit 0 AND >= 1 test collected; start failure -> fail with
     # the first error line; timeout -> stay pending. Detail keeps suite and gate.
     return check("ai.verify-command", "ai_readiness", "advisory", title, "pending",
-                 (f"run: {cmd}" if cmd else f"{why}; run the suite command by hand") +
+                 facts + (f"run: {cmd}" if cmd else f"{why}; run the suite command by hand") +
                  f" (suite: {suite}; {note}) -- pass only if it exits 0 and collects 1+ test; "
                  "start failure -> fail with the first error line; timeout -> pending",
                  "" if gate else "add a single `make check` (lint+types+tests) agents can run")

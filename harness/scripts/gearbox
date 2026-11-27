@@ -56,12 +56,18 @@ trap cleanup EXIT
 
 # Coarse advisory lock. Two concurrent deploys interleaving a rebase and a push is
 # the one way this script can lose a commit. ponytail: mkdir is the lock primitive
-# this box has (no flock(1)); stale reclaim after 600s, same shape as githooks/pre-commit.
+# this box has (no flock(1)); stale reclaim after 600s, same shape as githooks/pre-commit,
+# and at once when the pid file names a process that no longer runs (a killed session).
 take_lock() {
   local tries=0
   while ! mkdir "$LOCK" 2>/dev/null; do
-    local age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))
+    local age=$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || stat -f %m "$LOCK" 2>/dev/null || echo 0) ))
     if [ "$age" -gt 600 ]; then warn "reclaiming stale $LOCK (age ${age}s)"; rm -rf "$LOCK"; continue; fi
+    # An empty pid file is a run between mkdir and its echo: not dead.
+    local holder; holder=$(cat "$LOCK/pid" 2>/dev/null)
+    if [ -n "$holder" ] && ! ps -p "$holder" >/dev/null 2>&1; then
+      warn "reclaiming $LOCK from pid $holder, which no longer runs"; rm -rf "$LOCK"; continue
+    fi
     tries=$((tries + 1))
     [ "$tries" -ge 10 ] && die 1 "another gearbox run holds $LOCK — retry when it finishes"
     sleep 1
@@ -384,6 +390,7 @@ do_deploy() {
   say ""
 
   say "-- classify local state --"
+  CLAUDE_DIR="$CD" python3 "$CLASSIFY" --claude-dir "$CD" --restore-orca-timeout || true
   snapshot
   report
   say ""
@@ -449,6 +456,7 @@ do_deploy() {
   # unstaged, and the rebase below refused (exit 5: 2026-09-11, twice).
   # shortcut: a write after THIS snapshot can still race; the window is now seconds, not a minute.
   rm -f "$SNAP" "$SNAP".*
+  CLAUDE_DIR="$CD" python3 "$CLASSIFY" --claude-dir "$CD" --restore-orca-timeout || true
   snapshot
   if [ "$(snap_count harness,triage_untracked)" != "0" ]; then
     report
@@ -568,6 +576,47 @@ do_deploy() {
     warn "         remains green; re-run the sync after fixing the cause:"
     warn ""
     warn "    $mirror_py $mirror_sync --apply"
+  fi
+  say ""
+
+  # (g4) a NEW session must run what was just deployed. verify-routing reads files and
+  # never loads them into a session (memory note: gearbox-deploy-ok-can-deploy-nothing).
+  # One headless Haiku session from a new private temp folder (no project config above
+  # it; a shared /tmp could hold a planted one) must quote a
+  # heading the deployed CLAUDE.md holds, and its one shell call must be refused by a
+  # command-rules row that has NO condition (a conditioned row, e.g. repo_top, would
+  # let the call through in /tmp and prove nothing). Warn only: a login or network
+  # fault is not a broken tree. The checks read the whole event stream (stream-json),
+  # not only the last reply: the hook refused the call but Haiku's reply
+  # left the refusal out, and the probe warned on a working tree.
+  # GEARBOX_SKIP_PROBE=1 skips it; GEARBOX_CLAUDE names
+  # the binary (tests use a stub).
+  say "-- new-session probe --"
+  local probe_bin="${GEARBOX_CLAUDE:-}" probe_rule="merge-script-exit-code-hidden-by-pipe"
+  local probe_heading probe_out probe_quote probe_hook probe_dir
+  probe_heading="$(grep -m1 '^## This tree is' "$CD/CLAUDE.md" 2>/dev/null || true)"
+  if [ "${GEARBOX_SKIP_PROBE:-0}" = 1 ]; then
+    say "   skipped (GEARBOX_SKIP_PROBE=1)"
+  elif [ -z "$probe_bin" ] && [ "$CD" != "$HOME/.claude" ]; then
+    say "   skipped: $CD is not the default config dir, so a new session would not load it"
+  elif [ -z "$probe_heading" ] || ! grep -qF "\"$probe_rule\"" "$CD/hooks/command_rules.json" 2>/dev/null; then
+    warn "   WARNING: probe skipped: no '## This tree is' heading in $CD/CLAUDE.md, or no $probe_rule row in hooks/command_rules.json"
+  else
+    probe_dir="$(mktemp -d)"
+    probe_out="$(cd "$probe_dir" && env -u CLAUDE_CONFIG_DIR perl -e 'alarm shift; exec @ARGV' 180 \
+      "${probe_bin:-claude}" -p "Run exactly this shell command once with the Bash tool: merge_when_green.py --help | cat — then reply with the full text of any refusal the tool returned, and the exact heading line in your user instructions that starts with '## This tree is'." \
+      --model haiku --output-format stream-json --verbose \
+      --allowedTools 'Bash(merge_when_green.py --help | cat)' 2>&1)" || true
+    rmdir "$probe_dir" 2>/dev/null || true
+    probe_quote=no; grep -qF -- "$probe_heading" <<< "$probe_out" && probe_quote=yes
+    probe_hook=no; grep -qF -- "$probe_rule" <<< "$probe_out" && probe_hook=yes
+    if [ "$probe_quote$probe_hook" = yesyes ]; then
+      say "   OK: a new session quoted the deployed CLAUDE.md and the command-rules hook refused its call"
+    else
+      warn "   WARNING: a new session did not show the deployed harness (CLAUDE.md quote: $probe_quote, hook refusal: $probe_hook)."
+      warn "   The files are deployed; check that a new session loads them. Last lines of the probe:"
+      printf '%s\n' "$probe_out" | tail -5 | cut -c1-200 | sed 's/^/     /' >&2
+    fi
   fi
   say ""
 

@@ -351,10 +351,12 @@ def test_the_off_switch_refuses_an_unpinned_v8_session(tmp_path, capsys, routing
 
 
 def test_a_manifest_stamped_above_the_supported_version_is_refused(tmp_path, routing):
-    plan_dir = _v8_plan(tmp_path, [_unpinned()], version=9)
+    over = rad.pvg.SUPPORTED_MAX_SCHEMA + 1
+    plan_dir = _v8_plan(tmp_path, [_unpinned()], version=over)
     with pytest.raises(SystemExit) as e:
         run.cmd_begin(plan_dir, ["s01"])
-    assert "plan_schema_version 9" in str(e.value) and "supports (8)" in str(e.value)
+    assert f"plan_schema_version {over}" in str(e.value)
+    assert f"supports ({rad.pvg.SUPPORTED_MAX_SCHEMA})" in str(e.value)
     assert _status(plan_dir, "s01") == "TODO"
 
 

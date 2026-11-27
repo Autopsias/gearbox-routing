@@ -49,3 +49,20 @@ coverage: ALLOW — a fully-placed spec validates at the gating version
 coverage: CONTROL — the same defect below the gate still validates
 coverage: CONTROL — an unstamped spec (every plan on disk) still validates
 coverage: plan_mutate aliases the builder's group-key map (one definition)
+covers matrix: no pointer, no covers: no warning, no new manifest key
+covers matrix: no pointer, covers carried, never checked
+covers matrix: pointer, all ids covered: silent
+covers matrix: pointer, R2 uncovered: warning names R2
+covers matrix: pointer, unknown id: warning names it
+covers matrix: pointer, WITHDRAWN id: warning says WITHDRAWN
+covers matrix: pointer, plan not listed: warning names P9
+covers matrix: pointer, missing file: warning, no refusal
+covers matrix: R2 only in a code fence: not defined
+covers matrix: R3 only in an HTML comment: not defined
+covers matrix: P2 only in an HTML comment: not a plan
+covers matrix: R2 only in a Results row: warning says undefined
+covers matrix: P2 only under Results: not a plan
+covers matrix: pointer, unreadable file: warning, no abort
+covers matrix: malformed — covers not a list
+covers matrix: malformed — covers bad id
+covers matrix: malformed — spec_ref not an object

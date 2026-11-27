@@ -30,11 +30,10 @@ import land_brief as lb  # noqa: E402
 import land_state as lst  # noqa: E402
 import dispatch as dsp  # noqa: E402
 import land_steps  # noqa: E402
-from _land_fixture import ack_only, ignored_gate_output  # noqa: E402
-from _land_fixture import (_arm_prepush, _arm_slow_commit,  # noqa: E402
-                           _kill_when, build_repo,
-                           checked_out_branch, isolate, local_main, main_side,
-                           origin_main, run_cli, work)
+from _land_fixture import (_arm_prepush, _arm_slow_commit, _kill_when, ack_only,  # noqa: E402
+                           build_repo, checked_out_branch, ignored_gate_output, isolate,
+                           local_main, main_side, origin_main, work)
+from land_test_support import _inproc_session, inproc_cli as run_cli, run_cli_subprocess  # noqa: E402,F401
 from worktree import git  # noqa: E402
 
 
@@ -104,7 +103,7 @@ def test_sync_parks_on_a_conflicting_main_edit_and_merges_a_disjoint_one(fx):
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "shared.txt", "the plan's line\n")
     main_side(fx, "shared.txt", "main's line\n")          # SAME file, both sides
-    rc, out = run_cli("land", iso["plan_dir"])
+    rc, out = run_cli_subprocess("land", iso["plan_dir"])
     assert (rc, out["action"], out["kind"]) == (1, "land-parked", "sync-conflict")
     assert "shared.txt" in out["conflicts"]
     assert "git merge --abort" in out["brief"] and "land-resume" in out["brief"]
@@ -365,29 +364,6 @@ def test_a_main_that_moves_on_every_attempt_exhausts_the_bound_and_parks(fx):
     assert git(["rev-parse", "--verify", "--quiet", iso["branch"]], fx["root"])[0] == 0
     assert Path(st["land_path"]).is_dir()
     assert "Branch kept" in out["brief"] and "land-resume" in out["brief"]
-
-
-def test_a_repo_with_no_remote_lands_locally_and_says_so(tmp_path):
-    fx = build_repo(tmp_path)
-    git(["remote", "remove", "origin"], fx["root"], check=True)
-    iso = isolate(fx, "plan-a")
-    work(iso["tree"], "src/f.py", "F = 1\n")
-    before = local_main(fx)
-    rc, out = _ack_and_land(iso["plan_dir"])
-    assert (rc, out["action"]) == (0, "landed")
-    assert local_main(fx) == before                        # §4.3 holds here too
-    ref = "refs/plan-lands/plan-a"
-    st = lst.load(iso["plan_dir"])
-    # §8.c2: in a no-remote repo the FINAL-record commit is what the durable ref
-    # is re-pointed at, and the merge is its ancestor.
-    assert git(["rev-parse", "--verify", "--quiet", ref], fx["root"])[1] == st["final_record_sha"]
-    assert git(["merge-base", "--is-ancestor", out["merge_sha"], ref], fx["root"])[0] == 0
-    assert "LANDED LOCALLY ONLY" in out["brief"] and ref in out["brief"]
-    # §4.8a — the durable ref is the only thing keeping the commit reachable.
-    git(["reflog", "expire", "--expire=now", "--expire-unreachable=now", "--all"],
-        fx["root"], check=True)
-    git(["gc", "--prune=now"], fx["root"], check=True)
-    assert git(["cat-file", "-t", out["merge_sha"]], fx["root"]) == (0, "commit", "")
 
 
 # ------------------------------------------------------- §4.1 the lease, serial

@@ -165,6 +165,23 @@ def test_marker_is_gone_after_a_park(tmp_path, monkeypatch):
     assert lst.load(iso["plan_dir"])["ack"]                      # a park keeps the ack
 
 
+def test_in_process_land_failure_leaves_next_plan_isolated(tmp_path, monkeypatch):
+    """One interpreter, two lands: the first fails after it opened its protected window;
+    the second plan's land must not see its deadline, token or lease."""
+    fa, ia = _setup(tmp_path / "a", monkeypatch, "on")
+    _hook(fa, ia, refuse=True)
+    out = _land(ia)
+    assert (out["action"], out["kind"]) == ("land-parked", "push-rejected"), out
+    lease_a = sl._ship_lock_path(ia["plan_dir"], fa["resource"])
+    assert lp2._OPEN == {} and "at" not in lst._PHASE2_DEADLINE and not lease_a.exists()
+    fb, ib = _setup(tmp_path / "b", monkeypatch, "on")
+    _hook(fb, ib)
+    out_b = _land(ib)
+    assert out_b["action"] == "landed", out_b
+    assert lp2._OPEN == {} and "at" not in lst._PHASE2_DEADLINE
+    assert _snap(fb)[1]["token"] == _snap(fb)[0][0]["token"] == _snap(fb)[2]
+
+
 def test_marker_is_gone_after_an_exception(tmp_path, monkeypatch):
     fx, iso = _setup(tmp_path, monkeypatch, "on")
     seen = {}

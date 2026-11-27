@@ -22,6 +22,8 @@ Resolve once per session, log the chosen command before any test invocation:
 3. `python -m pytest` (venv but no lockfile).
 4. Bare `pytest` (last resort).
 
+**Every command with `-n` (including `-n0`) runs as `~/.claude/scripts/govrun --max-wait 0 $PYTEST_CMD ...`, in a background Bash call.** The governor hook refuses any `-n` run outside `govrun`, the queue that caps test workers on this machine (2026-11-20: 124 refusals in 38 sessions in 30 days). The commands below and in [playbook.md](playbook.md) omit the prefix for brevity; add it every time.
+
 Preflight once: `$PYTEST_CMD --version`, `$PYTEST_CMD --trace-config`, capture `addopts` from `pyproject.toml`/`pytest.ini`/`setup.cfg`. Detect xdist availability/version. Discover project conventions: `<repo>/.claude/rules/*.md`, conftest chain via `find . -name conftest.py` plus `$PYTEST_CMD --collect-only -q <node>` (closest-conftest, never assume `tests/conftest.py`), `<repo>/scripts/check-*.{sh,py}` validators, and any wait helper / mock factory / settings-patch fixture. **If found, prefer them in fix recommendations.** If absent, library defaults.
 
 ## Three calibrated gates
@@ -37,9 +39,9 @@ Preflight once: `$PYTEST_CMD --version`, `$PYTEST_CMD --trace-config`, capture `
 Full procedure: [playbook.md](playbook.md). Summary:
 
 0. **Triage existing log** — pasted log / `gh run view --log-failed` / local `pytest --log-file=` output. Match against the signal→class table in [taxonomy.md](taxonomy.md). Strong hint → skip 1–3, jump to 4 + 6. No log → start at 1.
-1. `$PYTEST_CMD <node> -n0` vs `$PYTEST_CMD <node> -n auto` differential.
+1. `$PYTEST_CMD <node> -n0` vs `$PYTEST_CMD <node> -n auto` differential (both through `govrun`, see above).
 2. Worker-assignment correlation (junitxml preferred; grep fallback emits parser-confidence flag).
-3. `$PYTEST_CMD <node> --dist loadfile -n auto` (order-dependence-within-file).
+3. `$PYTEST_CMD <node> --dist loadfile -n auto` (order-dependence-within-file; through `govrun`).
 4. Fixture scope audit (closest-conftest chain).
 5. Docker `--cpus=2 --memory=4g` simulation **with preflight + fallback** to local throttling (`taskset`/`cpulimit`) or CI reproduction.
 6. Calibrated reruns via `scripts/flake-rerun.sh -- <node> [N]` (process-level, separate pytest invocations).

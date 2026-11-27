@@ -8,6 +8,7 @@
 - [Area 3 — STEERING](#area-3--steering)
 - [Area 4 — PRUNING](#area-4--pruning)
 - [Post-edit gates](#post-edit-gates-updates-to-existing-skills)
+- [Eval results](#eval-results-a-skill-run-with-and-without-it)
 
 ## Provenance
 
@@ -92,3 +93,8 @@ problem is never fixed by rewording the description — those are two separate c
 - Full coherence re-read after editing any high-risk/orchestrator skill.
 - `bash ~/.claude/skills/.s08-verify-dangling-refs.sh` must pass after any batch of edits
   that moves or deletes files.
+
+## Eval results (a skill run with and without it)
+
+- A result counts as settled only at 3 or more runs. One run is a signal, not a result.
+- A baseline that the skill no longer beats points to retiring the skill, not to patching it.

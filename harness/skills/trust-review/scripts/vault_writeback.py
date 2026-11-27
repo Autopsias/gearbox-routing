@@ -59,7 +59,7 @@ sys.path.insert(0, os.path.join(SKILL_ROOT, "references", "scripts"))
 
 try:
     import adapter_registry as AR  # noqa: E402
-except Exception:                  # pragma: no cover - registry is always present in-repo
+except Exception:  # noqa: BLE001 — fail open: any import failure leaves AR as None  # pragma: no cover
     AR = None
 
 SCHEMA_VERSION = "3"

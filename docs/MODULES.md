@@ -17,7 +17,7 @@ start each one, read [the catalogue](CATALOG.md).
 
 Read [`INSTALL.md`](INSTALL.md) Part 2 first. It has the five rules that apply
 to every module: install only what you use, install into `~/.claude`, never
-copy `harness/settings.json` or `harness/CLAUDE.md` over your own, copy every
+copy `harness/settings.json` or `harness/CLAUDE.md.template` over your own, copy every
 path on the card, and read the cautions.
 
 **Status** on each card means:
@@ -85,7 +85,7 @@ path on the card, and read the cautions.
 
 | Module | What it does | Platform |
 |---|---|---|
-| [General commands](modules/general-commands.md) | `/review`, `/research`, `/wait-what`, `/nextsession`, `/improve`, `/pr`, and what is archived | Any |
+| [General commands](modules/general-commands.md) | `/review`, `/research`, `/wait-what`, `/nextsession`, `/pr`, and what is archived | Any |
 | [Reference docs](modules/reference-docs.md) | Background docs, a rule file, the original global instructions, key bindings | Any |
 
 ## Not for general use

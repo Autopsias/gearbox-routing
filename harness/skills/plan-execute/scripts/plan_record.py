@@ -54,17 +54,17 @@ def _names(args, cwd, what):
 # --------------------------------------------------------------------------
 # §8.c — WHO commits the plan record, and WHEN
 # --------------------------------------------------------------------------
-def record_plan(target, plan_dir, message=None):
+def record_plan(target, plan_dir, message=None, *, keep_ignored_local=False):
     """Copy, repair and commit the plan record, one process of this plan at a time."""
     plan_dir = Path(plan_dir).resolve()
     root = wt.repo_root(plan_dir)
     if root is None:
         raise wt.WorktreeError(f"{plan_dir} is not inside a git checkout")
     with frp.record_lock(root, plan_dir.name):
-        return _record_plan(target, plan_dir, message)
+        return _record_plan(target, plan_dir, message, keep_ignored_local=keep_ignored_local)
 
 
-def _record_plan(target, plan_dir, message=None):
+def _record_plan(target, plan_dir, message=None, *, keep_ignored_local=False):
     """Copy the LIVE outer plan directory into ``target`` and commit just it.
 
     §8.b removes ``/commit-orchestrate``'s ``git add -A`` from this job, and a
@@ -97,10 +97,15 @@ def _record_plan(target, plan_dir, message=None):
         raise wt.WorktreeError(
             f"record-plan target {target} IS the primary checkout holding {plan_dir} — "
             "copying a directory onto itself would destroy it.")
+    pathspec = rel.as_posix()
+    if (keep_ignored_local
+            and _git(["check-ignore", "-q", "--", pathspec + "/"], target)[0] == 0
+            and not _names(["ls-files", "--", pathspec], target, pathspec)):
+        _assert_only(target, pathspec)
+        return {"status": "kept-local", "pathspec": pathspec, "sha": None}
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(plan_dir, dest)
-    pathspec = rel.as_posix()
     _keep_runtime_local(target, dest, pathspec)
     dropped = _drop_ignored(target, dest, pathspec)
     _repair(target, plan_dir, pathspec)

@@ -48,7 +48,8 @@ THREE ERROR RULES, which are not opposites:
     `govrun --status`, which prints the tail of that log.
 
 WHERE THE COMMAND IS TAKEN APART. Not here, and no longer even in this file:
-`governor_parse.py` beside it. Quoting, grouping, operators and comments all
+`governor_parse.py` beside it (except quoted heredoc bodies, which
+`strip_quoted_heredocs` drops first). Quoting, grouping, operators and comments all
 come from `shlex`, the stdlib's shell lexer, because a hand-written scanner
 only knows the constructs someone already thought of and every one it misses is
 a silent bypass. That module's `CommandText` is the whole delta from shlex.
@@ -112,6 +113,7 @@ Self-check: hooks/test_governor_hook.py, hooks/test_governor_parse.py
 import datetime
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -175,6 +177,56 @@ def state_dir():
                 or Path.home() / ".machine-governor")
 
 
+# --- quoted heredocs ---------------------------------------------------------
+
+# A quoted-delimiter heredoc body (`<<'EOF'`, `<<"EOF"`) is DATA: bash runs no
+# backtick or `$(…)` in it (probed), yet the lexer splits its
+# backticks and newlines into commands, so a doc that MENTIONS `pytest -n 8` was
+# refused (16 refusals in 10 sessions, 30 days to 2026-11-25). An UNQUOTED
+# delimiter keeps its body: bash substitutes there. Two rules keep the strip from
+# hiding a real command: the body ends at the FIRST delimiter line, never later
+# than bash ends it, and an opener inside an open quote is not an opener.
+_QUOTED_HEREDOC = re.compile(
+    r"(?<!<)<<(?!<)-?[ \t]*(['\"])(\w+)\1[^\n]*\n(.*?)^[ \t]*\2[ \t]*$", re.S | re.M)
+
+
+def _quote_open(text):
+    """True when `text` ends inside a '…' or "…" string (an odd quote in a comment
+    reads as open too, which keeps the body: the safe direction)."""
+    quote, i = None, 0
+    while i < len(text):
+        c = text[i]
+        if quote == "'":
+            quote = None if c == "'" else quote
+        elif c == "\\":
+            i += 1
+        elif c == quote:
+            quote = None
+        elif quote is None and c in "'\"":
+            quote = c
+        i += 1
+    return quote is not None
+
+
+# Text around an opener that this scan does not model ends all stripping: a
+# comment (`# <<'X'`), an escape (`\<<'X'`), `$'…'`, `${…}`, a substitution, or
+# any other `<<` (an unquoted heredoc's body can hold a quoted opener), before
+# the opener OR after it on its line (`cat <<'A' <<B`). Fail closed.
+_UNMODELED = re.compile(r"#|\\|\$[{'\"(]|`|<<")
+
+
+def strip_quoted_heredocs(command):
+    """`command` with each quoted-delimiter heredoc body and its end line removed."""
+    out, at = [], 0
+    for m in _QUOTED_HEREDOC.finditer(command):
+        gap, tail = command[at:m.start()], command[m.end(2) + 1:m.start(3)]
+        if _UNMODELED.search(gap + " " + tail) or _quote_open("".join(out) + gap) or _quote_open(tail):
+            break  # keep this body and every later one
+        out.append(command[at:m.start(3) - 1])  # the opener line; the end line's newline follows
+        at = m.end()
+    return "".join(out) + command[at:]
+
+
 # --- decision ----------------------------------------------------------------
 
 def heavy(segment, index, earlier=()):
@@ -192,14 +244,14 @@ def heavy(segment, index, earlier=()):
         return "`docker build`", None
     if command in PYTEST_NAMES:
         workers = numprocesses(pytest_args(segment, index, earlier))
-        if workers is not None:
+        if workers is not None and workers != 0:  # xdist -n 0 runs in one process
             return "`pytest` with -n/--numprocesses", workers
     return None
 
 
 def decide(command):
     """`("deny", reason)`, `("bypass", command)`, or None to stay silent."""
-    segs = segments(command)
+    segs = segments(strip_quoted_heredocs(command))
     if not segs:
         return None
     if segs[0][0] == BYPASS_TOKEN:
@@ -271,7 +323,7 @@ def log(line):
         path.mkdir(parents=True, exist_ok=True)
         with open(path / "hook-errors.log", "a", encoding="utf-8") as handle:
             handle.write(f"{stamp} {line}\n")
-    except Exception:  # a full disk must not turn a fail-open into a crash
+    except Exception:  # noqa: BLE001 — fail open: a full disk must not turn the log into a crash
         pass
 
 

@@ -29,12 +29,14 @@ Exit:   0 always when it could inspect the tree; 2 if it could not (git failure)
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import re
 import stat
 import subprocess
 import sys
+import tempfile
 
 SELF = os.path.dirname(os.path.abspath(__file__))
 
@@ -139,7 +141,7 @@ def classify_settings(old_text, new_text, churn_keys, errors, relpath="settings.
         if old_text is None or new_text is None:
             raise FileNotFoundError("no text on one side")
         old, new = json.loads(old_text), json.loads(new_text)
-    except Exception as exc:  # unparseable / missing / deleted -> loud
+    except Exception as exc:  # noqa: BLE001 — fail closed: any read or parse error classifies the file as harness
         errors.append(f"{relpath}: cannot compare against HEAD ({exc.__class__.__name__}: {exc})")
         return "harness", {"churn": [], "harness": ["<uninspectable>"]}
 
@@ -245,6 +247,79 @@ def is_auto(claude_dir, path):
     return stat.S_ISREG(st.st_mode) and st.st_size < AUTO_MAX_BYTES
 
 
+def _find_orca_pretooluse_hooks(hooks):
+    """Return every Orca PreToolUse hook dict inside a settings.json `hooks` map."""
+    if not isinstance(hooks, dict):
+        return []
+    entries = hooks.get("PreToolUse")
+    if not isinstance(entries, list):
+        return []
+    return [
+        h
+        for m in entries
+        if isinstance(m, dict) and isinstance(m.get("hooks"), list)
+        for h in m["hooks"]
+        if isinstance(h, dict) and "agent-hooks/claude-hook" in str(h.get("command", ""))
+    ]
+
+
+def restore_orca_hook_timeout(claude_dir):
+    """Restore Orca's PreToolUse timeout when Orca's installer lowered it below HEAD.
+
+    Only acts when the SOLE difference inside `hooks` between HEAD:settings.json
+    and the working copy is Orca's `agent-hooks/claude-hook` PreToolUse timeout
+    dropping from >= 30 to a smaller integer. Leaves unrelated machine-churn
+    keys intact and refuses (returns None) on any other `hooks` change.
+    """
+    old_text, new_text = _settings_pair(claude_dir)
+    if old_text is None or new_text is None:
+        return None
+    try:
+        old, new = json.loads(old_text), json.loads(new_text)
+    except Exception:  # noqa: BLE001 — fail closed: never rewrite unparseable JSON
+        return None
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return None
+    old_hooks, new_hooks = old.get("hooks"), new.get("hooks")
+    if not isinstance(old_hooks, dict) or not isinstance(new_hooks, dict) or old_hooks == new_hooks:
+        return None
+
+    old_orca = _find_orca_pretooluse_hooks(old_hooks)
+    patched_hooks = copy.deepcopy(new_hooks)
+    new_orca = _find_orca_pretooluse_hooks(patched_hooks)
+    if len(old_orca) != 1 or len(new_orca) != 1:
+        return None
+
+    old_t, new_t = old_orca[0].get("timeout"), new_orca[0].get("timeout")
+    if (
+        isinstance(old_t, bool)
+        or isinstance(new_t, bool)
+        or not isinstance(old_t, int)
+        or not isinstance(new_t, int)
+        or old_t < 30
+        or new_t >= old_t
+    ):
+        return None
+
+    new_orca[0]["timeout"] = old_t
+    if patched_hooks != old_hooks:
+        return None
+
+    new["hooks"] = patched_hooks
+    target = os.path.join(claude_dir, "settings.json")
+    fd, tmp = tempfile.mkstemp(prefix=".settings.", suffix=".tmp", dir=claude_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(new, fh, indent=2)
+            fh.write("\n")
+        os.replace(tmp, target)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    return (new_t, old_t)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--claude-dir", default=os.environ.get("CLAUDE_DIR") or os.path.expanduser("~/.claude"))
@@ -253,7 +328,15 @@ def main(argv=None):
     ap.add_argument("--section", help="print the raw entries of one pathspec section and exit")
     ap.add_argument("--paths", help="print NUL-separated paths for these comma-separated classes and exit")
     ap.add_argument("--from-json", help="format an existing snapshot instead of re-running git status")
+    ap.add_argument("--restore-orca-timeout", action="store_true",
+                    help="restore Orca's PreToolUse timeout if it is the sole hooks diff vs HEAD")
     args = ap.parse_args(argv)
+
+    if args.restore_orca_timeout:
+        restored = restore_orca_hook_timeout(args.claude_dir)
+        if restored:
+            print(f"[gearbox] restored Orca PreToolUse timeout {restored[0]} -> {restored[1]} (reinstall regression)")
+        return 0
 
     spec = load_pathspec(args.pathspec)
     if args.section:

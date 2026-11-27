@@ -19,7 +19,7 @@ ISOLATION_MIN_SCHEMA = 7
 # route-at-dispatch-contract.md §1: from v8 the executor picks an unpinned
 # session's model and effort. A manifest above SUPPORTED_MAX_SCHEMA is refused.
 ROUTE_AT_DISPATCH_MIN_SCHEMA = 8
-SUPPORTED_MAX_SCHEMA = 8
+SUPPORTED_MAX_SCHEMA = 9
 
 _UNREADABLE = object()   # distinct from None, which a manifest of `null` parses to
 

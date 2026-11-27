@@ -7,6 +7,7 @@ return a string, calling nothing else in the builder, which is exactly why this
 was the clean seam.
 """
 import json
+from pathlib import Path
 
 
 # --------------------------------------------------------------------------
@@ -137,7 +138,34 @@ def _prompt_fields(session, items_by_id, verify, post_session):
     }
 
 
-def gen_session_prompt_md(session, plan_dir_name, items_by_id, post_session=None, verify=None):
+# The plan stamp from which the closeout contract asks for `decision_brief.owner_call`.
+# Must equal plan-execute's closeout_pipeline.OWNER_CALL_MIN_SCHEMA (a test pins it);
+# below it the prompt stays byte-identical, so older plans dispatch unchanged.
+OWNER_CALL_PROMPT_MIN_SCHEMA = 9
+OWNER_CALL_TEXT = (' Add `"owner_call"`: why only the owner can answer, one of `authorization`, '
+                   '`money`, `credentials`, `taste`, `stuck` (the stuck protocol ran out, or an '
+                   'abort condition hit) or `wait` (then add `"wait_for"`: the date or event). If '
+                   'none fits, the choice is yours: decide it, write why in `notes`, and close '
+                   'DONE or PARTIAL, not BLOCKED.')
+
+
+REPO_VERIFY_TEXT = """
+
+## Repo verify skill
+
+This repo has a verify skill (`.claude/skills/verify/SKILL.md`). When your diff touches code (not only docs or tests), run that skill as written before the closeout, and add `verify_skill: {"result": "pass|fail|not_run", "reason": "...", "evidence": "..."}` to the closeout. `not_run` and `fail` need a non-empty `reason`. Know its limits: it only sees what its flow runs. A fix in code that flow never reaches reads PASS on both the broken and the fixed commit (a replayed example-project fix in the MCP bridge headers was BLIND for this reason), while a planted fault in the query path was caught (FAIL on the bad commit, PASS on the good one). A PASS is evidence for the paths the skill covers, not for the whole diff. A `fail` does not block the closeout yet, but report it plainly.
+"""
+
+
+def repo_verify_block(project_root):
+    """The verify-skill section, only for a repo that has the skill; else ''."""
+    if project_root and (Path(project_root) / ".claude" / "skills" / "verify" / "SKILL.md").is_file():
+        return REPO_VERIFY_TEXT
+    return ""
+
+
+def gen_session_prompt_md(session, plan_dir_name, items_by_id, post_session=None, verify=None,
+                          plan_schema_version=None, project_root=None):
     """Render the invocation prompt the orchestrator hands to the subagent.
 
     The prompt body comes from session['prompt']. We wrap it with metadata
@@ -150,6 +178,8 @@ def gen_session_prompt_md(session, plan_dir_name, items_by_id, post_session=None
     sid, title, body = f["sid"], f["title"], f["body"]
     items_block, closeout_json = f["items_block"], f["closeout_json"]
     verify_block, post_session_block = f["verify_block"], f["post_session_block"]
+    owner_call_text = (OWNER_CALL_TEXT if (plan_schema_version or 0) >= OWNER_CALL_PROMPT_MIN_SCHEMA
+                       else "")
     return f"""# Session {sid.upper()} — {title}
 
 You are executing **SESSION {sid.upper()}** as a subagent dispatched by `/plan-execute`.
@@ -168,7 +198,7 @@ For schemas, mockups, code excerpts, and agent instructions per item, read:
 ## Work
 {body}
 {verify_block}
-{post_session_block}
+{post_session_block}{repo_verify_block(project_root)}
 
 ## Implementation notes
 
@@ -214,7 +244,7 @@ Closeout contract:
 - `evidence` (only if this session requires evidence — see "Verification gates" above): a list of paths to artifacts that prove the work engaged. Each path must exist and be non-empty or `DONE` is refused.
 - `deviations` (optional): array of strings, one per edge case where you deviated from the plan (conservative option chosen + why, one line each). Omit entirely if you didn't deviate — routine sessions should not generate noise.
 - `review_base` (optional): ONLY if you shipped your work through PRs that are already merged into the default branch — the commit your first PR started from (the default-branch tip before your first merge). Without it the review gate sees an empty diff and the plan halts. Omit it when your work is uncommitted or on the plan branch.
-- `decision_brief`: **REQUIRED when `result` is `BLOCKED`** (recommended whenever you set `human_checkpoint_reason`). "Stuck, please advise" is not a report — a blocked closeout without this is REFUSED and reworks like any malformed closeout. Shape: `{{"attempts": ["what you tried", …], "findings": [{{"source": "…", "takeaway": "…"}}, …], "options": ["…"] (1-3), "recommendation": "…"}}`. `findings` carries what the stuck-protocol research pass turned up, with its sources — if it genuinely found nothing, say so as a finding (`{{"source": "none", "takeaway": "searched X and Y, nothing found"}}`). At most three options, and name the one you'd pick. The brief is rendered into `HALT_NOTICE.txt`, so the operator sees the options and your recommendation without opening any file.
+- `decision_brief`: **REQUIRED when `result` is `BLOCKED`** (recommended whenever you set `human_checkpoint_reason`). "Stuck, please advise" is not a report — a blocked closeout without this is REFUSED and reworks like any malformed closeout. Shape: `{{"attempts": ["what you tried", …], "findings": [{{"source": "…", "takeaway": "…"}}, …], "options": ["…"] (1-3), "recommendation": "…"}}`. `findings` carries what the stuck-protocol research pass turned up, with its sources — if it genuinely found nothing, say so as a finding (`{{"source": "none", "takeaway": "searched X and Y, nothing found"}}`). At most three options, and name the one you'd pick.{owner_call_text} The brief is rendered into `HALT_NOTICE.txt`, so the operator sees the options and your recommendation without opening any file.
 
 Claude Code dispatches: run a command that may exceed 600 s with `run_in_background` and read the Bash reply. If it says you will be notified when it completes, end your turn with no closeout and arm no Monitor (each Monitor line wakes you, and each wake you end sends the orchestrator a notice), then return the closeout after you wake; if it says the command is terminated when you give your final response, stay in your turn and wait with Monitor and an until-loop (`until <check>; do echo waiting; sleep 30; done`, which prints a line on each pass so the turn never goes 600 s with no output). `Monitor` is a deferred tool: load it with ToolSearch `select:Monitor` before the first call. Never `sleep N` followed by a check, Claude Code blocks that.
 

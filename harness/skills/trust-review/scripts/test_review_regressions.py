@@ -171,3 +171,15 @@ def test_authority_does_not_accept_a_lookalike_host(url, expected):
 ])
 def test_quarantine_detection_matches_its_documented_variants(snippet, quarantined):
     assert ICA._is_quarantined_derived({"snippet": snippet}) is quarantined
+
+
+def test_the_reviewer_is_told_that_no_source_is_out_of_scope():
+    import review_contract as rc
+    prompt = rc.build_reviewer_prompt("C1 -> S1", "deck.pptx")
+    assert "NOTHING IS OUT OF SCOPE" in prompt and "source-not-provided" in prompt
+    ok, errs = rc.validate_edit_list([{
+        "id": "R-01", "location": "slide 4", "type": "source-not-provided",
+        "severity": "must-fix", "evidence": "cites the budget table; not in provenance",
+        "suggested_repair": "add the source excerpt to the bundle", "human_review": True,
+        "status": "open"}])
+    assert ok, errs

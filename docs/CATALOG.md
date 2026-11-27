@@ -20,7 +20,7 @@ Cmd+F) to look for a word.
 - **Hook** — Claude Code runs it on the event shown. It does nothing until
   you wire it in your own `~/.claude/settings.json`, as its card shows.
 
-Counts: 38 skills · 69 commands · 41 subagents · 14 hooks.
+Counts: 38 skills · 68 commands · 41 subagents · 14 hooks.
 
 ## By what you want to do
 
@@ -176,7 +176,6 @@ Counts: 38 skills · 69 commands · 41 subagents · 14 hooks.
 
 **[General commands](modules/general-commands.md)** · install: `./install-module general-commands`
 
-- `/improve` — Looks back over your sessions and proposes changes to rules, skills and memory.
 - `/nextsession` — Writes a prompt that lets a new session continue this one.
 - `/pr` — Manages Git PR workflows: stage, commit, push, create PRs, check status, sync branches, and merge.
 - `/research` — Marks a session as research, so automatic compaction waits much longer.
@@ -299,7 +298,6 @@ Counts: 38 skills · 69 commands · 41 subagents · 14 hooks.
 | `coverage` | `/coverage` | Analyzes test coverage gaps, prioritizes by risk, and orchestrates improvement. | [Repo health](modules/repo-health.md) |
 | `create-test-plan` | `/create-test-plan` | Generates structured test plans from requirements: epics, stories, features, or custom functionality. | [Test and CI commands](modules/test-and-ci.md) |
 | `epic-dev` | `/epic-dev` | Orchestrates BMAD development: standard, TDD/ATDD (--full), UAT (--uat), or end-of-epic validation (--end). | [BMAD method and epic builds](modules/bmad.md) |
-| `improve` | `/improve` | Review the current conversation and recent session history to suggest improvements to the project's configuration — CLAUDE.md, skills, frameworks, memory, agents (NOT … | [General commands](modules/general-commands.md) |
 | `nextsession` | `/nextsession` | Creates a self-contained continuation prompt capturing current context, progress, and next steps for seamless handoff to a new Claude Code session. | [General commands](modules/general-commands.md) |
 | `plan-harden` | `/plan-harden` | Pre-flight harden plan before exit. | [Plan pipeline](modules/plan-pipeline.md) |
 | `pr` | `/pr` | Manages Git PR workflows: stage, commit, push, create PRs, check status, sync branches, and merge. | [General commands](modules/general-commands.md) |

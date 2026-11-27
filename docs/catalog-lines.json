@@ -30,7 +30,6 @@
   "/codex-skill-sync": "Copies your Claude skills, agents and commands to where the Codex CLI loads them.",
   "/mods": "Decides whether a change to Claude Code itself is due, then creates, reviews or improves it.",
   "/write-a-skill": "Helps you write a new skill with the right structure and files.",
-  "/improve": "Looks back over your sessions and proposes changes to rules, skills and memory.",
   "/nextsession": "Writes a prompt that lets a new session continue this one.",
   "/research": "Marks a session as research, so automatic compaction waits much longer."
 }

@@ -239,12 +239,11 @@ def _run_gate(plan_dir, session_id, gate, *, dry_run=False):
     # (`returncode` None) means the gate never ANSWERED, and scoring it `fail`
     # charged a timed-out review as a real rework failure (measured).
     outcome = ssio.argv_outcome(res, g.get("indeterminate_exit"))
-    # EXPECT is a claim-check, meaningful only for a gate that ANSWERED: a timed-out
-    # run has no output to search, so `gate_miss` would turn "never answered" into a
-    # hard fail, the charge the indeterminate path exists to prevent.
     miss = (None if outcome == "indeterminate"
             else gx.gate_miss(g, res, skip=dry_run and not fake))
     if outcome == "pass" and miss is None:
+        if not dry_run:
+            vpk.automated_pass(plan_dir, session_id, state, gate)
         state["gate_status"][gate] = GATE_PASSED
         _save_state(plan_dir, session_id, state)
         return _advance(plan_dir, session_id, gates, state, dry_run)
@@ -514,7 +513,7 @@ def verify_finalize(plan_dir, session_id, _state=None, *, skip_evidence=False):
     # unconfirmed.
     try:
         render = rv.check(plan_dir)
-    except Exception as e:  # pragma: no cover - defensive
+    except Exception as e:  # noqa: BLE001 — fail open: render check is best effort; an error becomes status unavailable  # pragma: no cover - defensive
         render = {"status": "unavailable", "reason": f"render-verify errored: {e}"}
     if render.get("status") == "failed":
         return _gate_failed(

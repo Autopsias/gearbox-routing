@@ -261,8 +261,8 @@ def test_verify_command_is_a_pending_collect_probe_never_a_pass(tmp_path):
     """A `test:` target that cannot start used to read pass."""
     repo = make_repo(tmp_path, dirty=False)
     row = _verify_row(repo, "test:\n\t@python3 -m pytest -q\nlint:\n\ttrue\n")
-    assert row["status"] == "pending" and "run: python3 -m pytest -q --collect-only -q" in row["detail"]
+    assert row["status"] == "warn" and "run: python3 -m pytest -q --collect-only -q" in row["detail"]
     row = _verify_row(repo, "test:\n\t@echo ok\n")
-    assert row["status"] == "pending" and "no collect form" in row["detail"]
+    assert row["status"] == "warn" and "no collect form" in row["detail"]
     health.set_result(repo, "ai.verify-command", "fail", "No module named pytest")
     assert statuses(repo)["ai.verify-command"] == "fail"

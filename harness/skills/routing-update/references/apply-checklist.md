@@ -5,6 +5,11 @@ it is verified. The authoritative surface SET is the SSOT `consumers:` list + th
 + settings.json — if this file and the SSOT `consumers:` list ever disagree, the SSOT wins
 and THIS file gets the fix.
 
+## Contents
+
+- [Step 7 in full — prose-content propagation](#step-7-in-full--prose-content-propagation)
+- [Notes](#notes)
+
 | # | Surface | Edit | Verified by |
 |---|---|---|---|
 | 1 | `~/.claude/model-routing.yaml` | Apply approved diffs to `prices:` / `task_classes:` / `effort_policy:` / `agents:` / `main_session:` / `degradation:`(mirror) / `fanout_policy:`; **bump `version:`**, update `last_reviewed:`; append (never overwrite) a dated `DECISION HISTORY` entry citing the changeset file. **Maintain `value_epoch:`** (v1.17): if the changeset moved ANY routing-affecting value (task_classes, providers, agents, main_session, prices, degradation), set `value_epoch:` to the NEW version; a record-only changeset leaves it unchanged — the outcome aggregator's proposal pool spans `value_epoch..version`, so getting this wrong either discards evidence (too high) or pools across different mappings (too low) | guard (a)–(e) downstream |

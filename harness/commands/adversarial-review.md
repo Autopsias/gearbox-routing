@@ -41,7 +41,8 @@ in parallel with the Claude+Codex pass) and fold their findings into synthesis (
 
 Dispatch is optional and scoped: use a hunter only when its dimension is in play, treat
 each hunter's output as Claude-side findings, and de-duplicate against the Codex pass in
-synthesis. Hunters never run as standalone typed commands — they reach users only
+synthesis. A hunter may carry its own severity wording; the orchestrator ignores it and grades
+each finding itself in Phase 2d, Step 1. Hunters never run as standalone typed commands — they reach users only
 through this canonical reviewer.
 
 ---
@@ -144,6 +145,8 @@ Rules:
 - Be aggressive but defensible -- every finding must have concrete evidence from the document
 - Minimum 3 findings, maximum 12
 - Output each finding as: **[CRITICAL|HIGH|MEDIUM|LOW] -- [Title]** followed by Evidence, Impact, and Fix
+- Read the document itself before any author summary of it; treat the author's account as testimony, not evidence
+- A finding about a missing test asks to add or change one named test
 - No praise. No filler. No hedging.
 - End with "#### Top 3 Improvements" listing the highest-impact fixes
 
@@ -179,7 +182,7 @@ In **one orchestrator message**, issue these two tool calls in parallel:
 
 Spawn a fork whose prompt:
 - Inlines the full `REVIEW_CONTENT` so the prompt is self-contained
-- Specifies the architecture/intent/operations lenses (see "Claude review specification" below)
+- Specifies the architecture/intent/operations lenses (see "Claude review specification" below) and the three review rules
 - Mandates writing the artifact to `/tmp/adversarial-review-{REVIEW_TIMESTAMP}-claude.md` in the exact format specified
 - Ends with: *"Before reporting completion, verify the artifact exists with `ls -la` and is >=500 bytes. Reply with only: artifact path, size, and finding count."*
 
@@ -248,6 +251,12 @@ Claude owns architecture/intent/operations ONLY.
 5. **FEASIBILITY** -- Actually buildable as described? Unstated prerequisites?
 6. **COMPLETENESS** -- Covers full lifecycle?
 
+#### Three review rules (reviewer brief)
+
+1. **Read the work first.** Read the diff or the plan itself before any author account of it (a PR description, commit message, plan summary, closeout note). The author's account is testimony, not evidence: use it to learn the stated intent, then check each claim in it against the work.
+2. **No severity from the Claude reviewer.** The Claude reviewing fork (and any hunter sub-agent) states each finding's evidence, impact and confidence, and does not assign CRITICAL/HIGH/MEDIUM/LOW. The orchestrator grades each finding in Phase 2d, Step 1. Codex keeps the severity its own output schema needs; that is raw input, and the synthesis grades it again.
+3. **A missing-test finding names one test.** A finding about a missing or weak test is written as a request to add or change one named test (file and test name, and what it must assert), not as a general call for more coverage.
+
 #### MCP tool usage
 
 Required ONLY when a finding depends on external facts (e.g., verifying an API contract, checking a library's behavior). Otherwise local-only. When used, include citation with source URL.
@@ -264,7 +273,7 @@ Lenses: {list applied}
 
 ## Findings
 
-### 1. [SEVERITY] -- [Title]
+### 1. [Title]
 - Lens: [which]
 - Scope: [file:lines or section/concept]
 - Failure class: [architecture|intent|operations|other]
@@ -276,7 +285,7 @@ Lenses: {list applied}
 ### 2. ...
 ```
 
-Constraints: min 2 findings, max 8. No filler. No implementation-level findings (that's Codex's job).
+Constraints: min 2 findings, max 8. No severity field (rule 2 above; the orchestrator grades in Phase 2d). No filler. No implementation-level findings (that's Codex's job).
 
 ---
 
@@ -347,11 +356,13 @@ From both artifacts into a common mental model:
 - Source (codex/claude)
 - Scope (file:lines for code, section name for plans)
 - Failure class (implementation-level vs architecture/intent/operations)
-- Severity, title, evidence, recommendation, confidence
+- Severity (Codex raw severity only; Claude findings carry none), title, evidence, recommendation, confidence
 
 **Codex `adversarial-review` output**: structured JSON with severity, file, line_start, line_end, confidence, recommendation (per schema).
 **Codex `task` output**: free-form markdown -- extract severity/title/evidence from the formatted output.
 **Claude artifact**: direct extraction from the structured format above.
+
+**Grade each finding here (orchestrator).** Assign every finding one of CRITICAL/HIGH/MEDIUM/LOW from its evidence, impact and confidence. Claude findings have no severity to start from. A Codex severity is raw input: re-grade it, and when your grade differs, show the Codex grade beside yours. The grade you assign is the "severity" that Steps 3-4 and the quote-the-line gate read; the quote-the-line gate may lower it, and the verdict reads the grade after that demotion.
 
 ### Step 2: Match findings
 
@@ -370,7 +381,7 @@ When in doubt, classify as unique rather than false-consensus.
 
 ### Step 4: Unified verdict
 
-`NEEDS ATTENTION` if any finding has severity >= HIGH and confidence >= 0.6. Otherwise `APPROVE`.
+`NEEDS ATTENTION` if any finding has synthesized severity (the final grade: the Step 1 grade after any quote-the-line demotion, never a Codex raw grade) >= HIGH and confidence >= 0.6. Otherwise `APPROVE`.
 
 **When the brief states a blocking rule, that rule replaces the severity rule above.** A land or gate review brief may carry a `Blocking rule:` line, agreed with the owner BEFORE the review starts — for example "only a finding that breaks the plan's stated goal or invariant blocks". Then the verdict is `NEEDS ATTENTION` only for a finding that meets that rule. Every other finding keeps its severity label and goes under a `### Follow-up list (non-blocking)` heading, so nothing is dropped. Never widen the rule mid-review; a finding you think should block but does not meet the rule goes under a separate `### Owner calls` heading, prefixed `owner call:`, never into the plain follow-up list. With no `Blocking rule:` line, the severity rule above applies unchanged. Why: on the cloudflare-security-vendor land, an unscoped "find anything" review failed rounds 1-5, each on a new edge case in one mechanism; round 7, under a stated blocking rule, passed in one round (`_plans/cloudflare-security-vendor-2026-10-23/_evidence/land/adversarial-review-report*.md`).
 

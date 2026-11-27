@@ -136,7 +136,8 @@ def finished(state, sid, cmd, **extra):
 @pytest.mark.parametrize("cmd", ["git push -u origin HEAD", "git -C ~/your-private-harness push",
                                  "~/.claude/scripts/gearbox deploy", "gh pr merge 61 --squash",
                                  "gh release create v1.2", "uv publish", "cd x && ./deploy.sh prod",
-                                 ".venv/bin/python tools/publish_public.py v0.20.49 --confirm pypi"])
+                                 ".venv/bin/python tools/publish_public.py v0.20.49 --confirm pypi",
+                                 "git status; git push"])
 def test_finished_command_offers_once(tmp_path, cmd):
     out = finished(tmp_path, "f1", cmd)
     ctx = json.loads(out)["hookSpecificOutput"]
@@ -146,7 +147,8 @@ def test_finished_command_offers_once(tmp_path, cmd):
 
 
 @pytest.mark.parametrize("cmd", ["git status", "git commit -m 'push the fix'", "echo deploy", "git log | grep push",
-                                 "grep -n docker deploy.sh", "tools/release.py bump patch"])
+                                 "grep -n docker deploy.sh", "tools/release.py bump patch",
+                                 "command grep -n -E 'log|gh pr merge' f.py", 'rg "git push" docs'])
 def test_other_commands_are_silent(tmp_path, cmd):
     assert finished(tmp_path, "f2", cmd) == "" and fired(tmp_path) == 0
 

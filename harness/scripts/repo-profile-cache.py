@@ -80,7 +80,7 @@ _MANIFEST_LOCKFILE = {
     "deno.json", "deno.jsonc", "deno.lock",
     # Monorepo / workspace orchestrators
     "nx.json", "lerna.json", "turbo.json", "rush.json",
-    # Go (incl. workspaces)
+    # Go (incl. workspaces)  # noqa: ERA001 — ecosystem group label in a filename list, not code
     "go.mod", "go.sum", "go.work", "go.work.sum",
     # Rust
     "Cargo.toml", "Cargo.lock",
@@ -391,7 +391,7 @@ def do_put(profile_file: str) -> int:
             except OSError:
                 pass
             raise
-    except Exception as exc:  # never block the caller, whatever the failure
+    except Exception as exc:  # noqa: BLE001 — fail open: a caught cache write error takes the NO-CACHE fallback
         sys.stderr.write(f"repo-profile-cache: cannot write cache: {exc}\n")
         print("NO-CACHE")
         return 0

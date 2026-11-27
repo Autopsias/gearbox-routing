@@ -53,6 +53,7 @@ different verdicts. Otherwise proceed and disclose the chosen assumptions.
 
 Before generating objections:
 
+0. Read the artifact itself (diff or plan) before any author account of it; treat that account as testimony, not evidence.
 1. Summarize the artifact's central claim or approach internally.
 2. Identify the strongest evidence and constraints supporting it.
 3. Distinguish what it claims from what it merely leaves open.

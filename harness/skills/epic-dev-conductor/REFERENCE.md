@@ -127,7 +127,7 @@ Pass `{ epic: N }` as the Workflow `args`. Present the returned verdict to the o
    (Use the project's required co-author trailer from its git rules.) If the build runs on a branch, that is fine; keep one branch per build unless the project policy says PR-per-story.
 3. **Push** the current branch to `origin`. If there is no remote, record "no remote — local commit only" and proceed (CI is then vacuously satisfied; flag it so the operator can add a remote).
 4. **Run / await CI.**
-   - **CI exists** (`.github/workflows/*` present AND a remote configured): watch the run for the pushed commit — `gh run watch --exit-status` (or `gh pr checks <pr> --watch` when building via PRs). Capture the conclusion.
+   - **CI exists** (`.github/workflows/*` present AND a remote configured): watch the run for the pushed commit — a background `until [ "$(gh run view <id> --json status -q .status)" = completed ]; do sleep 30; done`, then read `--json conclusion` (never `gh run watch`: it can end before the run does) (or `gh pr checks <pr> --watch` when building via PRs). Capture the conclusion.
    - **No CI yet:** many builds stand CI up partway through (in this project, Epic 1 / **Story 1.5** creates the dual-arch determinism CI). Before that story, there is nothing to run — record **"no CI configured yet — commit+push only"** and treat the gate as satisfied. Do not fabricate a CI result.
 5. **Decision.**
    - **All checks green →** proceed to the next story (or the epic boundary).

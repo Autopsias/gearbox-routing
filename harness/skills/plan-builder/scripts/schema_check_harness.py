@@ -48,7 +48,7 @@ def expect_valid(spec, name):
     try:
         build_plan.validate_spec(spec)
         ok(name)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
         bad(name, f"unexpectedly raised {type(e).__name__}: {e}")
 
 
@@ -61,7 +61,7 @@ def expect_invalid(spec, name, needle=None):
             bad(name, f"raised but message lacked {needle!r}: {e}")
         else:
             ok(name)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — test harness: a wrong exception type is recorded as a FAIL via bad()
         bad(name, f"raised wrong type {type(e).__name__}: {e}")
 
 

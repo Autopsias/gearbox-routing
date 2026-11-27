@@ -375,10 +375,8 @@ def publish_final_record(plan_dir, ctx, st, *, message=None):
     on no branch at all. §8.c2 calls that a second silent loss and fixes it by
     ordering rather than hope.
 
-    It obeys every rule the first push does — the lease is already held, a
-    FRESHLY captured ``EXPECTED``, a ``record-plan`` staging confined to
-    ``_plans/<slug>/``, a compare-and-swap push — and it is NOT re-gated and NOT
-    re-approved. That exemption is earned MECHANICALLY, not asserted: the commit
+    It uses the held lease, a fresh ``EXPECTED``, confined plan staging, and
+    a compare-and-swap push. It skips new gates and approval only because the commit
     it adds is verified to touch only paths under the record pathspec, and a
     commit naming anything else PARKS instead of pushing. No code can ride it.
 
@@ -401,15 +399,15 @@ def publish_final_record(plan_dir, ctx, st, *, message=None):
                 return _conflict_park(plan_dir, ctx, st, path, (err or out)[:2000])
         before = rev(path, "HEAD")
         try:
-            res = pship.record_plan(path, plan_dir, message or
-                                    f"plan({ctx['slug']}): final record")
+            res = pship.record_plan(path, plan_dir, message or f"plan({ctx['slug']}): final record",
+                                    keep_ignored_local=ctx["remote"] is None)
         except wt.WorktreeError as e:
             return park(plan_dir, ctx, st, "final-record-failed",
                         f"LAND PARKED AFTER A SUCCESSFUL LAND — the merge is on "
                         f"{st['landed_on']}, but record-plan refused in {path}:\n{e}\n\n"
                         "Nothing was cleaned up. Fix and re-run `run.py land-resume "
                         f"{plan_dir}`.")
-        if res["status"] == "already-recorded" and before == st.get("final_record_sha"):
+        if res["status"] in ("already-recorded", "kept-local") and before == st.get("final_record_sha"):
             return None                       # nothing new to publish
         head = rev(path, "HEAD")
         bad = _final_record_confined(plan_dir, ctx, st, path, before, head, pathspec)
@@ -478,7 +476,9 @@ def step_finish(plan_dir, ctx, st):
                "local_default_after": rev(ctx["root"], ctx["default"])})
     st["brief"] = lb.landed(st["landed_sha"], st["landed_on"] if ctx["remote"] else None,
                             catch, extra=f"{PLAN_LANDS_REF}/{ctx['slug']}")
-    st["final_record_published"] = bool(st.get("final_record_sha"))
+    kept_local = st.get("record_status") == "kept-local"
+    st["brief"] += "\n\nThe ignored plan record stays in the original plan directory." if kept_local else ""
+    st["final_record_published"] = bool(st.get("final_record_sha")) and not kept_local
     st.pop("park", None)
     save(plan_dir, ctx, st)
     lst.write_notice(plan_dir, st["brief"])

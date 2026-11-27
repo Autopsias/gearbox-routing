@@ -10,7 +10,7 @@ allowed-tools: ["Task", "Bash", "Skill", "Read", "Grep"]
 
 ## HARD CONSTRAINTS (enforced here, not in prompt text)
 
-- NEVER use `gh pr merge --auto`. After the CI loop is GREEN, the last stage runs `python3 ~/.claude/scripts/merge_when_green.py <pr>`, which merges only when every check of the head commit is green (owner decision). Deploy and release stay an explicit request.
+- NEVER use `gh pr merge --auto`. After the CI loop is GREEN, the last stage runs `python3 ~/.claude/scripts/merge_when_green.py <pr-url>`, which merges only when every check of the head commit is green (owner decision). A merged gearbox change deploys at once with `~/.claude/scripts/gearbox deploy`, even while sessions run (owner decision, `STRATEGY.md`); an app deploy and any release stay an explicit request.
 - NEVER pass --no-verify to any git command. Fix the underlying hook issue instead.
 - NEVER run against a dirty tree at the start (see State Machine below).
 - SLASH_DEPTH cap: if SLASH_DEPTH >= 2, report and EXIT — do not re-enter the chain.
@@ -168,6 +168,12 @@ After completion:
 
 Log: `[ship-tail] STAGE 1 test-fix COMPLETE — tests green`
 
+### Verify-skill step (after test-fix, before commit)
+
+Skip if `.claude/skills/verify/SKILL.md` does not exist in the repo, or the diff touches only docs or tests.
+Otherwise run that skill as written. A FAIL is handled like a failing test: fix, re-run, at most three rounds, then
+report the failure and EXIT without committing. Keep the final `VERIFY:` line for the STEP 6 report.
+
 ---
 
 ## STEP 3: COMMIT-POINT STAGE
@@ -266,8 +272,9 @@ ship-tail COMPLETE
   Branch : <branch>
   Commit : <hash> <subject>
   PR     : <url or "skipped">
+  Verify : <PASS | FAIL after 3 rounds | skipped (no verify skill, or no code in the diff)>
   CI     : <GREEN after N cycle(s) via <path>> | <ESCALATED: reason> | <skipped (--no-ci)>
-  Merge  : <MERGED | NO MERGE: reason from merge_when_green.py> (deploy/release stay an explicit request)
+  Merge  : <MERGED | NO MERGE: reason from merge_when_green.py> (a merged gearbox change deploys at once; an app deploy and any release stay an explicit request)
 ```
 
 ---
@@ -288,4 +295,4 @@ ship-tail COMPLETE
 
 Before ship-tail, the chain was emergent: `/test-orchestrate` STEP 10 auto-invoked `/commit-orchestrate`, and `/commit-orchestrate`'s chain-invocation.md called `/pr create`. That worked but was invisible — you could not run the chain as a first-class operation, and double-fires were possible if SLASH_DEPTH tracking fell out of sync. Ship-tail makes the chain explicit, suppresses the emergent auto-chain inside each stage (`--no-chain`), and owns sequencing as a single documented entry point.
 
-The CI loop (STEP 5) closes the tail: after the PR pushes, ship-tail watches CI to green and, on red, triggers `/ci-orchestrate` and re-pushes — looping (bounded) until green. It auto-detects its environment so the SAME command works both where `api.github.com` is reachable (gh path) and inside a network sandbox like example-project's where it is blocked (self-hosted runner-log path: `~/actions-runners/*/_diag/Worker_*.log`). On green it runs `~/.claude/scripts/merge_when_green.py`, which merges only when every check is green (never `--auto`); deploy and release stay an explicit request. See `references/ship-tail/ci-loop.md` for the full algorithm and `references/ship-tail/test_runner_log_path.sh` for the parser/fixture-hygiene tests.
+The CI loop (STEP 5) closes the tail: after the PR pushes, ship-tail watches CI to green and, on red, triggers `/ci-orchestrate` and re-pushes — looping (bounded) until green. It auto-detects its environment so the SAME command works both where `api.github.com` is reachable (gh path) and inside a network sandbox like example-project's where it is blocked (self-hosted runner-log path: `~/actions-runners/*/_diag/Worker_*.log`). On green it runs `~/.claude/scripts/merge_when_green.py`, which merges only when every check is green (never `--auto`); a merged gearbox change deploys at once, and an app deploy and any release stay an explicit request. See `references/ship-tail/ci-loop.md` for the full algorithm and `references/ship-tail/test_runner_log_path.sh` for the parser/fixture-hygiene tests.

@@ -7,6 +7,7 @@ whatever python3 is on PATH; test_no_requirements_file_means_no_check proves tha
 """
 
 import os
+import subprocess
 import sys
 import venv
 from pathlib import Path
@@ -25,6 +26,10 @@ def no_ci_venv(tmp_path, monkeypatch):
     """The real /tmp/ci-venv on this machine would turn every park below into a pass."""
     monkeypatch.setattr(lev, "VENV", str(tmp_path / "no-ci-venv"))
     monkeypatch.setenv("LAND_CI_VENV", lev.VENV)    # and for run.py subprocesses
+    monkeypatch.setenv(lev.NO_BUILD_ENV, "1")       # no test builds a real venv (pip, network)
+    monkeypatch.setenv("PYRES_VENV", "")            # record pre-test state so teardown undoes land_env writes
+    monkeypatch.delenv("PYRES_VENV", raising=False)
+    monkeypatch.setattr(lev, "_ATTEMPTED", {})
 
 
 @pytest.fixture
@@ -124,6 +129,65 @@ def test_a_session_gate_with_a_bare_python3_is_not_run_and_not_charged(tree, tmp
     (tmp_path / "plain").mkdir()
     assert lev.gate_problem(tmp_path / "plain", gate["argv"]) is None  # no requirements file
     assert lev.gate_problem(tree, ["/bin/sh", "-c", "true"]) is None  # gate runs no python3
+
+class _Build:
+    """The subprocess edge of a venv build: `-m venv` makes a real venv (a stand-in pytest in
+    it, no pip), `pip install` is recorded, answers with `pip_rc` and `pip_err`; every other call
+    (the probe) runs for real."""
+
+    def __init__(self, monkeypatch, pip_rc=0, pip_err=""):
+        self.calls, self.pip_rc, self.pip_err, self.real = [], pip_rc, pip_err, subprocess.run
+        monkeypatch.delenv(lev.NO_BUILD_ENV)
+        monkeypatch.setattr(lev.subprocess, "run", self)
+
+    def __call__(self, argv, *a, **kw):
+        if argv[1:3] == ["-m", "venv"]:
+            self.calls.append(argv)
+            _venv(argv[3], pytest_file=self.pip_rc == 0)    # a failed pip leaves no pytest
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        if argv[1:3] == ["-m", "pip"]:
+            self.calls.append(argv)
+            return subprocess.CompletedProcess(argv, self.pip_rc, "", self.pip_err)
+        return self.real(argv, *a, **kw)
+
+
+def test_the_default_venv_is_under_dyno_not_tmp():
+    env = {k: v for k, v in os.environ.items() if k != "LAND_CI_VENV"}
+    out = subprocess.run([sys.executable, "-c", "import land_env; print(land_env.VENV)"],
+                         env=env, cwd=SCRIPTS, capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == os.path.expanduser("~/.gearbox-state/ci-venv")
+
+
+def test_a_broken_venv_is_moved_aside_and_rebuilt_from_the_requirements(tree, monkeypatch):
+    monkeypatch.setenv("PATH", str(Path(sys.base_prefix) / "bin"))
+    _venv(lev.VENV, pytest_file=False)                  # a venv that cannot run the gates
+    (Path(lev.VENV) / "pyvenv.cfg").unlink()            # what /tmp/ci-venv lost twice
+    build = _Build(monkeypatch)
+    assert _check(tree) is None
+    assert [c[1:3] for c in build.calls] == [["-m", "venv"], ["-m", "pip"]]
+    assert build.calls[1][-2:] == ["-r", str(tree / lev.REQUIREMENTS)]
+    assert os.environ["PATH"].startswith(f"{lev.VENV}/bin{os.pathsep}")
+    assert len(list(Path(lev.VENV).parent.glob("no-ci-venv.broken-*"))) == 1   # kept, not deleted
+    assert _check(tree) is None and len(build.calls) == 2                      # a working venv: no second build
+
+
+def test_a_good_venv_is_adopted_without_a_build(tree, monkeypatch):
+    monkeypatch.setenv("PATH", str(Path(sys.base_prefix) / "bin"))
+    _venv(lev.VENV)
+    build = _Build(monkeypatch)
+    assert _check(tree) is None
+    assert build.calls == [] and os.environ["PATH"].startswith(f"{lev.VENV}/bin{os.pathsep}")
+
+
+def test_a_failed_build_parks_with_its_output_and_is_not_retried(tree, monkeypatch):
+    monkeypatch.setenv("PATH", str(Path(sys.base_prefix) / "bin"))
+    build = _Build(monkeypatch, pip_rc=1, pip_err="ERROR: no matching distribution for pytest==9.1.1")
+    out = _check(tree)
+    assert (out["action"], out["kind"]) == ("land-parked", "land-environment"), out
+    assert f"building {lev.VENV} failed" in out["problem"] and "no matching distribution" in out["problem"]
+    assert "not in a virtual environment" in out["problem"] and len(build.calls) == 2
+    assert _check(tree)["problem"] == out["problem"] and len(build.calls) == 2   # once per process
+    assert os.environ["PATH"] == str(Path(sys.base_prefix) / "bin")
 
 
 def test_land_parks_before_any_gate_runs(tmp_path, monkeypatch):

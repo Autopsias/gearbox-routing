@@ -51,7 +51,6 @@ import land_state as lst
 import manifest_io as mio
 import plan_mutate as pm
 import plan_worktree as pwt
-import review_context as rvs
 import run_state_io as rsi
 import safe_json as sj
 import untrusted_block as ub
@@ -230,8 +229,9 @@ def _rerun(plan_dir, ctx, st, red, gates):
     a ``pass`` on a re-run made in THIS call makes a gate flaky: the memo only saves
     a second re-run, so a gate red again on the same candidate stays red; an
     undecided re-run (a timeout) is not saved as an answer and runs again. A review
-    gate (it declares the review base) is never re-run: re-reviewing an unchanged
-    tree answers nothing new."""
+    gate (one that asks a reviewer, `vp.is_review_gate`) is never re-run: re-reviewing
+    an unchanged tree answers nothing new. Declaring the review base does not make a
+    gate a review gate: `code-review-gate` declares it and runs tests."""
     key = f"{st.get('gate_key')}:{json.dumps(_cand(st), sort_keys=True)}"
     prior = st.get("rerun") if (st.get("rerun") or {}).get("candidate") == key else None
     memo: dict[str, Any] = prior or {"candidate": key, "gates": {}}
@@ -240,7 +240,7 @@ def _rerun(plan_dir, ctx, st, red, gates):
         g = r["gate_id"]
         if (memo["gates"].get(g) or {}).get("outcome") not in DECIDED:  # undecided: again
             cwd = lgt.gate_cwd(gates[g].get("cwd"), ctx["plan_tree"], st["land_path"])
-            review = rvs.BASE_ENV in (gates[g].get("env_allowlist") or [])
+            review = vp.is_review_gate(gates[g])
             rec = {"outcome": "not-rerun", "wall_s": None} if cwd is None or review else \
                 lgt._run_argv_gate(plan_dir, ctx, st, g, gates[g], cwd, log=".rerun")
             again = _failing(rec, None)["tests"] if rec["outcome"] == "fail" else []
@@ -374,6 +374,9 @@ def _directive(plan_dir, ctx, n, cand, failing, sid=None):
     sid = sid or next(f"lr{i}" for i in range(1, len(taken) + 2) if f"lr{i}" not in taken)
     tree = ctx["plan_tree"]
     prompt = _prompt(n, cand, failing)
+    # Schema 8 needs `touches` on every item. The repair fixes what the plan broke,
+    # so it declares the plan's own diff; [] only when git cannot list it.
+    touched = lst.range_files(tree, cand["expected"], cand["plan_head"]) or []
     return {"action": "land-repair", "round": n, "max_rounds": MAX_ROUNDS, "candidate": cand,
             **({"amend_session": {"sid": sid, "prompt": prompt}} if existing else {}),
             "failing": failing,
@@ -384,7 +387,8 @@ def _directive(plan_dir, ctx, n, cand, failing, sid=None):
                 "depends_on": [],
                 "new_items": [{"id": f"land-repair-{n}", "category": cat, "title": title,
                                "research_status": "skipped",
-                               "research_reason": "repair of a red land gate"}],
+                               "research_reason": "repair of a red land gate",
+                               "touches": ", ".join(touched) if touched else []}],
                 "infographic_group": group, "prompt": prompt}}
 
 

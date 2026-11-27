@@ -11,7 +11,7 @@
 input=$(cat)
 now=$(date +%s)
 
-IFS=$'\001' read -r session model effort cur_dir ctx h5 h5_reset d7 d7_reset hit warm misses cause <<<"$(
+IFS=$'\001' read -r session model effort cur_dir ctx h5 h5_reset d7 d7_reset hit warm misses cause mid sid <<<"$(
   printf '%s' "$input" | jq -r '
     [ (.session_name // ""), (.model.display_name // ""), (.effort.level // ""),
       (.workspace.current_dir // ""),
@@ -25,7 +25,8 @@ IFS=$'\001' read -r session model effort cur_dir ctx h5 h5_reset d7 d7_reset hit
       ((.prompt_cache.misses // 0) | tostring),
       ((.prompt_cache.last_miss_cause.causes // []) | join("+")
         | gsub("_prompt_changed|_changed|_rewritten"; "") | gsub("ttl_expired_"; "ttl")
-        | gsub("likely_server_side"; "server"))
+        | gsub("likely_server_side"; "server")),
+      (.model.id // ""), (.session_id // "")
     ] | join("")' 2>/dev/null
 )"
 
@@ -43,6 +44,21 @@ seg() {
   [ "${3%.*}" -gt 0 ] 2>/dev/null && s="$s ($(remain "$3"))"
   printf '%s' "$s"
 }
+
+# Live model and effort for the model nudge (ADR 0007): one guarded write, no output, never fails the line.
+# observed_at is the time this line saw the values, not a file time. Skipped when the nudge mode is `off`.
+re_sid='^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'; re_mid='^[A-Za-z0-9][][A-Za-z0-9._:@-]{0,79}$'
+if [[ "$sid" =~ $re_sid && "$mid" =~ $re_mid ]]; then
+  {
+    nd="${MODEL_NUDGE_DIR:-$HOME/.gearbox-state/routing/nudge}"
+    if [ "$(cat "$nd/mode" 2>/dev/null)" != off ]; then
+      at=$(date -u +%Y-%m-%dT%H:%M:%SZ); ef=""
+      case "$effort" in low|medium|high|xhigh|max) ef=$(printf ',"effort":{"value":"%s","observed_at":"%s"}' "$effort" "$at");; esac
+      mkdir -p "$nd/live" && printf '{"model":{"value":"%s","observed_at":"%s"}%s}\n' "$mid" "$at" "$ef" >"$nd/live/$sid.json.$$" &&
+        mv "$nd/live/$sid.json.$$" "$nd/live/$sid.json"
+    fi
+  } >/dev/null 2>&1 || true
+fi
 
 dir_name=$(basename "${cur_dir/#$HOME/\~}")
 model=${model% (1M context)}

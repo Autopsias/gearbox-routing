@@ -66,7 +66,7 @@ def load_config(project_path: Path) -> dict:
     try:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return config
 
     q = data.get("tool", {}).get("claude-quality", {})
@@ -97,7 +97,7 @@ def parse_exceptions(source: str) -> dict[str, int]:
     """The baseline text -> {file: loc}. Shared with the parent-version read."""
     try:
         return {e["file"]: e["loc"] for e in json.loads(source).get("exceptions", [])}
-    except Exception:
+    except (ValueError, RecursionError, AttributeError, KeyError, TypeError):
         return {}
 
 
@@ -105,7 +105,7 @@ def count_lines(filepath: Path) -> int:
     try:
         with open(filepath, encoding="utf-8", errors="replace") as f:
             return sum(1 for _ in f)
-    except Exception:
+    except (OSError, ValueError):
         return 0
 
 
@@ -319,7 +319,7 @@ def generate_baseline(project_path: Path, config: dict) -> None:
         try:
             with open(exc_file) as f:
                 existing = {e["file"] for e in json.load(f).get("exceptions", [])}
-        except Exception:
+        except Exception:  # noqa: BLE001 — baseline regeneration: on a read or parse error try to continue with no preserved entries
             pass
 
     data = {"exceptions": [{"file": v["file"], "loc": v["loc"]} for v in blocking]}

@@ -30,6 +30,7 @@ guard, one approval protocol.
 - [ ] **Deterministic scan** — run `retro_scan.py`, read the JSON
 - [ ] **Aggregation** (step 1b) — run `aggregate_outcomes.py`, read its JSON (never the raw
   `outcomes.ndjson` ledger); surface any fired proposal and the `apex_revisit` callout
+- [ ] **Main-session turns** (step 1c) — run `main_session_turns.py`, state the display verdict
 - [ ] **Judgment layer** — infer task shape, compare expected vs actual routing
 - [ ] **Report** — render the one-pager (`render_report.py`) + a decision card of at most 3
   proposed changes, each with a recommended action
@@ -51,7 +52,15 @@ python3 ~/.claude/skills/routing-retro/scripts/retro_scan.py \
 - **Always pass the current session's id** to `--exclude-session` (it's in your transcript
   path); the scanner also drops `entrypoint: sdk*` (headless) sessions itself.
 - Useful variants: `--project <substring>` to scope to one project; `--since YYYY-MM-DD`;
-  `--last N`.
+  `--until YYYY-MM-DD` (with `--since`: a fixed date window, replies counted only inside it, so a baseline reruns to the same numbers;
+  `--until` without `--since` scans all history up to `--until`, with no start bound);
+  `--last N`. A bounded window picks sessions by their UTC start date, so a session that started before the window
+  and has replies inside it is not counted (one opened two minutes before the window drops its in-window replies).
+- Totals: `model_changes` counts changes of the served model id between main-chain replies (sidechain/subagent
+  replies excluded), ignoring a trailing `[..]` suffix such as `[1m]`; with `--until`, only replies dated inside
+  the window count. `model_family_changes` counts those that cross a family (opus to sonnet), and `family_share`
+  is the list-price share of reply spend by family; `model_effort_switches` counts typed `/model` and `/effort`
+  commands only.
 - Output per session: model mix %, token breakdown, **cost against SSOT `prices:`**,
   `context_peak_tokens` + `reread_cost_usd`/`reread_cost_pct` (context carried forward),
   duration, tool/API error counts, `max_tokens` truncations, Task/Agent dispatches
@@ -135,6 +144,48 @@ two-stage, explicit-tag experiment (grill 2026-08-13):
    `evals/routing/adoptions.ndjson` boundary the aggregator reads back for did-it-help
    comparisons on future retros).
 
+### 1c. Main-session turns (what the owner ran, and whether the nudge helped)
+
+The model nudge (ADR 0007, `hooks/model-nudge.py`) writes one line per main-session turn to
+`~/.gearbox-state/routing/main-turns.ndjson`. Read it with the script, never by hand:
+
+```
+python3 ~/.claude/skills/routing-retro/scripts/main_session_turns.py --since YYYY-MM-DD
+```
+
+It prints JSON: per task type, model and effort the turns, sessions, pushback rate, moved-up-after rate,
+nudges shown, followed share and silent would-nudge count; the malformed and skipped line counts (headless
+sessions and model changes not made by the owner are left out and counted by value); `table_proposals`;
+and `health` with the `display_verdict`. Pass the same JSON to `render_report.py --main-turns FILE` for the
+report section. State the display verdict in the retro, judged in this order: **broken** (model unknown (no model, or an id the table cannot place) in
+more than 20% of lines, or no line in the last 7 days of a window of 7 days or more: re-probe the payload facts
+of the nudge hook, because the hook fails open and silence is not "not enough data"), **wait** (fewer than 20
+nudges shown, or fewer than 20 shown nudges with a known followed or ignored outcome), **keep** (followed share 25% or more), else **silent** (set `~/.gearbox-state/routing/nudge/mode` to `silent`
+and fix the rules). Thresholds are named constants at the top of the script; the owner can change them there.
+
+A proposal is evidence, never an edit. `lower_row`, `raise_row` and `rule_wrong` entries with status `proposed`
+go to the owner as decision-card options; a `below_min_n` entry prints its N and goes nowhere. When the owner
+approves one, make it as a normal edit of `hooks/model_nudge_table.json` in the source repository
+(`~/your-private-harness`), then `scripts/verify-routing.sh` and deploy as usual. When he rejects it, leave the table.
+
+**After-landing check (due date and commands).** The session that deploys the nudge writes a dated memory note
+holding the due date below. On or after 2026-12-03, and 14 days or more after the deploy, run
+`python3 skills/routing-retro/scripts/main_session_turns.py --since <deploy date>` and
+`python3 skills/routing-retro/scripts/retro_scan.py --since <deploy date> --until <deploy date + 13 days> --last 100000`
+(it prints `selection.files`; confirm that number is below `--last`, else the cap bound and the check is void),
+and re-run the baseline window
+`python3 skills/routing-retro/scripts/retro_scan.py --since 2026-11-09 --until 2026-11-18 --last 100000`
+on the same day, so both Sonnet shares use one method and one price table. Read the display verdict (keep at a
+followed share of 25% or more over 20 or more nudges, unless the health check says broken, which is judged first)
+and the Sonnet share of main-session list-price spend, which is the `totals.family_share.sonnet` value of
+`retro_scan.py`, against the baseline for 2026-11-09 to 2026-11-18. The baseline is **0.1244** (12.4%), taken from
+`_evidence/s04/after.json` of the plan `main-session-model-nudge-2026-11-18` with the baseline command above as its
+method (list-price cost share of replies dated in the window, costs summed unrounded). It replaces the carried
+planning estimate of about 10%. Target: 20%.
+
+The script also says wait when fewer than 20 shown nudges have a known outcome, so read the display verdict
+from its `health.followed_n` as well as `health.nudges_shown`.
+
 ### 2. Judgment layer
 
 Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_policy:`,
@@ -158,10 +209,12 @@ Read `~/.claude/model-routing.yaml` (`task_classes:`, `main_session:`, `effort_p
    steps, restating why a step doesn't apply, or output quality complaints. If seen,
    propose trimming that agent's .md prescription via `/routing-update` — never edit here.
 
-**Effort blind spot — handle explicitly.** Transcripts do NOT record effort. Report effort
-as *inferred* (settings.json `effortLevel`, `CLAUDE_CODE_EFFORT_LEVEL` env, `/effort`
-switches seen in transcripts) and label it "inferred" in every finding — never
-claim effort as measured. (`verify-routing.sh` check (g) shows current env overrides.)
+**Effort blind spot — handle explicitly.** Transcripts do NOT record effort. Main-session effort is measured in the
+turn ledger (step 1c) only when the line's `effort_source` is `stop`, `statusline` or `switch`; the `effort_sources`
+count of each cell in the step 1c output shows the mix. `settings` stays inferred (it is the settings.json value, not
+what ran), and so does a session with no ledger line: report its effort as *inferred* (settings.json `effortLevel`,
+`CLAUDE_CODE_EFFORT_LEVEL` env, `/effort` switches seen in transcripts) and label it "inferred" in every finding. Never claim
+effort as measured without a measured `effort_source`. (`verify-routing.sh` check (g) shows current env overrides.)
 
 ### 3. Report — one rendered one-pager + a decision card, every retro, the house way
 
@@ -181,7 +234,8 @@ python3 ~/.claude/skills/routing-retro/scripts/render_report.py /tmp/aggregate.j
   and status, straight from `aggregate.json`'s `cells[]`.
 - **Did-it-help check inline** — `aggregate.json`'s `did_it_help[]` (see step 3a below)
   renders as its own table: before/after N and pass rate per adopted proposal, always with
-  a verdict (`helped` / `no_improvement` / `underpowered`).
+  a verdict (`helped` / `no_improvement` / `underpowered`; a switch to a cheaper rung reads
+  `held` / `helped` / `dropped` / `unclear` instead, because it only has to keep quality).
 - Share the rendered file path (or publish it as an Artifact if the environment supports
   it) — never a bare multi-page markdown dump in its place.
 
@@ -213,7 +267,12 @@ date** [HARDENED:codex-verify-r3]: a source adoption isn't live in the ledger un
 `proposal_id` are reported separately in `canaries[]` (step 1b) — did-it-help is the
 class-wide default-population comparison. Always report N on both sides; below the
 aggregator's floor (`DID_IT_HELP_MIN_N`) on either side, the verdict reads "underpowered" —
-report that honestly rather than picking a direction from too little data.
+report that honestly rather than picking a direction from too little data. A switch to a
+cheaper rung (lower model, or same model at lower effort) is judged on whether quality HELD:
+`dropped` only when the after pass rate is significantly lower (one-sided z > 1.645),
+`helped` when it rose, `held` only when the one-sided 95% upper bound of the drop is
+below 10 points (`HELD_MARGIN`, owner-ratified 2026-11-19), and `unclear` otherwise -- a small sample cannot prove
+quality held. Never read `held` as a reason to roll back; read `unclear` as "wait for N".
 
 ### 3b. Did the compaction work help? (per intervention, never "since the deploy")
 

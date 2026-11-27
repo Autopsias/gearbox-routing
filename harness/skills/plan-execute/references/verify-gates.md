@@ -6,7 +6,24 @@ independent check `/plan-execute` runs so an optimistic closeout never advances 
 ships unverified work. It is **opt-in and additive** — a plan with no `verify`
 block runs exactly as before.
 
-**Contents:** [The block](#the-block-authored-in-the-plan-spec-resolved-into-the-manifest) · [Gate kinds](#gate-kinds-same-as-shipping-gates) · [`expect`](#expect--the-gate-passes-on-its-output-not-only-its-exit-code) · [When it runs](#when-it-runs-and-what-happens) · [Review gates (vetted lever)](#review-gates-the-vetted-lever--p5) · [LLM review gates](#llm-review-gates--llm-review-lowmediumhigh-bound-2026-08-12) · [Cross-family review](#cross-family-review--cross-family-review-lowmediumhigh-added) · [Under the Codex harness](#under-the-codex-harness--the-mirror-direction-added-session-s05) · [Helper subcommands](#helper-subcommands) · [Durability / safety](#durability--safety-so-you-dont-have-to)
+## Contents
+
+- [The block (authored in the plan spec, resolved into the manifest)](#the-block-authored-in-the-plan-spec-resolved-into-the-manifest)
+- [Gate kinds (same as shipping gates)](#gate-kinds-same-as-shipping-gates)
+  - [`expect` — output matching](#expect--the-gate-passes-on-its-output-not-only-its-exit-code)
+  - [`indeterminate_exit` — the third outcome](#indeterminate_exit--the-third-outcome)
+- [When it runs and what happens](#when-it-runs-and-what-happens)
+- [Review gates (the "vetted" lever — P5)](#review-gates-the-vetted-lever--p5)
+- [LLM review gates (`llm-review-low|medium|high`)](#llm-review-gates--llm-review-lowmediumhigh-bound-2026-08-12)
+  - [Land review stop rules](#land-review-stop-rules--agree-what-blocks-before-the-review-runs-2026-10-26)
+  - [Session review stop rules](#the-same-stop-rules-hold-for-every-session-review-gate-2026-11-16)
+  - [The blocking rule](#the-blocking-rule-the-plan-author-agrees-what-may-fail-a-session-review-2026-11-23)
+- [Judged on recall](#judged-on-recall-added-2026-10-17)
+- [Cross-family review (`cross-family-review-low|medium|high`)](#cross-family-review--cross-family-review-lowmediumhigh-added)
+- [Under the Codex harness](#under-the-codex-harness--the-mirror-direction-added-session-s05)
+- [Helper subcommands](#helper-subcommands)
+- [Durability / safety](#durability--safety-so-you-dont-have-to)
+- [Size check (RV-02) & quality-gate re-run (QG-01)](#size-check-before-the-first-review-rv-02)
 
 ## The block (authored in the plan spec, resolved into the manifest)
 
@@ -743,6 +760,52 @@ answers `review-exit-pending` for that session until the plan's change log
 gains an entry. The halt reason shows the new findings per round from the
 first halt on, so the trend is visible before the third clear.
 
+### The blocking rule: the plan author agrees what may fail a session review
+
+The stop rules above need a rule written before the review. For a session
+review gate the plan author writes it into the session's `verify` block as an
+optional string, a numbered list of conditions:
+
+```json
+"verify": {"gates": ["llm-review-medium"], "blocking_rule": "1. a blocking finding can pass the gate\n2. a finding is lost from the ledger"}
+```
+
+**How it is applied (argv gates: `llm-review-*`, `cross-family-review-*`).**
+`review_context.gate_env` hands the text to the gate as
+`PLAN_EXECUTE_BLOCKING_RULE` (allow-listed like `PLAN_EXECUTE_INTENT_FILE`;
+`--blocking-rule` on the command line). The prompt carries it inside
+UNTRUSTED-DATA markers and asks the reviewer to give EVERY finding a `"rule"`
+field: the number of the condition it meets, or `"none"`. The verdict reads
+that field, never the rule text:
+
+- a finding with a rule number blocks, at any severity;
+- a finding with `"rule": "none"` is written to the ledger as `noted` and
+  printed under `not blocking:`. It never starts a new round and is never
+  dropped;
+- a finding with the field missing, null or unreadable blocks (fail closed);
+- an open prior is judged as before: omission is not a fix.
+
+The rule text can only travel INTO the reviewer, like the intent: it cannot
+lower a finding the reviewer tied to a rule number. With no blocking rule the
+severity floor and the output are exactly as before.
+
+**Skill gates (`adversarial-review` and any other skill-kind review).** The
+orchestrator pastes the same numbered list into the review brief, as for the
+land review, and asks the reviewer to tag each finding with a rule number or
+`none`. It records a finding tagged `none` as noted in the follow-up list
+(`_decisions/`) and treats every other finding, and any finding with no tag, as
+blocking.
+
+**A base defect is not a verdict change (every review gate, session or land).** A blocking
+finding that the orchestrator reproduces on the base (the session's base commit,
+`run_state.json` `session_base`, or the land base) is a defect the base already has. The
+gate verdict does not change. This is the one case where the orchestrator, not the owner,
+writes the accept entry of exit 1 ('Accept on record'): the reason starts with
+'base defect:' and holds the reproduction command and its output on the base. The
+orchestrator also writes one line 'base defect: <finding>' to the follow-up list. Without
+a reproduction on the base, the finding stays the owner's to accept. A finding that shows
+a false pass, or a silently dropped open finding, is never a base defect: it always blocks.
+
 ### Canary review policy — `*-canary` gates
 
 `llm-review-low-canary`, `llm-review-medium-canary`, `cross-family-review-low-canary` and
@@ -760,6 +823,17 @@ failed only on a review gate, 385 of 811 high findings sat in code written to fi
 finding, and 162 sessions ended at their rework cap instead of on a verdict. A plan opts in by
 naming the `-canary` gate instead of the production one. Judge it on first-attempt pass rate,
 rounds per session, and how many moved findings were real defects, before widening it.
+
+**Production gates ask for proof (trial from 2026-11-21, result due 2026-12-05).** Every
+production `llm-review-*` and `cross-family-review-*` gate now passes `--require-repro`
+(label only, as above: an unproven finding still blocks). `--stop-after-round` stays canary-only:
+findings first raised at attempt 3 or later were fixed at 41% against 37% for earlier ones
+(1,308 findings over 250 ledgers), so the stop rule would defer real fixes. On
+2026-12-05, count blocking findings with `policy: unproven` and the review-only reworks that rest
+only on them. If 30% or more of the rework-causing blocks carry no repro and a hand check of 20
+shows most are not real, build the follow-on: the orchestrator, never reviewer output, turns an
+unproven block into an owner card instead of a rework. Else remove the flag. Record:
+`docs/worth-adopting/2026-11-21-stanford-cs329a.md`.
 
 ## Judged on recall (added)
 
@@ -1109,3 +1183,16 @@ step — no separate work.
   `verify_passed` · `verify_failed`.
 - The session stays in `DOING` for the whole dispatch→verify cycle — no new
   dashboard status, so the PLAN.html nav JS is untouched.
+
+## Size check before the first review (RV-02)
+
+On attempt 1 of a review gate, `review_size_check.py` counts the changed lines of the surface. Over `LIMIT_LINES` with no size acceptance, the gate starts no reviewer and halts with the size, the limit and the three exits (split, accept on record, escalate). Accept with one entry in `<sid>.accepted.json`: `{"size": true, "reason": "..."}`; it is copied to the ledger as `size_accepted`. Attempt 2 and later never run the check. It is printed only (`ENFORCE = False`) until a changed-line history exists; `scripts/review_rounds.py` prints that history.
+
+## The quality gate re-runs a failed test file once, alone (QG-01)
+
+`scripts/session-quality-gate.sh` runs the test files in parallel shards. A file
+that fails there with pytest exit 1 (tests failed) is re-run once, alone. A pass
+alone prints `FLAKY UNDER LOAD: <file>`, names the file in the suite verdict
+(`pass(flaky=<file>)`) and passes. A failure alone fails the gate with that run's
+log. A collection or usage error, or a shard that left no exit code, fails at
+once and is never re-run.

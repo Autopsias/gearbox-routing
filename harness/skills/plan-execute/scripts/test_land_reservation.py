@@ -5,6 +5,7 @@
 
 import itertools
 import json
+import subprocess
 import sys
 import threading
 from datetime import UTC, datetime, timedelta
@@ -184,3 +185,39 @@ def test_retry_fields_for_an_unreadable_lease_fall_back_to_a_minute(fx2, monkeyp
 
     monkeypatch.setattr(sl, "_read_lock", unreadable)
     assert lr.retry_fields(a, res) == {"expires_at": None, "retry_after_seconds": 60}
+
+
+def _set_origin(a, url):
+    subprocess.run(["git", "-C", a, "remote", "set-url", "origin", url], check=True)
+
+
+@pytest.mark.parametrize("url", ["https://github.com/Own-er/re.po.git", "git@github.com:Own-er/re.po.git"])
+def test_take_lease_publishes_the_pointer_for_https_and_ssh(fx2, tmp_path, monkeypatch, url):
+    _fx, a, _b, res = fx2
+    monkeypatch.setenv("LAND_HOLD_DIR", str(tmp_path / "holds"))
+    _set_origin(a, url)
+    assert land._take_lease(a, {"resource": res}) is None
+    pf = tmp_path / "holds" / "Own-er__re.po.json"
+    assert [p.name for p in pf.parent.iterdir()] == [pf.name]
+    rec = json.loads(pf.read_text())
+    assert sorted(rec) == ["hold_version", "locks_dir", "repo", "resource", "written_at"]
+    assert (rec["hold_version"], rec["repo"], rec["resource"]) == (1, "Own-er/re.po", res)
+    assert rec["locks_dir"] == str(sl._ship_lock_path(a, res).parent.resolve())
+    assert (Path(rec["locks_dir"]) / sl._ship_lock_path(a, res).name).exists()
+    before = pf.stat().st_mtime_ns
+    lr.publish_pointer(a, res)                    # same content: untouched
+    assert pf.stat().st_mtime_ns == before
+
+
+@pytest.mark.parametrize("broken", ["no-origin", "unwritable"])
+def test_a_failing_pointer_never_fails_the_land(fx2, tmp_path, monkeypatch, broken):
+    _fx, a, _b, res = fx2
+    hold = tmp_path / "holds"
+    if broken == "unwritable":
+        hold.write_text("a file, not a folder")
+        _set_origin(a, "https://github.com/o/r.git")
+    else:
+        subprocess.run(["git", "-C", a, "remote", "remove", "origin"], check=True)
+    monkeypatch.setenv("LAND_HOLD_DIR", str(hold))
+    assert land._take_lease(a, {"resource": res}) is None
+    assert "land_pointer_failed" in (Path(a) / "run.ndjson").read_text()

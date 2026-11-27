@@ -10,6 +10,7 @@ from pathlib import Path
 
 import attestation
 import safe_json as sj
+import touch_guard
 import transcript_find
 
 # The two sentences the app writes when an agent stops while its own background
@@ -84,6 +85,16 @@ def refuse_if_unlabelled_inline_fix(plan_dir, session_id, out):
     if reason:
         out({"applied": False, "failure": "inline-fix-unlabelled", "reason": reason}, plan_dir=plan_dir)
         sys.exit(1)
+
+
+def refuse_before_apply(plan_dir, manifest, session_id, log_event, out):
+    """Run the guards that come before apply reads the closeout.
+
+    First an unlabelled inline fix, then a declared file written in the main
+    checkout (touch_guard). One call keeps run.py inside its size bound.
+    """
+    refuse_if_unlabelled_inline_fix(plan_dir, session_id, out)
+    touch_guard.refuse_if_declared_write_in_main(plan_dir, manifest, session_id, log_event, out)
 
 
 def last_dispatch_harness(plan_dir, session_id):

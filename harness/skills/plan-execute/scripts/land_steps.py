@@ -26,6 +26,7 @@ import land_carry as lcy
 import land_flaky as lfk
 import land_gate_split as lgs
 import land_load as lld
+import land_regate as lrg
 import land_repair as lrp
 import land_state as lst
 import plan_scope as ps
@@ -350,7 +351,8 @@ def step_record(plan_dir, ctx, st):
                             f"  run.py land-resume {plan_dir}")
             git(["reset", "--hard", merge_sha], path)
         try:
-            res = pship.record_plan(path, plan_dir, f"plan({ctx['slug']}): record")
+            res = pship.record_plan(path, plan_dir, f"plan({ctx['slug']}): record",
+                                    keep_ignored_local=ctx["remote"] is None)
         except wt.WorktreeError as e:
             return park(plan_dir, ctx, st, "record-plan-failed",
                         f"LAND PARKED — record-plan refused in {path}:\n{e}")
@@ -444,7 +446,8 @@ def step_ack(plan_dir, ctx, st):
                                                             lrp.cost_note(st),
                                                             lfk.flaky_note(st),
                                                             lgs.note(st),
-                                                            lld.note(st)])) or None)
+                                                            lld.note(st),
+                                                            lrg.note(st)])) or None)
     save(plan_dir, ctx, st)
     lst.write_notice(plan_dir, st["brief"])
     rsi.log_event(plan_dir, "plan_land_awaits_review", session_ids=[], slug=ctx["slug"],

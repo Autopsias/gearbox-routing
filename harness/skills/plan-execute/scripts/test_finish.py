@@ -23,9 +23,11 @@ import finish_record as fr  # noqa: E402
 import land_state as lst  # noqa: E402
 import plan_teardown as pt  # noqa: E402
 import ship_locks as sl  # noqa: E402
+from _land_fixture import run_cli as run_cli_subprocess  # noqa: E402,F401  (the real boundary)
+from land_test_support import _inproc_session, inproc_cli as run_cli  # noqa: E402,F401
 from _land_fixture import ack_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, local_main, main_side, origin_main,  # noqa: E402
-                           run_cli, work)
+                           work)
 from worktree import git  # noqa: E402
 
 INDEX = ("# Active Plans\n\n"
@@ -235,7 +237,7 @@ def test_non_isolated_local_ahead_parks_and_pushes_nothing(fx, ci):
     git(["commit", "-qam", "local only"], fx["root"], check=True)
     _dirty_record(fx)
     before = origin_main(fx)
-    rc, out = run_cli("finish", fx["plan"], "--no-wait")
+    rc, out = run_cli_subprocess("finish", fx["plan"], "--no-wait")
     assert rc == 1 and out["action"] == "finish-parked"
     assert out["preflight"]["park_reason"] == "local-ahead"
     assert out["record"]["status"] == "skipped" and out["ci"] is None
@@ -557,8 +559,12 @@ def _pending(fx, ci):
     return finish.context(fx["plan"])
 
 
-def test_cli_without_a_remote_finishes_and_with_two_parks(fx):
+@pytest.mark.parametrize("disabled_origin", [False, True])
+def test_cli_without_a_remote_finishes_and_with_two_parks(fx, disabled_origin):
     git(["remote", "remove", "origin"], fx["root"], check=True)
+    if disabled_origin:
+        git(["remote", "add", "origin", str(fx["origin"])], fx["root"], check=True)
+        git(["remote", "set-url", "--push", "origin", "DISABLED://export-only"], fx["root"], check=True)
     rc, out = run_cli("finish", fx["plan"], "--no-wait")
     assert rc == 0 and out["action"] == "finished", out
     assert (out["record"]["status"], out["checkout"]["status"], out["ci"]) == \

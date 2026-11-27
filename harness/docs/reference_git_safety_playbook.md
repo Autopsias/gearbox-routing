@@ -236,3 +236,5 @@ def run_agent():
 - Root cause analysis: safe-refactor agent stash bug
 - Industry best practice: avoid `git stash` in automation
 - Atlassian Git documentation on stash behavior
+- Destructive delete incident: a terse "b" was read as authorization for `git rm -r <dir> && rm -rf <dir>` on a pre-existing directory the agent never created; the harness blocked it as scope escalation.
+- Stale local `main` incidents: example-project 2026-09-17 reported a deploy gap of 7 commits that was really 2; Kuzushi 2026-10-16 answered a reader-feedback question from a `main` 33 commits behind and stated a fault already fixed on `origin/main`; example-project 2026-11-25 searched a checkout sitting on an old branch instead of `origin/main`.

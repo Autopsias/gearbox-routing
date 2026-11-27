@@ -57,7 +57,7 @@ Subcommands (all take the plan directory as the first positional arg):
                                    records the acceptance in run.ndjson.
   add-session DIR --id SID --title T [--items I] [--new-item 'id|cat|title'|JSON]
               [--depends-on S] [--model M] [--reasoning R] [--task-class C] [--gates G]
-              [--require-evidence] [--prompt P] [--infographic-group G]
+              [--post-session none|commit|commit-push|commit-push-pr] [--require-evidence] [--prompt P] [--infographic-group G]
                                    Add a session (and any new items) to a RUNNING
                                    plan, writing EVERY surface in one journalled
                                    transaction: manifest entry, anchored article
@@ -180,7 +180,7 @@ from apply_guards import (
     last_codex_dispatch as _last_codex_dispatch,  # noqa: F401 — read by tests
     last_dispatch_harness as _last_dispatch_harness,
     missing_dispatch_receipt as _missing_dispatch_receipt,
-    refuse_if_unlabelled_inline_fix as _refuse_if_unlabelled_inline_fix,
+    refuse_before_apply as _refuse_before_apply,
     refuse_if_interim as _refuse_if_interim,
 )
 import checkpoint_answer as ca
@@ -266,7 +266,7 @@ def _shadow_dispatch_description(plan_dir, session, prompt_text):
             cwd=Path.cwd(),
         )
         return f"plan-execute:{session['id']} {marker}" if marker else None
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open: shadow-hook registration is best effort, any error returns None
         return None
 
 
@@ -944,7 +944,7 @@ def _translate_claude_token(raw, task_class, ssot_text, rr, openai):
         if token is not None:
             try:
                 anthropic = rr._Profile(ssot_text, "anthropic")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — fail closed: any parse error makes the session unroutable (raises UnroutableCodexSession)
                 raise UnroutableCodexSession(f"providers.anthropic profile unparseable: {e}")
             tier = anthropic.tier_of(token)
             if tier and openai.models.get(tier):
@@ -1004,18 +1004,18 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
         )
     try:
         rr = _import_resolver()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — fail closed: any import error makes the session unroutable (raises UnroutableCodexSession)
         raise UnroutableCodexSession(f"scripts/resolve_route.py unavailable ({e})")
     try:
         openai = rr._Profile(ssot_text, "openai")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — fail closed: any parse error makes the session unroutable (raises UnroutableCodexSession)
         raise UnroutableCodexSession(f"providers.openai profile unparseable: {e}")
     if require_calibrated:
         try:
             pblock = rr._parse_provider_block(ssot_text, "openai")
             calib = rr._sub_block(pblock, "calibration", 4) or ""
             status = rr._find_scalar(calib, "status")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — fail closed: any parse error makes the session unroutable (raises UnroutableCodexSession)
             raise UnroutableCodexSession(f"providers.openai calibration unreadable: {e}")
         if status != "researched":
             raise UnroutableCodexSession(
@@ -1068,7 +1068,7 @@ def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=
         tier = openai.tier_of(model)
         intent = _INTENT_FROM_REASONING.get(_reasoning_tier(reasoning), "standard")
         effort = openai.native_effort(tier, intent)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — fail closed: any lookup error makes the session unroutable (raises UnroutableCodexSession)
         raise UnroutableCodexSession(f"no native effort resolvable for {model!r}: {e}")
     # ...and the EFFORT obeys the same "stronger of both signals" rule as the model.
     # `resolve(task_class, openai)` prescribes a whole CELL, not just a model, and
@@ -1334,7 +1334,7 @@ def _codex_translation(sid, session, codex_model, codex_effort, ssot_text, dropp
         row = openai.effort_map.get(tier) or {}
         pblock = rr._parse_provider_block(ssot_text, "openai")
         calibration = rr._find_scalar(rr._sub_block(pblock, "calibration", 4) or "", "status")
-    except Exception:  # pragma: no cover - the same parse already succeeded upstream
+    except Exception:  # noqa: BLE001 — fail open: best-effort description of the route, any error keeps the defaults  # pragma: no cover - the same parse already succeeded upstream
         pass
     fidelity = _effort_fidelity(row, intent)
     # `fidelity` describes the effort.map ROW — how much of the declared reasoning
@@ -1869,6 +1869,10 @@ def cmd_plan(plan_dir, resume, only_session, auto=False, harness="claude", answe
         post_session_parked=_post_session_parked(plan_dir, statuses),
     )
     action.update(ca.handle(plan_dir, manifest, statuses, action, resume, answer, _awaits_review_kind))
+    if action.get("checkpoint_session") and not resume:
+        # Park here: orchestrators skipped `checkpoint` (2026-11-17, -20) and the answer was lost.
+        _park_pre_dispatch(plan_dir, action["checkpoint_session"])
+        action["parked"] = True
     # Echo the autonomy posture so the orchestrator (and audit) record it. --auto
     # only affects how the orchestrator self-drives; it NEVER changes the decision
     # here (human checkpoints/blockers still surface). Human gates stay sacrosanct.
@@ -2134,16 +2138,9 @@ def _harness_codex_member(sid, s, spec, plan_dir, prompt_file, reason_tier):
             "translated_from": tr["translated_from"],
             "effort_fidelity": tr["effort_fidelity"],
             "translation": tr,
-            # D4e (deferred, recommended default): the stamp stays
-            # honest — OpenAI executed — but the cross-family verifier
-            # would mean spawning Claude from the Codex shell, i.e. the
-            # same cross-vendor egress in reverse, which an operator who
-            # chose Codex may specifically not want. Review-class gates
-            # are on-box/human until a Claude verifier is elected;
-            # deterministic gates (tests, argv) are family-neutral.
             "executor_family": "openai",
             "verifier_family": "anthropic",
-            "verifier_mode": "on_box_human",
+            "verifier_mode": vpk.codex_verifier_mode(spec.get("worktree") or wt.repo_root(plan_dir)),
             **({"on_dispatch_refusal": spec["on_dispatch_refusal"]}
                if spec.get("on_dispatch_refusal") else {}),
     }
@@ -3109,7 +3106,7 @@ def _apply_verify_handoff(blocked, completed, dry_run_shipping, gate, hc, parsed
         # raise: an environment with no headless Chrome must still finish.
         try:
             out["render_verify"] = rv.check(plan_dir)
-        except Exception as e:  # pragma: no cover - defensive
+        except Exception as e:  # noqa: BLE001 — fail open: render check is best effort; an error becomes status unavailable  # pragma: no cover - defensive
             out["render_verify"] = {"status": "unavailable", "reason": f"render-verify errored: {e}"}
     if dry_run_shipping and post_session:
         out["shipping_dry_run"] = shp.ship_begin(plan_dir, session_id, dry_run=True)
@@ -3282,7 +3279,7 @@ def cmd_apply(plan_dir, session_id, output_file, dry_run_shipping=False):
              plan_dir=plan_dir)
         sys.exit(1)
 
-    _refuse_if_unlabelled_inline_fix(plan_dir, session_id, _out)
+    _refuse_before_apply(plan_dir, manifest, session_id, rsi.log_event, _out)
 
     raw = Path(output_file).read_text()
 
@@ -3399,6 +3396,18 @@ def _failure_reason(result):
 
 
 def cmd_checkpoint(plan_dir, session_id):
+    brief = _park_pre_dispatch(plan_dir, session_id)
+    _out(
+        {
+            "checkpoint": session_id,
+            "checkpoint_brief": brief,
+            "resume_with": f"write the owner's words verbatim to {plan_dir}/_decisions/{session_id}.md, then plan {plan_dir} --resume --answer-file <that file> (or --no-answer when the owner gave none)",
+        },
+        plan_dir=plan_dir,
+    )
+
+
+def _park_pre_dispatch(plan_dir, session_id):
     # Surface the author's decision brief (reason/decision/options) so the
     # operator sees WHAT they are deciding, not just "review sNN". None on
     # legacy (pre-brief) manifests — the orchestrator then derives context
@@ -3425,14 +3434,7 @@ def cmd_checkpoint(plan_dir, session_id):
         session_ids=[session_id],
         reason=(brief or {}).get("decision"), kind="pre_dispatch",
     )
-    _out(
-        {
-            "checkpoint": session_id,
-            "checkpoint_brief": brief,
-            "resume_with": f"write the owner's words verbatim to {plan_dir}/_decisions/{session_id}.md, then plan {plan_dir} --resume --answer-file <that file> (or --no-answer when the owner gave none)",
-        },
-        plan_dir=plan_dir,
-    )
+    return brief
 
 
 def _ack_approved(plan_dir, session_id, manifest, co, note):
@@ -4073,6 +4075,7 @@ def cmd_add_session(plan_dir, args):
         infographic_group=args.infographic_group,
         allow_builder_drift=args.allow_builder_drift,
         task_class=getattr(args, "task_class", None),
+        post_session=getattr(args, "post_session", None),
     ))
 
 
@@ -4385,6 +4388,10 @@ def _add_mutation_parsers(sub):
                         "\"build\", \"source\": \"what you checked\"}}'")
     s.add_argument("--depends-on", action="append", default=None,
                    help="Session ids this one waits for (comma-separated, repeatable)")
+    s.add_argument("--post-session", default=None,
+                   choices=["none", "commit", "commit-push", "commit-push-pr"],
+                   help="Git step after this session. Default: the plan's most common "
+                        "git step, so an added session ships like the others; 'none' opts out")
     s.add_argument("--model", default=None)
     s.add_argument("--reasoning", default=None, choices=["low", "medium", "high", "xhigh", "max"])
     s.add_argument("--task-class", default=None, choices=list(sess_fields.TASK_CLASSES),

@@ -33,7 +33,7 @@ cp harness/hooks/agent-elapsed-nag.py ~/.claude/hooks/
 {
   "hooks": {
     "PreToolUse": [
-      {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" pre", "timeout": 5}]}
+      {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" pre", "timeout": 15}]}
     ],
     "SubagentStop": [
       {"matcher": "*", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/agent-elapsed-nag.py\"; [ -f \"$p\" ] || exit 0; python3 \"$p\" stop", "timeout": 5}]}

@@ -6,6 +6,22 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
+### Changed (harness sync of 2026-11-27)
+This sync carries the private harness changes from 2026-11-20 to 2026-11-27.
+The routing policy (`claude/model-routing.yaml`) does not change.
+
+- **CLAUDE.md export:** `harness/CLAUDE.md` is now exported as
+  `harness/CLAUDE.md.template` (with internal marker comments stripped) so
+  Claude Code does not auto-load it inside this repository. See
+  [reference docs](docs/modules/reference-docs.md).
+- **Skill hygiene and plan pipeline:** oversized skill files were split into
+  focused reference docs with tables of contents, broken internal links were
+  fixed, and `plan-execute` / `plan-builder` gained review-size, touch-guard,
+  and land-regate helper modules.
+- **General commands:** `harness/commands/improve.md` was removed from the
+  export after `/improve` was promoted to a private skill. See
+  [general commands](docs/modules/general-commands.md).
+
 ### Changed (harness sync of 2026-11-19)
 This sync carries the private harness changes from 2026-11-18 to 2026-11-19.
 The routing policy (`claude/model-routing.yaml`) does not change: it is an

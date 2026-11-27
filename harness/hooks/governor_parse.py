@@ -132,9 +132,8 @@ def segments(command):
 
 def segments_ops(command):
     """``[(segment, operator after it or None)]``: the separate commands a shell would run.
-    The punctuation chars make `a&&b` and `pytest -n 8|tail` split without spaces; quoted text stays
-    ONE token (so `grep -rn 'docker build' .` is not a docker build). `\\n` is a punctuation char so
-    a newline splits; `\\r` stays whitespace. Comments are handled by `CommandText`."""
+    Punctuation chars split `a&&b` and `pytest -n 8|tail` with no spaces; quoted text stays ONE token
+    (`grep -rn 'docker build' .` is no build); `\\n` splits, `\\r` is whitespace. Comments: `CommandText`."""
     lexer = shlex.shlex(CommandText(command), posix=True,
                         punctuation_chars="();<>|&\n`")
     lexer.whitespace = " \t\r"
@@ -151,6 +150,8 @@ def segments_ops(command):
         tokens = command.replace("\n", " ; ").split()
     out, current = [], []
     for token in tokens:
+        if "\n" in token and not token.strip("();<>|&\n`"):  # shlex glues `&&\n`, `\n\n`
+            token = token.replace("\n", "") if token.replace("\n", "") in SEPARATORS else "\n"
         if token in SEPARATORS:
             out.append((current, token))
             current = []

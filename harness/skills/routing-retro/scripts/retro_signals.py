@@ -218,6 +218,46 @@ def time_to_signal(class_defaults, provider, cells_by_key, now):
 
 DID_IT_HELP_MIN_N = 6  # matches MIN_N_UPGRADE — the same statistical floor this
                         # module already treats as "enough to trust a rate"
+DROP_Z = 1.645  # one-sided 95%: a cheaper switch "dropped" only past this
+HELD_MARGIN = 0.10  # "held" needs the 95% upper bound of the drop below 10 points;
+                    # owner-ratified 2026-11-19 ("let's follow your pick": keep 10 points)
+
+_MODEL_RANK = {"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3}
+_EFFORT_RANK = {"low": 0, "medium": 1, "high": 2, "xhigh": 3, "max": 4}
+
+
+def _rung_rank(rung):
+    """`opus@high` -> (2, 2); None for a rung outside the Anthropic ladder."""
+    model, _, effort = str(rung or "").partition("@")
+    if model not in _MODEL_RANK or effort not in _EFFORT_RANK:
+        return None
+    return _MODEL_RANK[model], _EFFORT_RANK[effort]
+
+
+def _is_cheaper_switch(old_rung, new_rung):
+    old, new = _rung_rank(old_rung), _rung_rank(new_rung)
+    return old is not None and new is not None and new < old
+
+
+def _dropped(before, after):
+    """True only when the after pass rate is significantly LOWER (pooled z-test)."""
+    n1, n2 = before["n"], after["n"]
+    p1 = before["first_attempt_pass_rate"] or 0.0
+    p2 = after["first_attempt_pass_rate"] or 0.0
+    pooled = (p1 * n1 + p2 * n2) / (n1 + n2)
+    se = (pooled * (1 - pooled) * (1 / n1 + 1 / n2)) ** 0.5
+    return se > 0 and (p1 - p2) / se > DROP_Z
+
+
+def _held(before, after):
+    """True only when the drop is PROVABLY small: the one-sided 95% upper bound of
+    (before - after) is below HELD_MARGIN. A small sample cannot prove that, so
+    6-vs-6 with 100% -> 67% reads "unclear", never a green "held"."""
+    n1, n2 = before["n"], after["n"]
+    p1 = before["first_attempt_pass_rate"] or 0.0
+    p2 = after["first_attempt_pass_rate"] or 0.0
+    se = (p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2) ** 0.5
+    return (p1 - p2) + DROP_Z * se < HELD_MARGIN
 
 
 def did_it_help(non_experimental_cohorts, adoptions):
@@ -267,6 +307,13 @@ def did_it_help(non_experimental_cohorts, adoptions):
         underpowered = before_stats["n"] < DID_IT_HELP_MIN_N or after_stats["n"] < DID_IT_HELP_MIN_N
         if underpowered:
             verdict = "underpowered"
+        elif _is_cheaper_switch(rec.get("old_rung"), rec.get("new_rung")):
+            # a cheaper switch only has to keep quality: "no_improvement" read as failure
+            b_rate = before_stats["first_attempt_pass_rate"] or 0.0
+            a_rate = after_stats["first_attempt_pass_rate"] or 0.0
+            verdict = ("dropped" if _dropped(before_stats, after_stats)
+                       else "helped" if a_rate > b_rate
+                       else "held" if _held(before_stats, after_stats) else "unclear")
         else:
             b_rate = before_stats["first_attempt_pass_rate"] or 0.0
             a_rate = after_stats["first_attempt_pass_rate"] or 0.0

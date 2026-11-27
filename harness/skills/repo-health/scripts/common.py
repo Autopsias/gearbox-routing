@@ -368,7 +368,7 @@ def quality_excludes(repo):
     try:
         import tomllib
         cfg = tomllib.loads(read(repo, "pyproject.toml"))
-    except Exception:
+    except (ImportError, ValueError, RecursionError):  # TOMLDecodeError is a ValueError; read() swallows OSError
         return ()
     q = typed(typed(cfg.get("tool"), dict, {}).get("claude-quality"), dict, {})
     return tuple(typed_items(q.get("exclude"), str))

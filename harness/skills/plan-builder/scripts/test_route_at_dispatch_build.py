@@ -331,7 +331,9 @@ def test_a_fork_session_is_refused_at_v8_and_only_warned_below(capsys):
 
 
 def test_a_spec_above_the_supported_max_is_refused():
-    msg = _refused(_spec(version=9), "plan_schema_version 9", "at most 8")
+    over = rad.SUPPORTED_MAX_SCHEMA + 1
+    msg = _refused(_spec(version=over), f"plan_schema_version {over}",
+                   f"at most {rad.SUPPORTED_MAX_SCHEMA}")
     assert "lower" in msg
     _refused(_spec(version="8"), "must be an integer")
 
@@ -347,15 +349,15 @@ def test_the_integration_session_leaves_the_model_to_dispatch():
     assert (old["model"], old["reasoning"]) == ("Opus", "high")
 
 
-def test_the_docs_tell_a_new_spec_to_declare_8():
+def test_the_docs_tell_a_new_spec_to_declare_the_current_version():
     refs = Path(__file__).resolve().parents[1]
     line = next(ln for ln in (refs / "references" / "schemas.md").read_text().splitlines()
                 if ln.startswith("- **`plan_schema_version`**"))
     assert "stamp `5`" not in line and "always `build_plan.PLAN_SCHEMA_VERSION`" not in line
-    assert "declare `plan_schema_version: 8`" in line and "stamps 7" in line
+    assert f"declare `plan_schema_version: {bp.PLAN_SCHEMA_VERSION}`" in line and "stamps 7" in line
     skill = (refs / "SKILL.md").read_text()
     assert '"plan_schema_version": 6`' not in skill and "stamped `plan_schema_version: 7`" not in skill
-    assert '"plan_schema_version": 8' in skill
+    assert f'"plan_schema_version": {bp.PLAN_SCHEMA_VERSION}' in skill
 
 # -- stamps --------------------------------------------------------------------
 def test_a_v7_spec_builds_a_manifest_stamped_7(tmp_path):

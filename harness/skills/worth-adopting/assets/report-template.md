@@ -1,7 +1,7 @@
 # <Title of the source>: worth adopting?
 
 <!-- One page. One or two lines per bullet. Say each point once. Leave out a section that has
-     nothing in it, except "Dropped", "Above the target" and "Principles": write those two as
+     nothing in it, except "Dropped", "Above the target", "Drop challenge" and "Principles": write the last three as
      "- none: <reason>" when empty, or `wa_ledger.py add-row` refuses the row. Delete this comment. -->
 
 - **Source:** <url or "pasted text"> · <author> · <date of the source> · got by <method>; <full | cut at … | paywalled, parts from summaries>
@@ -39,6 +39,10 @@
 Reasons: already have it (`path`) · no pain today · carry cost near the gain · claimed, nothing to inspect · not our platform.
 
 - **<title>** — <reason>
+
+## Drop challenge
+
+- <one of the three DROP verdicts on the thinnest search> — searched again: <words, folders, memories> — <changed: new verdict | held>
 
 ## What the source shows about the target
 

@@ -11,6 +11,17 @@
 > understand why a class resolves where it does, or to justify an override. Do not copy a
 > cell from it into a v8 session.
 
+## Contents
+
+- [What the class defaults are (the executor's input, not the author's choice)](#what-the-class-defaults-are-the-executors-input-not-the-authors-choice)
+- [Claude Fable 5 — the tier above Opus (added)](#claude-fable-5--the-tier-above-opus-added-2026-06-10)
+- [Codex-executed sessions (`model: gpt-5.6-*`)](#codex-executed-sessions-model-gpt-56-)
+- [Class definitions — what the author picks](#class-definitions--what-the-author-picks)
+- [How to pick one](#how-to-pick-one)
+- [When an override is justified](#when-an-override-is-justified)
+- [How the skill encodes this](#how-the-skill-encodes-this)
+- [Sources](#sources-reviewed-2026-05-29-official-docs-re-verified-via-mcp-2026-07-01)
+
 > **Canonical source:** `~/.claude/model-routing.yaml` is the AUTHORITY for
 > task-class defaults, the escalation ladder, and per-agent pins. This document
 > stays the prose playbook (model lineup, availability notes, live-vs-async

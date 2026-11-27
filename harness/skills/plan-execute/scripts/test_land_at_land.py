@@ -20,8 +20,10 @@ sys.path.insert(0, str(SCRIPTS))
 import land_at_land as lal  # noqa: E402
 import land_gate as lg  # noqa: E402
 import land_state as lst  # noqa: E402
+from _land_fixture import run_cli as run_cli_subprocess  # noqa: E402,F401  (the real boundary)
+from land_test_support import _inproc_session, inproc_cli as run_cli  # noqa: E402,F401
 from _land_fixture import (GATE_ARGV, build_repo, isolate, local_main,  # noqa: E402
-                           main_side, origin_main, run_cli, work)
+                           main_side, origin_main, work)
 from worktree import git  # noqa: E402
 
 REG = ".claude/eval-gates.json"

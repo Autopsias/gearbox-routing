@@ -210,7 +210,7 @@ MARKER_GUARD = ("import sys,pathlib\n"
 
 def test_entry_fails_closed_with_a_fast_path():
     e = _entry()
-    assert e["onFailure"] == "block" and e["timeout"] == 10
+    assert e["onFailure"] == "block" and e["timeout"] == 60  # load stalls of 10 s+ refused calls
     assert "case " in e["command"] and "in=$(cat)" in e["command"]
 
 

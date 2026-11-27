@@ -412,3 +412,15 @@ def test_no_closeout_or_no_review_base_changes_nothing(tmp_path):
     _declare(d, "")
     assert rvs.declared_base(str(d), "s01", str(r)) is None
     assert not _events(d, "review_base_refused") and not _events(d, "review_base_declared")
+
+
+def test_the_session_blocking_rule_reaches_the_gate_env(tmp_path):
+    """verify.blocking_rule rides the same env route as scope; absent or blank, no key."""
+    r, run = _repo(tmp_path)
+    _commit(run, r, "a.txt", "2026-01-01T10:00:00+00:00")
+    d = _plan(tmp_path, [{"event": "dispatch_started", "session_ids": ["s01"],
+                          "ts": "2026-01-01T11:00:00+00:00"}])
+    for rule, want in (("1. x\n2. y", "1. x\n2. y"), ("  ", None), (None, None)):
+        vb = {"gates": ["llm-review-low"], **({"blocking_rule": rule} if rule is not None else {})}
+        (d / "manifest.json").write_text(json.dumps({"plan_schema_version": 2, "sessions": [{"id": "s01", "verify": vb}]}))
+        assert rvs.gate_env(str(d), "s01", str(r)).get(rvs.RULE_ENV) == want

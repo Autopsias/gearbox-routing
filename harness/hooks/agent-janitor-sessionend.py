@@ -55,7 +55,7 @@ def main() -> int:
              "--session-id", session_id],
             capture_output=True, timeout=25,
         )
-    except Exception:  # a SessionEnd hook must never raise -- degrade to no-op
+    except Exception:  # noqa: BLE001 — fail open: SessionEnd cannot block shutdown, and this reap is best effort
         pass
     return 0
 

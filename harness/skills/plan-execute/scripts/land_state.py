@@ -130,6 +130,17 @@ def save(plan_dir, ctx, st):
     return st
 
 
+def writable_remotes(root, *, run_git=git):
+    """Exclude fetch-only remotes explicitly disabled for all pushes."""
+    remotes = []
+    for name in run_git(["remote"], root)[1].split():
+        rc, out, *_ = run_git(["remote", "get-url", "--push", "--all", name], root)
+        urls = out.splitlines()
+        if rc or not urls or any(not url.startswith("DISABLED://") for url in urls):
+            remotes.append(name)
+    return remotes
+
+
 def context(plan_dir):
     """Everything the protocol needs about this plan, or None when it is not an
     isolated plan in a git checkout (§6's version gate, or §7.2's non-git target).
@@ -162,7 +173,7 @@ def context(plan_dir):
     # left the machine. Multiple remotes with no `origin` stay None and carry
     # `remote_ambiguous`, which `land._preflight` parks: guessing a push target
     # is worse than refusing one.
-    remotes = git(["remote"], root)[1].split()
+    remotes = writable_remotes(root)
     remote = "origin" if "origin" in remotes else (remotes[0] if len(remotes) == 1 else None)
     return {"plan_dir": str(plan_dir), "root": root, "slug": pwt.plan_slug(plan_dir),
             "branch": branch, "plan_tree": claim.get("path"), "default": default,

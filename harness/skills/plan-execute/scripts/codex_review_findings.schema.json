@@ -20,7 +20,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["file", "line", "severity", "title", "why"],
+        "required": ["file", "line", "severity", "title", "why", "rule"],
         "properties": {
           "file": {"type": "string"},
           "line": {"type": "integer"},
@@ -28,6 +28,7 @@
             "type": "string",
             "enum": ["blocker", "critical", "high", "medium", "low", "info"]
           },
+          "rule": {"type": ["string", "null"], "description": "The blocking-rule number this finding meets, \"none\" when it meets none, null when the prompt gave no rule."},
           "title": {"type": "string", "description": "One short phrase naming the defect."},
           "why": {"type": "string", "description": "The defect and its evidence, one or two sentences."}
         }

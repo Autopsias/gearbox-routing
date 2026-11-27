@@ -198,6 +198,7 @@ def reply_transcript(tmp_path, text):
     ("Still open: the cleanup.\nNext: x. Needs you: the OAuth key", 0),
     ("Done.\nNext: x. Needs you: nothing\nState: committed no (uncommitted until the gate passes)", 0),
     ("The cleanup is still open.\nNext: x. Needs you: nothing\nState: committed no", 2),
+    ("Deployed.\n**Not checked**\n- The fill rate in the owner's apps.\nNext: a timer. Needs you: nothing", 2),
     # A decision in 'Needs you' with no pick blocks; the same with a pick, or "nothing, unless … or …", passes.
     ("Done.\nNext: wait. Needs you: run the plan now, both, or neither?", 2),
     ("Done.\nNext: wait. Needs you: run the plan now, or wait? My pick: run it now.", 0),

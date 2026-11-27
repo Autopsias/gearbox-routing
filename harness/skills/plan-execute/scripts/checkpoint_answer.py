@@ -103,7 +103,7 @@ def handle(plan_dir, manifest, statuses, action, resume, answer, kind_of):
         import plan_mutate  # late: it imports the dashboard renderer; findings_digest must not
         plan_mutate.record_change(plan_dir, op="checkpoint-answer", session=sid,
                                   summary=summary, sessions_touched=[sid])
-    except Exception as e:  # the answer is already on record; the page is display only
+    except Exception as e:  # noqa: BLE001 — fail open: display-only changelog write; the answer is already appended, the error text goes into the output
         out["checkpoint_answer"]["changelog_error"] = f"{e.__class__.__name__}: {e}"
     return out
 
@@ -122,5 +122,5 @@ def display_halt_answer(plan_dir, sid, text):
         import plan_mutate
         plan_mutate.record_change(plan_dir, op="halt-answer", session=sid,
                                   summary=f"owner answered the halt: {text}", sessions_touched=[sid])
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open: display-only changelog write, any error is skipped
         pass

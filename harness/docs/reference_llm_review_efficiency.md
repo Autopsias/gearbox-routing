@@ -210,3 +210,5 @@ Measured resume degradation on one agent:
     fresh      finished the task in under five minutes
 
 Cost of getting this wrong on that session: five dead attempts.
+
+Measured Monitor wake spam in main sessions: a 60 s "waiting" echo woke one session ~8 times (example-project 2026-11-14) and another ~16 times (Trader 2026-11-16), each answered with "Still running." Main-session until-loops therefore print nothing per pass, and a `run_in_background` command in the main session needs no Monitor at all.

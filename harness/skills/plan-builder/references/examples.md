@@ -4,6 +4,18 @@ Five small reference specs, one per infographic template. Use these as starting 
 
 Each example is a complete, valid spec that the build script will accept.
 
+## Contents
+
+- [Example 1 — Phase Journey (product launch)](#example-1--phase-journey-product-launch)
+- [Example 2 — Maturity Ladder (observability climb)](#example-2--maturity-ladder-observability-climb)
+- [Example 3 — Hub & Spoke (cross-team launch)](#example-3--hub--spoke-cross-team-launch)
+- [Example 4 — Before/After (monolith → services)](#example-4--beforeafter-monolith--services)
+- [Example 5 — Pillars (engineering culture)](#example-5--pillars-engineering-culture)
+- [Choosing between templates — quick decision guide](#choosing-between-templates--quick-decision-guide)
+- [Aurora edition — dual-layer item + session example](#aurora-edition--dual-layer-item--session-example)
+- [Dispatch examples — for `/plan-execute`](#dispatch-examples--for-plan-execute)
+- [Model + reasoning tiering — match the tier to the work](#model--reasoning-tiering--match-the-tier-to-the-work)
+
 ## Example 1 — Phase Journey (product launch)
 
 See `../../plan-builder-workspace/test-spec.json` (if present) for a full Q4-product-launch plan: 5 sessions, 9 items, 4-phase journey from v2.5 to v3.0.

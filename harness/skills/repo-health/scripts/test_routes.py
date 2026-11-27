@@ -26,19 +26,23 @@ from test_health_shape import ALL_CHECK_IDS, card, git, make_repo  # noqa: E402
 # ---------- routes are dispatchable, docs match the code ----------
 
 SKILL_MD = Path(health.__file__).resolve().parent.parent / "SKILL.md"
+PROBES_AND_ROUTES_MD = (
+    Path(health.__file__).resolve().parent.parent / "references" / "probes-and-routes.md"
+)
 CHECK_ID = re.compile(r"`([a-z]+\.[a-z0-9-]+)`")
 
 
 def table_ids(header_cell):
-    """Check ids in column 1 of the SKILL.md table whose first header cell matches.
+    """Check ids in column 1 of the references/probes-and-routes.md table whose
+    first header cell matches.
 
-    Scoped to one table on purpose — SKILL.md holds three, and a document-wide
-    grep for backticked ids would let the routing table satisfy an assertion
-    about the probe table. Ids must be in backticks; that is why the tables were
-    restructured rather than the parser loosened.
+    Scoped to one table on purpose — the reference doc holds multiple tables, and
+    a document-wide grep for backticked ids would let the routing table satisfy an
+    assertion about the probe table. Ids must be in backticks; that is why the
+    tables were restructured rather than the parser loosened.
     """
     ids, inside = set(), False
-    for line in SKILL_MD.read_text().splitlines():
+    for line in PROBES_AND_ROUTES_MD.read_text().splitlines():
         if not line.strip().startswith("|"):
             inside = False
             continue

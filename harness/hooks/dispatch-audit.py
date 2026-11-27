@@ -163,7 +163,7 @@ def main():
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception:
+    except Exception:  # noqa: BLE001 — hook must fail open: an observer never fails the dispatch
         pass  # an observer never fails the dispatch it observes
 
 

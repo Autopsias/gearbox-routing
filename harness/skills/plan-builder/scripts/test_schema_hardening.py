@@ -149,7 +149,7 @@ def _check_build_and_acceptance():
             ok("build: prompt.md renders the Evidence contracts list")
         except AssertionError as e:
             bad("build: manifest/prompt propagation", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build: manifest/prompt propagation", f"{type(e).__name__}: {e}")
 
     # ── 11. acceptance_review — the closing plan-level validation session ────────
@@ -207,7 +207,7 @@ def _check_build_and_acceptance():
             ok("build: manifest carries acceptance_review (default False)")
         except AssertionError as e:
             bad("build: acceptance_review propagation", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build: acceptance_review propagation", f"{type(e).__name__}: {e}")
 
 
@@ -262,7 +262,7 @@ def _check_codex_tokens():
             ok("build: Codex session renders a model-codex chip; ESLint no-undef gate stays green")
         except AssertionError as e:
             bad("build: Codex session dashboard render", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build: Codex session dashboard render", f"{type(e).__name__}: {e}")
 
     # A RETIRED token is no longer dispatchable (the WARNING above) but an already-built
@@ -368,7 +368,7 @@ def _check_rebuild_preserve_state():
             ok("rebuild --preserve-state: mixed statuses + notes + ship badge survive; added s11 is TODO")
         except AssertionError as e:
             bad("rebuild --preserve-state preserves status", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("rebuild --preserve-state preserves status", f"{type(e).__name__}: {e}")
 
     # (c) The test can fail: neuter the carry-over (restoring the pre-fix code path)
@@ -387,7 +387,7 @@ def _check_rebuild_preserve_state():
                 assert all(v == "TODO" for v in statuses_of(plan).values()), \
                     "control wiped only some statuses"
                 ok("control: rebuild WITHOUT carry-over demonstrably wipes every status (test can fail)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("control: rebuild WITHOUT carry-over", f"{type(e).__name__}: {e}")
         finally:
             build_plan.carry_over_recorded_state = real
@@ -414,7 +414,7 @@ def _check_rebuild_edge_cases():
             ok("rebuild --preserve-state: a REMOVED session does not resurrect; survivors keep status")
         except AssertionError as e:
             bad("rebuild --preserve-state with a removed session", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("rebuild --preserve-state with a removed session", f"{type(e).__name__}: {e}")
 
     # Fail-closed: rebuilding an executed plan WITHOUT --preserve-state is refused,
@@ -432,7 +432,7 @@ def _check_rebuild_edge_cases():
                 ok("rebuild without --preserve-state is REFUSED and leaves PLAN.html untouched")
         except AssertionError as e:
             bad("rebuild without --preserve-state is refused", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("rebuild without --preserve-state is refused", f"{type(e).__name__}: {e}")
 
     # A never-executed plan is unaffected: --rebuild with no flag still just works.
@@ -446,7 +446,7 @@ def _check_rebuild_edge_cases():
             ok("rebuild of a never-executed plan needs no flag and is byte-stable")
         except AssertionError as e:
             bad("rebuild of a never-executed plan", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("rebuild of a never-executed plan", f"{type(e).__name__}: {e}")
 
 
@@ -473,7 +473,7 @@ def _build_fails(spec, needle, label):
             except AssertionError as e2:
                 bad(label, e2)
             return
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad(label, f"{type(e).__name__}: {e}")
             return
         bad(label, "build SUCCEEDED where it had to refuse")
@@ -488,7 +488,7 @@ def _build_ok(spec, label, check=None):
             ok(label)
         except AssertionError as e:
             bad(label, e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad(label, f"{type(e).__name__}: {e}")
 
 
@@ -582,6 +582,38 @@ def _check_scope_and_open_questions():
     _build_ok(BASE, "no scope fields => no scope keys in manifest.json", _check_no_scope)
 
 
+def _check_blocking_rule():
+    """verify.blocking_rule: carried unchanged; non-string refused; warns only on a reviewed session."""
+    rule = "1. a\n2. b\n3. c"
+    def mk(gates, r=None):
+        s = copy.deepcopy(BASE)
+        vb = {"gates": gates}
+        if r is not None:
+            vb["blocking_rule"] = r
+        sess(s, "s01")["verify"] = vb
+        return s
+    def _warns(spec):
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            build_plan.validate_spec(spec)
+        return "no verify.blocking_rule" in buf.getvalue()
+    def _same(m):
+        got = [x for x in m["sessions"] if x["id"] == "s01"][0]["verify"]["blocking_rule"]
+        assert got == rule, got
+    _build_ok(mk(["code-review-gate", "llm-review-low"], rule), "blocking_rule: manifest holds the spec text", _same)
+    expect_invalid(mk(["code-review-gate"], 5), "blocking_rule: a number is refused", "blocking_rule")
+    expect_invalid(mk(["code-review-gate"], "  "), "blocking_rule: blank is refused", "blocking_rule")
+    if _warns(mk(["llm-review-low"])):
+        ok("blocking_rule: reviewed session without a rule warns")
+    else:
+        bad("blocking_rule: reviewed session without a rule warns", "no warning")
+    _build_ok(mk(["llm-review-low"]), "blocking_rule: reviewed session without a rule still builds")
+    if _warns(mk(["code-review-gate"])) or _warns(mk(["llm-review-low"], rule)):
+        bad("blocking_rule: no warning without a gate or with a rule", "warned")
+    else:
+        ok("blocking_rule: no warning without a gate or with a rule")
+
+
 def _run_all_checks():
     """Run every core check once, in order."""
     _check_hardening_keys()
@@ -591,6 +623,7 @@ def _run_all_checks():
     _check_rebuild_edge_cases()
     _check_codex_shell_grant()
     _check_scope_and_open_questions()
+    _check_blocking_rule()
 
     # ---------------------------------------------------------------------------
     # Prior-art decision (RS-01/RS-02, 2026-08-12 hardening; VERSION-GATED as of

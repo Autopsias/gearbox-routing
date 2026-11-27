@@ -405,7 +405,8 @@ nothing else failed; `make check` runs `test` last for `ci-check`.
    "task_class": "agentic_build", "gates": ["ci-check"], "depends_on": [],
    "new_items": [{"id": "land-repair-1", "category": "<category key>",
                   "title": "Repair ci-check at land (round 1)",
-                  "research_status": "skipped", "research_reason": "repair of a red land gate"}],
+                  "research_status": "skipped", "research_reason": "repair of a red land gate",
+                  "touches": "src/a.py, test_x.py"}],
    "infographic_group": "<group name or null>",
    "prompt": "Fix the named failures at the root cause. Never weaken, skip or delete a test. …"}}
 ```
@@ -415,7 +416,9 @@ Field rules. `candidate.head` is the land worktree's `HEAD` (it descends
 it, so the repair starts from the merged tree, not the bare plan branch.
 `add_session.gates` holds only the failing gates: the next `land` re-gates the
 whole union anyway. `sid` is the first free `lr<n>`; the item id is
-`land-repair-<round>`. `category` and `infographic_group` are copied from the
+`land-repair-<round>`. `touches` lists the plan's own diff (base to plan head),
+comma-separated, because schema 8 requires it on every item; it is `[]` when
+git cannot list that diff. `category` and `infographic_group` are copied from the
 first item of the session that last went `DONE`; `infographic_group` is `null`
 when the plan has no infographic groups. A gate that does not resolve for the
 repair session parks `repair-gate-unresolvable` (above). A round whose session

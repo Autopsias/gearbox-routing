@@ -19,6 +19,8 @@ import html
 import json
 import sys
 
+from main_turns_html import section as main_turns_section
+
 MAX_DECISION_OPTIONS = 3
 
 
@@ -162,7 +164,7 @@ table { width:100%; border-collapse:collapse; overflow-x:auto; display:block; }
 th,td { border:1px solid var(--border); padding:0.4rem 0.6rem; text-align:left; font-size:0.85rem; }
 .empty, .deferred { opacity:0.7; font-size:0.9rem; }
 .apex { color:#c53030; font-weight:600; }
-.verdict-helped { color:#2f855a; } .verdict-no_improvement { color:#c53030; } .verdict-underpowered { opacity:0.7; }
+.verdict-helped, .verdict-held { color:#2f855a; } .verdict-no_improvement, .verdict-dropped { color:#c53030; } .verdict-underpowered, .verdict-unclear { opacity:0.7; }
 .verdict-confounded { color:#b7791f; } .verdict-no_baseline, .verdict-no_exposure, .verdict-activation_unknown { opacity:0.6; }
 .verdict-line { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.9rem; }"""
 
@@ -414,6 +416,7 @@ def render(agg):
 {_cost_section(agg.get("cost_cells"))}
 {dih_section}
 {_compaction_section(agg.get("compaction"))}
+{main_turns_section(agg.get("main_turns"))}
 <script>
 function setVerdict(btn, v) {{
   const card = btn.closest('.card');
@@ -449,6 +452,8 @@ def main():
     ap.add_argument("-o", "--output", default=None, help="write HTML here (default: stdout)")
     ap.add_argument("--compaction", default=None,
                     help="compaction_report.py JSON to fold in as the Compaction section")
+    ap.add_argument("--main-turns", default=None,
+                    help="main_session_turns.py JSON to fold in as the Main-session turns section")
     ap.add_argument("--only-compaction", action="store_true",
                     help="render ONLY the compaction did-it-help one-pager")
     args = ap.parse_args()
@@ -461,6 +466,9 @@ def main():
     if args.compaction:
         with open(args.compaction, encoding="utf-8") as f:
             agg["compaction"] = json.load(f)
+    if args.main_turns:
+        with open(args.main_turns, encoding="utf-8") as f:
+            agg["main_turns"] = json.load(f)
     out = render_compaction_page(agg.get("compaction")) if args.only_compaction else render(agg)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:

@@ -87,7 +87,7 @@ Every one of these was observed, not imagined.
   Descriptions carry colons, quotes and `>`. The script emits frontmatter through
   PyYAML for that reason. An unparseable skill is an absent skill, so validate after
   any change to `render()`:
-  `python3 -c "import yaml,pathlib; [yaml.safe_load(p.read_text().split('---')[1]) for p in pathlib.Path.home().glob('.agents/skills/*/SKILL.md')]"`
+  `"$(~/.claude/scripts/pyres yaml)" -c "import yaml,pathlib; [yaml.safe_load(p.read_text().split('---')[1]) for p in pathlib.Path.home().glob('.agents/skills/*/SKILL.md')]"`
 - **Codex truncates descriptions to roughly the first eight words.** It
   warns when it does. Put the verb and the object in the opening sentence, and prune
   skills you do not use: fewer skills means longer visible descriptions.

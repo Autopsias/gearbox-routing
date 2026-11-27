@@ -49,9 +49,13 @@ PROMPT_LINE = ("improve-nudge: 3 pushback prompts from the owner in this session
                "Do not run it unasked.")
 START_LINE = ("improve-nudge: no full-scope /improve in 30+ days. "
               "Offer the owner /improve (historical scope) in one line.")
-FINISHED = re.compile(r"\bgit(?:\s+-[cC]\s+\S+|\s+--?\S+)*\s+push\b|\bgearbox deploy\b|\bgh pr merge\b"
-                      r"|\bgh release create\b|\b(?:npm|pnpm|yarn|uv|twine) (?:publish|upload)\b"
-                      r"|(?:^|[;&|(\n]\s*)(?:\S*(?:python|bash|sh)\S*\s+)?(?:\S*/)?(?:deploy\.sh|publish_public\.py)\b")
+# Each finishing command counts only as a command word: at the start or after ; & | ( or a new
+# line, never inside quoted text (a grep for "gh pr merge" is not a merge), as merge-ff-main.py does.
+FINISHED = re.compile(r"(?:^|[;&|(\n]\s*)(?:"
+                      r"(?:\S*/)?git(?:\s+-[cC]\s+\S+|\s+--?\S+)*\s+push\b|(?:\S*/)?gearbox deploy\b"
+                      r"|gh pr merge\b|gh release create\b|(?:npm|pnpm|yarn|uv|twine) (?:publish|upload)\b"
+                      r"|(?:\S*(?:python|bash|sh)\S*\s+)?(?:\S*/)?(?:deploy\.sh|publish_public\.py)\b)")
+QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 # Automated sessions (claude -p / SDK, codex exec, Codex run from Claude Code) get no offer.
 AUTOMATED = ("sdk", "codex_exec", "Claude Code")
 HOWTO = {"claude": ("/improve", "dispatch ONE subagent (subagent_type general-purpose, model sonnet)"),
@@ -77,7 +81,7 @@ def _sha(s: str) -> str:
 def _read_stdin():
     try:
         return json.loads(sys.stdin.read())
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return None
 
 
@@ -177,9 +181,11 @@ def mode_finished(sd: Path) -> None:
     if not isinstance(ti, dict):
         return
     cmd = ti.get("command")
-    if not isinstance(cmd, str):
-        cmd = json.dumps(ti)  # shortcut: Codex exec input shape is undocumented, search it whole
-    if not FINISHED.search(cmd):
+    # shortcut: Codex exec input shape is undocumented, so try every string (and list item) in it
+    cmds = [cmd] if isinstance(cmd, str) else [s for v in ti.values()
+                                                 for s in (v if isinstance(v, list) else [v])
+                                                 if isinstance(s, str)]
+    if not any(FINISHED.search(QUOTED.sub("''", c)) for c in cmds):
         return
     sessions = sd / "sessions"
     sessions.mkdir(parents=True, exist_ok=True)
@@ -209,7 +215,7 @@ def mode_finished(sd: Path) -> None:
             out = ddir / f"{h}.txt"
             out.write_text(digest.text)
             line = PREVIEW_LINE.format(digest=out, reader=reader, improve=improve)
-        except Exception:
+        except Exception:  # noqa: BLE001 — fail open: any digest error means no preview, plain offer; imported code is unbounded
             pass  # no preview, plain offer
     _log(sd, "finished", h)
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse",
@@ -231,7 +237,7 @@ def main() -> int:
             mode_session_start(sd)
         elif mode == "finished":
             mode_finished(sd)
-    except Exception:
+    except Exception:  # noqa: BLE001 — fail open: an unexpected error means no reminder and a quiet exit
         pass
     return 0
 

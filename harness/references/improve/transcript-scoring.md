@@ -72,7 +72,7 @@ A scored session is evidence, not a finding. Convert with this bar:
    current instructions still fail this way?** If the instruction already required
    the right behavior, that is model variance, not a gap — no finding. If the real
    fix is code or infrastructure (a pointer, a check, a cheaper tool, read access),
-   propose it as **"Remove the cause"** (`commands/improve.md` §4a) with the exact
+   propose it as **"Remove the cause"** (`skills/improve/SKILL.md` §4a) with the exact
    change; never turn it into a rule or a memory note.
 4. If a skill exists that covers the wasted step and never fired, that is a failed
    trigger — route it per `relevance-audit.md` Step 3, not as a new rule.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -451,8 +452,17 @@ def test_check_types_end_to_end_against_a_planted_error(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text('[tool.ty.src]\ninclude = ["src"]\n', encoding="utf-8")
     (tmp_path / "src").mkdir()
     bad = tmp_path / "src" / "bad.py"
-    bad.write_text('x: int = "not an int"\n', encoding="utf-8")
+    bad.write_text('x: int = "not an int"\nimport nope_not_installed\n', encoding="utf-8")
     proj = str(tmp_path)
+
+    # --staged: nothing staged passes; a staged file blocks on its own error, never on the import
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    assert run("check_types.py", "--project", proj, "--staged").returncode == 0
+    subprocess.run(["git", "add", "src/bad.py"], cwd=tmp_path, check=True)
+    staged = run("check_types.py", "--project", proj, "--staged")
+    assert staged.returncode == 1 and "invalid-assignment" in staged.stdout
+    assert "unresolved-import" not in staged.stdout
+    bad.write_text('x: int = "not an int"\n', encoding="utf-8")
 
     first = run("check_types.py", "--project", proj)
     assert first.returncode == 1, first.stdout + first.stderr
@@ -470,3 +480,310 @@ def test_check_types_end_to_end_against_a_planted_error(tmp_path: Path) -> None:
     under = run("check_types.py", "--project", proj)
     assert under.returncode == 0
     assert "below baseline src/bad.py" in under.stdout
+
+
+# --- check_subprocess_results -------------------------------------------------
+
+def _load_subprocess_check():
+    import importlib.util
+    sys.path.insert(0, str(SCRIPTS))
+    spec = importlib.util.spec_from_file_location("check_subprocess_results", SCRIPTS / "check_subprocess_results.py")
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+BARE = "import subprocess\n\ndef f():\n    subprocess.run(['x'])\n"
+
+
+@pytest.mark.parametrize("body,flagged", [
+    ("    subprocess.run(['x'])\n", 1),                                   # plant: bare call
+    ("    r = subprocess.run(['x'], capture_output=True)\n    return r.stdout\n", 1),   # .stdout only
+    ("    r = subprocess.run(['x'])\n    if r:\n        pass\n", 1),      # always truthy
+    ("    subprocess.run(['x'], check=False)\n", 1),
+    ("    subprocess.run(['x'], check=True)\n", 0),                       # allow
+    ("    r = subprocess.run(['x'])\n    return r.returncode == 0\n", 0),
+    ("    r = subprocess.run(['x'])\n    return r\n", 0),                 # wrapper returns the result
+    ("    r = subprocess.run(['x'])\n    g(r)\n", 0),                     # passed on whole
+    ("    subprocess.run(['x'], check=strict)\n", 0),                     # non-literal check
+    ("    subprocess.run(['x'], **kw)\n", 0),                             # check via **kwargs
+    ("    a = b = subprocess.run(['x'])\n", 1),                           # chained: neither name is read
+    ("    a = b = subprocess.run(['x'])\n    return b.stdout\n", 1),      # .stdout only, on either name
+    ("    a = b = subprocess.run(['x'])\n    return b\n", 0),              # one name passed on whole
+    ("    r = subprocess.run(['x'])\n    assert r\n", 1),                  # an assert on the object is always true
+    ("    assert subprocess.run(['x'])\n", 1),
+])
+def test_subprocess_check_plant_and_allow(body: str, flagged: int) -> None:
+    mod = _load_subprocess_check()
+    assert len(mod.bare_calls(f"import subprocess\n\ndef f():\n{body}")) == flagged
+
+
+def test_subprocess_check_sees_aliases() -> None:
+    mod = _load_subprocess_check()
+    assert len(mod.bare_calls("import subprocess as sp\n\ndef f():\n    sp.run(['x'])\n")) == 1
+    assert len(mod.bare_calls("from subprocess import run\n\ndef f():\n    run(['x'])\n")) == 1
+    assert mod.bare_calls("def f():\n    run(['x'])\n") == []   # no import of subprocess
+
+
+def sub_check(proj: Path, *args: str) -> subprocess.CompletedProcess:
+    return run("check_subprocess_results.py", "--project", str(proj), *args)
+
+
+def sub_repo(tmp_path: Path, files: dict[str, str]) -> str:
+    """A repo whose first commit holds `files`; returns that commit's sha."""
+    make_repo(tmp_path)
+    for rel, text in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "base")
+    return git(tmp_path, "rev-parse", "HEAD").stdout.strip()
+
+
+def sub_change(tmp_path: Path, base: str, mode: str, edit_tree) -> subprocess.CompletedProcess:
+    """Apply `edit_tree`, put the result in the state `mode` judges, run the check."""
+    edit_tree(tmp_path)
+    if mode == "staged":
+        git(tmp_path, "add", "-A")
+        return sub_check(tmp_path, "--staged")
+    if mode == "base":
+        git(tmp_path, "add", "-A")
+        git(tmp_path, "commit", "-qm", "change")
+        return sub_check(tmp_path, "--base", base)
+    return sub_check(tmp_path, "--base", base, "--worktree")   # nothing staged, untracked kept
+
+
+MODES = ["staged", "base", "worktree"]
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_subprocess_new_bare_call_fails_and_inherited_passes(tmp_path: Path, mode: str) -> None:
+    base = sub_repo(tmp_path, {"old.py": BARE})
+    ok = sub_change(tmp_path, base, mode, lambda p: (p / "new.py").write_text("x = 1\n"))
+    assert ok.returncode == 0, ok.stdout + ok.stderr   # the inherited call alone is not new
+    bad = sub_change(tmp_path, base, mode, lambda p: (p / "new.py").write_text(BARE.replace("'x'", "'y'")))
+    assert bad.returncode == 1 and "new.py:4" in bad.stdout, bad.stdout + bad.stderr
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_subprocess_function_rename_passes(tmp_path: Path, mode: str) -> None:
+    base = sub_repo(tmp_path, {"a.py": BARE})
+    proc = sub_change(tmp_path, base, mode, lambda p: (p / "a.py").write_text(BARE.replace("def f", "def renamed")))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_subprocess_file_move_passes(tmp_path: Path, mode: str) -> None:
+    base = sub_repo(tmp_path, {"a.py": BARE})
+
+    def move(p: Path) -> None:
+        (p / "sub").mkdir()
+        (p / "sub" / "b.py").write_text(BARE)   # untracked destination in worktree mode
+        (p / "a.py").unlink()
+    proc = sub_change(tmp_path, base, mode, move)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_subprocess_moved_file_with_new_call_fails(tmp_path: Path, mode: str) -> None:
+    base = sub_repo(tmp_path, {"a.py": BARE})
+
+    def move_and_add(p: Path) -> None:
+        (p / "b.py").write_text(BARE + "\ndef g():\n    subprocess.run(['new'])\n")
+        (p / "a.py").unlink()
+    proc = sub_change(tmp_path, base, mode, move_and_add)
+    assert proc.returncode == 1 and "['new']" in proc.stdout, proc.stdout + proc.stderr
+
+
+def test_subprocess_ratchet_rejects_equal_count_replacement(tmp_path: Path) -> None:
+    base = sub_repo(tmp_path, {"a.py": BARE})
+    proc = sub_change(tmp_path, base, "staged", lambda p: (p / "a.py").write_text(BARE.replace("'x'", "'other'")))
+    assert proc.returncode == 1 and "'other'" in proc.stdout   # one removed, one added: still new
+
+
+def test_subprocess_second_identical_call_fails(tmp_path: Path) -> None:
+    base = sub_repo(tmp_path, {"a.py": BARE})
+    proc = sub_change(tmp_path, base, "base", lambda p: (p / "b.py").write_text(BARE))
+    assert proc.returncode == 1 and "b.py:4" in proc.stdout   # one more call than the base had
+
+
+def test_subprocess_staged_reads_index(tmp_path: Path) -> None:
+    sub_repo(tmp_path, {"a.py": "x = 1\n"})
+    (tmp_path / "a.py").write_text(BARE)
+    git(tmp_path, "add", "a.py")
+    (tmp_path / "a.py").write_text("x = 1\n")   # fixed on disk, bad version still staged
+    proc = sub_check(tmp_path, "--staged")
+    assert proc.returncode == 1 and "a.py:4" in proc.stdout
+
+
+def test_subprocess_ci_mode_fails_new_call(tmp_path: Path) -> None:
+    base = sub_repo(tmp_path, {"a.py": "x = 1\n"})
+    proc = sub_change(tmp_path, base, "base", lambda p: (p / "a.py").write_text(BARE))
+    assert proc.returncode == 1
+    unreachable = sub_check(tmp_path, "--base", "0" * 40)
+    assert unreachable.returncode == 2   # an unknown base is never a pass
+    assert sub_check(tmp_path, "--base", "").returncode == 2
+
+
+def test_subprocess_staged_listing_failure_is_exit_2(tmp_path: Path) -> None:
+    proc = sub_check(tmp_path, "--staged")   # not a git repo: no listing, no pass
+    assert proc.returncode == 2
+
+
+def test_subprocess_worktree_mode_flags_unstaged_call(tmp_path: Path) -> None:
+    base = sub_repo(tmp_path, {"old.py": BARE})
+    assert sub_check(tmp_path, "--base", base, "--worktree").returncode == 0   # inherited call passes
+    (tmp_path / "old.py").write_text(BARE + "\ndef g():\n    subprocess.run(['new'])\n")
+    proc = sub_check(tmp_path, "--base", base, "--worktree")
+    assert proc.returncode == 1 and "['new']" in proc.stdout
+
+
+def test_subprocess_ratchet_blocks_commit(tmp_path: Path) -> None:
+    """The real githooks/pre-commit refuses a staged bare call, and not a clean one."""
+    sub_repo(tmp_path, {"a.py": "x = 1\n"})
+    (tmp_path / "scripts").mkdir()
+    shutil.copytree(SCRIPTS, tmp_path / "scripts" / "quality", ignore=shutil.ignore_patterns("__pycache__"))
+    (tmp_path / "scripts" / "verify-routing.sh").write_text("exit 0\n")   # the routing guard is not under test
+    hook = tmp_path / "pre-commit"
+    shutil.copy(REPO_ROOT / "githooks" / "pre-commit", hook)
+    git(tmp_path, "add", "-A")   # the scaffold is part of the base, not of the commit under test
+    git(tmp_path, "commit", "-qm", "scaffold")
+
+    def commit_hook() -> subprocess.CompletedProcess:
+        git(tmp_path, "add", "-A")
+        return subprocess.run(["bash", str(hook)], cwd=tmp_path, capture_output=True, text=True)
+
+    (tmp_path / "a.py").write_text(BARE)
+    bad = commit_hook()
+    assert bad.returncode == 1 and "COMMIT BLOCKED: check_subprocess_results" in bad.stderr
+    (tmp_path / "a.py").write_text(BARE.replace("['x'])", "['x'], check=True)"))
+    assert "check_subprocess_results" not in commit_hook().stderr
+    # A tracked checker that is missing from disk is a broken tree: the hook blocks, it does not skip.
+    checker = tmp_path / "scripts" / "quality" / "check_subprocess_results.py"
+    checker.unlink()
+    (tmp_path / "a.py").write_text(BARE)
+    broken = commit_hook()
+    assert broken.returncode == 1 and "tracked by git but missing from disk" in broken.stderr
+    # A worktree that predates the checker never tracked it: the hook skips it instead of failing the commit.
+    git(tmp_path, "commit", "-qm", "tree without the checker", "--no-verify")
+    (tmp_path / "a.py").write_text(BARE.replace("['x'])", "['x'], check=True)"))
+    old_tree = commit_hook()
+    assert old_tree.returncode == 0 and "can't open file" not in old_tree.stderr
+
+
+def test_context_size_blocks_growth_past_the_bound_and_allows_pruning(tmp_path: Path) -> None:
+    """Plant: an over-limit CLAUDE.md that grows blocks; a file crossing the bound blocks.
+    Control: the same over-limit file shrinking passes; a path-scoped rule is not counted."""
+    make_repo(tmp_path)
+    (tmp_path / "rules").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("x " * 60 + "\n" + "rule\n" * 250)  # 251 lines
+    (tmp_path / "rules" / "small.md").write_text("rule\n" * 190)
+    (tmp_path / "rules" / "scoped.md").write_text("---\npaths:\n  - src/**\n---\n" + "r\n" * 400)
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "debt exists")
+
+    (tmp_path / "CLAUDE.md").write_text("x " * 60 + "\n" + "rule\n" * 249)
+    git(tmp_path, "add", "-A")
+    proc = run("check_context_size.py", "--project", str(tmp_path), "--staged")
+    assert proc.returncode == 0, f"pruning an over-limit file must pass:\n{proc.stdout}"
+
+    (tmp_path / "CLAUDE.md").write_text("x " * 60 + "\n" + "rule\n" * 251)
+    (tmp_path / "rules" / "scoped.md").write_text("---\npaths:\n  - src/**\n---\n" + "r\n" * 500)
+    git(tmp_path, "add", "-A")
+    proc = run("check_context_size.py", "--project", str(tmp_path), "--staged")
+    assert proc.returncode == 1 and "BLOCK   CLAUDE.md" in proc.stdout
+    assert "scoped.md" not in proc.stdout, "a path-scoped rule loads on demand and is not counted"
+
+    git(tmp_path, "reset", "-q", "--hard")
+    (tmp_path / "rules" / "small.md").write_text("rule\n" * 210)
+    git(tmp_path, "add", "-A")
+    proc = run("check_context_size.py", "--project", str(tmp_path), "--staged")
+    assert proc.returncode == 1 and "rules/small.md" in proc.stdout, "crossing the bound must block"
+
+
+# --- pyres resolution order & verify.yml push.paths invariants ---------------
+
+def _fake_venv(root: Path, *, rc: int = 0) -> Path:
+    py = root / "bin" / "python"
+    py.parent.mkdir(parents=True, exist_ok=True)
+    py.write_text(f"#!/bin/sh\nexit {rc}\n")
+    py.chmod(0o755)
+    return py.resolve()
+
+
+def test_pyres_resolution_order_and_worktree_fallback(tmp_path: Path) -> None:
+    """PYRES_VENV > VIRTUAL_ENV > repo .venv-ci > worktree common-dir .venv-ci > ~/.claude/.venv > python3."""
+    import os
+
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    shutil.copy2(REPO_ROOT / "scripts" / "pyres", repo / "scripts" / "pyres")
+    make_repo(repo)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "init")
+    wt = tmp_path / "wt"
+    assert git(repo, "worktree", "add", "-q", "-b", "wt-branch", str(wt)).returncode == 0
+
+    override_py = _fake_venv(tmp_path / "override")
+    active_py = _fake_venv(tmp_path / "active")
+    repo_ci_py = _fake_venv(repo / ".venv-ci")
+    home_dir = tmp_path / "home"
+    home_py = _fake_venv(home_dir / ".claude" / ".venv")
+    outside = tmp_path / "outside" / "scripts"
+    outside.mkdir(parents=True)
+    shutil.copy2(REPO_ROOT / "scripts" / "pyres", outside / "pyres")
+
+    base = {k: v for k, v in os.environ.items() if k not in ("PYRES_VENV", "VIRTUAL_ENV")}
+    base["HOME"] = str(home_dir)
+    def run_p(p: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run([str(p), *args], cwd=p.parent, env=env, capture_output=True, text=True)
+
+    r1 = run_p(repo / "scripts" / "pyres", {**base, "PYRES_VENV": str(tmp_path / "override"),
+                                            "VIRTUAL_ENV": str(tmp_path / "active")})
+    assert r1.returncode == 0 and Path(r1.stdout.strip()).resolve() == override_py
+    r2 = run_p(repo / "scripts" / "pyres", {**base, "VIRTUAL_ENV": str(tmp_path / "active")})
+    assert r2.returncode == 0 and Path(r2.stdout.strip()).resolve() == active_py
+    _fake_venv(tmp_path / "incomplete", rc=1)
+    r2b = run_p(repo / "scripts" / "pyres", {**base, "VIRTUAL_ENV": str(tmp_path / "incomplete")}, "pytest")
+    assert r2b.returncode == 0 and Path(r2b.stdout.strip()).resolve() == repo_ci_py
+    r3 = run_p(repo / "scripts" / "pyres", base)
+    assert r3.returncode == 0 and Path(r3.stdout.strip()).resolve() == repo_ci_py
+    assert not (wt / ".venv-ci").exists()
+    r4 = run_p(wt / "scripts" / "pyres", base)
+    assert r4.returncode == 0 and Path(r4.stdout.strip()).resolve() == repo_ci_py
+    r5 = run_p(outside / "pyres", base)
+    assert r5.returncode == 0 and Path(r5.stdout.strip()).resolve() == home_py
+    bare = {**base, "HOME": str(tmp_path / "empty-home")}
+    r6 = run_p(outside / "pyres", bare, "json")
+    assert r6.returncode == 0 and r6.stdout.strip().endswith("python3")
+    r_noisy = run_p(outside / "pyres", bare, "this")
+    assert r_noisy.returncode == 0 and r_noisy.stdout.splitlines() == [r_noisy.stdout.strip()]
+    assert r_noisy.stdout.strip().endswith("python3") and "Zen of Python" not in r_noisy.stdout
+    assert run_p(outside / "pyres", bare, "no_such_module_xyz").returncode == 127
+
+
+def test_verify_workflow_push_paths_cover_agentic_config_and_keep_pr_unfiltered() -> None:
+    """Every agentic config / check-input path triggers push CI; exclusion stays last; PR has no paths filter."""
+    import yaml
+
+    wf_path = REPO_ROOT / ".github" / "workflows" / "verify.yml"
+    if not wf_path.exists():
+        pytest.skip("verify.yml not present in this checkout")
+    data = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
+    on_block = data.get("on") if "on" in data else data.get(True)
+    push_paths = on_block["push"]["paths"]
+    required = [
+        "CLAUDE.md", "AGENTS.md", "rules/**", "agents/**", "output-styles/**",
+        "settings.json", ".claude/settings.json", "codex/**", "model-routing.digest.md",
+        "epic-dev-assignments.yaml", ".claude/eval-gates.json", "README.md",
+        "UPDATE-PLAYBOOK.md", "docs/reference_*.md", ".complexity-exceptions",
+    ]
+    missing = [p for p in required if p not in push_paths]
+    assert not missing, f"verify.yml on.push.paths missing: {missing}"
+    assert push_paths[-1] == "!evals/routing/outcomes.ndjson"
+    assert "pull_request" in on_block, "verify.yml must define on.pull_request"
+    pr_block = on_block["pull_request"]
+    assert pr_block is None or not ({"paths", "paths-ignore"} & set(pr_block)), (
+        f"verify.yml on.pull_request must not filter paths: {pr_block}"
+    )

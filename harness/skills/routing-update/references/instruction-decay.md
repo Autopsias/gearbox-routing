@@ -2,7 +2,10 @@
 
 Run this pass when the trigger is a **model-generation change**: a new family
 (e.g. Claude 5), a new major version of a lineup model, or a main-session model
-family switch. Skip it for price changes, deprecations without a replacement
+family switch. Also run it on any `/routing-update` when the newest
+`evals/routing/results/*/RETIRED-RULES.md` is more than 90 days old: rules grow
+between generations (`CLAUDE.md` + `rules/` went from 15,833 to 31,086 bytes
+between 2026-08-21 and 2026-11-21 while the pass stayed idle). Skip it for price changes, deprecations without a replacement
 model, and binary bumps — those change costs and plumbing, not model behavior.
 
 **Why this pass exists.** Our standing rules are failure-derived: each one was

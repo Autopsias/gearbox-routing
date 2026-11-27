@@ -75,6 +75,11 @@ def test_open_waits_for_the_due_date(tmp_path):
 def test_overrides_hide_absorbed_lines(tmp_path):
     p = make(tmp_path)
     assert run(p, "overrides").count("- 2026") == 1 and run(p, "overrides", "--all").count("- 2026") == 2
+    with pytest.raises(SystemExit):
+        run(p, "absorb", " A ", "edit 1")                                # A is absorbed already: no open match
+    run(p, "absorb", " B ", "edit 1", "--today", "2026-09-20")
+    assert "no override" in run(p, "overrides")
+    assert 'the owner said: "z" · absorbed 2026-09-20 (edit 1)' in open(p, encoding="utf-8").read()
 
 
 def test_row_refuses_an_ambiguous_match(tmp_path):
@@ -99,6 +104,8 @@ def test_writes_land_in_the_right_place(tmp_path):
     run(p, "note", "undecided", "planned (plan x)", "--field", "decision")
     assert "undecided" not in run(p, "open", "--today", "2026-11-17")
     assert "| planned (plan x) | none needed |" in open(p, encoding="utf-8").read()   # "open" replaced, result kept
+    run(p, "note", "undecided", "built 2026-09-21", "--field", "decision")
+    assert "| planned (plan x) · built 2026-09-21 |" in open(p, encoding="utf-8").read()   # two notes stay apart
 
 
 def test_add_row_works_on_a_ledger_with_no_row_yet(tmp_path):
@@ -134,7 +141,7 @@ def test_retro_due_counts_rows_and_live_overrides(tmp_path):
     assert "rows after the last retro: 3" in out and "not absorbed: 1" in out and "Enough" not in out
 
 
-FILLED = "## Above the target\n\n- example-project: the same check — TRIAL\n\n## Principles\n\n- none: the source argues no principle\n"
+FILLED = "## Above the target\n\n- example-project: the same check — TRIAL\n\n## Drop challenge\n\n- none: no DROP\n\n## Principles\n\n- none: the source argues no principle\n"
 
 
 @pytest.mark.parametrize("report,source,ok", [
@@ -143,16 +150,18 @@ FILLED = "## Above the target\n\n- example-project: the same check — TRIAL\n\n
     (FILLED.replace("## Principles", "## Other"), "a source", False),   # section missing
     (FILLED.replace("- example-project: the same check — TRIAL", "- <where else the idea applies>"), "a source", False),
     (FILLED.replace("- example-project: the same check — TRIAL", ""), "a source", False),   # empty section
+    (FILLED.replace("## Drop challenge", "## Other"), "a source", False),   # drop challenge missing
     (None, "retro", True),                                              # a retro row has no report to check
 ])
-def test_add_row_refuses_a_report_that_skips_the_big_picture(tmp_path, report, source, ok):
+@pytest.mark.parametrize("ticks", [True, False])                       # a plain path is checked too
+def test_add_row_refuses_a_report_that_skips_the_big_picture(tmp_path, report, source, ok, ticks):
     d = tmp_path / "docs" / "worth-adopting"
     d.mkdir(parents=True)
     p = str(d / "LEDGER.md")
     open(p, "w", encoding="utf-8").write(open(make(tmp_path), encoding="utf-8").read())
     if report is not None:
         (d / "r.md").write_text(report, encoding="utf-8")
-    new = row("2026-09-10", source).replace("`r.md`", "`docs/worth-adopting/r.md`")
+    new = row("2026-09-10", source).replace("`r.md`", "`docs/worth-adopting/r.md`" if ticks else "docs/worth-adopting/r.md")
     if ok:
         run(p, "add-row", stdin=new)
         assert new in open(p, encoding="utf-8").read()

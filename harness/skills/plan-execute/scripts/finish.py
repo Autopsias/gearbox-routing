@@ -127,7 +127,7 @@ def context(plan_dir):
     if iso is not None:
         return {**iso, "isolated": True,
                 "default": iso["default"] or _default_branch(root, iso["remote"])}
-    remotes = git(["remote"], root)[1].split()
+    remotes = lst.writable_remotes(root)
     remote = "origin" if "origin" in remotes else (remotes[0] if len(remotes) == 1 else None)
     default = ps.claim(plan_dir).get("default_branch") or _default_branch(root, remote)
     return {"plan_dir": str(plan_dir), "root": root, "slug": pwt.plan_slug(plan_dir),

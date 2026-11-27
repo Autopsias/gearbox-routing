@@ -67,8 +67,8 @@ SCRIPT_EXTENSIONS = {".py", ".sh", ".js", ".ts"}
 
 # OTHER-CHECKOUT waivers: a (document, token) pair the document itself places
 # in the Gearbox public-export checkout (`~/Gearbox`), never in this repo — so
-# `git ls-files` here can never confirm it. Verified that all three
-# exist there. Keyed by (document, token) so a document that claims the SAME
+# `git ls-files` here can never confirm it. Verified that each listed path
+# exists there. Keyed by (document, token) so a document that claims the SAME
 # token WITHOUT placing it in that checkout still fails, per the checker's own
 # rule that a document is never evidence for its own claim.
 OTHER_CHECKOUT_WAIVERS = {
@@ -76,6 +76,7 @@ OTHER_CHECKOUT_WAIVERS = {
     ("README.md", "docs/HARNESS.md"),
     ("UPDATE-PLAYBOOK.md", "scripts/sync-from-claude.py"),
     ("UPDATE-PLAYBOOK.md", "harness/SYNCED-FROM"),
+    ("UPDATE-PLAYBOOK.md", "scripts/README.md"),
 }
 
 # RUNTIME-FILE waivers: a (document, token) pair naming a bare filename the
@@ -165,7 +166,7 @@ def _git_ls_files(repo_root: Path) -> set[str]:
             capture_output=True, text=True, check=True,
         )
         return set(out.stdout.splitlines())
-    except Exception:
+    except (OSError, ValueError, subprocess.SubprocessError):
         return set()
 
 

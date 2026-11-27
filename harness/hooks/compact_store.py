@@ -152,7 +152,7 @@ def ledger(event, session, reason, **fields):
             record[key] = value
     try:
         append_line(os.path.join(root(), "decisions.ndjson"), record)
-    except Exception:  # a ledger failure must never gate a compaction
+    except Exception:  # noqa: BLE001 — fail open: a ledger failure must never gate a compaction
         pass
     return record
 

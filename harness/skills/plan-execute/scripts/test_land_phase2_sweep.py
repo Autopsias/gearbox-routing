@@ -82,7 +82,7 @@ def _run(tmp_path, monkeypatch, faults, seen, races=0):
             fired = _instrument(mp, fault, seen)
             try:
                 _land(iso)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — an injected fault may make the land raise any error; only a raise from a fault-free call is recorded as a violation
                 if fault is None:                            # the last land must not crash
                     bad.append(f"the final land raised {type(e).__name__}: {e}")
             if fault and not fired:

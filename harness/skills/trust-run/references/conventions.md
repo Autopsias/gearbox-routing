@@ -1,5 +1,38 @@
 # Trust Layer — Conventions (the contract hub)
 
+## Contents
+
+- [1. Enumerations (controlled vocabulary)](#1-enumerations-controlled-vocabulary)
+  - [1.1 Source identifiers & source status](#11-source-identifiers--source-status)
+  - [1.2 Severity — `severity`](#12-severity--severity)
+  - [1.3 Review status — `review_status`](#13-review-status--review_status)
+  - [1.4 Readiness — `readiness`](#14-readiness--readiness)
+  - [1.5 Issue lifecycle — `issue_lifecycle`](#15-issue-lifecycle--issue_lifecycle)
+  - [1.6 Surface & format — `surface`, `format` (v2 additive)](#16-surface--format--surface-format-v2-additive)
+  - [1.7 Document Pretty-But-Wrong defect list (`doc` surface, v2 additive)](#17-document-pretty-but-wrong-defect-list-doc-surface-v2-additive)
+- [2. The abstract provenance record](#2-the-abstract-provenance-record)
+  - [2.1 Speaker-note / evidence template (per claim)](#21-speaker-note--evidence-template-per-claim)
+  - [2.2 Source verification records (verify against the world, v2 additive)](#22-source-verification-records-verify-against-the-world-v2-additive)
+  - [2.3 Claim materiality & per-travel-class verification budget (v2 additive, finding #4)](#23-claim-materiality--per-travel-class-verification-budget-v2-additive-finding-4)
+  - [2.4 External source-quality policy (v2 additive, finding #7)](#24-external-source-quality-policy-v2-additive-finding-7)
+  - [2.5 Web-egress rule (v2 additive, finding #8)](#25-web-egress-rule-v2-additive-finding-8)
+- [3. Standard command I/O contract](#3-standard-command-io-contract)
+  - [3.1 Status enum — `status`](#31-status-enum--status)
+  - [3.2 The per-run manifest](#32-the-per-run-manifest)
+- [4. Readiness & waiver semantics](#4-readiness--waiver-semantics)
+- [5. Release thresholds (concrete, change-controlled)](#5-release-thresholds-concrete-change-controlled)
+  - [5.1 Threshold-change rule](#51-threshold-change-rule)
+- [6. How components reference this file](#6-how-components-reference-this-file)
+- [7. v3 contract extensions (additive — frozen v1/v2 above unchanged)](#7-v3-contract-extensions-additive--frozen-v1v2-above-unchanged)
+  - [7.1 Degraded-status caps — `degraded_status` (findings 3/4/5)](#71-degraded-status-caps--degraded_status-findings-345)
+  - [7.2 Reviewer independence by travel class — `reviewer_independence` (finding 5)](#72-reviewer-independence-by-travel-class--reviewer_independence-finding-5)
+  - [7.3 Checks-tab spec enum — `checks_tab` (finding 4 / ab-01)](#73-checks-tab-spec-enum--checks_tab-finding-4--ab-01)
+  - [7.4 In-PDF embedded-evidence channel + locator addition (finding 3 / ab-02)](#74-in-pdf-embedded-evidence-channel--locator-addition-finding-3--ab-02)
+  - [7.5 Canonical claim identity + moved-claim diff (finding 2)](#75-canonical-claim-identity--moved-claim-diff-finding-2)
+  - [7.6 Human-gate-digest invariant schema (finding 7 / av-01)](#76-human-gate-digest-invariant-schema-finding-7--av-01)
+  - [7.7 Two-phase vault-writeback record (finding 8 / av-02)](#77-two-phase-vault-writeback-record-finding-8--av-02)
+  - [7.8 Schema versioning + migration (finding 10 / fd-03)](#78-schema-versioning--migration-finding-10--fd-03)
+
 **This is the single file every Trust Layer component reads from.** Skills, commands, and the two-context reviewer reference these definitions; they never redefine them locally. Defining the vocabulary, the provenance record, the I/O contract, the waiver rule, and the release thresholds **once** is what keeps the components composable and prevents implementation drift as the plugin grows across sessions and milestones.
 
 A machine-readable mirror of everything below lives in [`conventions.json`](conventions.json). When code needs these values, it reads the JSON; humans read this file.

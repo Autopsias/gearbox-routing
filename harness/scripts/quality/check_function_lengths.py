@@ -64,7 +64,7 @@ def load_config(project_path: Path) -> dict:
     try:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return config
 
     q = data.get("tool", {}).get("claude-quality", {})
@@ -110,7 +110,7 @@ def parse_exceptions(source: str) -> dict[str, int]:
             exception_key(e["file"], e["name"]): e["lines"]
             for e in json.loads(source).get("exceptions", {}).values()
         }
-    except Exception:
+    except (ValueError, RecursionError, AttributeError, KeyError, TypeError):
         return {}
 
 
@@ -156,7 +156,7 @@ def functions_in_source(source: str, filename: str = "<source>") -> list[tuple[i
     """Return list of (lineno, name, length) for all functions in the source."""
     try:
         tree = ast.parse(source, filename=filename)
-    except Exception:
+    except (SyntaxError, ValueError, RecursionError):
         return []
 
     results = []
@@ -171,7 +171,7 @@ def functions_in_source(source: str, filename: str = "<source>") -> list[tuple[i
 def get_functions(filepath: Path) -> list[tuple[int, str, int]]:
     try:
         source = filepath.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except (OSError, ValueError):
         return []
     return functions_in_source(source, str(filepath))
 
@@ -341,7 +341,7 @@ def generate_baseline(project_path: Path, config: dict) -> None:
         try:
             with open(exc_file) as f:
                 existing = json.load(f).get("exceptions", {})
-        except Exception:
+        except Exception:  # noqa: BLE001 — baseline regeneration: on a read or parse error try to continue with no preserved manual entries
             pass
 
     new_exceptions = {

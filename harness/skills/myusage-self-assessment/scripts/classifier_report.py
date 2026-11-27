@@ -46,7 +46,7 @@ def collect(files):
     for f in files:
         try:
             rows.extend(refusals(f))
-        except Exception as e:  # one bad file never aborts the run
+        except Exception as e:  # noqa: BLE001 — report loop keeps going: a bad file is skipped with a stderr note
             sys.stderr.write(f"[classifier_report] skipped {f}: {e}\n")
     return rows
 

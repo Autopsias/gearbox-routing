@@ -72,7 +72,7 @@ def log_gate(plan_dir, session, gate, t0, outcome, attempts=(), attempt_usd=()):
                       attempt_ms=list(attempts),
                       attempt_usd=list(attempt_usd))
         return True
-    except Exception:   # instrumentation must never decide a gate
+    except Exception:  # noqa: BLE001 — fail open: the timing log is best effort; an error returns False
         return False
 
 
@@ -90,5 +90,5 @@ def log_run(plan_dir, phase, session, gate, seconds, outcome):
         rsi.log_event(plan_dir, "gate_run", session_ids=[session] if session else [],
                       phase=phase, gate=gate, outcome=outcome, seconds=round(seconds, 1))
         return True
-    except Exception:   # instrumentation must never decide a gate
+    except Exception:  # noqa: BLE001 — fail open: the timing log is best effort; an error returns False
         return False

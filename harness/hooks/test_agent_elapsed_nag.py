@@ -127,6 +127,19 @@ def test_background_bash():
         assert text and "31 minutes" in text, f"newer running twin lost its reminder: {text}"
         nag.run("stopbg", {"session_id": sid, "background_tasks": []})
         assert nag.run("pre", other) is None, "nagged after every twin ended"
+        # ended mid-turn (no Stop since): the finished notice in the transcript drops it
+        transcript = os.path.join(root, "t.jsonl")
+        with open(transcript, "w", encoding="utf-8") as fh:
+            fh.write('{"x": "<task-notification><tool-use-id>e1</tool-use-id><status>completed</status>"}\n')
+        seen = {**other, "transcript_path": transcript}
+        nag.run("pre", bgs("e2", "still running"))
+        bg_age(root, 31)
+        assert nag.run("pre", seen), "known positive: a command with no finished notice is reminded"
+        nag.run("stopbg", {"session_id": sid, "background_tasks": []})
+        nag.run("pre", bgs("e1", "docker build"))
+        bg_age(root, 261)
+        assert nag.run("pre", seen) is None, "reminded about a command whose finished notice is in the transcript"
+        assert kept() == [], "kept an ended command"
         # parallel starts: the lock keeps every task
         nag.run("stopbg", {"session_id": sid, "background_tasks": []})
         threads = [threading.Thread(target=nag.run, args=("pre", bgs(f"c{i}", f"job {i}"))) for i in range(8)]

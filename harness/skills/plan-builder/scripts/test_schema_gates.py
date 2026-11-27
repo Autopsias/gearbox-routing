@@ -96,7 +96,7 @@ def _check_version_gate():
         try:
             build_plan.build(copy.deepcopy(_minimal_prebump_spec), Path(td) / "plan")
             ok("build(): an unrelated pre-bump 1-item spec with no prior_art notion builds clean (the regression)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build(): unrelated pre-bump spec regression", f"{type(e).__name__}: {e}")
 
     # Plant 1: omission refused -- neither prior_art nor research_status present.
@@ -168,7 +168,7 @@ def _check_prior_art_and_research_skip():
             ok("build: prior_art and research-skipped both render in the agent-spec")
         except AssertionError as e:
             bad("build: prior_art rendering", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build: prior_art rendering", f"{type(e).__name__}: {e}")
 
     # ── Decision hotspots: a build-with-note item is pulled in WITHOUT tweak_likelihood ──
@@ -191,7 +191,7 @@ def _check_prior_art_and_research_skip():
             ok("build: a build decision with no note (no alternative found) stays OUT of decision hotspots")
         except AssertionError as e:
             bad("build: decision hotspots prior-art pull-in", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("build: decision hotspots prior-art pull-in", f"{type(e).__name__}: {e}")
 
 
@@ -427,7 +427,7 @@ def _check_research_status_claims():
             ok("RS-06: research_env stamped into spec.json + manifest.json, and gen_manifest stays pure")
         except AssertionError as e:
             bad("RS-06: research_env emission", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("RS-06: research_env emission", f"{type(e).__name__}: {e}")
 
     # The byte-identical guarantee for every plan built before RS-06: a spec with no
@@ -443,7 +443,7 @@ def _check_research_status_claims():
             ok("RS-06: a spec with no research_status gains no research_env (pre-RS-06 plans unchanged)")
         except AssertionError as e:
             bad("RS-06: no-skip-claim spec untouched", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("RS-06: no-skip-claim spec untouched", f"{type(e).__name__}: {e}")
 
     # The system-verified heading renders only for the machine-adjudicated value.
@@ -462,7 +462,7 @@ def _check_research_status_claims():
             ok("RS-06: an 'unavailable' item renders the build-time-verified prior-art block")
         except AssertionError as e:
             bad("RS-06: unavailable rendering", e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
             bad("RS-06: unavailable rendering", f"{type(e).__name__}: {e}")
 
 
@@ -514,7 +514,7 @@ def _check_infographic_coverage():
             ok("coverage: plan_mutate aliases the builder's group-key map (one definition)")
         else:
             bad("coverage: group-key map is duplicated", "plan_mutate holds its own copy")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
         bad("coverage: group-key map is shared", f"{type(e).__name__}: {e}")
 
 
@@ -523,6 +523,78 @@ def _check_infographic_coverage():
 # Every check above is reported as its own test. The checks share progressively
 # built state, so they run as one pass inside a session fixture; parametrisation
 # reports each verdict separately rather than hiding 109 results behind one dot.
+
+
+def _check_covers_spec_ref_matrix():
+    # covers x spec_ref matrix (contract section 7): pointer present or not,
+    # against an id covered, uncovered, or unknown. Warnings never refuse.
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as d:
+        sp = Path(d) / "SPEC.md"
+        sp.write_text("## Requirements\n- R1: a\n- R2: b\n- R4: WITHDRAWN 2026-11-01 — x [L1]\n"
+                      "## Plans\n- P1: t — covers: R1, R2 — status: thin\n")
+        def run(spec_ref, covers):
+            s: dict = copy.deepcopy(_minimal_prebump_spec)
+            if covers is not None:
+                s["items"][0]["covers"] = covers
+            if spec_ref:
+                s["spec_ref"] = spec_ref
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                build_plan.validate_spec(s)
+                w = build_plan.rad.spec_coverage.warnings(s)
+                m = build_plan.gen_manifest(s)
+            return w, m
+        ref = {"path": str(sp), "plan": "P1"}
+        cells = [  # name, spec_ref, covers, substrings every warning list must hold
+            ("no pointer, no covers: no warning, no new manifest key", None, None, []),
+            ("no pointer, covers carried, never checked", None, ["R9"], []),
+            ("pointer, all ids covered: silent", ref, ["R1", "R2"], []),
+            ("pointer, R2 uncovered: warning names R2", ref, ["R1"], ["no item covers R2"]),
+            ("pointer, unknown id: warning names it", ref, ["R1", "R2", "R7"], ["R7"]),
+            ("pointer, WITHDRAWN id: warning says WITHDRAWN", ref, ["R1", "R2", "R4"], ["R4", "WITHDRAWN"]),
+            ("pointer, plan not listed: warning names P9", {"path": str(sp), "plan": "P9"}, ["R1"], ["P9"]),
+            ("pointer, missing file: warning, no refusal", {"path": str(Path(d) / "no.md"), "plan": "P1"}, ["R1"], ["does not exist"]),
+        ]
+        sp2 = Path(d) / "SPEC2.md"  # R2's definition is gone; its Results row and a P-line under Results remain
+        sp2.write_text("## Requirements\n- R1: a\n## Plans\n- P1: t — covers: R1 — status: thin\n"
+                       "## Results\n- R2: NEVER CHECKED — 2026-11-21 — x — evidence: y\n- P2: t — covers: R1 — status: thin — x\n")
+        sp3 = Path(d) / "SPEC3.md"  # not text: the read fails after the existence check
+        sp3.write_bytes(b"\xff\xfe\x00bad")
+        sp4 = Path(d) / "SPEC4.md"  # R2 and P2 appear only in a code fence and in an HTML comment
+        sp4.write_text("## Requirements\n- R1: a\n```\n- R2: example\n```\n<!--\n- R3: old\n-->\n## Plans\n"
+                       "- P1: t — covers: R1 — status: thin\n<!--\n- P2: t — covers: R1 — status: thin\n-->\n")
+        cells += [
+            ("R2 only in a code fence: not defined", {"path": str(sp4), "plan": "P1"}, ["R1", "R2"], ["R2", "does not define"]),
+            ("R3 only in an HTML comment: not defined", {"path": str(sp4), "plan": "P1"}, ["R1", "R3"], ["R3", "does not define"]),
+            ("P2 only in an HTML comment: not a plan", {"path": str(sp4), "plan": "P2"}, ["R1"], ["P2"]),
+            ("R2 only in a Results row: warning says undefined", {"path": str(sp2), "plan": "P1"}, ["R1", "R2"], ["R2", "does not define"]),
+            ("P2 only under Results: not a plan", {"path": str(sp2), "plan": "P2"}, ["R1"], ["P2"]),
+            ("pointer, unreadable file: warning, no abort", {"path": str(sp3), "plan": "P1"}, ["R1"], ["could not be read"]),
+        ]
+        for name, r_, c_, needles in cells:
+            nm = "covers matrix: " + name
+            try:
+                w, m = run(r_, c_)
+                text = " | ".join(w)
+                if bool(needles) != bool(w) or any(n not in text for n in needles):
+                    bad(nm, f"warnings {w}")
+                elif ("covers" in m["items"][0]) != (c_ is not None):
+                    bad(nm, "manifest covers key does not follow the item")
+                elif (r_ is None) and "spec_ref" in m:
+                    bad(nm, "manifest gained spec_ref without one in the spec")
+                else:
+                    ok(nm)
+            except Exception as e:  # noqa: BLE001 — test harness: any unexpected error is recorded as a FAIL via bad()
+                bad(nm, f"raised {type(e).__name__}: {e}")
+    for name, patch in (("covers not a list", {"covers": "R1"}), ("covers bad id", {"covers": ["r1"]})):
+        s: dict = copy.deepcopy(_minimal_prebump_spec)
+        s["items"][0].update(patch)
+        expect_invalid(s, "covers matrix: malformed — " + name, "covers")
+    s = copy.deepcopy(_minimal_prebump_spec)
+    s["spec_ref"] = "SPEC.md"
+    expect_invalid(s, "covers matrix: malformed — spec_ref not an object", "spec_ref")
 
 
 def run_gate_checks():
@@ -538,6 +610,7 @@ def run_gate_checks():
     _check_research_probe()
     _check_research_status_claims()
     _check_infographic_coverage()
+    _check_covers_spec_ref_matrix()
     return {k: v for k, v in RESULTS.items() if k not in before}
 
 

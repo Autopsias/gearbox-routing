@@ -28,9 +28,11 @@ import land_state as lst  # noqa: E402
 import manifest_io as mio  # noqa: E402
 import plan_mutate as pm  # noqa: E402
 import plan_scope as ps  # noqa: E402
+from _land_fixture import run_cli as run_cli_subprocess  # noqa: E402,F401  (the real boundary)
+from land_test_support import _inproc_session, inproc_cli as run_cli  # noqa: E402,F401
 from _land_fixture import ack_only, record_only  # noqa: E402
 from _land_fixture import (build_repo, isolate, main_side, origin_main,  # noqa: E402
-                           run_cli, work)
+                           work)
 from worktree import git  # noqa: E402
 
 REG = ".claude/eval-gates.json"
@@ -119,7 +121,8 @@ def test_a_red_repairable_gate_returns_round_one_with_the_full_directive(fx):
         "depends_on": [], "infographic_group": "P1"}
     assert add["new_items"] == [{"id": "land-repair-1", "category": "work",
                                  "title": add["title"], "research_status": "skipped",
-                                 "research_reason": "repair of a red land gate"}]
+                                 "research_reason": "repair of a red land gate",
+                                 "touches": "BROKEN"}]
     assert add["prompt"].startswith(
         f"FIRST, before anything else, run this in your working copy:\n\n"
         f"    git merge-base --is-ancestor {cand['head']} HEAD\n")
@@ -160,11 +163,13 @@ def _close(plan_dir, sid, item):
     assert run_cli("verify-finalize", plan_dir, "--session", sid)[1]["final_status"] == "DONE"
 
 
-@pytest.mark.parametrize("via", ["python", "cli"])
-def test_add_session_then_begin_then_a_fixed_tree_lands(fx, via):
+@pytest.mark.parametrize("via,v8", [("python", False), ("cli", False), ("cli", True)])
+def test_add_session_then_begin_then_a_fixed_tree_lands(tmp_path, via, v8):
     """Contract §15's park row: an all-terminal plan, parked on a red gate. The
     directive goes through add-session (in-process, or the CLI with each item as
-    `--new-item '<json>'`), `begin` dispatches it, and the repaired tree lands."""
+    `--new-item '<json>'`), `begin` dispatches it, and the repaired tree lands. At
+    schema 8 every item must carry `touches`, the repair item too."""
+    fx = build_repo(tmp_path, gates={"ci-gate": _gate(tmp_path, BROKEN)}, built=True, v8=v8)
     plan_dir = fx["plans"]["plan-a"]
     assert run_cli("begin", plan_dir, "--sessions", "s01")[0] == 0
     iso = {"plan_dir": plan_dir, "tree": Path(ps.plan_worktree(plan_dir))}
@@ -184,7 +189,7 @@ def test_add_session_then_begin_then_a_fixed_tree_lands(fx, via):
                 "--prompt", kwargs["prompt"], "--infographic-group", kwargs["infographic_group"]]
         for item in kwargs["new_items"]:
             argv += ["--new-item", json.dumps(item)]
-        rc, added = run_cli(*argv)
+        rc, added = run_cli_subprocess(*argv)
         assert rc == 0, added
     subprocess.run(shlex.split(d["start"]["command"]), check=True, capture_output=True)
     rc, begun = run_cli("begin", plan_dir, "--sessions", "lr1")
@@ -467,16 +472,24 @@ def test_a_mixed_run_repairs_only_the_gate_red_twice(tmp_path):
     assert "flaky-gate" not in lrp.cost_note(st)
 
 
-def test_a_review_gate_is_not_re_run(tmp_path):
-    """A gate that declares the review base re-reviews an unchanged tree: no re-run."""
+@pytest.mark.parametrize("reviewer", [True, False])
+def test_only_a_reviewer_gate_skips_the_re_run(tmp_path, reviewer):
+    """A reviewer gate is never re-run; a test gate that only lists the review base (code-review-gate) is."""
     gate = {**_flaky(tmp_path), "env_allowlist": ["PLAN_EXECUTE_REVIEW_BASE"]}
+    if reviewer:
+        gate["argv"] = [*gate["argv"], "llm_review_gate.py"]
     fx = build_repo(tmp_path, gates={"ci-gate": gate}, built=True)
     iso = isolate(fx, "plan-a")
     work(iso["tree"], "src/f.py", "F = 1\n")
     rc, out = _land(iso)
-    assert out["action"] == "land-repair", out          # the base run (green) decides
-    assert _state(iso)["rerun"]["gates"]["ci-gate"]["outcome"] == "not-rerun"
-    assert _land_runs(tmp_path) == 1 and _base_runs(tmp_path) == 1
+    if reviewer:
+        assert out["action"] == "land-repair", out      # a review never runs on the base
+        assert _state(iso)["rerun"]["gates"]["ci-gate"]["outcome"] == "not-rerun"
+        assert _land_runs(tmp_path) == 1 and _base_runs(tmp_path) == 0
+    else:
+        assert out["kind"] == "gate-flaky", out         # run 1 red, re-run green
+        assert _state(iso)["rerun"]["gates"]["ci-gate"]["outcome"] == "pass"
+        assert _land_runs(tmp_path) == 2
 
 
 # --------------------------------------------------------------------------

@@ -24,9 +24,9 @@ sys.path.insert(0, str(SCRIPTS))
 
 import land_carry as lc  # noqa: E402
 import land_state as lst  # noqa: E402
-from _land_fixture import ack_only, verify_only  # noqa: E402
-from _land_fixture import (_arm_prepush, build_repo, isolate, main_side, origin_main,  # noqa: E402
-                           run_cli, work)
+from _land_fixture import (_arm_prepush, ack_only, build_repo, isolate, main_side,  # noqa: E402
+                           origin_main, verify_only, work)
+from land_test_support import _inproc_session, inproc_cli as run_cli, run_cli_subprocess  # noqa: E402,F401
 from worktree import git  # noqa: E402
 
 SLUG = "plan-a"

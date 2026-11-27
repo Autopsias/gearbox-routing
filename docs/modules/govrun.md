@@ -38,7 +38,7 @@ cp harness/hooks/governor-hook.py harness/hooks/governor_parse.py ~/.claude/hook
 {
   "hooks": {
     "PreToolUse": [
-      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; in=$(cat); printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134' | LC_ALL=C grep -qiF -e pytest -e py.test -e docker || exit 0; printf '%s' \"$in\" | python3 \"$p\"; s=$?; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }", "timeout": 15, "onFailure": "block"}]}
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "p=\"$HOME/.claude/hooks/governor-hook.py\"; [ -f \"$p\" ] || exit 0; in=$(cat); printf '%s' \"$in\" | LC_ALL=C tr -d '\\042\\047\\134' | LC_ALL=C grep -qiF -e pytest -e py.test -e docker || exit 0; { printf '%s %s %s start\\n' \"$(date +%s)\" \"${p##*/}\" $$ >> \"$HOME/.gearbox-state/hook-timing.log\"; } 2>/dev/null; printf '%s' \"$in\" | python3 \"$p\"; s=$?; { printf '%s %s %s end %s\\n' \"$(date +%s)\" \"${p##*/}\" $$ $s >> \"$HOME/.gearbox-state/hook-timing.log\"; } 2>/dev/null; [ $s -eq 0 ] || { echo \"governor-hook: present but exited $s without rendering a decision - refusing this Bash call. Fix or remove $p.\" >&2; exit 2; }", "timeout": 60, "onFailure": "block"}]}
     ]
   }
 }

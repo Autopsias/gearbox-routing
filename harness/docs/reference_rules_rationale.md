@@ -1,7 +1,7 @@
 # Why these rules exist
 
-The rules themselves live in `~/.claude/CLAUDE.md`. Each rule there carries a
-`(why: docs/reference_rules_rationale.md#anchor)` pointer to its section here.
+The rules themselves live in `~/.claude/CLAUDE.md`. Each section below quotes the
+first words of the rule it explains.
 This file is NOT loaded into base context — read it when you want the evidence
 behind a rule, when you are tempted to relax one, or when you are writing a new
 one and need the house style for justification.
@@ -47,6 +47,8 @@ which point the operator had taken a different route entirely ("do it yourself I
 out auto mode"). The option was executable; nothing said by whom, or how. An option
 the user must perform carries its steps in the card, so choosing it ends the exchange
 instead of starting one.
+
+2026-11-22 (squid session c118c901): a card priced a speed fix from a cProfile share ("saves about 40 of the 55 s", labelled as an estimate). The prototype then measured 31.5 s -> 20.1 s median, and an earlier A/B run with both versions at once had read 24 s -> 23 s. Hence the speed-option clause: time a prototype, one version after the other, before the card.
 
 ## ALWAYS verify how a tool / MCP / framework / substrate actually behaves
 
@@ -212,4 +214,4 @@ reach. The test-value review of repo-health measures the result.
 
 ## After a session opens a pull request it merges when every check is green
 
-Owner decision: 'Always merge when green'. It replaces the older rule 'NEVER auto-merge'. Why: 41 owner messages in 23 sessions said 'merge when green', 'check and merge' or 'merge and release', and 'Merge Without Review' was the top classifier refusal (30). The native `gh pr merge --auto` is barred because it merged at once when checks were optional (memory note gh-auto-merge-merges-at-once-on-optional-checks). `scripts/merge_when_green.py` waits for every check of the exact head commit, requires every pull_request job of the workflows to be present, and refuses on zero checks, any failure, a draft, a conflict, requested changes or a moved head. Skipped or neutral checks count only beside a success (PR #66 read verify success, secrets skipped). Deploy and release stay an explicit request.
+Owner decision: 'Always merge when green'. It replaces the older rule 'NEVER auto-merge'. Why: 41 owner messages in 23 sessions said 'merge when green', 'check and merge' or 'merge and release', and 'Merge Without Review' was the top classifier refusal (30). The native `gh pr merge --auto` is barred because it merged at once when checks were optional (memory note gh-auto-merge-merges-at-once-on-optional-checks). `scripts/merge_when_green.py` waits for every check of the exact head commit, requires every pull_request job of the workflows to be present, and refuses on zero checks, any failure, a draft, a conflict, requested changes or a moved head. Skipped or neutral checks count only beside a success (PR #66 read verify success, secrets skipped). Owner decision (vision answers H-1 and R2-3, `STRATEGY.md`): a merged gearbox change deploys at once, even while sessions run, because a merged fix that sits undeployed helps no session; an app deploy and any release stay an explicit request.

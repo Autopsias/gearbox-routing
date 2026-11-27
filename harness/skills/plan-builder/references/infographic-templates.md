@@ -2,6 +2,16 @@
 
 Five SVG templates ship with the skill. Pick one based on the plan's underlying narrative.
 
+## Contents
+
+- [phase-journey](#phase-journey)
+- [maturity-ladder](#maturity-ladder)
+- [hub-spoke](#hub-spoke)
+- [before-after](#before-after)
+- [pillars](#pillars)
+- [custom](#custom)
+- [How to recommend a template](#how-to-recommend-a-template)
+
 ## phase-journey
 **Best for:** staged rollouts. Most plans fit here when you can express the work as "Now → Phase 1 → Phase 2 → … → Goal."
 

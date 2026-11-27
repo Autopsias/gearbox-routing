@@ -11,7 +11,9 @@ import pytest
 
 import land_carry as lc
 import land_state as lst
-from _land_fixture import _arm_prepush, ack_only, build_repo, isolate, main_side, origin_main, run_cli, work
+from _land_fixture import run_cli as run_cli_subprocess  # noqa: E402,F401  (the real boundary)
+from land_test_support import _inproc_session, inproc_cli as run_cli  # noqa: E402,F401
+from _land_fixture import _arm_prepush, ack_only, build_repo, isolate, main_side, origin_main, work
 from test_land_carry import (GATES, KEY, SCRIPTS, SLUG, Repo, _break_classifier, _commit,
                              _events, _g, _harvest, _settings, _state)
 

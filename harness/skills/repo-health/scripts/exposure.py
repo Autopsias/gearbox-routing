@@ -290,7 +290,7 @@ def _main_check_run(args, cf_check):
         try:                        # the open set is read under the lock, after any earlier run
             held.enter_context(repo_lock(ns.repo))
             _check_run(ns, cf_check)
-        except Exception as e:      # never leave an older result standing
+        except Exception as e:  # noqa: BLE001 — fail closed: any error prints pending and exits 2; with --record it also records pending over an older pass
             why = f"check-run error: {type(e).__name__}: {e}"[:MAX_LINE]
             if ns.record:           # a fixed detail: no further read of untrusted input
                 record(ns.repo, "pending", SEP.join([why, f"output: {ns.out_dir}"]))

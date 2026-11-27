@@ -23,8 +23,10 @@ import land_state as lst  # noqa: E402
 import lease_guard as lg  # noqa: E402
 import run_state_io as rsi  # noqa: E402
 import ship_locks as sl  # noqa: E402
+from _land_fixture import run_cli as run_cli_subprocess  # noqa: E402,F401  (the real boundary)
+from land_test_support import _inproc_session, inproc_cli as run_cli  # noqa: E402,F401
 from _land_fixture import (_arm_prepush, ack_only, build_repo, isolate,  # noqa: E402
-                           main_side, origin_main, run_cli, work)
+                           main_side, origin_main, work)
 from worktree import git  # noqa: E402
 
 HARVEST = ("projects/p/memory/note.md", "harvested\n", "harvest: 1 live-state")
@@ -63,7 +65,7 @@ def _on_origin(fx, sha):
 def test_ack_on_a_current_candidate_pushes_in_the_same_command(one):
     fx, iso = one
     before = origin_main(fx)
-    rc, out = run_cli("land-ack", iso["plan_dir"], "--note", "ok")
+    rc, out = run_cli_subprocess("land-ack", iso["plan_dir"], "--note", "ok")
     assert (rc, out["action"], out["outcome"]) == (0, "landed", "pushed"), out
     assert origin_main(fx) != before and _on_origin(fx, out["merge_sha"])
     assert out["ack"]["note"] == "ok"

@@ -120,6 +120,41 @@ def test_add_session_writes_every_surface(plan):
     assert pm.consistency_report(plan)["ok"]
 
 
+def test_add_session_ships_like_the_plans_other_sessions(tmp_path):
+    """ALLOW + CONTROLS — an added session inherits the plan's git step, so it
+    commits and pushes; an explicit value overrides; 'none' opts out; a plan
+    that ships nothing gives the added session nothing (byte-compatible)."""
+    ship = {"git": "commit-push"}
+    sessions = [dict(s, post_session=ship) for s in _sessions()]
+    plan = str(make_plan(tmp_path, sessions, name="a"))
+    pm.add_session(plan, sid="s04", title="Repair", new_items=["w-04|work|X"],
+                   model="Sonnet", reasoning="low", task_class="standard_build")
+    entry = mio.session_by_id(mio.load_manifest(plan))["s04"]
+    assert entry["post_session"]["git"] == "commit-push"
+    assert "commit" in (Path(plan) / "sessions" / "s04.prompt.md").read_text().lower()
+    # untouched sessions keep their block, unchanged
+    assert mio.session_by_id(mio.load_manifest(plan))["s01"]["post_session"]["git"] == "commit-push"
+
+    pm.add_session(plan, sid="s05", title="Local only", new_items=["w-05|work|Y"],
+                   model="Sonnet", reasoning="low", task_class="standard_build",
+                   post_session="commit")
+    assert mio.session_by_id(mio.load_manifest(plan))["s05"]["post_session"]["git"] == "commit"
+    pm.add_session(plan, sid="s06", title="No ship", new_items=["w-06|work|Z"],
+                   model="Sonnet", reasoning="low", task_class="standard_build",
+                   post_session="none")
+    assert mio.session_by_id(mio.load_manifest(plan)).get("s06", {}).get("post_session") is None
+    with pytest.raises(pm.MutationError):
+        pm.add_session(plan, sid="s07", title="Bad", new_items=["w-07|work|Q"],
+                       model="Sonnet", reasoning="low", task_class="standard_build",
+                       post_session="push-it")
+
+    # CONTROL — a plan whose sessions ship nothing adds a session that ships nothing.
+    bare = str(make_plan(tmp_path, _sessions(), name="b"))
+    pm.add_session(bare, sid="s04", title="Repair", new_items=["w-04|work|X"],
+                   model="Sonnet", reasoning="low", task_class="standard_build")
+    assert mio.session_by_id(mio.load_manifest(bare))["s04"].get("post_session") is None
+
+
 def test_add_session_records_task_class(plan):
     """RT-01 ALLOW — --task-class lands in manifest.json AND spec.json, and the
     session dispatches with it (build_plan.gen_manifest already reads it)."""
@@ -341,6 +376,16 @@ def test_amend_session_allow(plan):
     assert "new body" in (Path(plan) / "sessions" / "s03.prompt.md").read_text()
     assert 'depends on <a href="#s01">S01</a>' in _html(plan)
     assert pm.consistency_report(plan)["ok"]
+
+
+def test_amend_session_keeps_repo_verify_section(plan, tmp_path, monkeypatch):
+    """A re-render must carry the "Repo verify skill" section the build adds (2026-11-23 review)."""
+    skill = tmp_path / "proj" / ".claude" / "skills" / "verify" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("# verify\n")
+    monkeypatch.setattr(pm, "project_root_for", lambda _d: str(tmp_path / "proj"))
+    pm.amend_session(plan, "s03", prompt="new body")
+    assert "## Repo verify skill" in (Path(plan) / "sessions" / "s03.prompt.md").read_text()
 
 
 @pytest.mark.parametrize("status", ["DOING", "DONE", "WONTFIX", "AWAITS_REVIEW"])
@@ -691,6 +736,17 @@ def test_an_item_has_no_chip_and_that_is_not_a_desync(tmp_path):
     plan = str(make_plan(tmp_path, _sessions()))
     text = (Path(plan) / "PLAN.html").read_text()
     assert ab.chip_status(text, "w-01") is None
+
+
+def test_a_hardened_plan_takes_a_mutation_and_keeps_its_summary(plan):
+    """/plan-harden writes its summary block after the last rebuild. The drift
+    check refused every add/amend on such a plan."""
+    path = Path(plan) / "PLAN.html"
+    block = "<!-- PLAN-HARDEN-SUMMARY:BEGIN -->\n<p>hardened</p>\n<!-- PLAN-HARDEN-SUMMARY:END -->"
+    path.write_text(path.read_text().replace("</main>", block + "\n</main>", 1))  # as plan-harden.md §4.2 places it
+    pm.amend_session(plan, "s03", prompt="new body")
+    pm.add_session(plan, sid="s04", title="Added", new_items=["w-04|work|X"], task_class="standard_build")
+    assert path.read_text().count(block) == 1
 
 
 def test_builder_drift_refusal_names_its_content_count_and_its_truncation(plan):

@@ -292,3 +292,20 @@ def test_silence_classification_and_policy_version_reach_the_page():
     assert "9 had nothing to compact" in out
     assert "2 ran with the hooks inactive" in out
     assert "policy_version 3" in out
+
+
+def test_main_turns_section_renders_verdict_cells_and_proposals_escaped():
+    mt = {"display_verdict": "broken", "malformed": 3, "skipped": 2,
+          "health": {"lines": 9, "model_null_share": 0.5, "effort_null_share": None, "lines_last_7_days": 0},
+          "cells": [{"task_type": "quick<b>", "model": "haiku", "effort": "high", "turns": 4, "sessions": 2,
+                     "pushback_rate": 0.25, "moved_up_after_rate": None, "nudges_shown": 1, "followed_share": 1.0,
+                     "status": "below_min_n"}],
+          "table_proposals": [{"kind": "rule_wrong", "task_type": "quick", "status": "proposed", "n": 10}]}
+    out = rr.render({"main_turns": mt})
+    assert "Display verdict: <strong>broken</strong>" in out and "Re-probe the payload facts" in out
+    assert "quick&lt;b&gt;" in out and "<b>" not in out.split("Main-session turns")[1].split("</table>")[0]
+    assert "25%" in out and "rule_wrong" in out and "None" not in out.split("Main-session turns")[1].split("<script>")[0]
+
+
+def test_no_main_turns_renders_no_records_line_not_a_blank_table():
+    assert "No turn records were given" in rr.render({})

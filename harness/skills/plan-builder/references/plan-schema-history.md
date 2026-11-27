@@ -1,7 +1,7 @@
 # `plan_schema_version` — what each version turned on
 
 The highest stamp lives in ONE place, `scripts/build_plan.py`'s
-`PLAN_SCHEMA_VERSION` (8); which stamp a build writes is
+`PLAN_SCHEMA_VERSION` (9); which stamp a build writes is
 `route_at_dispatch_build.manifest_stamp` (see version 8 below). This file is
 its history, extracted 2026-08-23 when the s10 activation bump pushed
 `build_plan.py` past its file-size baseline and the
@@ -12,9 +12,18 @@ Every version below is OPT-IN BY STAMP. `/plan-execute` accepts any plan at
 version 2 or above, and each feature switches on only for manifests stamped at
 or above its own minimum — so a plan built before a feature existed never gains
 a new refusal mode retroactively. The per-feature minimums are constants in
-`plan-execute/scripts/` (`closeout_pipeline.DECISION_BRIEF_MIN_SCHEMA`,
+`plan-execute/scripts/` (`closeout_pipeline.DECISION_BRIEF_MIN_SCHEMA`, `closeout_pipeline.OWNER_CALL_MIN_SCHEMA`,
 `escalation.ESCALATION_MIN_SCHEMA`, `plan_version_gate.ISOLATION_MIN_SCHEMA`),
 never re-typed here.
+
+## Contents
+
+- [Versions 2–6 (executable schema through upward escalation)](#versions-26-executable-schema-through-upward-escalation)
+- [Version 7 — plan-level git isolation](#version-7--example-isolation-plan)
+- [Version 8 — route at dispatch](#version-8--route-at-dispatch)
+- [Version 9 — BLOCKED owner_call and SPEC.md notes](#version-9--blocked-owner_call-and-specmd-notes)
+
+## Versions 2–6 (executable schema through upward escalation)
 
 History: 2 — the executable-plan schema (2026-07). 3 — `plan_impact`
 closeouts + the REPLAN checkpoint + the rendered plan change log.
@@ -44,6 +53,8 @@ regenerate-and-compare gate would have been false on arrival). A session opts ou
 with `escalation: false`. The same version carries the optional
 `routing_experiment: {kind, proposal_id}` session tag, validated here and
 propagated into the manifest for the outcome ledger to read back.
+## Version 7 — plan-level git isolation
+
 7 — PLAN-LEVEL GIT ISOLATION: a plan gets its own branch and its
 own LOCKED worktree at `begin`, every session and gate runs inside it, and the
 work reaches the default branch through the `land` protocol's compare-and-swap
@@ -66,6 +77,8 @@ a clone of this repo with a real dispatched subagent, real hooks and a real
 land). `plan-execute/scripts/test_plan_worktree.py` carries the tripwire that
 fires if this constant ever crosses the gate again by accident.
 
+## Version 8 — route at dispatch
+
 8 — ROUTE AT DISPATCH (2026-09-29, route-at-dispatch s04): the author names the
 kind of work (`task_class`, now required) and `/plan-execute begin` picks the
 model and effort. `model` + `reasoning` become an optional override pair that
@@ -83,3 +96,25 @@ and compares, with a v8 spec as the positive control. `--preserve-state`
 refuses a rebuild that crosses the v8 boundary, and a spec above
 `SUPPORTED_MAX_SCHEMA` (8) is refused rather than stamped lower. The executor's
 side (`plan_version_gate`) lands in the next session.
+
+## Version 9 — BLOCKED owner_call and SPEC.md notes
+
+9 — the BLOCKED `decision_brief.owner_call`: a BLOCKED closeout
+must name why only the owner can answer, one of `authorization`, `money`,
+`credentials`, `taste` (the owner-only calls of CLAUDE.md), `stuck` (the stuck
+protocol ran out, or a declared abort condition hit) or `wait` (with
+`wait_for`: the date or event). Any other choice the session makes itself.
+Measured before: 19 BLOCKED closeouts in the 30 days to 2026-11-19, of which 5
+were picks between options the session could make itself
+(`docs/worth-adopting/2026-11-19-building-machine-inside-the-factory.md`).
+Gate: `closeout_pipeline.OWNER_CALL_MIN_SCHEMA`. The key is accepted at every
+version (the session prompt names it for all plans), and required only at 9.
+The fresh stamp follows the spec as at 8: a spec that declares 9 stamps 9.
+
+No version change, 2026-11-20 — optional `covers` (item) and `spec_ref` (top level),
+for plans that belong to an endeavour's SPEC.md. Both are warn-only: a coverage
+gap prints a build warning and never refuses, so an older builder (which ignores
+unknown keys) stays compatible and no version bump is needed. A spec with
+neither key builds a byte-identical manifest (measured on two `_plans` specs;
+see the s06 matrix test in `test_schema_gates.py`). A bump becomes necessary
+only if a later decision turns a warning into a refusal.

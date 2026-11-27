@@ -1,9 +1,9 @@
 """PL-01 — worktree isolation mechanism (contract §2 M3, §3 rules 5-7, §4).
 
-The END-TO-END proof is `fixtures/worktree-parallel/run.sh`: three concurrent
-members, a producer-first merge, and both planted failures. This file covers the
-paths that proof cannot cheaply reach — the ones where being wrong destroys work
-rather than merely failing:
+The END-TO-END proof is `skills/plan-execute/fixtures/worktree-parallel/run.sh`:
+three concurrent members, a producer-first merge, and both planted failures. This
+file covers the paths that proof cannot cheaply reach — the ones where being
+wrong destroys work rather than merely failing:
 
   * containment DETECTION (§3 rule 6) — advisory containment is worth nothing
     unless a member that ignored its worktree is actually caught;
@@ -14,7 +14,7 @@ rather than merely failing:
     leaving the integration session's gates on the merged tree.
 
 Every check runs against a real git repository. Run:
-    pytest plan-execute/scripts/test_worktree.py -q
+    scripts/pytest-m -q skills/plan-execute/scripts/test_worktree.py
 """
 
 import sys

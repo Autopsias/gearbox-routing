@@ -197,7 +197,7 @@ def read_stamp(target_dir):
     try:
         with open(os.path.join(target_dir, STAMP), encoding="utf-8") as fh:
             return json.load(fh)
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return None
 
 

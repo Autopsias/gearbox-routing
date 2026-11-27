@@ -11,6 +11,8 @@ Run: pytest skills/plan-builder/scripts/test_register_plan.py -q
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import build_plan  # noqa: E402
@@ -95,3 +97,9 @@ def test_rebuild_without_register_in_reads_the_project_gates(tmp_path, monkeypat
     assert (plan_dir / "manifest.json").is_file()
     # The _plans_index.md write stays gated on --register-in.
     assert not (project / "_plans_index.md").exists()
+
+    # An unregistered gate is refused, and the message names the route that works:
+    # a plan session cannot add the entry for itself (seen, test-speed).
+    spec["sessions"][0]["verify"]["gates"] = ["not-registered"]
+    with pytest.raises(ValueError, match="on main first"):
+        build_plan.build(spec, project / "_plans" / "fx2", project_root=str(project))

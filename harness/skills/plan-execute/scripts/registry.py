@@ -58,6 +58,7 @@ owner, never reapable — see `registry_owners.branch_owners`/`classify_branches
 and `classify_worktrees`.
 """
 
+import contextlib
 import json
 from pathlib import Path
 
@@ -234,6 +235,27 @@ def render_table(data):
     return "\n".join(lines)
 
 
+@contextlib.contextmanager
+def memo_git_reads():
+    """Ask git each repo-root and shared-git-dir question once per path.
+
+    plans-status asked the same two questions 622 times for 76 plans and passed
+    the fleet snapshot's 120 s limit under load. Only for read-only scans: begin,
+    land and teardown make and remove worktrees, so an old answer can be wrong."""
+    import ship_locks as sl  # noqa: PLC0415 — only this scan needs it
+
+    def once(ask):
+        memo = {}
+        return lambda path: memo[str(path)] if str(path) in memo else memo.setdefault(str(path), ask(path))
+
+    saved = wt.repo_root, sl._git_common_dir
+    wt.repo_root, sl._git_common_dir = once(saved[0]), once(saved[1])
+    try:
+        yield
+    finally:
+        wt.repo_root, sl._git_common_dir = saved
+
+
 def cmd_plans_status(as_json=False):
     """REG-01 — read-only registry across every plan under this repo's
     `_plans/`. See this module's docstring for the classification rules.
@@ -243,7 +265,8 @@ def cmd_plans_status(as_json=False):
     root = default_repo_root()
     if root is None:
         raise SystemExit("plans-status: not inside a git repository")
-    data = collect(root, default_plans_root(root))
+    with memo_git_reads():
+        data = collect(root, default_plans_root(root))
     print(json.dumps(data, indent=2, ensure_ascii=False) if as_json else render_table(data))
 
 

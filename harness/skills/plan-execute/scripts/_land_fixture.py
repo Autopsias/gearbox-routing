@@ -13,9 +13,12 @@ and ``main_side`` advances ``origin/main`` from a THIRD clone — the shape anot
 plan landing first actually has.
 """
 
+import atexit
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -31,19 +34,24 @@ RUN_PY = SCRIPTS / "run.py"
 GATE_ARGV = ["/bin/sh", "-c", "test ! -f GATE_FAIL"]
 
 
-def _built_plan(root, slug):
+def _built_plan(root, slug, v8=False):
     """A plan made by plan-builder's own ``build`` (spec.json, real PLAN.html), so
-    ``add-session`` and ``begin`` can run on it. Stamped v7: isolated."""
+    ``add-session`` and ``begin`` can run on it. Stamped v7: isolated; ``v8`` builds
+    a schema-8 spec (task_class, item touches) and keeps its v8 stamp."""
     sys.path.insert(0, str(SCRIPTS.parent.parent / "plan-builder" / "scripts"))
     import build_plan  # noqa: PLC0415
     item = f"{slug}-i1"
     d = root / "_plans" / slug
     build_plan.build({
         "title": f"Plan {slug}", "categories": [{"key": "work", "label": "Work"}],
+        **({"plan_schema_version": 8} if v8 else {}),
         "items": [{"id": item, "title": "I1", "category": "work",
-                   "research_status": "skipped", "research_reason": "fixture"}],
+                   "research_status": "skipped", "research_reason": "fixture",
+                   **({"touches": "src/f.py"} if v8 else {})}],
         "phases": [],
-        "sessions": [{"id": "s01", "title": "S01", "model": "Sonnet", "reasoning": "medium",
+        "sessions": [{"id": "s01", "title": "S01",
+                      **({"task_class": "standard_build"} if v8 else
+                         {"model": "Sonnet", "reasoning": "medium"}),
                       "items": [item], "prompt": "do the work",
                       "verify": {"gates": ["marker-gate"]}}],
         "infographic": {"type": "phase-journey", "title": "t",
@@ -52,12 +60,13 @@ def _built_plan(root, slug):
                         "anchor_goal": {"name": "c", "tagline": "d"}}},
         d, project_root=str(root))
     m = json.loads((d / "manifest.json").read_text())
-    (d / "manifest.json").write_text(json.dumps({**m, "plan_schema_version": 7}, indent=2) + "\n")
+    (d / "manifest.json").write_text(json.dumps(
+        {**m, "plan_schema_version": 8 if v8 else 7}, indent=2) + "\n")
     return d
 
 
-def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False,
-               plan_gates=("marker-gate",)):
+def _build_repo_fresh(tmp, slugs=("plan-a",), *, gates=None, built=False,
+                      plan_gates=("marker-gate",), v8=False):
     """A primary checkout on ``main`` with a real ``origin`` and N plan dirs.
     ``gates`` adds registry entries; ``built`` makes each plan with plan-builder;
     ``plan_gates`` are the gate ids a hand-made plan's one session declares."""
@@ -82,7 +91,7 @@ def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False,
     plans = {}
     for slug in slugs:
         if built:
-            plans[slug] = _built_plan(root, slug)
+            plans[slug] = _built_plan(root, slug, v8)
             continue
         d = root / "_plans" / slug
         d.mkdir(parents=True)
@@ -109,6 +118,36 @@ def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False,
     (hooks / "post-commit").write_text("#!/bin/sh\nexit 0\n")
     (hooks / "post-commit").chmod(0o755)
     return {"root": root, "origin": origin, "plans": plans, "tmp": tmp}
+
+
+_TEMPLATES = {}
+
+
+def build_repo(tmp, slugs=("plan-a",), *, gates=None, built=False,
+               plan_gates=("marker-gate",), v8=False):
+    """`_build_repo_fresh`, but the git calls that make the repo run once per
+    argument set per process; every later call copies the finished tree. A repo with
+    custom `gates` or `built` plans is built fresh: the gate file and PLAN.html are in the base commit.
+
+    The copy is independent of the template. The one absolute path git keeps in it is
+    the `origin` URL in `.git/config`, rewritten to the new place."""
+    if gates or built:      # built plans keep the absolute project path in PLAN.html
+        return _build_repo_fresh(tmp, slugs, gates=gates, built=built,
+                                 plan_gates=plan_gates, v8=v8)
+    key = (tuple(slugs), built, tuple(plan_gates), v8)
+    if key not in _TEMPLATES:
+        base = Path(tempfile.mkdtemp(prefix="land-template-"))
+        atexit.register(shutil.rmtree, base, True)
+        _build_repo_fresh(base, slugs, built=built, plan_gates=plan_gates, v8=v8)
+        _TEMPLATES[key] = base
+    src, tmp = _TEMPLATES[key], Path(tmp)
+    for name in ("origin.git", "proj"):
+        shutil.copytree(src / name, tmp / name, symlinks=True)
+    cfg = tmp / "proj" / ".git" / "config"
+    cfg.write_text(cfg.read_text().replace(str(src / "origin.git"), str(tmp / "origin.git")))
+    root = tmp / "proj"
+    return {"root": root, "origin": tmp / "origin.git", "tmp": tmp,
+            "plans": {slug: root / "_plans" / slug for slug in slugs}}
 
 
 def isolate(fx, slug):

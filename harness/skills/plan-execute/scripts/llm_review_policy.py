@@ -38,6 +38,8 @@ def prompt_extra(args):
 def apply(args, led, parsed, recs, fail):
     """-> (fail, recs, moved). Re-labels NEW open findings per the flags; priors are never touched."""
     stop, need = getattr(args, "stop_after_round", 0) or 0, getattr(args, "require_repro", False)
+    if getattr(args, "blocking_rule", None):
+        stop = 0  # under a blocking rule "open" means blocked BY RULE: the canary never relabels it
     if not (led and fail and (stop or need)):
         return fail, recs, []
     priors = {p.get("fid") for p in led.priors}

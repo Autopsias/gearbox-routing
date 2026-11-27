@@ -73,7 +73,7 @@ def load_excludes(project: Path) -> list[str]:
     try:
         with open(pyproject, "rb") as fh:
             data = tomllib.load(fh)
-    except Exception:
+    except (OSError, ValueError, RecursionError):
         return list(SKIP_DIRS)
     configured = data.get("tool", {}).get("claude-quality", {}).get("exclude", [])
     return list(SKIP_DIRS) + [str(item) for item in configured]

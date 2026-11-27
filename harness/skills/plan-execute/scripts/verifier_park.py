@@ -156,35 +156,25 @@ def claude_verifier_opted_in(path=None):
     return bool(m) and m.group(1).strip().strip('"\'').lower() == "true"
 
 
-def reviewer_for(harness, reviewer):
-    """WHICH FAMILY REVIEWS, once the harness is known. Call BEFORE the identity
-    line — line 1 must name the family that actually runs.
-
-    `refusal()` answers only "may this run proceed?"; it never swapped the
-    reviewer, so a `cross-family-review-*` gate on a CODEX-built session kept the
-    registry's `--reviewer codex` and — with the opt-in ON — reviewed Codex-built
-    code with Codex, then reported a cross-family PASS. Measured:
-    1 codex invocation, 0 claude, action=passed. That is worse than the gate not
-    running, because it is a false assurance.
-
-    Under the codex harness the family that did NOT write the code is CLAUDE, so
-    with the opt-in the cross-family reviewer IS `claude -p`; without it
-    `refusal()` parks and nothing runs at all. The `claude` harness is untouched:
-    `--reviewer codex` there is already cross-family and stays codex.
-    """
-    return "claude" if harness == "codex" and claude_verifier_opted_in() else reviewer
+def reviewer_for(harness, reviewer, scoped=False):
+    """Choose the actual reviewer before announcing its identity."""
+    return "claude" if harness == "codex" and (scoped or claude_verifier_opted_in()) else reviewer
 
 
-def refusal(harness, level, out=None):
+def codex_verifier_mode(cwd):
+    from scoped_claude_review import approved
+
+    return "on_box_claude" if approved(_ssot_path(), cwd) or claude_verifier_opted_in() else "on_box_human"
+
+
+def refusal(harness, level, out=None, scoped=False):
     """The gate's harness check. `None` to proceed, or the exit code to return.
 
-    Called AFTER the identity line so line 1 stays the reviewer identity, and
-    BEFORE the surface is prepared so a refused run writes nothing to the ledger
-    and leaves no half-review behind.
+    Called after the identity line and before the review surface is prepared.
     """
     import sys  # noqa: PLC0415
 
-    if harness != "codex" or claude_verifier_opted_in():
+    if harness != "codex" or scoped or claude_verifier_opted_in():
         return None
     w = out or sys.stdout
     print(MARKER, file=w)
@@ -366,7 +356,7 @@ def unpark_closeout(plan_dir, session_id, state):
     an empty field, the session's OWN checkpoint text when it did not — which
     leaves shipping deferred until a human answers THAT one."""
     prior = state.pop("on_box_prior_checkpoint", None)
-    if state.pop("on_box_resolved", None) != VERIFIED_ON_BOX:
+    if state.pop("on_box_resolved", None) not in (VERIFIED_ON_BOX, "automated"):
         return False
     return set_closeout_checkpoint(plan_dir, session_id, prior)
 
@@ -374,6 +364,16 @@ def unpark_closeout(plan_dir, session_id, state):
 def pending_park(plan_dir, session_id):
     """This session's open on-box park, or None. Read-only."""
     return (_verify_state(plan_dir, session_id)).get("on_box_review") or None
+
+
+def automated_pass(plan_dir, session_id, state, gate):
+    if (state.get("on_box_review") or {}).get("gate") != gate:
+        return
+    import run_state_io as rsi
+    state.pop("on_box_review")
+    state["human_checkpoint_reason"] = state.get("on_box_prior_checkpoint")
+    state["on_box_resolved"] = "automated"
+    rsi.log_event(plan_dir, "verifier_retry_passed", session_ids=[session_id], gate=gate)
 
 
 def pending_gate(plan_dir, session_id):

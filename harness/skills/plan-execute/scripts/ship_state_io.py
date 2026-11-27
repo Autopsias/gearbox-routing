@@ -138,7 +138,7 @@ def save_ship_state(plan_dir, session_id, state):
 # --------------------------------------------------------------------------
 # argv-kind step execution
 # --------------------------------------------------------------------------
-_DEFAULT_ENV_ALLOWLIST = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "USER", "SHELL")
+_DEFAULT_ENV_ALLOWLIST = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "USER", "SHELL", "PYRES_VENV")
 
 
 def build_allowlisted_env(extra_allow=None):

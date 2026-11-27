@@ -75,7 +75,7 @@ class StoryDiscovery:
         try:
             content = self.epics_file.read_text(encoding='utf-8')
             return self._parse_epics_content(content)
-        except Exception as e:
+        except Exception as e: # noqa: BLE001 — fail open: any read or parse error warns on stderr and yields no stories
             print(f"Warning: Failed to parse {self.epics_file}: {e}", file=sys.stderr)
             return {}
 
@@ -249,7 +249,7 @@ class TestGateDiscovery:
         try:
             content = script_path.read_text(encoding='utf-8')
             metadata = self._extract_script_metadata(content)
-        except Exception as e:
+        except Exception as e: # noqa: BLE001 — fail open: any read or parse error warns on stderr and yields empty metadata
             print(f"Warning: Failed to read {script_path}: {e}", file=sys.stderr)
             metadata = {}
 

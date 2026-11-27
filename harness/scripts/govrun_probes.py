@@ -133,11 +133,11 @@ def kill_tree_safe(*procs):
         if p.poll() is None:
             try:
                 p.kill()
-            except Exception:
+            except Exception:  # noqa: BLE001 — cleanup: a failed kill must not raise out of kill_tree_safe
                 pass
             try:
                 p.wait(timeout=5)
-            except Exception:
+            except Exception:  # noqa: BLE001 — cleanup: a failed wait must not raise out of kill_tree_safe
                 pass
 
 

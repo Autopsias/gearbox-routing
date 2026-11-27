@@ -127,3 +127,11 @@ def test_cross_platform_agent_context():
         "CLAUDE.md must start with @AGENTS.md so Claude Code imports AGENTS.md without duplication")
     assert "<!-- BEGIN ROUTING -->" not in claude_md.read_text(encoding="utf-8"), (
         "Routing digest belongs only in AGENTS.md, not duplicated in CLAUDE.md")
+
+
+def test_harness_claude_md_is_template():
+    """harness/CLAUDE.md is exported as CLAUDE.md.template so Claude Code does not auto-load it."""
+    assert not (ROOT / "harness" / "CLAUDE.md").exists(), (
+        "harness/CLAUDE.md must not exist (exported as harness/CLAUDE.md.template)")
+    assert (ROOT / "harness" / "CLAUDE.md.template").is_file(), (
+        "harness/CLAUDE.md.template must exist")

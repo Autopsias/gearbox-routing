@@ -245,7 +245,7 @@ def test_the_short_option_table_matches_the_installed_pytest():
     try:
         from _pytest.config import get_config
         actions = get_config([])._parser.optparser._actions
-    except Exception as exc:  # pragma: no cover - depends on pytest internals
+    except (ImportError, AttributeError, TypeError, ValueError) as exc:  # pragma: no cover - depends on pytest internals
         pytest.skip(f"cannot introspect this pytest's parser: {exc}")
     real = {opt[1] for action in actions for opt in action.option_strings
             if len(opt) == 2 and opt.startswith("-") and action.nargs != 0}

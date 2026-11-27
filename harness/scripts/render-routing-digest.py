@@ -371,7 +371,7 @@ def main(argv=None) -> int:
     except RenderError as e:
         print(f"FATAL (render-routing-digest.py): {e}", file=sys.stderr)
         return 2
-    except Exception as e:  # tooling crash — fail closed, never a silent bypass
+    except Exception as e:  # noqa: BLE001 — fail closed: an unexpected render error is fatal, never a silent bypass
         print(f"FATAL (render-routing-digest.py, unexpected {type(e).__name__}): {e}", file=sys.stderr)
         return 2
 

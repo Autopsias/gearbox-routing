@@ -56,3 +56,24 @@ for vj in "$CD"/skills/*/vendor.json; do
     osascript -e "display notification \"$sk: $msg\" with title \"gearbox: vendored skill\" subtitle \"see $LOG\"" 2>/dev/null || true
   fi
 done
+
+# Outside-source records (docs/worth-adopting/upstream/<name>/vendor.json, no local
+# copy): same check, same posture. A glob matching nothing is silent, so the count
+# line is logged on every run.
+up_n=0
+for vj in "$CD"/docs/worth-adopting/upstream/*/vendor.json; do
+  [ -f "$vj" ] || continue
+  up_n=$((up_n + 1))
+  sk="$(basename "$(dirname "$vj")")"
+  v_out="$(PATH="${HOMEBREW_PREFIX:-/usr/local}/bin:/usr/local/bin:$PATH" python3 "$CD/skills/repo-health/scripts/vendor.py" --skill-dir "$(dirname "$vj")" check 2>&1)" && v_rc=0 || v_rc=$?
+  printf '[%s] upstream %s: rc=%s\n' "$ts" "$sk" "$v_rc" >> "$LOG"
+  if [ "$v_rc" != "0" ]; then
+    printf '%s\n' "$v_out" | sed 's/^/    /' >> "$LOG"
+    if [ "$v_rc" = "1" ]; then msg="outside source moved: run upstream_delta.py --record"; else msg="could not check outside source"; fi
+    osascript -e "display notification \"$sk: $msg\" with title \"gearbox: upstream record\" subtitle \"see $LOG\"" 2>/dev/null || true
+  fi
+done
+printf '[%s] upstream records: %s checked\n' "$ts" "$up_n" >> "$LOG"
+if [ "$up_n" = "0" ]; then  # zero records checked means the glob found nothing: an alert, not only a log line
+  osascript -e 'display notification "no outside-source record was checked" with title "gearbox: upstream record" subtitle "see the drift log"' 2>/dev/null || true
+fi

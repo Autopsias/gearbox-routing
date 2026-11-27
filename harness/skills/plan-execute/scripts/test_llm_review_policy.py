@@ -19,8 +19,8 @@ def recs(*findings, new_in="delta"):
              "line": f["line"], "summary": f["summary"], "status": "open", "new_in": new_in} for f in findings]
 
 
-def args(stop=0, repro=False):
-    return NS(stop_after_round=stop, require_repro=repro)
+def args(stop=0, repro=False, rule=0):
+    return NS(stop_after_round=stop, require_repro=repro, blocking_rule=rule)
 
 
 def test_off_by_default_changes_nothing():
@@ -42,6 +42,9 @@ def test_stop_round_moves_only_new_fix_code_findings_after_the_round():
     assert fail is False and out[0]["status"] == "noted" and out[0]["policy"] == "followup" and moved
     r = recs(F_FIRST, new_in="outside")  # original work still blocks after the stop round
     assert P.apply(args(stop=2), mkled(3), [F_FIRST], r, True)[0] is True
+    r = recs(F_DELTA)  # a blocking rule made it open: the canary never relabels it
+    fail, out, moved = P.apply(args(stop=2, rule=1), mkled(3), [F_DELTA], r, True)
+    assert fail is True and out[0]["status"] == "open" and moved == []
 
 
 def test_a_reviewer_delta_tag_outside_the_gates_delta_still_blocks():
@@ -62,6 +65,14 @@ def test_require_repro_labels_but_never_clears_a_block():
     r = recs(F_FIRST, new_in="first")
     assert P.apply(args(repro=True), mkled(1), [F_FIRST], r, True)[2] == []  # has repro
     assert "repro" in P.prompt_extra(args(repro=True)) and "STILL blocking" in P.report(moved)
+
+
+def test_two_findings_of_one_round_with_one_fid_keep_the_open_one():
+    twin = {"file": "x.py", "severity": "low", "summary": "same words"}
+    ctx = NS(attempt=1, priors=[], delta=set(), hashes={})
+    for pair in ([{**twin, "rule": "1"}, {**twin, "rule": "none"}], [{**twin, "rule": "none"}, {**twin, "rule": "1"}]):
+        fail, _, out = L.judge(ctx, pair, rule_on=True)
+        assert fail is True and L.latest_by_id(out)[L.fingerprint(twin)]["status"] == "open"
 
 
 def test_gate_cli_accepts_the_flags():

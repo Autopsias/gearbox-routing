@@ -4,6 +4,32 @@
 import argparse
 import os
 
+import untrusted_block as ub
+
+
+def blocking_rule_block(blocking_rule, max_chars):
+    """The plan author's blocking-rule section appended to the review prompt."""
+    return (
+        "\n\n" + ub.untrusted_block(blocking_rule, label="BLOCKING RULE",
+                                     source="the plan author's conditions", max_chars=max_chars,
+                                     keep="head") + "\n"
+        "Give EVERY finding a `\"rule\"` field: the number of the listed condition it meets, "
+        "or `\"none\"` when it meets no condition. A finding that meets no condition stays IN "
+        "the array with `\"rule\": \"none\"`; never drop it. The gate blocks on the rule "
+        "NUMBER you give; a finding with no `rule` field blocks."
+    )
+
+
+def rule_too_long(args, max_chars):
+    """Trim --blocking-rule once (a blank rule is no rule). True when it is over max_chars:
+    a cut rule would gate on a partial list, so the gate refuses, never truncates."""
+    args.blocking_rule = (args.blocking_rule or "").strip()
+    if len(args.blocking_rule) <= max_chars:
+        return False
+    print(f"[llm-review-gate] blocking rule is over {max_chars} chars; refusing to gate on a "
+          "partial rule. Shorten verify.blocking_rule.")
+    return True
+
 
 def parse_args(argv, description, levels):
     ap = argparse.ArgumentParser(description=description)
@@ -31,6 +57,10 @@ def parse_args(argv, description, levels):
                          "most 2 attempts, so budget the registry timeout at "
                          "2x this plus slack)")
     ap.add_argument("--intent-file", default=os.environ.get("PLAN_EXECUTE_INTENT_FILE", ""))
+    ap.add_argument("--blocking-rule", default=os.environ.get("PLAN_EXECUTE_BLOCKING_RULE", ""),
+                    help="the plan author's numbered blocking conditions (the session's "
+                         "verify.blocking_rule). With it, a finding blocks only when the reviewer "
+                         "ties it to a rule number; `rule: none` is recorded noted. Empty = off.")
     ap.add_argument("--base", default=os.environ.get("PLAN_EXECUTE_REVIEW_BASE", ""),
                     help="git ref the session started from. The reviewed surface "
                          "becomes `git diff <base>` (commits AND working tree). "
