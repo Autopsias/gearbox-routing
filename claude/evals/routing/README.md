@@ -29,12 +29,12 @@ override can route elsewhere), so check that separately.
 
 ## Enforcement point
 
-Wire the guard to **auto-fire on every commit that touches
-`claude/model-routing.yaml`** via a pre-commit hook — no manual invocation
-needed for routine work. It fails CLOSED on both a policy violation (drift
-found) and a tooling crash (missing dep, malformed SSOT, traceback); a broken
-guard must never silently become a bypass. Document any recovery escape
-hatches inline in the hook itself — never reach for `--no-verify`.
+Run `bash claude/scripts/verify-routing.sh --full --strict` before committing
+any change to `claude/model-routing.yaml` (CI also runs it on every PR and push
+to `master`; you can optionally wire it into your own pre-commit hook). It fails
+CLOSED on both a policy violation (drift found) and a tooling crash (missing
+dep, malformed SSOT, traceback); a broken guard must never silently become a
+bypass. Never reach for `--no-verify`.
 
 ## Operating commands
 
@@ -53,7 +53,7 @@ recent sessions vs `task_classes:`, proposing `MISROUTES.md` entries
 
 | Trigger | What to run | Why |
 |---|---|---|
-| **Every commit touching the SSOT** | Guard fires automatically via the pre-commit hook (no action needed) | Continuous drift detection |
+| **Every commit touching the SSOT** | Run `bash claude/scripts/verify-routing.sh --full --strict` (CI also runs it on every PR and push to `master`) | Continuous drift detection |
 | **Every coding-agent binary/runtime version bump** | Your effort-dial canary/preflight check, if you have one | Effort-dial honoring can be runtime-version-dependent and unobservable post-hoc — a build can silently make the effort param inert |
 | **New model GA on your active provider** | Full recalibration pass (`/routing-update`) | A new frontier/tier changes the cost-quality frontier every row in `task_classes:` was tuned against |
 | **≥2 entries land in `MISROUTES.md` since `model-routing.yaml`'s `last_reviewed`** | `/routing-retro`, then `/routing-update` on any accepted finding | Two independent misroutes since the last calibration is signal that the table has drifted from reality, not noise |
@@ -83,11 +83,11 @@ trigger above, so entries must stay dated and never be silently pruned.
 3. **Operator-approved.** No SSOT change is auto-mutated by an eval result.
    `/routing-update` proposes diffs; the operator approves (or rejects/tunes)
    each one before it's applied.
-4. **Regenerate every consumer in the same change.** Re-render the `CLAUDE.md`
-   routing digest, bump any `<!-- routing-ssot: vN -->`-style stamps in
-   consumer files to match (see `model-routing.yaml`'s `consumers:` block for
-   the full list), then run the guard (`--core` and `--strict`) as the
-   release gate before committing.
+4. **Regenerate every consumer in the same change.** Re-render the `AGENTS.md` /
+   `CLAUDE.md` routing digest (do not add legacy `<!-- routing-ssot: vN -->`
+   stamps — the renderer rejects them), update any affected consumer files
+   listed in `model-routing.yaml`'s `consumers:` block, then run the guard
+   (`--full --strict`) as the release gate before committing.
 
 ## Peer-gate-miss promotion — owner-gate
 

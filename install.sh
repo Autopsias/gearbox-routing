@@ -173,7 +173,11 @@ resolve_live_path() {
   fi
 }
 
-REAL_HOME="$(cd "$HOME" && pwd -P)"
+if [[ -n "${HOME:-}" && -d "$HOME" ]]; then
+  REAL_HOME="$(cd "$HOME" && pwd -P)"
+else
+  REAL_HOME="${HOME:-}"
+fi
 LEDGER="$CLAUDE_HOME/claude/.gearbox-install-ledger"
 
 # On --uninstall without explicit --platform, auto-detect AGENTS.md from the
@@ -228,19 +232,21 @@ legacy_backups() {
   return 0
 }
 
-for live_candidate in \
-  "$REAL_HOME/.claude" \
-  "$REAL_HOME/.codex" \
-  "$REAL_HOME/.gemini" \
-  "$REAL_HOME/.gemini/config"; do
-  resolved_live="$(resolve_live_path "$live_candidate")"
-  if [[ "$CLAUDE_HOME" == "$resolved_live" && $UNDERSTAND_LIVE -ne 1 ]]; then
-    echo "FATAL: target home resolves to your real $live_candidate." >&2
-    echo "This installer refuses to touch a real live agent home without an explicit opt-in." >&2
-    echo "Re-run with --i-understand-this-mutates-live-home if that is really what you want." >&2
-    exit 2
-  fi
-done
+if [[ -n "$REAL_HOME" ]]; then
+  for live_candidate in \
+    "$REAL_HOME/.claude" \
+    "$REAL_HOME/.codex" \
+    "$REAL_HOME/.gemini" \
+    "$REAL_HOME/.gemini/config"; do
+    resolved_live="$(resolve_live_path "$live_candidate")"
+    if [[ "$CLAUDE_HOME" == "$resolved_live" && $UNDERSTAND_LIVE -ne 1 ]]; then
+      echo "FATAL: target home resolves to your real $live_candidate." >&2
+      echo "This installer refuses to touch a real live agent home without an explicit opt-in." >&2
+      echo "Re-run with --i-understand-this-mutates-live-home if that is really what you want." >&2
+      exit 2
+    fi
+  done
+fi
 
 echo "install.sh — Gearbox installer"
 echo "  repo:        $REPO_DIR"

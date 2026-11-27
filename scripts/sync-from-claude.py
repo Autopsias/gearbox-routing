@@ -225,8 +225,11 @@ def compile_scrub_rules(manifest: dict) -> list:
 
 def apply_scrub_rules(text: str, rules: list, rel_path: str | None = None) -> str:
     out = text
+    match_paths = {rel_path} if rel_path is not None else set()
+    if rel_path in _SCRUB_SCOPE_ALIASES:
+        match_paths.add(_SCRUB_SCOPE_ALIASES[rel_path])
     for rx, repl, scope in rules:
-        if scope is not None and scope != rel_path:
+        if scope is not None and scope not in match_paths:
             continue
         out = rx.sub(lambda _m, _r=repl: _r, out)
     return out
@@ -265,7 +268,7 @@ def _scrub_claude_md(text: str) -> str:
     # never publishes (only the hand-maintained, EXAMPLE-marked profiles under
     # claude/ do). Replace the whole block with a pointer to the public,
     # genericized SSOT rather than shipping a second, real one.
-    out = re.sub(
+    out, count = re.subn(
         r"^<!-- BEGIN ROUTING.*?-->\n.*?^<!-- END ROUTING -->\n?",
         "<!-- BEGIN ROUTING -->\n"
         "## Task routing — classify before you start\n"
@@ -283,9 +286,10 @@ def _scrub_claude_md(text: str) -> str:
         out,
         flags=re.M | re.S,
     )
-    if "<!-- BEGIN ROUTING -->" not in out:
-        # Fail closed: the source no longer carries the markers this transform
-        # keys on, which means the real digest may be shipping unreplaced.
+    if count == 0:
+        # Fail closed: the source no longer carries a complete BEGIN/END marker
+        # pair (either marker missing), which means the real digest may be
+        # shipping unreplaced.
         raise fatal(
             "CLAUDE.md scrub: BEGIN/END ROUTING markers not found — the private routing "
             "digest may be shipping unscrubbed. Fix _scrub_claude_md before exporting."
@@ -492,6 +496,14 @@ TARGETED_TRANSFORMS: dict[str, "callable"] = {
     "scripts/prod-status-pinned.sh": _scrub_prod_status_pinned_sh,
     "scripts/deploy.pathspec": _scrub_deploy_pathspec,
 }
+
+# Destination path renames applied during export. CLAUDE.md is exported as
+# CLAUDE.md.template so Claude Code does not auto-load private deploy-target
+# rules when reading inside public harness/.
+DEST_RENAMES: dict[str, str] = {
+    "CLAUDE.md": "CLAUDE.md.template",
+}
+_SCRUB_SCOPE_ALIASES: dict[str, str] = {dst: src for src, dst in DEST_RENAMES.items()}
 
 
 # A hook command names a harness file as ~/.claude/<rel>, $HOME/.claude/<rel>
@@ -777,7 +789,12 @@ def copy_entries(manifest: dict, source_dir: Path, harness_dir: Path, scrub_rule
         src = (source_dir / rel_path).resolve()
         if not src.exists():
             raise fatal(f"manifest entry source path does not exist: {src} (entry: {raw_path})")
-        dest = harness_dir / rel_path
+        dest_rel = DEST_RENAMES.get(rel_path, rel_path)
+        if rel_path in DEST_RENAMES:
+            stale = harness_dir / rel_path
+            if stale.is_file() or stale.is_symlink():
+                stale.unlink()
+        dest = harness_dir / dest_rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
             if dest.exists():
@@ -809,7 +826,7 @@ def copy_entries(manifest: dict, source_dir: Path, harness_dir: Path, scrub_rule
         else:
             shutil.copy2(src, dest)
             dest.chmod(dest.stat().st_mode | 0o200)
-        copied.append(rel_path)
+        copied.append(dest_rel)
 
     # Apply targeted, hand-authored transforms to every file this script knows
     # needs one — regardless of which coarse bucket (publish vs
@@ -817,7 +834,7 @@ def copy_entries(manifest: dict, source_dir: Path, harness_dir: Path, scrub_rule
     # is the source of what to copy; TARGETED_TRANSFORMS is the authoritative
     # source of what to rewrite once copied.
     for rel_path, fn in TARGETED_TRANSFORMS.items():
-        dest = harness_dir / rel_path
+        dest = harness_dir / DEST_RENAMES.get(rel_path, rel_path)
         if not dest.is_file():
             continue
         text = dest.read_text(encoding="utf-8")

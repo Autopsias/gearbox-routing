@@ -27,6 +27,12 @@ Classify the task, set the tier. Authority: `claude/model-routing.yaml`
 - **Routing receipt:** after delegate/escalate, log a one-liner (class → resolved tier) to `claude/evals/routing/MISROUTES.md` on any mismatch.
 <!-- END ROUTING -->
 
+## Verify
+
+- `bash claude/scripts/verify-routing.sh --full --strict`
+- `pytest -q -p no:cacheprovider claude scripts`
+- `pytest -q -p no:cacheprovider harness/skills/plan-builder/scripts harness/skills/routing-retro/scripts harness/skills/trust-review/scripts harness/skills/trust-review/references/scripts`
+
 ## Commit messages here carry no trailers
 
 **This repo is a repo-local exception to the global commit convention: no

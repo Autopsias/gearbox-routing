@@ -164,60 +164,46 @@ def parse_provider_profile(yaml_text: str, provider: str) -> dict:
     return {"models": models, "effort_map": effort_map}
 
 
-# ---- resolve_route.py import (S09 dependency) ------------------------------
-# GUARD-02 hardening requirement: this renderer must use resolve_route.py's resolve()
-# as the SINGLE tier->model resolution path — never reimplement it — so the renderer
-# and the vendored resolver cannot drift apart. resolve_route.py is authored in a
-# LATER session (S09); it does not exist yet at S05 port time. Import it lazily and
-# fall back to a local BASELINE-ONLY resolution (mirrors ARCHITECTURE.md §3's
-# "Baseline" rule exactly: tier+intent -> native level, falling back to `standard`)
-# only when the module is absent, so this script isn't blocked on S09 landing.
-# TODO(S07 final integration): once resolve_route.py exists, delete
-# `_baseline_resolve_fallback` below and make the import a hard requirement (no
-# try/except) — a silent fallback surviving past S07 would let the renderer and the
-# resolver drift exactly as the hardening note warns against.
+# ---- resolve_route.py import -----------------------------------------------
+# GUARD-02 hardening requirement: this renderer uses resolve_route.py's resolve()
+# as the SINGLE tier->model resolution path — never reimplementing it — so the
+# renderer and the vendored resolver cannot drift apart.
 def _load_resolve_route():
     repo_dir = os.environ.get("_RRD_REPO_DIR")
-    candidate = os.path.join(repo_dir, "claude", "scripts", "resolve_route.py") if repo_dir else None
-    if not candidate or not os.path.isfile(candidate):
-        return None
+    candidates = []
+    if repo_dir:
+        candidates.append(os.path.join(repo_dir, "claude", "scripts", "resolve_route.py"))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "resolve_route.py"))
+    candidate = next((p for p in candidates if os.path.isfile(p)), None)
+    if not candidate:
+        raise fatal(f"missing required resolver module resolve_route.py (checked: {', '.join(candidates)})")
     spec = importlib.util.spec_from_file_location("resolve_route", candidate)
     if spec is None or spec.loader is None:
-        return None
+        raise fatal(f"could not load resolver module from {candidate}")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    if not hasattr(mod, "resolve"):
+        raise fatal(f"resolver module {candidate} does not define resolve()")
     return mod
 
 
-def _baseline_resolve_fallback(tier: str, intent: str, profile: dict) -> tuple[str | None, str | None]:
-    """ponytail: temporary stand-in for resolve_route.resolve(), baseline case only
-    (no escalation/degrade — the digest only ever renders the baseline row). Delete
-    once resolve_route.py lands (S09) and the import above becomes non-optional."""
-    model_id = profile["models"].get(tier)
-    tier_map = profile["effort_map"].get(tier, {})
-    if not tier_map or all(v is None for v in tier_map.values()):
-        return model_id, None
-    return model_id, tier_map.get(intent, tier_map.get("standard"))
-
-
-def resolve_task_classes_for_active_provider(yaml_text: str) -> dict:
+def resolve_task_classes_for_active_provider(yaml_text: str, yaml_path: str | None = None) -> dict:
     """{class_name: (model_id, native_effort_or_None)} for every task_classes row,
-    resolved against active_provider. Uses resolve_route.resolve() when importable
-    (see _load_resolve_route's TODO), else the baseline-only fallback."""
+    resolved against active_provider via resolve_route.resolve()."""
     task_classes = parse_task_classes(yaml_text)
     active_provider = parse_active_provider(yaml_text)
-    profile = parse_provider_profile(yaml_text, active_provider)
 
     resolver_mod = _load_resolve_route()
     resolved = {}
-    for name, (tier, intent) in task_classes.items():
-        if resolver_mod is not None and hasattr(resolver_mod, "resolve"):
-            result = resolver_mod.resolve(
-                task_class=name, active_provider=active_provider, current=None, signal="none"
-            )
-            resolved[name] = (result["model_id"], result.get("native_effort"))
-        else:
-            resolved[name] = _baseline_resolve_fallback(tier, intent, profile)
+    for name in task_classes:
+        result = resolver_mod.resolve(
+            task_class=name,
+            active_provider=active_provider,
+            current=None,
+            signal="none",
+            ssot_path=yaml_path,
+        )
+        resolved[name] = (result["model_id"], result.get("native_effort"))
     return resolved
 
 
@@ -258,7 +244,7 @@ _TIER_ROW_PLACEHOLDER_RE = re.compile(r"\{\{resolve:(\w+)\}\}")
 def render_block(yaml_path: str, source_path: str, variant: str) -> str:
     yaml_text = read(yaml_path)
     version = parse_ssot_version(yaml_text)
-    resolved = resolve_task_classes_for_active_provider(yaml_text)
+    resolved = resolve_task_classes_for_active_provider(yaml_text, yaml_path)
     active_provider = parse_active_provider(yaml_text)
 
     inner = extract_variant_block(read(source_path), variant)

@@ -46,8 +46,21 @@ jobs:
             echo "rc=0" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Open an issue on stale as_of / calibration.date
+      - name: Check for an existing open staleness issue
+        id: existing
         if: steps.guard.outputs.rc != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OPEN_COUNT="$(gh issue list --label staleness --state open --json number --jq length)"
+          echo "open_count=$OPEN_COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$OPEN_COUNT" -gt 0 ]; then
+            echo "Skipping duplicate issue creation: $OPEN_COUNT open staleness issue(s) already exist."
+          fi
+
+      - name: Open an issue on stale as_of / calibration.date
+        if: steps.guard.outputs.rc != '0' && steps.existing.outputs.open_count == '0'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |

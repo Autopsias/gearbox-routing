@@ -203,3 +203,61 @@ def test_invalid_platform_and_conflicting_home_flags_refuse(tmp_path):
                         "--accept-example-profile")
     assert conflict.returncode == 2
     assert not (tmp_path / "a").exists() and not (tmp_path / "b").exists()
+
+
+def test_custom_profile_yaml_renders_custom_models_in_preflight_and_install(tmp_path):
+    """render-routing-digest.py --repo-dir <repo> --yaml <custom> and install.sh --profile
+    must resolve models from the custom YAML, not silently fall back to the repo default."""
+    import sys
+
+    custom_yaml = tmp_path / "custom-routing.yaml"
+    custom_text = (ROOT / "claude" / "model-routing.yaml").read_text(encoding="utf-8")
+    assert "claude-sonnet-5-5" in custom_text
+    custom_yaml.write_text(
+        custom_text.replace("claude-sonnet-5-5", "claude-sonnet-9-9-custom"),
+        encoding="utf-8",
+    )
+
+    # (a) Preflight path: --repo-dir points at repo while --yaml points at custom_yaml
+    target_md = tmp_path / "preflight.md"
+    rendered = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "claude" / "scripts" / "render-routing-digest.py"),
+            "--repo-dir", str(ROOT),
+            "--yaml", str(custom_yaml),
+            "--source", str(ROOT / "claude" / "model-routing.digest.md"),
+            "--target", str(target_md),
+            "--install",
+        ],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+    assert "claude-sonnet-9-9-custom" in target_md.read_text(encoding="utf-8")
+
+    check_against_repo = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "claude" / "scripts" / "render-routing-digest.py"),
+            "--repo-dir", str(ROOT),
+            "--yaml", str(custom_yaml),
+            "--check",
+        ],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    assert check_against_repo.returncode == 1, check_against_repo.stdout + check_against_repo.stderr
+
+    # (b) End-to-end install.sh --profile <custom.yaml>
+    home = tmp_path / "custom-home"
+    inst = _run_raw("--target-home", str(home), "--profile", str(custom_yaml))
+    assert inst.returncode == 0, inst.stdout + inst.stderr
+    assert "claude-sonnet-9-9-custom" in (home / "CLAUDE.md").read_text(encoding="utf-8")
+
+
+def test_target_home_install_succeeds_when_home_dir_does_not_exist(tmp_path):
+    """install.sh --target-home must not crash when $HOME points at a nonexistent directory."""
+    home = tmp_path / "out"
+    env = {**os.environ, "HOME": str(tmp_path / "nonexistent-home")}
+    out = _run_raw("--target-home", str(home), "--accept-example-profile", env=env)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "BEGIN ROUTING" in (home / "CLAUDE.md").read_text(encoding="utf-8")

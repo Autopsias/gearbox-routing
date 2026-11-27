@@ -393,7 +393,7 @@ providers:
       date: 2026-10-09
       provider_version: null
       research_ref: "ILLUSTRATIVE PROFILE — model ids, prices and thinking levels checked against ai.google.dev/gemini-api/docs (models, pricing, thinking pages), see date above; no measured result backs the maps"
-    models:                  # EXAMPLE — verify current model lineup before relying on this. as_of: 2026-07-05 (see calibration.date above)
+    models:                  # EXAMPLE — verify current model lineup before relying on this. as_of: 2026-10-09 (see calibration.date above)
       cheap_fast:        gemini-3.5-flash-lite   # $0.30 / $2.50 per MTok in/out; thinking_level minimal..high, default `minimal`
       workhorse:         gemini-3.8-flash        # $0.75 / $3.75 per MTok in/out through 2026-12-31, $1.50 / $7.50 from 2027-01-01; thinking_level low..high, default `medium`
       frontier_reasoner: gemini-3.1-pro-preview  # $2.00 / $12.00 per MTok in/out (<=200k ctx; higher above); thinking_level low..high, default `high`
@@ -449,7 +449,7 @@ providers:
         cheap_fast:        { light: low,  standard: max, thorough: max }   # flash: below max is the documented rough zone for serious work
         workhorse:         { light: low,  standard: max, thorough: max }
         frontier_reasoner: { light: high, standard: max, thorough: max }
-      source: "the vendor's model documentation pages (fetched 2026-08-30)"
+      source: "the vendor's model documentation pages (fetched 2026-10-09)"
     escalation:
       trigger: "2 failures at the same root cause"
       effort_ladder:
@@ -477,17 +477,17 @@ prices:
     frontier_reasoner: { in: 4.00, out: 20.00, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. claude-opus-5-5" }
     workhorse:         { in: 2.00, out: 10.00, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. claude-sonnet-5-5" }
     cheap_fast:        { in: 0.10, out:  0.50, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. claude-haiku-5-5, prompts up to 100k tokens ($0.50/$2.50 above)" }
-    source: "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-07-05)"
+    source: "https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-10-09)"
   openai:
     frontier_reasoner: { in: 10.00, out: 50.00, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gpt-6-astra, up to 272k input tokens" }
     workhorse:         { in: 2.00, out: 10.00, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gpt-6.1-sol, up to 272k input tokens" }
     cheap_fast:        { in: 0.10, out:  0.50, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gpt-6-luna, up to 272k input tokens" }
-    source: "https://developers.openai.com/api/docs/pricing (fetched 2026-07-05)"
+    source: "https://developers.openai.com/api/docs/pricing (fetched 2026-10-09)"
   gemini:
     frontier_reasoner: { in: 2.00, out: 12.00, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gemini-3.1-pro-preview, <=200k context tier; higher above 200k" }
     workhorse:         { in: 0.75, out:  3.75, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gemini-3.8-flash, through 2026-12-31; $1.50/$7.50 from 2027-01-01" }
     cheap_fast:        { in: 0.30, out:  2.50, as_of: 2026-10-09, note: "EXAMPLE — verify pricing. gemini-3.5-flash-lite, text/image/video input rate" }
-    source: "https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-07-05)"
+    source: "https://ai.google.dev/gemini-api/docs/pricing (fetched 2026-10-09)"
   # zai: no example prices recorded — read the vendor's pricing page before any cost math.
 
 # model_prices — v2.4.0. BILLING rates per SERVED model id, $/MTok. prices: above
@@ -508,7 +508,7 @@ model_prices:
   claude-sonnet-5-5: { in: 2.00, out: 10.00, cache_read: 0.10, cache_write_5m: 2.50, cache_write_1h: 4.00 }   # cache hits at 0.05x input (as_of 2026-10-09)
   claude-haiku-5-5:  { in: 0.10, out:  0.50, cache_read: 0.01, cache_write_5m: 0.125, cache_write_1h: 0.20, long_prompt: { over: 100000, in: 0.50, out: 2.50, cache_read: 0.05, cache_write_5m: 0.625, cache_write_1h: 1.00 } }  # prompts up to 100k tokens; above that the whole request bills 0.50/2.50 (as_of 2026-10-09)
   claude-haiku-4-5:  { in: 1.00, out:  5.00, cache_read: 0.10, cache_write_5m: 1.25, cache_write_1h: 2.00 }
-  claude-fable-5-1:  { in: 10.00, out: 50.00, cache_read: 0.25, cache_write_5m: 12.50, cache_write_1h: 20.00 }   # the apex example; as_of 2026-09-05
+  claude-fable-5-1:  { in: 10.00, out: 50.00, cache_read: 0.25, cache_write_5m: 12.50, cache_write_1h: 20.00 }   # the apex example; as_of 2026-10-09
 
 # Cost accounting — v2.4.0. Read by people and by any cost report built on
 # model_prices above. The rule exists because a report that leaves cache-creation

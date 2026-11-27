@@ -52,6 +52,7 @@ path on the card, and read the cautions.
 | Module | What it does | Platform |
 |---|---|---|
 | [Repo health](modules/repo-health.md) | Scores a repo from 0 to 100 on a dashboard, with BLOCKING and ADVISORY findings | Any |
+| [Repo review](modules/repo-review.md) | Read-only whole-repo audit of architecture, agentic surfaces, evals, and frontier-model fit | Any |
 | [Code quality](modules/code-quality.md) | Finds files, functions and complexity over the limits; audits dead code | Any — best on Python |
 | [Engineering skills](modules/engineering-skills.md) | Test-driven development, architecture deepening, per-repo setup | Any |
 | [Flake detective](modules/flake-detective.md) | Proves a test is flaky and finds the cause | Pytest projects |

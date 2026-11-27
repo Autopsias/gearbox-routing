@@ -16,6 +16,11 @@ SKIP_DIRS = {
     ".git", "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache",
     ".mypy_cache", ".ruff_cache", "dist", "build", "target", ".next", ".nuxt",
     ".tox", ".eggs", "coverage", ".turbo", "vendor",
+    ".plan-worktrees", ".backups", ".venv-ci",
+}
+
+SKIP_REL_DIRS = {
+    ".claude/worktrees",
 }
 
 MANIFEST_NAMES = (
@@ -206,8 +211,11 @@ def measure_surface(path: Path, root: Path, kind: str, auto_loaded: bool) -> dic
 def walk_repo(root: Path, max_files: int) -> tuple[list[Path], bool]:
     files: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
         base = Path(dirpath)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in SKIP_DIRS and rel_path(base / d, root) not in SKIP_REL_DIRS
+        )
         for name in sorted(filenames):
             files.append(base / name)
             if len(files) >= max_files:

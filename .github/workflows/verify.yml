@@ -47,6 +47,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Guard against hand edits in harness/
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only --no-renames "origin/${GITHUB_BASE_REF}...HEAD")
+          HARNESS_CHANGED=$(echo "$CHANGED" | grep -E '^harness/' || true)
+          if [ -n "$HARNESS_CHANGED" ] && ! echo "$CHANGED" | grep -qx 'harness/SYNCED-FROM'; then
+            echo "FAIL: harness/ was modified without updating harness/SYNCED-FROM." >&2
+            echo "harness/ is generated from the private source repo by scripts/sync-from-claude.py." >&2
+            echo "Do not hand-edit harness/ in this repo; change the source and re-run sync-from-claude.py." >&2
+            echo "Changed harness/ paths:" >&2
+            echo "$HARNESS_CHANGED" >&2
+            exit 1
+          fi
+          echo "OK: harness/ guard clean."
+
       - name: Routing policy drift guard (verify-routing.sh --full --strict)
         run: |
           set -euo pipefail

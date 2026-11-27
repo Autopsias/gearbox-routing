@@ -153,3 +153,38 @@ def test_cli_json_and_markdown_and_missing_dir(tmp_path):
         check=False,
     )
     assert missing.returncode == 2
+
+
+def test_skips_worktrees_backups_and_venv_ci_while_keeping_claude_configs(tmp_path):
+    mod = _load_module()
+    (tmp_path / "README.md").write_text("# Demo\n", encoding="utf-8")
+
+    # .claude config files that MUST remain visible
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "settings.json").write_text('{"model": "opus"}\n', encoding="utf-8")
+    (claude_dir / "eval-gates.json").write_text('{"gates": []}\n', encoding="utf-8")
+
+    # Ignored trees populated with files and orphan fixtures that must NOT be scanned
+    ignored_files = [
+        tmp_path / ".claude" / "worktrees" / "stale-branch" / "fixtures" / "orphan-case" / "bad.yaml",
+        tmp_path / ".claude" / "worktrees" / "stale-branch" / "AGENTS.md",
+        tmp_path / ".plan-worktrees" / "plan-s01" / "scripts" / "foo.py",
+        tmp_path / ".backups" / "2026-11-01" / "hooks" / "old.py",
+        tmp_path / ".venv-ci" / "lib" / "python3.12" / "site.py",
+    ]
+    for path in ignored_files:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# ignored\n", encoding="utf-8")
+
+    data = mod.scan_repo(tmp_path)
+    assert data["repo"]["scan_truncated"] is False
+    assert data["repo"]["total_files_scanned"] == 3  # README.md + .claude/settings.json + .claude/eval-gates.json
+    assert ".claude/settings.json" in data["agentic_surfaces"]["mcp_and_configs"]
+    assert ".claude/eval-gates.json" in data["evals_and_tests"]["eval_paths"]
+    assert data["evals_and_tests"]["unreferenced_fixture_dirs"] == []
+
+    modules = {m["module"]: m["file_count"] for m in data["repo"]["top_level_modules"]}
+    assert modules.get(".claude") == 2
+    for skipped in (".plan-worktrees", ".backups", ".venv-ci"):
+        assert skipped not in modules

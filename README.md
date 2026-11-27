@@ -277,9 +277,10 @@ Each example below comes from the "Check it works" part of its card.
   unit tests, a docs check and a scratch install on every pull request and on
   every push to `master`.
 - **Harness modules:** a copy of one person's daily setup, refreshed from time
-  to time. CI does not run the harness tests, because many of them expect a live
-  `~/.claude`, macOS, or tools a CI runner does not have. Each module card says
-  whether its module is stable, experimental or author-specific.
+  to time. CI runs the three fast harness test suites (`plan-builder`,
+  `routing-retro`, and `trust-review`); the rest expect a live `~/.claude`,
+  macOS, or tools a CI runner does not have. Each module card says whether its
+  module is stable, experimental or author-specific.
 
 ## About this repo
 
