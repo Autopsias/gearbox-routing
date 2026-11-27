@@ -52,25 +52,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          HARNESS_CHANGED=()
-          SYNCED_FROM_CHANGED=0
-          while IFS= read -r -d '' path; do
-            if [[ "$path" == harness/* ]]; then
-              HARNESS_CHANGED+=("$path")
-            fi
-            if [[ "$path" == "harness/SYNCED-FROM" ]]; then
-              SYNCED_FROM_CHANGED=1
-            fi
-          done < <(git diff --name-only --no-renames -z "origin/${GITHUB_BASE_REF}...HEAD")
-          if (( ${#HARNESS_CHANGED[@]} > 0 )) && (( SYNCED_FROM_CHANGED == 0 )); then
-            echo "FAIL: harness/ was modified without updating harness/SYNCED-FROM." >&2
-            echo "harness/ is generated from the private source repo by scripts/sync-from-claude.py." >&2
-            echo "Do not hand-edit harness/ in this repo; change the source and re-run sync-from-claude.py." >&2
-            echo "Changed harness/ paths:" >&2
-            printf '%s\n' "${HARNESS_CHANGED[@]}" >&2
-            exit 1
-          fi
-          echo "OK: harness/ guard clean."
+          python3 - <<'PY'
+          import os, subprocess, sys
+
+          base = os.environ["GITHUB_BASE_REF"]
+          proc = subprocess.run(
+              ["git", "diff", "--name-only", "--no-renames", "-z", f"origin/{base}...HEAD"],
+              capture_output=True,
+          )
+          if proc.returncode != 0:
+              sys.stderr.buffer.write(proc.stderr)
+              sys.exit(proc.returncode)
+          paths = [p.decode("utf-8", errors="surrogateescape") for p in proc.stdout.split(b"\x00") if p]
+          harness_changed = [p for p in paths if p.startswith("harness/")]
+          if harness_changed and "harness/SYNCED-FROM" not in paths:
+              print("FAIL: harness/ was modified without updating harness/SYNCED-FROM.", file=sys.stderr)
+              print("harness/ is generated from the private source repo by scripts/sync-from-claude.py.", file=sys.stderr)
+              print("Do not hand-edit harness/ in this repo; change the source and re-run sync-from-claude.py.", file=sys.stderr)
+              print("Changed harness/ paths:", file=sys.stderr)
+              for p in harness_changed:
+                  print(p, file=sys.stderr)
+              sys.exit(1)
+          print("OK: harness/ guard clean.")
+          PY
 
       - name: Routing policy drift guard (verify-routing.sh --full --strict)
         run: |
