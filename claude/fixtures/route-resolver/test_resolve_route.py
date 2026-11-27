@@ -141,12 +141,12 @@ class TestEffortSteepProvider(unittest.TestCase):
         cur = rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT)
         self.assertEqual(cur, {"model_id": "glm-5.3-flash", "native_effort": "max"})
         cur = rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT)
-        self.assertEqual(cur, {"model_id": "glm-5.3", "native_effort": "max"})
+        self.assertEqual(cur, {"model_id": "glm-5.4", "native_effort": "max"})
         self.assertEqual(rr.escalate("mechanical", "zai", current=cur, ssot_path=REAL_SSOT), "exhausted")
 
     def test_zai_degrade_keeps_max(self):
         base = rr.resolve("linchpin", "zai", ssot_path=REAL_SSOT)
-        self.assertEqual(base, {"model_id": "glm-5.3", "native_effort": "max"})
+        self.assertEqual(base, {"model_id": "glm-5.4", "native_effort": "max"})
         degraded = rr.degrade("linchpin", "zai", current=base, signal="unavailable", ssot_path=REAL_SSOT)
         self.assertEqual(degraded, {"model_id": "glm-5.3-flash", "native_effort": "max"})
 
