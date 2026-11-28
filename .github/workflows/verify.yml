@@ -87,10 +87,11 @@ jobs:
       - name: Unit tests (claude/ and scripts/)
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check --quiet "pytest>=8,<10"
+          python -m pip install --disable-pip-version-check --quiet "pytest>=8,<10" "pytest-xdist>=3,<4" "mypy>=1,<3"
           export HOME="$RUNNER_TEMP/empty-home"
           mkdir -p "$HOME"
-          python -m pytest -q -p no:cacheprovider claude scripts
+          python -m mypy --ignore-missing-imports scripts claude
+          python -m pytest -q -p no:cacheprovider -n auto claude scripts
 
       # harness/ is a synced copy of a private deployment. Only its three fast
       # suites run here (~20s); the rest (plan-execute takes ~35 min) expect

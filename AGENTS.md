@@ -30,7 +30,8 @@ Classify the task, set the tier. Authority: `claude/model-routing.yaml`
 ## Verify
 
 - `bash claude/scripts/verify-routing.sh --full --strict`
-- `pytest -q -p no:cacheprovider claude scripts`
+- `mypy --ignore-missing-imports scripts claude`
+- `pytest -q -p no:cacheprovider -n auto claude scripts` (needs `pytest-xdist`; drop `-n auto` without it)
 - `pytest -q -p no:cacheprovider harness/skills/plan-builder/scripts harness/skills/routing-retro/scripts harness/skills/trust-review/scripts harness/skills/trust-review/references/scripts`
 
 ## Commit messages here carry no trailers

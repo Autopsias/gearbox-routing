@@ -294,13 +294,13 @@ class _Profile:
     def escalation(self) -> Optional[dict]:
         if self._escalation is self._UNSET:
             self._escalation = _parse_escalation(self._block)
-        return self._escalation
+        return self._escalation  # type: ignore[return-value]  # shortcut: _UNSET sentinel is typed object, replace with a typed sentinel if more properties join
 
     @property
     def degrade(self) -> Optional[dict]:
         if self._degrade is self._UNSET:
             self._degrade = _parse_degrade(self._block)
-        return self._degrade
+        return self._degrade  # type: ignore[return-value]
 
     def tier_of(self, model_id: str) -> Optional[str]:
         for tier, mid in self.models.items():

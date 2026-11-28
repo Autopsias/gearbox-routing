@@ -16,6 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 loader = importlib.machinery.SourceFileLoader("install_module", str(ROOT / "install-module"))
 spec = importlib.util.spec_from_loader("install_module", loader)
+assert spec
 im = importlib.util.module_from_spec(spec)
 loader.exec_module(im)
 

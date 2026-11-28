@@ -104,6 +104,7 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
+from collections.abc import Callable
 import datetime
 import json
 import os
@@ -502,7 +503,7 @@ def _scrub_deploy_pathspec(text: str) -> str:
 # Keyed by path RELATIVE TO harness/ (i.e. same as the manifest's rel_path).
 # Only STRUCTURAL transforms live here — every find/replace whose match string
 # is itself a confidential value now lives in manifest["scrub_rules"].
-TARGETED_TRANSFORMS: dict[str, "callable"] = {
+TARGETED_TRANSFORMS: dict[str, Callable[[str], str]] = {
     "CLAUDE.md": _scrub_claude_md,
     "settings.json": _scrub_settings_json,
     "scripts/prod-status-pinned.sh": _scrub_prod_status_pinned_sh,
@@ -1202,8 +1203,7 @@ def _decode_variants(raw: bytes) -> list[str]:
             out.append(decoded)
     # A normalization that changed nothing is not a second place to look — drop
     # it so one leak reports once, at its real line number.
-    seen = set()
-    return [v for v in out if not (v in seen or seen.add(v))]
+    return list(dict.fromkeys(out))
 
 
 def _compile_blocked(blocked_patterns: list[str]) -> list:
