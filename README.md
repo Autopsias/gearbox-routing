@@ -99,6 +99,7 @@ matches this repo.
 
 ### Repo health and quality
 - `/repo-review` (installed by `install.sh` for Claude, Codex and Antigravity) gives any repo a candid Good / Bad / Ugly review across architecture, ways of working, agentic surfaces (`AGENTS.md`, skills, hooks), evals, and modern frontier LLM fit, read-only.
+- `/rust-migration-review` (installed the same way) decides whether all or part of a repo should move to Rust: which code units to port first, which to keep, cheaper alternatives, and the benefit, feasibility, risk and effort of each, checked against current case studies, read-only.
 - `/repo-health` scores a repo from 0 to 100 on a dashboard, splits findings into BLOCKING and ADVISORY, and keeps the history.
 - `/code-quality` holds file-size, function-length and complexity limits as a ratchet that only lets debt go down.
 - Test and CI fixers sort failures and send specialist subagents; `/ship-tail` takes a branch to a pull request with green CI, and never merges.
