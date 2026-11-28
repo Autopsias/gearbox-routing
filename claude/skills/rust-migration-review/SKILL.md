@@ -150,6 +150,8 @@ Start it only if `cargo --version` works and the user says yes; propose a time b
 2. Port the unit to Rust there.
 3. Check parity: run old and new on the same inputs and compare the outputs.
 4. Benchmark old, then new, in sequence: 3 runs each, report the median and the machine load.
+   Also time old against old (an A/A control) and report that spread: a gain smaller than the
+   spread is noise.
 5. Record the wall time the port took. It calibrates the effort model.
 
 If `cargo` is missing or the user declines, skip the spike and record it in **Blind spots**.
