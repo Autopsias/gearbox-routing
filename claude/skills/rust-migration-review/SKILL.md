@@ -61,6 +61,10 @@ C/C++, concurrency, single-binary distribution, or a strategic or hiring reason.
 gave no reason, ask one question. If there is still none, the report says so: rewriting only
 for the sake of Rust is not a business case.
 
+ALWAYS settle the goal before step 3. Ask the question first, because a verdict scored against
+the wrong goal costs a second report. If the user does not answer, write the assumed goal as
+the first line of the report and score against it.
+
 Also record the limits: who can write and review Rust (count authors of existing `.rs` files
 with `git log --format=%an -- '*.rs' | sort -u`), target platforms (serverless, edge, WASM,
 Windows, unusual CPUs), the release model, and how long a feature freeze the team can accept.
@@ -78,7 +82,10 @@ A benefit that you did not measure is a hypothesis, and the report labels it as 
 4. For memory safety, find the C/C++ code that touches untrusted input (parsers, network,
    file formats) and search history for security fixes:
    `git log -i --oneline -E --grep='CVE|overflow|use-after-free|out-of-bounds|segfault'`.
-5. If the profile top is network, database or disk wait, or a library that is already native
+5. ALWAYS time a command inside one process (a script loop, 5 or more runs, the median), and time
+   `/usr/bin/true` first. Separate tool calls add their own overhead: if the baseline is not far
+   below the target, the timing is invalid. Print the machine load beside the numbers.
+6. If the profile top is network, database or disk wait, or a library that is already native
    (NumPy, a C regex engine), Rust will not help that path. Say so.
 
 ### 4. Candidates
@@ -168,6 +175,9 @@ Write the report in plain, direct English. Lead with the answer, not the invento
    top risks with likelihood, impact and mitigation.
 7. **Decision card**: (1) the decision and why, in one sentence; (2) up to 3 options, each
    with a one-line trade-off; (3) your pick and why; (4) the cost of doing nothing.
+   NEVER put an effort, cost or "already used" claim in a card without a command run in this
+   session. If an option names a cheap tool (mypy, ruff, a test flag), run it first. Label any
+   figure you could not measure "guess".
 8. **Blind spots**: only what you could not check now (no production profile, no `cargo`,
    private dependencies, no search tool). Do every check you can run in a few minutes first.
 
