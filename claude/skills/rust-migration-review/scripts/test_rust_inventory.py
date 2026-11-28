@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -127,3 +128,42 @@ def test_cli_rejects_missing_dir(tmp_path):
     proc = subprocess.run([sys.executable, str(SCRIPT_PATH), str(tmp_path / "nope")],
                           capture_output=True, text=True)
     assert proc.returncode == 2
+
+
+def test_manifest_symlink_is_skipped_not_read(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret-dependency\n", encoding="utf-8")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.txt").symlink_to(outside)
+    found, _ = _load_module().scan_dependencies(repo)
+    assert found == [{"manifest": "requirements.txt", "ecosystem": "pypi",
+                      "error": "skipped: symlink, not a regular file, or over the size cap"}]
+
+
+@pytest.mark.skipif(not shutil.which("ssh-keygen"), reason="needs ssh-keygen to sign a commit")
+def test_git_churn_ignores_repo_config_that_runs_a_program(tmp_path: Path) -> None:
+    repo, marker = tmp_path / "repo", tmp_path / "ran"
+    repo.mkdir()
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(tmp_path / "key")], check=True)
+    _write(repo, "src/a.py", "x = 1\n")
+    subprocess.run(git + ["add", "-A"], check=True)
+    subprocess.run(git + ["-c", "gpg.format=ssh", "-c", f"user.signingkey={tmp_path / 'key'}",
+                          "commit", "-q", "-S", "-m", "signed"], check=True)
+    evil = tmp_path / "evil.sh"
+    evil.write_text(f"#!/bin/sh\ntouch {marker}\nexit 1\n", encoding="utf-8")
+    evil.chmod(0o755)
+    (tmp_path / "signers").write_text("", encoding="utf-8")
+    for key, value in (("log.showSignature", "true"), ("gpg.ssh.program", str(evil)),
+                       ("gpg.ssh.allowedSignersFile", str(tmp_path / "signers"))):
+        subprocess.run(["git", "-C", str(repo), "config", key, value], check=True)
+    # control: plain git log does run the planted program, so the check below can fail
+    subprocess.run(["git", "-C", str(repo), "log", "--name-only", "--pretty=format:"], capture_output=True)
+    if not marker.exists():
+        pytest.skip("this git does not verify signatures in log; the attack cannot be shown here")
+    marker.unlink()
+    churn = _load_module().git_churn(repo, 2, 365)
+    assert not marker.exists()
+    assert churn == {"src": 1}

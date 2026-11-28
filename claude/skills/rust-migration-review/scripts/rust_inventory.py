@@ -140,7 +140,9 @@ def scan_units(root: Path, depth: int) -> tuple[dict[str, dict[str, Any]], list[
 def git_churn(root: Path, depth: int, days: int) -> dict[str, int] | None:
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "log", f"--since={days}.days", "--name-only", "--pretty=format:"],
+            # the target may be untrusted: its .git/config must not make git run a program
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), "log", "--no-show-signature",
+             f"--since={days}.days", "--name-only", "--pretty=format:"],
             capture_output=True, text=True, timeout=60, check=True,
         ).stdout
     except (OSError, subprocess.SubprocessError):
@@ -208,6 +210,10 @@ def scan_dependencies(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
                 cargo.append(rel(path, root))
             parser = _manifest_parser(name)
             if not parser:
+                continue
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_FILE_BYTES:
+                found.append({"manifest": rel(path, root), "ecosystem": parser[0],
+                              "error": "skipped: symlink, not a regular file, or over the size cap"})
                 continue
             try:
                 deps = parser[1](path.read_text(encoding="utf-8", errors="replace"))
