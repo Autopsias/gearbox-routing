@@ -68,7 +68,7 @@ Sourced 2026-10-17 while building the skill, not invented. Each rule in
   generator is not the one that produces the fastest first render. It is the
   one that gets you to an accurate, editable final video with the least
   hidden repair work" ([diyai.io, 2026-08](https://diyai.io/ai-tools/video-generation/ai-explainer-video-generator/)).
-  video-creator exposes the script, the cues and a lint + QA loop; that is why
+  the video-creator skill exposes the script, the cues and a lint + QA loop; that is why
   it is the route.
 - NotebookLM (renamed Gemini Notebook, 2026-07) Video Overviews: fixed style,
   no branding, script by prompt only, three a day free, generation can exceed

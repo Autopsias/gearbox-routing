@@ -23,8 +23,13 @@ _LEDGER = ".findings.ndjson"
 def _ledgers(plan_dir, sid):
     """(ledger session name, its records) for every review gate of `sid`."""
     import llm_review_ledger as lrl
-    names = sorted(f.name[:-len(_LEDGER)]
-                   for f in (Path(plan_dir) / "_verify_state").glob(f"{sid}.*{_LEDGER}"))
+    import safe_json as sj
+    vs = Path(plan_dir) / "_verify_state"
+    try:
+        sj.resolve_inside(vs, sid)
+    except ValueError:  # an empty or escaping session id has no ledgers (clear_halt passes "" when no session halted)
+        return []
+    names = sorted(f.name[:-len(_LEDGER)] for f in vs.glob(f"{sid}.*{_LEDGER}"))
     return [(n, lrl.load(plan_dir, n)) for n in names]
 
 

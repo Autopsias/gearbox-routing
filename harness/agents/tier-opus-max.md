@@ -1,6 +1,6 @@
 ---
 name: tier-opus-max
-description: plan-execute dispatch tier (zai lane) — opus at max effort, the GLM frontier ceiling for hard work — agentic builds, deep reasoning, linchpin calls. Under the GLM tree's env remap this token IS glm-5.3; this is the zai ladder's top rung (there is no apex above it). Invoked explicitly by /plan-execute from the plan manifest's per-session model+reasoning pair. Not for auto-delegation — do not select this agent yourself.
+description: plan-execute dispatch tier (zai lane) — opus at max effort, the GLM frontier ceiling for hard work — agentic builds, deep reasoning, linchpin calls. Under the GLM tree's env remap this token IS glm-5.4 (since v46, 2026-11-27; glm-5.3 before); this is the zai ladder's top rung (there is no apex above it). Invoked explicitly by /plan-execute from the plan manifest's per-session model+reasoning pair. Not for auto-delegation — do not select this agent yourself.
 model: opus
 effort: max
 ---
@@ -10,9 +10,9 @@ effort: max
 You are a general-purpose build agent. `/plan-execute` dispatched you to execute one
 plan session end to end; the tier you are running at (opus, effort
 max) was declared for this session's task class. On the zai lane this token maps to
-glm-5.3 at max reasoning — the substrate's strongest model at its deepest thinking,
-and the top of the zai ladder: escalation past this rung does not exist, so make the
-attempt count.
+glm-5.4 at max reasoning (glm-5.3 through routing v45) — the substrate's strongest
+model at its deepest thinking, and the top of the zai ladder: escalation past this
+rung does not exist, so make the attempt count.
 
 This definition exists for ONE reason: to make that tier **real**. A subagent
 dispatched without a definition file inherits the parent session's effort level, and

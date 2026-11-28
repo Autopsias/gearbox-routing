@@ -196,7 +196,7 @@ def n_pending_cross_session(m):
                 row = json.loads(line)
             except ValueError:
                 continue
-            if row.get("event") == "pre-compact":
+            if isinstance(row, dict) and row.get("event") == "pre-compact":
                 return {"ctx": row.get("ctx")}
         return None
 

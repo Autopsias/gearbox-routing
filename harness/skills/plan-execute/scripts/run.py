@@ -227,7 +227,7 @@ from codex_command import (
 from egress import _egress_root, _egress_verdict
 from run_parsers import (HARNESSES, _add_begin_parser, _add_land_parsers, _add_plan_parser,
                         _add_shipping_parsers, _add_verify_parsers, add_dir)
-from ssot_policy import UnroutableCodexSession, _executor_for, _session_barred
+from ssot_policy import UnroutableCodexSession, _executor_for, _session_barred, canary_pin_cell, is_canary
 
 PLAN_HTML = "PLAN.html"
 _SHADOW_HOOK_MODULE = None
@@ -980,8 +980,13 @@ def _translate_claude_token(raw, task_class, ssot_text, rr, openai):
     return model, class_cell
 
 
-def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, require_calibrated=False,
-                            task_class=None):
+def _resolve_codex_dispatch(raw_model, reasoning, ssot_text, canary=False, **kw):
+    return (canary_pin_cell(raw_model, _reasoning_tier(reasoning), ssot_text, canary)
+            or _resolve_codex_cell(raw_model, reasoning, ssot_text, **kw))
+
+
+def _resolve_codex_cell(raw_model, reasoning, ssot_text, require_calibrated=False,
+                        task_class=None):
     """Resolve a Codex-backed session to ``(codex_model, codex_effort)`` against
     `providers.openai` in the SSOT. Raises UnroutableCodexSession on ANY gap —
     never returns a partial/guessed route.
@@ -1460,7 +1465,7 @@ def _codex_harness_spec(plan_dir, sid, session, ssot_text, egress_state, manifes
     # moved on from it.
     base_model, base_effort = _resolve_codex_dispatch(
         *rad.effective_cell(plan_dir, manifest, session), ssot_text, require_calibrated=False,
-        task_class=(session.get("task_class") or "").strip().lower() or None,
+        task_class=(session.get("task_class") or "").strip().lower() or None, canary=is_canary(session),
     )
     # ESC-03 — the climb, applied to the RESOLVED cell and before the command is
     # built, so the escalated rung is what the emitted `codex exec` actually runs.
@@ -1479,8 +1484,8 @@ def _codex_harness_spec(plan_dir, sid, session, ssot_text, egress_state, manifes
     effective_prompt, codex_dir, worktree_meta = _codex_worktree_files(
         plan_dir, session, prompt_file, worktree_path, stamp, eg["opted_in"]
     )
-    lm_file = str(codex_dir / f"{sid}.{stamp}.last-message.txt")
-    fb_lm_file = str(codex_dir / f"{sid}.{stamp}-fb.last-message.txt")
+    lm_file = str(sj.resolve_inside(codex_dir, f"{sid}.{stamp}.last-message.txt"))
+    fb_lm_file = str(sj.resolve_inside(codex_dir, f"{sid}.{stamp}-fb.last-message.txt"))
     # The session's DECLARED shell capabilities (writes outside the workspace,
     # network, nested dispatch). Resolved and gate-checked BEFORE the command is
     # built, so an ungated full-access request never becomes a runnable string.
@@ -2490,7 +2495,7 @@ def _resolve_codex_session_spec(declared_codex, egress_state, manifest, plan_dir
         codex_model, codex_effort = _resolve_codex_dispatch(
             *rad.effective_cell(plan_dir, manifest, s), ssot_text,
             require_calibrated=not declared_codex,
-            task_class=(s.get("task_class") or "").strip().lower() or None,
+            task_class=(s.get("task_class") or "").strip().lower() or None, canary=is_canary(s),
         )
         # ESC-03 — the climb, on the RESOLVED cell, before the command is built.
         # The same funnel and the same rules as the Claude lane below; only the
@@ -2507,8 +2512,8 @@ def _resolve_codex_session_spec(declared_codex, egress_state, manifest, plan_dir
             effective_prompt, codex_dir, worktree_meta = _codex_worktree_files(
                 plan_dir, s, prompt_file, wt_path, stamp, eg["opted_in"]
             )
-            lm_file = str(codex_dir / f"{sid}.{stamp}.last-message.txt")
-            fb_lm_file = str(codex_dir / f"{sid}.{stamp}-fb.last-message.txt")
+            lm_file = str(sj.resolve_inside(codex_dir, f"{sid}.{stamp}.last-message.txt"))
+            fb_lm_file = str(sj.resolve_inside(codex_dir, f"{sid}.{stamp}-fb.last-message.txt"))
         else:
             effective_prompt = _codex_no_worktree_prompt(plan_dir, sid, prompt_file, stamp, eg["opted_in"])
             worktree_meta = {}
@@ -2858,7 +2863,7 @@ def cmd_begin(plan_dir, sessions, unsafe_lock=False, harness="claude", resume=Fa
                 lambda s: pl.lane_profile(_dispatch_lane(s, provider, ssot_text, harness), provider),
                 _normalize_model, lambda s: _resolve_codex_dispatch(
                     s.get("model"), s.get("reasoning"), ssot_text,
-                    task_class=(s.get("task_class") or "").strip().lower() or None),
+                    task_class=(s.get("task_class") or "").strip().lower() or None, canary=is_canary(s)),
                 _reasoning_tier)
     # Cache each dispatch tree's egress verdict once per begin.
     _egress = {}
@@ -3296,6 +3301,8 @@ def cmd_apply(plan_dir, session_id, output_file, dry_run_shipping=False):
     if result["status"] != "ok":
         # Closeout invalid in some way -> BLOCK the session + halt.
         reason = _failure_reason(result)
+        if is_canary(session) and _declared_codex(session.get("model")):
+            outc.record_no_closeout(plan_dir, session_id, _apply_attempt(plan_dir, session_id))
         ab.apply_mutation(
             _html_path(plan_dir),
             session_id,
@@ -3673,7 +3680,7 @@ def _archive_session_state(plan_dir, session_id, version):
             rest = f.name[len(session_id) + 1 :]
             if _ARCHIVE_RE.match(rest):  # already archived by an earlier round
                 continue
-            f.rename(dpath / f"{session_id}.r{version}.{rest}")
+            f.rename(sj.resolve_inside(dpath, f"{session_id}.r{version}.{rest}"))
             moved.append(f"{d}/{session_id}.r{version}.{rest}")
     return moved
 
@@ -3853,7 +3860,7 @@ def _assert_real_rung(plan_dir, manifest, session, model, reasoning):
         try:
             authored_model, authored_reasoning = _resolve_codex_dispatch(
                 session.get("model"), session.get("reasoning"), ssot_text,
-                task_class=(session.get("task_class") or "").strip().lower() or None,
+                task_class=(session.get("task_class") or "").strip().lower() or None, canary=is_canary(session),
             )
         except UnroutableCodexSession as e:
             raise SystemExit(
@@ -4338,7 +4345,7 @@ def _add_replan_parsers(sub):
         "served-model field (evals/routing/graders/judge.py:8). "
         "Usage rules: route-at-dispatch-contract.md rule 6.",
     )
-    s.add_argument("--backend", default="claude", choices=("claude", "codex"))
+    s.add_argument("--backend", default="claude", choices=("claude", "codex"), help="Which backend ran the attempt")
     s.add_argument("--inline-fix", default=None, metavar="REASON",
                    help="You, not an agent, did this attempt's work: why. Stored on the receipt and the outcome row.")
     s = sub.add_parser(
@@ -4403,8 +4410,8 @@ def _add_mutation_parsers(sub):
                    help="Verify gate ids (comma-separated, repeatable)")
     s.add_argument("--require-evidence", action="store_true")
     s.add_argument("--prompt", default=None, help="Session prompt body")
-    s.add_argument("--human-summary", default=None)
-    s.add_argument("--parallel-group", default=None)
+    s.add_argument("--human-summary", default=None, help="Plain-language summary shown on the dashboard")
+    s.add_argument("--parallel-group", default=None, help="Parallel group id the session belongs to")
     s.add_argument("--infographic-group", default=None,
                    help="Plan Achievement group the new item(s) belong to (pillar / "
                         "phase / spoke name). Defaults to the group named after the "

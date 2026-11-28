@@ -32,7 +32,7 @@ import plan_scope as ps  # noqa: E402
 import plan_teardown as pt  # noqa: E402
 import run_state_io as rsi  # noqa: E402
 from _land_fixture import ack_only  # noqa: E402
-from _land_fixture import build_repo, isolate, run_cli, work  # noqa: E402
+from _land_fixture import build_repo, isolate, origin_main, run_cli, work  # noqa: E402
 from worktree import git  # noqa: E402
 
 
@@ -79,6 +79,38 @@ def test_a_landed_plan_loses_its_worktree_and_both_branches(fx):
     # cheap no-op, not a re-walk of the protocol.
     rc, out = run_cli("land", iso["plan_dir"])
     assert (rc, out["action"], out["cleanup"]["worktree"]) == (0, "landed", "removed"), out
+
+
+def test_a_failed_state_save_after_the_branch_delete_is_finished_by_the_next_cleanup(fx, monkeypatch):
+    """C-04 row 9: the local branch is deleted, then the state save raises. The next
+    cleanup finds the branch absent and records the answer; it never reports a half state."""
+    import ship_state_io as ssio
+    iso = isolate(fx, "plan-a")
+    work(iso["tree"], "src/f.py", "F = 1\n")
+    base = origin_main(fx)
+    git(["push", "-q", "origin", f"{iso['branch']}:main"], fx["root"], check=True)
+    ctx = lst.context(fx["plan_dir"] if "plan_dir" in fx else iso["plan_dir"])
+    st = {"state": "landed", "landed_on": "origin/main", "landed_sha": origin_main(fx),
+          "landed_base": base}
+    lst.save(iso["plan_dir"], ctx, st)
+    real, fired = ssio.durable_write_json, []
+
+    def second_write(path, obj):
+        if "cleanup" in obj:
+            fired.append(1)
+            raise OSError("injected crash before the cleanup record is saved")
+        return real(path, obj)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(ssio, "durable_write_json", second_write)
+        with pytest.raises(OSError):
+            pt.teardown_plan_tree(iso["plan_dir"], ctx, st)
+    assert fired
+    assert git(["rev-parse", "--verify", "--quiet", iso["branch"]], fx["root"])[0] != 0   # step 1 happened
+    assert "cleanup" not in lst.load(iso["plan_dir"])                                      # step 2 did not
+    out = pt.teardown_plan_tree(iso["plan_dir"], ctx, lst.load(iso["plan_dir"]))
+    assert out["worktree"] != "preserved" and out["branch_local"] == "absent", out
+    assert lst.load(iso["plan_dir"])["cleanup"] == out and not iso["tree"].is_dir()
 
 
 # --------------------------------------------------------------------- LND-02.2

@@ -169,15 +169,18 @@ def left_surface(p, inside, before):
     return f not in inside and (not rule_blocks(p) or f in before)
 
 
-def open_priors(records, floor=None):
+def open_priors(records, floor=None, rule=True):
     """Findings not yet marked fixed. The LATEST status per id wins.
 
     Filtered by the SEVERITY FLOOR, so a ledger written before the floor existed
     stops blocking on its recorded mediums instead of pinning a live session to
     a rule it was never judged under. They stay in the file and stay printed.
+
+    `rule` is whether the gate has a blocking rule now: a finding tagged under a
+    rule blocks only while one is live (a removed rule must not keep it blocking).
     """
     return _latest_findings(records, lambda r: r.get("status", "open") in ("open", "unverifiable")
-                            and (blocks(r.get("severity"), floor) or rule_blocks(r)))
+                            and (blocks(r.get("severity"), floor) or (rule and rule_blocks(r))))
 
 
 def latest_by_id(records):
@@ -229,7 +232,7 @@ class Context:
         self.unhashed = [p for p in surface_paths
                          if p not in self.hashes and os.path.lexists(Path(cwd, p))]
         self.delta = fix_delta(self.records, self.hashes) if self.attempt > 1 else set()
-        self.priors = open_priors(self.records, self.floor)
+        self.priors = open_priors(self.records, self.floor, bool(rule))
         # A prior whose file left the surface (removed, reverted) is moot: retire it
         # so it neither blocks nor is listed to the reviewer (2026-11-10, s02).
         inside = {_norm(x) for x in surface_paths}

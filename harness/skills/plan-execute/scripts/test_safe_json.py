@@ -24,6 +24,35 @@ import land_at_land as lal  # noqa: E402
 import run_state_io as rsi  # noqa: E402
 import safe_json as sj  # noqa: E402
 
+# One row each: bad JSON, [], a string, a number, null, an object with a list where a
+# word is expected, bytes that are not UTF-8, then two good rows (one blank line between).
+BROKEN_ROWS = (b'{bad\n[]\n"x"\n1\nnull\n{"event": ["a"]}\n\xff{\n\n'
+               b'{"event": "go"}\n{"event": "stop"}\n')
+
+
+@pytest.mark.parametrize("raw", [BROKEN_ROWS, BROKEN_ROWS.decode("utf-8", "replace")])
+def test_load_rows_skips_and_counts_every_broken_row(raw):
+    rows, skipped = sj.load_rows(raw)
+    assert skipped == 6                     # bad json, [], "x", 1, null, \xff{ ; the blank line is neither
+    assert [sj.get_str(r, "event") for r in rows] == [None, "go", "stop"]   # a list-valued word reads as absent
+
+
+def test_load_rows_skips_a_row_nested_too_deep(monkeypatch):
+    real = sj.json.loads        # 3.11/3.12 raise RecursionError natively on 3.14 it does not: force it
+    def deep(s, *a):
+        if s.startswith("[[["):
+            raise RecursionError
+        return real(s, *a)
+    monkeypatch.setattr(sj.json, "loads", deep)
+    assert sj.load_rows("[" * 100000 + '\n{"a": 1}\n') == ([{"a": 1}], 1)
+
+
+def test_load_rows_on_a_clean_file_keeps_every_row():
+    assert sj.load_rows('{"a": 1}\n{"a": 2}\n') == ([{"a": 1}, {"a": 2}], 0)
+    assert sj.load_rows(b"") == ([], 0)
+    row = '{"a": "x\u2028y"}\n'      # a raw U+2028 inside a string is not a row break, in str or bytes
+    assert sj.load_rows(row) == sj.load_rows(row.encode()) == ([{"a": "x\u2028y"}], 0)
+
 
 # --- the helper -------------------------------------------------------------
 @pytest.mark.parametrize("text, want", [
@@ -175,3 +204,54 @@ def test_a_malformed_at_land_descriptor_parks_instead_of_crashing(tmp_path, entr
 def test_well_formed_and_non_gate_entries(tmp_path, entry, want):
     g = _flagged(tmp_path, entry)
     assert (g and (g["kind"], g.get("cwd"))) == want
+
+
+def test_review_rounds_survives_broken_rows(tmp_path):
+    sys.path.insert(0, str(SCRIPTS.parent.parent.parent / "scripts"))
+    import review_rounds
+    led = tmp_path / "_plans" / "p" / ("_verify" + "_state") / "s01.gate.findings.ndjson"
+    led.parent.mkdir(parents=True)
+    led.write_bytes(BROKEN_ROWS + b'{"kind": "surface", "attempt": "2", "hashes": 5}\n'
+                    b'{"kind": "surface", "attempt": 1, "note": "a\xffb"}\n{"kind": ["surface"]}\n')
+    out = review_rounds.rows([str(tmp_path)], None)                    # no raise
+    assert (out[0]["files"], out[0]["skipped"]) == (0, 7)             # a list-valued kind is counted; the bad-byte row is kept
+    assert "malformed ledger rows ignored: 7" in review_rounds.report(out)
+    led.write_bytes(b'{"kind": "surface", "attempt": 1, "hashes": {"a": 1}\n{"kind": "surface" BAD\n')
+    out = review_rounds.rows([str(tmp_path)], None)                    # no surface row survives: still counted
+    assert "malformed ledger rows ignored: 2" in review_rounds.report(out)
+    assert "ledgers: 0; not measured (no line count): 0" in review_rounds.report(out)   # the entry holds no run
+
+
+# ---- resolve_inside: a name from outside cannot leave its folder (plan review-cause-checks s04) ----
+@pytest.mark.parametrize("name", ["../x.json", "a/../../x.json", "/etc/passwd", "", "..", "."])
+def test_resolve_inside_refuses_a_name_that_leaves_base(tmp_path, name):
+    with pytest.raises(ValueError):
+        sj.resolve_inside(tmp_path, name)
+
+
+def test_resolve_inside_refuses_a_symlink_out_of_base(tmp_path):
+    base, outside = tmp_path / "base", tmp_path / "outside"
+    base.mkdir()
+    outside.mkdir()
+    (base / "link").symlink_to(outside)
+    with pytest.raises(ValueError):
+        sj.resolve_inside(base, "link/x.json")
+
+
+def test_resolve_inside_keeps_a_valid_name_unchanged(tmp_path):
+    assert sj.resolve_inside(tmp_path, "s01.json") == tmp_path / "s01.json"
+    assert sj.resolve_inside(tmp_path, "sub/s01.json") == tmp_path / "sub" / "s01.json"
+    assert sj.resolve_inside(tmp_path, " x.json") == tmp_path / " x.json"
+
+
+@pytest.mark.parametrize("call", [
+    lambda d: __import__("verify_paths").verify_state_path(d, "../../esc"),
+    lambda d: __import__("verify_paths")._feedback_path(d, "../esc"),
+    lambda d: __import__("ship_state_io").ship_state_path(d, "/abs"),
+    lambda d: __import__("closeout_pipeline").load_closeout(d, "../esc"),
+    lambda d: __import__("replan").record_path(d, "../esc"),
+    lambda d: __import__("locked_checks").snapshot_path(d, "../esc"),
+])
+def test_write_sites_refuse_an_escaping_session_id(tmp_path, call):
+    with pytest.raises(ValueError):
+        call(tmp_path)

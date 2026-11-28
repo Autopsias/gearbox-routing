@@ -11,6 +11,7 @@ NEVER the manifest and never a digest input, so escalation state can never trip
 from pathlib import Path
 
 import run_state_io as rsi
+import safe_json as sj
 import ship_state_io as ssio
 
 STATE_KEY = "escalation"
@@ -156,7 +157,7 @@ def reset(plan_dir, session_id, why):
 
 def _rework_count(plan_dir, session_id):
     st = ssio.read_json_with_bak(
-        Path(plan_dir) / "_verify_state" / f"{session_id}.json"
+        sj.resolve_inside(Path(plan_dir) / "_verify_state", f"{session_id}.json")
     )
     return int((st or {}).get("rework_count") or 0)
 

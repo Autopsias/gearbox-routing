@@ -18,6 +18,7 @@ import egress
 import findings_digest as fd
 import parallel_contract as pc
 import plan_scope as ps
+import safe_json as sj
 import worktree as wt
 from ssot_policy import UnroutableCodexSession, _session_barred
 from verify_paths import _feedback_path
@@ -251,7 +252,7 @@ def _codex_worktree_files(plan_dir, session, prompt_file, worktree_path, stamp,
         runtime_dir.mkdir(exist_ok=True)
         if not feedback_text and not digest:
             return str(prompt_file), runtime_dir, {}
-        prompt_copy = runtime_dir / f"{sid}.{stamp}.prompt.md"
+        prompt_copy = sj.resolve_inside(runtime_dir, f"{sid}.{stamp}.prompt.md")
         prompt_copy.write_text(digest + source_prompt)
         return str(prompt_copy), runtime_dir, {}
 
@@ -265,7 +266,7 @@ def _codex_worktree_files(plan_dir, session, prompt_file, worktree_path, stamp,
     worktree = Path(worktree_path)
     runtime_dir = worktree / wt.WORKTREE_DIRNAME / "codex"
     runtime_dir.mkdir(parents=True, exist_ok=True)
-    prompt_copy = runtime_dir / f"{sid}.{stamp}.prompt.md"
+    prompt_copy = sj.resolve_inside(runtime_dir, f"{sid}.{stamp}.prompt.md")
     prompt_copy.write_text(digest + preamble + source_prompt)
     meta = {"worktree": str(worktree), "isolation": pc.ISOLATION_WORKTREE,
             "worktree_branch": ps.member_branch(plan_dir, group, sid) if member
@@ -289,7 +290,7 @@ def _codex_no_worktree_prompt(plan_dir, sid, prompt_file, stamp, opted_in=False)
         return str(prompt_file)
     runtime_dir = Path(plan_dir) / "_codex"
     runtime_dir.mkdir(exist_ok=True)
-    prompt_copy = runtime_dir / f"{sid}.{stamp}.prompt.md"
+    prompt_copy = sj.resolve_inside(runtime_dir, f"{sid}.{stamp}.prompt.md")
     prompt_copy.write_text(digest + Path(prompt_file).read_text())
     return str(prompt_copy)
 

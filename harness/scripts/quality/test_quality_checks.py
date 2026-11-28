@@ -526,6 +526,17 @@ def test_subprocess_check_sees_aliases() -> None:
     assert mod.bare_calls("def f():\n    run(['x'])\n") == []   # no import of subprocess
 
 
+def test_subprocess_check_skips_a_dangling_symlink(tmp_path: Path) -> None:
+    """A whole-project scan reports the real files even when one `.py` entry is a symlink
+    to a path that no longer exists (a stale plugin-cache link): the scan used
+    to stop on it with FileNotFoundError and report nothing."""
+    sub_repo(tmp_path, {"a.py": "import subprocess\n\ndef f():\n    subprocess.run(['x'])\n"})
+    (tmp_path / "gone.py").symlink_to(tmp_path / "no-such-dir" / "__init__.py")
+    res = sub_check(tmp_path)
+    assert res.returncode == 0, res.stderr
+    assert "a.py:" in res.stdout and "Summary: 1 subprocess.run call(s)" in res.stdout
+
+
 def sub_check(proj: Path, *args: str) -> subprocess.CompletedProcess:
     return run("check_subprocess_results.py", "--project", str(proj), *args)
 
@@ -541,17 +552,18 @@ def sub_repo(tmp_path: Path, files: dict[str, str]) -> str:
     return git(tmp_path, "rev-parse", "HEAD").stdout.strip()
 
 
-def sub_change(tmp_path: Path, base: str, mode: str, edit_tree) -> subprocess.CompletedProcess:
+def sub_change(tmp_path: Path, base: str, mode: str, edit_tree, check=None) -> subprocess.CompletedProcess:
     """Apply `edit_tree`, put the result in the state `mode` judges, run the check."""
+    check = check or sub_check
     edit_tree(tmp_path)
     if mode == "staged":
         git(tmp_path, "add", "-A")
-        return sub_check(tmp_path, "--staged")
+        return check(tmp_path, "--staged")
     if mode == "base":
         git(tmp_path, "add", "-A")
         git(tmp_path, "commit", "-qm", "change")
-        return sub_check(tmp_path, "--base", base)
-    return sub_check(tmp_path, "--base", base, "--worktree")   # nothing staged, untracked kept
+        return check(tmp_path, "--base", base)
+    return check(tmp_path, "--base", base, "--worktree")   # nothing staged, untracked kept
 
 
 MODES = ["staged", "base", "worktree"]
@@ -659,6 +671,12 @@ def test_subprocess_ratchet_blocks_commit(tmp_path: Path) -> None:
     assert bad.returncode == 1 and "COMMIT BLOCKED: check_subprocess_results" in bad.stderr
     (tmp_path / "a.py").write_text(BARE.replace("['x'])", "['x'], check=True)"))
     assert "check_subprocess_results" not in commit_hook().stderr
+    # The shared-append ratchet runs in the same loop: a new plain append in hooks/ blocks.
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "hooks" / "h.py").write_text(APPEND)
+    appended = commit_hook()
+    assert appended.returncode == 1 and "COMMIT BLOCKED: check_shared_append" in appended.stderr
+    (tmp_path / "hooks" / "h.py").unlink()
     # A tracked checker that is missing from disk is a broken tree: the hook blocks, it does not skip.
     checker = tmp_path / "scripts" / "quality" / "check_subprocess_results.py"
     checker.unlink()
@@ -666,10 +684,90 @@ def test_subprocess_ratchet_blocks_commit(tmp_path: Path) -> None:
     broken = commit_hook()
     assert broken.returncode == 1 and "tracked by git but missing from disk" in broken.stderr
     # A worktree that predates the checker never tracked it: the hook skips it instead of failing the commit.
+    # Such a tree has no check_shared_append either (it imports check_subprocess_results).
+    (tmp_path / "scripts" / "quality" / "check_shared_append.py").unlink()
+    git(tmp_path, "add", "-A")
     git(tmp_path, "commit", "-qm", "tree without the checker", "--no-verify")
     (tmp_path / "a.py").write_text(BARE.replace("['x'])", "['x'], check=True)"))
     old_tree = commit_hook()
     assert old_tree.returncode == 0 and "can't open file" not in old_tree.stderr
+
+
+# --- check_shared_append ------------------------------------------------------
+
+def _load_append_check():
+    import importlib.util
+    sys.path.insert(0, str(SCRIPTS))
+    spec = importlib.util.spec_from_file_location("check_shared_append", SCRIPTS / "check_shared_append.py")
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+APPEND = "def f(p):\n    with open(p, 'a') as fh:\n        fh.write('row')\n"
+
+
+@pytest.mark.parametrize("body,flagged", [
+    ("    open(p, 'a').write('x')\n", 1),                                # plant: plain append
+    ("    p.open('ab').write(b'x')\n", 1),                               # pathlib, binary
+    ("    open(p, mode='a+').write('x')\n", 1),                          # mode keyword
+    ("    io.open(p, 'at').write('x')\n", 1),                            # module.open, mode is arg 2
+    ("    open(p, 'a').write('x')  # single-writer:\n", 1),              # marker with no reason
+    ("    open(p, 'a').write('x')  # single-writer: only this cron job writes it\n", 0),   # allow: marked
+    ("    import shared_file\n    shared_file.append_capped(p, 'x', 1024)\n", 0),   # allow: helper
+    ("    with open(p, 'a') as fh:\n        fcntl.flock(fh, fcntl.LOCK_EX)\n", 0),  # allow: locked
+    ("    open(p, 'w').write('x')\n", 0),
+    ("    open(p).read()\n", 0),
+    ("    os.open(p, os.O_WRONLY | os.O_APPEND)\n", 0),                  # flags, not a mode (known limit)
+    ("    open(p, m).write('x')\n", 0),                                  # non-literal mode (known limit)
+])
+def test_shared_append_plant_and_allow(body: str, flagged: int) -> None:
+    mod = _load_append_check()
+    assert len(mod.plain_appends(f"import io, os, fcntl\n\ndef f(p, m):\n{body}")) == flagged
+
+
+@pytest.mark.parametrize("rel,inside", [
+    ("hooks/a.py", True), ("scripts/x/b.py", True), ("skills/s/scripts/c.py", True),
+    ("skills/s/scripts/test_c.py", False), ("hooks/c_test.py", False),
+    ("skills/s/vendor/c.py", False), ("evals/c.py", False), ("c.py", False),
+])
+def test_shared_append_scope(rel: str, inside: bool) -> None:
+    assert _load_append_check().in_scope(rel) is inside
+
+
+def append_check(proj: Path, *args: str) -> subprocess.CompletedProcess:
+    return run("check_shared_append.py", "--project", str(proj), *args)
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_shared_append_new_site_fails_and_old_site_passes(tmp_path: Path, mode: str) -> None:
+    base = sub_repo(tmp_path, {"hooks/old.py": APPEND})
+    untouched = sub_change(tmp_path, base, mode, lambda p: (p / "hooks" / "new.py").write_text("x = 1\n"),
+                           append_check)
+    assert untouched.returncode == 0, untouched.stdout + untouched.stderr   # the inherited append is not new
+    marked = APPEND.replace("as fh:", "as fh:  # single-writer: one test process")
+    near = sub_change(tmp_path, base, mode, lambda p: (p / "hooks" / "new.py").write_text(marked), append_check)
+    assert near.returncode == 0, near.stdout + near.stderr
+    bad = sub_change(tmp_path, base, mode,
+                     lambda p: (p / "hooks" / "new.py").write_text(APPEND.replace("'row'", "'other'")
+                                                                   .replace("(p, 'a')", "(q, 'a')")),
+                     append_check)
+    assert bad.returncode == 1 and "hooks/new.py:2" in bad.stdout and "single-writer:" in bad.stdout, \
+        bad.stdout + bad.stderr
+
+
+def test_shared_append_out_of_scope_file_passes(tmp_path: Path) -> None:
+    base = sub_repo(tmp_path, {"x.py": "x = 1\n"})
+    proc = sub_change(tmp_path, base, "staged",
+                      lambda p: (p / "hooks").mkdir() or (p / "hooks" / "test_h.py").write_text(APPEND),
+                      append_check)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_shared_append_unknown_base_is_exit_2(tmp_path: Path) -> None:
+    sub_repo(tmp_path, {"x.py": "x = 1\n"})
+    assert append_check(tmp_path, "--base", "0" * 40).returncode == 2
 
 
 def test_context_size_blocks_growth_past_the_bound_and_allows_pruning(tmp_path: Path) -> None:
@@ -700,90 +798,3 @@ def test_context_size_blocks_growth_past_the_bound_and_allows_pruning(tmp_path: 
     git(tmp_path, "add", "-A")
     proc = run("check_context_size.py", "--project", str(tmp_path), "--staged")
     assert proc.returncode == 1 and "rules/small.md" in proc.stdout, "crossing the bound must block"
-
-
-# --- pyres resolution order & verify.yml push.paths invariants ---------------
-
-def _fake_venv(root: Path, *, rc: int = 0) -> Path:
-    py = root / "bin" / "python"
-    py.parent.mkdir(parents=True, exist_ok=True)
-    py.write_text(f"#!/bin/sh\nexit {rc}\n")
-    py.chmod(0o755)
-    return py.resolve()
-
-
-def test_pyres_resolution_order_and_worktree_fallback(tmp_path: Path) -> None:
-    """PYRES_VENV > VIRTUAL_ENV > repo .venv-ci > worktree common-dir .venv-ci > ~/.claude/.venv > python3."""
-    import os
-
-    repo = tmp_path / "repo"
-    (repo / "scripts").mkdir(parents=True)
-    shutil.copy2(REPO_ROOT / "scripts" / "pyres", repo / "scripts" / "pyres")
-    make_repo(repo)
-    git(repo, "add", "-A")
-    git(repo, "commit", "-qm", "init")
-    wt = tmp_path / "wt"
-    assert git(repo, "worktree", "add", "-q", "-b", "wt-branch", str(wt)).returncode == 0
-
-    override_py = _fake_venv(tmp_path / "override")
-    active_py = _fake_venv(tmp_path / "active")
-    repo_ci_py = _fake_venv(repo / ".venv-ci")
-    home_dir = tmp_path / "home"
-    home_py = _fake_venv(home_dir / ".claude" / ".venv")
-    outside = tmp_path / "outside" / "scripts"
-    outside.mkdir(parents=True)
-    shutil.copy2(REPO_ROOT / "scripts" / "pyres", outside / "pyres")
-
-    base = {k: v for k, v in os.environ.items() if k not in ("PYRES_VENV", "VIRTUAL_ENV")}
-    base["HOME"] = str(home_dir)
-    def run_p(p: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess:
-        return subprocess.run([str(p), *args], cwd=p.parent, env=env, capture_output=True, text=True)
-
-    r1 = run_p(repo / "scripts" / "pyres", {**base, "PYRES_VENV": str(tmp_path / "override"),
-                                            "VIRTUAL_ENV": str(tmp_path / "active")})
-    assert r1.returncode == 0 and Path(r1.stdout.strip()).resolve() == override_py
-    r2 = run_p(repo / "scripts" / "pyres", {**base, "VIRTUAL_ENV": str(tmp_path / "active")})
-    assert r2.returncode == 0 and Path(r2.stdout.strip()).resolve() == active_py
-    _fake_venv(tmp_path / "incomplete", rc=1)
-    r2b = run_p(repo / "scripts" / "pyres", {**base, "VIRTUAL_ENV": str(tmp_path / "incomplete")}, "pytest")
-    assert r2b.returncode == 0 and Path(r2b.stdout.strip()).resolve() == repo_ci_py
-    r3 = run_p(repo / "scripts" / "pyres", base)
-    assert r3.returncode == 0 and Path(r3.stdout.strip()).resolve() == repo_ci_py
-    assert not (wt / ".venv-ci").exists()
-    r4 = run_p(wt / "scripts" / "pyres", base)
-    assert r4.returncode == 0 and Path(r4.stdout.strip()).resolve() == repo_ci_py
-    r5 = run_p(outside / "pyres", base)
-    assert r5.returncode == 0 and Path(r5.stdout.strip()).resolve() == home_py
-    bare = {**base, "HOME": str(tmp_path / "empty-home")}
-    r6 = run_p(outside / "pyres", bare, "json")
-    assert r6.returncode == 0 and r6.stdout.strip().endswith("python3")
-    r_noisy = run_p(outside / "pyres", bare, "this")
-    assert r_noisy.returncode == 0 and r_noisy.stdout.splitlines() == [r_noisy.stdout.strip()]
-    assert r_noisy.stdout.strip().endswith("python3") and "Zen of Python" not in r_noisy.stdout
-    assert run_p(outside / "pyres", bare, "no_such_module_xyz").returncode == 127
-
-
-def test_verify_workflow_push_paths_cover_agentic_config_and_keep_pr_unfiltered() -> None:
-    """Every agentic config / check-input path triggers push CI; exclusion stays last; PR has no paths filter."""
-    import yaml
-
-    wf_path = REPO_ROOT / ".github" / "workflows" / "verify.yml"
-    if not wf_path.exists():
-        pytest.skip("verify.yml not present in this checkout")
-    data = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
-    on_block = data.get("on") if "on" in data else data.get(True)
-    push_paths = on_block["push"]["paths"]
-    required = [
-        "CLAUDE.md", "AGENTS.md", "rules/**", "agents/**", "output-styles/**",
-        "settings.json", ".claude/settings.json", "codex/**", "model-routing.digest.md",
-        "epic-dev-assignments.yaml", ".claude/eval-gates.json", "README.md",
-        "UPDATE-PLAYBOOK.md", "docs/reference_*.md", ".complexity-exceptions",
-    ]
-    missing = [p for p in required if p not in push_paths]
-    assert not missing, f"verify.yml on.push.paths missing: {missing}"
-    assert push_paths[-1] == "!evals/routing/outcomes.ndjson"
-    assert "pull_request" in on_block, "verify.yml must define on.pull_request"
-    pr_block = on_block["pull_request"]
-    assert pr_block is None or not ({"paths", "paths-ignore"} & set(pr_block)), (
-        f"verify.yml on.pull_request must not filter paths: {pr_block}"
-    )

@@ -99,9 +99,11 @@ overview / Claude Code model-config).
 
 ## What the class defaults are (the executor's input, not the author's choice)
 
-> **Default a standard session AND an agentic/integration session to `Sonnet · low`** (SSOT v38 and v40;
-> the agentic canary finished 10 of 10 real plan sessions at about half the Opus·high cost per finished
-> session, and a failure climbs `low`→`medium`→`high`→`Opus · high` under `max_rework: 4`). A session
+> **Default a standard session to `Sonnet · low` and an agentic/integration session to `Sonnet · medium`**
+> (SSOT v38 and v45; the v40 agentic canary at `Sonnet · low` finished 10 of 10 real plan sessions at
+> about half the Opus·high cost per finished session, but at N=207 its first-try pass fell from 0.68 to
+> 0.61 on review findings, so v45 moved agentic one rung up). A failure climbs
+> `medium`→`high`→`Opus · high` under `max_rework: 4`. A session
 > you KNOW is hard from the start goes to the linchpin class (`Opus · high`), or pin `Opus · high` with the reason. Route architecture / novel /
 > security-sensitive / hard-debug work to **`Opus · medium`** (dominates
 > the retired Fable·low pin on both axes) and a genuine linchpin to

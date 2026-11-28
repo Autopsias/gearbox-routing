@@ -506,6 +506,34 @@ def test_a_run_killed_during_the_ci_poll_resumes_without_repeating_the_steps(fx,
     assert finish.finish_action(fx["plan"], {"action": "complete"})["action"] == "complete"
 
 
+def test_a_failed_finished_at_write_leaves_the_steps_done_and_the_rerun_only_polls(fx, ci, monkeypatch):
+    """C-04 row 11: steps_done_at is saved, then the finished_at save raises. The rerun
+    repeats no step and ends finished."""
+    import ship_state_io as ssio
+    calls, _ = ci
+    _arm(fx)
+    _dirty_record(fx)
+    real, fired = ssio.durable_write_json, []
+
+    def second_write(path, obj):
+        if obj.get("finished_at") and not fired:
+            fired.append(1)
+            raise OSError("injected crash before finished_at is saved")
+        return real(path, obj)
+
+    with monkeypatch.context() as mp:
+        mp.setattr(ssio, "durable_write_json", second_write)
+        with pytest.raises(OSError):
+            finish.finish(fx["plan"], timeout_s=0)
+    assert fired
+    st = _state(fx)
+    assert st["steps_done_at"] and not st.get("finished_at")
+    pushed = origin_main(fx)
+    out = finish.finish(fx["plan"], timeout_s=0)
+    assert out["action"] == "finished" and origin_main(fx) == pushed and _state(fx)["finished_at"]
+    assert "already ran" in str(out) and {c["sha"] for c in calls} == {st["ci_sha"]}   # polled, steps not redone
+
+
 def test_a_killed_report_only_run_never_blocks_the_steps_of_an_apply_run(fx, ci, monkeypatch):
     _dirty_record(fx)
     before = origin_main(fx)

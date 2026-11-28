@@ -44,7 +44,8 @@ def counting_fixture(tmp_path, monkeypatch):
 def runs(counter):
     return len(counter.read_text().split()) if counter.exists() else 0
 
-RED = "def test_new():\n    assert 1 == 2, 'main broke it'\n"
+RED = "import os\n\n\ndef test_new():\n    assert not os.path.exists('src/f.py'), 'main broke it'\n"   # green on main, red once the plan's src/f.py is merged
+MAIN_RED = "def test_new():\n    assert 1 == 2, 'main is red'\n"                                     # red on main itself
 GREEN = "def test_new():\n    assert 1 == 1\n"
 
 
@@ -58,6 +59,35 @@ def test_a_red_test_added_on_main_parks_before_the_long_gates(tmp_path, monkeypa
     st = lst.load(str(iso["plan_dir"]))
     assert (st["state"], st["park"]["kind"]) == ("parked", "gate-failed")
     assert "main_tests_key" not in st                               # a red is never settled
+
+
+def test_a_test_that_is_red_on_main_too_does_not_park_the_plan(tmp_path, monkeypatch):
+    fx, iso, counter = counting_fixture(tmp_path, monkeypatch)
+    main_side(fx, "tests/test_new.py", MAIN_RED)
+    out = run_cli("land", iso["plan_dir"])[1]
+    assert out["action"] == "land-awaits-review" and runs(counter) == 1, out   # the gates decide
+    st = lst.load(str(iso["plan_dir"]))
+    assert st["main_tests"]["red"] == []
+
+
+def test_a_base_tree_with_an_absolute_symlink_unpacks(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(["init", "-q"], repo, check=True)
+    (repo / "a.txt").write_text("a")
+    (repo / "link").symlink_to("/etc/hosts")
+    git(["add", "."], repo, check=True)
+    git(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], repo, check=True)
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    out = lmt._base_tree(str(repo), "HEAD", str(dest))
+    assert out and (Path(out) / "a.txt").read_text() == "a"
+
+
+def test_files_from_two_folders_are_run_apart(tmp_path):
+    groups = lmt._by_folder(["scripts/test_a.py", "skills/x/scripts/test_b.py", "scripts/test_c.py"])
+    assert groups == {"scripts": ["scripts/test_a.py", "scripts/test_c.py"],
+                      "skills/x/scripts": ["skills/x/scripts/test_b.py"]}
 
 
 def test_a_green_test_added_on_main_continues_and_is_not_run_twice(tmp_path, monkeypatch):
@@ -129,7 +159,7 @@ def test_a_timeout_is_undecided_not_red(tmp_path, monkeypatch):
     monkeypatch.setattr(lmt.ssio, "run_deploy_argv", lambda argv, **kw: {
         "returncode": 0 if argv[1] == "-c" else None, "stdout": "", "stderr": "timeout"})
     red, undecided, _ = lmt._failures(str(tmp_path), ["tests/test_a.py"], [], str(tmp_path))
-    assert red == [] and undecided == ["pytest"]
+    assert red == [] and undecided == ["pytest tests"]
 
 
 @pytest.mark.parametrize(("disabled_remote", "ignored_plan"),

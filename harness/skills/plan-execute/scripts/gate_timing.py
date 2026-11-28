@@ -18,7 +18,12 @@ crash in the instrumentation, so every failure here is swallowed.
 
 from __future__ import annotations
 
+import os
+import re
 import time
+
+#: The base line `scripts/session-quality-gate.sh` prints: what the gate compared against.
+_SCOPE = re.compile(r"\[session-quality-gate\] base: (session|merge-base) ")
 
 
 #: `llm_review_gate`'s exit codes, named for the journal. Kept beside the
@@ -76,19 +81,26 @@ def log_gate(plan_dir, session, gate, t0, outcome, attempts=(), attempt_usd=()):
         return False
 
 
-def log_run(plan_dir, phase, session, gate, seconds, outcome):
+def log_run(plan_dir, phase, session, gate, seconds, outcome, output=""):
     """Append one `gate_run` event for ANY argv gate, in any repo.
 
     `gate_completed` above is the review gate's own per-attempt record; this one
     is written by the RUNNER (`verify` and land), so test gates are timed too and
     `gate_durations.py` can say how long each repo's gates take. `phase` is
     "verify", "land", "land-base" or "land-rerun". Never breaks a gate.
+
+    `scope` is the base the session gate printed in `output` ("session" or
+    "merge-base"; None for a gate that prints none) and `load` is the 1, 5 and
+    15 minute load average at the end: a time limit needs both to be read.
     """
     try:
         import run_state_io as rsi
 
+        m = _SCOPE.search(output) if isinstance(output, str) else None
         rsi.log_event(plan_dir, "gate_run", session_ids=[session] if session else [],
-                      phase=phase, gate=gate, outcome=outcome, seconds=round(seconds, 1))
+                      phase=phase, gate=gate, outcome=outcome, seconds=round(seconds, 1),
+                      scope=m.group(1) if m else None,
+                      load=[round(x, 1) for x in os.getloadavg()])
         return True
     except Exception:  # noqa: BLE001 — fail open: the timing log is best effort; an error returns False
         return False

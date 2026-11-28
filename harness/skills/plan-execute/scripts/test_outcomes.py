@@ -734,7 +734,8 @@ def test_begin_stamps_the_field_on_every_dispatch_started(tmp_path, monkeypatch)
 # A known POSITIVE is what that test lacked.
 @pytest.mark.parametrize(("task_class", "backend", "model", "reasoning", "expected"), [
     ("deep_reasoning", "claude", "opus", "medium", "default_resolved"),
-    ("agentic_build", "claude", "sonnet", "low", "default_resolved"),       # v40: workhorse.light -> low
+    ("agentic_build", "claude", "sonnet", "medium", "default_resolved"),    # v45: workhorse.standard -> medium
+    ("agentic_build", "claude", "sonnet", "low", "pinned_override"),     # the v40..v44 default
     ("agentic_build", "claude", "opus", "high", "pinned_override"),     # the pre-v40 default
     ("standard_build", "claude", "sonnet", "low", "default_resolved"),       # v38: workhorse.light -> low
     ("mechanical", "claude", "haiku", "low", "default_resolved"),       # cheap_fast.light -> low
@@ -772,3 +773,22 @@ def test_attested_model_without_reasoning_keeps_the_climbed_effort(tmp_path, iso
     assert rec["model_ran_source"] == outc.SOURCE_ATTESTED
     assert rec["reasoning_authored"] == "medium"
     assert rec["reasoning_ran"] == "high"
+
+
+@pytest.mark.parametrize("canary,rows", [(True, 1), (False, 0)])
+def test_codex_canary_run_with_no_closeout_is_a_failed_attempt(tmp_path, isolated_ledger, canary, rows):
+    """A Codex canary session whose run ends with no closeout (the safety monitor ends the task)
+    leaves an `exhausted` row reason `no_closeout`; the same run on an untagged session leaves none."""
+    sess: dict = dict(SESS, model="gpt-6.2-sol", reasoning="high")
+    if canary:
+        sess["routing_experiment"] = {"kind": "canary", "proposal_id": "91ec998aa7e9"}
+    plan_dir = make_plan(tmp_path, [sess])
+    run.cmd_begin(plan_dir, ["s01"])
+    empty = tmp_path / "closeout-s01.txt"
+    empty.write_text("")
+    with pytest.raises(SystemExit):
+        run.cmd_apply(plan_dir, "s01", str(empty))
+    recs = _read_ledger(isolated_ledger)
+    assert len(recs) == rows
+    if canary:
+        assert (recs[0]["result"], recs[0]["gates_failed"]) == ("exhausted", ["no_closeout"])

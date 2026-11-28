@@ -50,7 +50,11 @@ def test_i2_closeout_quoting_a_marker_applies(tmp_path, capsys):
     plan_dir = _fixture(tmp_path)
     notes = json.dumps({"it-1": "handled 'This agent has not reported yet' text"})
     code, out = _apply(plan_dir, tmp_path, capsys, GOOD % notes)
-    assert out["applied"] is True
+    # A clean apply exits 0. `applied: true` alone does not say so: a refused closeout
+    # and an apply the structural gate blocks both print `applied` and exit 1, and a
+    # caller that reads only the exit code would take this case for one of those
+    # (review finding 7de0ce636f: these two success cases discarded `code`).
+    assert code == 0 and out["applied"] is True
     assert run._statuses(plan_dir)["s01"] == "DONE"
     run.cmd_release(plan_dir)
 
@@ -76,7 +80,7 @@ def test_i5_final_message_applies_after_an_interim_refusal(tmp_path, capsys):
     plan_dir = _fixture(tmp_path)
     _apply(plan_dir, tmp_path, capsys, INTERIM_TEXT)
     code, out = _apply(plan_dir, tmp_path, capsys, GOOD % "{}")
-    assert out["applied"] is True and run._statuses(plan_dir)["s01"] == "DONE"
+    assert code == 0 and out["applied"] is True and run._statuses(plan_dir)["s01"] == "DONE"
     run.cmd_release(plan_dir)
 
 

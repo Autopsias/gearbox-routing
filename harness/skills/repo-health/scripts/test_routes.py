@@ -174,7 +174,7 @@ def test_a_deliberate_operator_row_is_not_shaped_like_an_undecided_one():
     the operator ones, because routing something to the human is a decision.
     """
     import routes
-    for cid, r in routes.ROUTES.items():
+    for cid, r in {**routes.ROUTES, **_dynamic_cf_routes()}.items():
         assert r["routed"] is True, cid
     assert routes.UNKNOWN["routed"] is False
     # "never measured" is not "unrouted": the probe row carries an instruction.
@@ -251,7 +251,25 @@ ARGUMENT_METAVARS = {
 # "na: no dependency manifest tracked" and its commands were never checked.
 # That is why the fixture below tracks a manifest.
 PATH_BEARING = {"sec.dangerous-workflow", "sec.vendor-pins",
-                "test.runtime", "test.collection-cost", "test.parallel-safety"}
+                "test.runtime", "test.collection-cost", "test.parallel-safety",
+                "sec.sast#cf", "sec.sast#cf-mixed", "sec.sast#sentry-cov",
+                "sec.sast#cf-incomplete", "sec.sast#cf-recovery"}
+
+
+def _dynamic_cf_routes():
+    import route_table
+    import routes
+    a, sd = routes.agent, routes.SKILL_DIR
+    return {
+        "sec.sast#cf": route_table.build_cloudflare_sast_route(a, sd, has_deployment=True),
+        "sec.sast#cf-mixed": route_table.build_cloudflare_sast_route(
+            a, sd, exposure_mode="downgrade", mixed_sentry=True, sentry_carried=True,
+            also_pending=True),
+        "sec.sast#sentry-cov": route_table.build_sentry_with_coverage_route(a, sd),
+        "sec.sast#cf-incomplete": route_table.build_cloudflare_incomplete_route(a, sd),
+        "sec.sast#cf-recovery": route_table.build_cloudflare_recovery_route(
+            a, sd, open_set_error=True, missing_evidence=True, downgrade_only=True),
+    }
 
 
 def emitted_text(tmp_path):
@@ -264,7 +282,8 @@ def emitted_text(tmp_path):
     and carry their commands — see PATH_BEARING above.
     """
     import routes
-    rows = dict(routes.ROUTES, UNKNOWN=routes.UNKNOWN, PROBE=routes.PROBE)
+    rows = dict(routes.ROUTES, UNKNOWN=routes.UNKNOWN, PROBE=routes.PROBE,
+                **_dynamic_cf_routes())
     out = {(cid, field): v for cid, r in rows.items() for field, v in r.items()
            if isinstance(v, str) and v}
     repo = make_repo(tmp_path, "emitted", {"a.py": "x = 1\n",
@@ -343,7 +362,7 @@ def test_no_route_is_a_bare_slash_command():
     FILE an agent can read. The operator rows are the named exceptions above.
     """
     import routes
-    for cid, r in routes.ROUTES.items():
+    for cid, r in {**routes.ROUTES, **_dynamic_cf_routes()}.items():
         if r["dispatch"] == "operator":
             assert cid in OPERATOR_ONLY, f"{cid} is operator homework"
             assert r["operator"], f"{cid} is operator-only with no reason given"
@@ -637,3 +656,68 @@ def test_the_supply_chain_findings_file_is_never_shared_across_runs_or_repos(tmp
             f"{paths[0]} exists already — a previous run's file reads as this run's"
     assert a1[0] != b1[0], f"two repos share one findings file: {a1[0]}"
     assert a1[0] != a2[0], f"two runs share one findings file: {a1[0]}"
+
+
+# ---------- CF-02: handoff boundary and two-tier security docs ----------
+
+
+def _section_across_docs(heading_prefix):
+    """Find a `## ` section matching heading_prefix in SKILL.md or references/*.md."""
+    candidates = [SKILL_MD, *sorted((SKILL_DIR / "references").glob("*.md"))]
+    for md in candidates:
+        out, inside = [], False
+        for line in md.read_text().splitlines():
+            if line.startswith("## "):
+                if inside:
+                    break
+                inside = line.strip().startswith(heading_prefix)
+            elif inside:
+                out.append(line)
+        if out:
+            return "\n".join(out)
+    return ""
+
+
+def test_skill_and_fix_plan_use_handoff_boundary():
+    """All three consumer sites invoke `--handoff` and enforce its contract."""
+    workflow = skill_md_section("## Workflow")
+    assert "fix-routes --repo <repo> --advisory --handoff" in workflow, workflow
+    assert "omit_detail" in workflow and "stale" in workflow, workflow
+
+    fb = skill_md_section("## `--fix-blocking`")
+    assert "fix-routes --repo <repo> --handoff" in fb, fb
+    assert "exit 2" in fb.lower() and "stale" in fb.lower(), fb
+    assert "health.py collect" in fb, fb
+    assert "omit_detail" in fb and "never copy or append raw `detail`" in fb.lower(), fb
+
+    fix_plan = (SKILL_DIR / "references" / "fix-plan.md").read_text()
+    assert "--advisory --handoff" in fix_plan, fix_plan
+    assert "exit 2" in fix_plan.lower() and "stale" in fix_plan.lower(), fix_plan
+    assert "omit_detail" in fix_plan, fix_plan
+    assert "plan_item.description" in fix_plan and "plan_session.prompt" in fix_plan
+    assert "sessions/*.context.md" in fix_plan, fix_plan
+    assert "PoC" in fix_plan and "regression" in fix_plan.lower(), fix_plan
+    assert "--deep" in fix_plan and "owner decision" in fix_plan.lower(), fix_plan
+
+
+def test_two_tier_security_docs_distinguish_cloudflare_quick_and_claude_security():
+    """Merge-order-safe check on `--deep`, `Cadence`, and `checks.md` `sec.sast`."""
+    deep = _section_across_docs("## `--deep`")
+    cadence = _section_across_docs("## Cadence")
+    assert deep, "could not find --deep section in SKILL.md or references/*.md"
+    assert cadence, "could not find Cadence section in SKILL.md or references/*.md"
+    for label, text in (("--deep", deep), ("Cadence", cadence)):
+        assert "cloudflare-quick" in text, f"{label} missing cloudflare-quick"
+        assert "/claude-security" in text, f"{label} missing /claude-security"
+        for job in ("Scan codebase", "Scan changes", "Suggest patches",
+                    "Vulnerability Triage"):
+            assert job in text, f"{label} missing in-session job {job}"
+        assert "--changes" not in text, (
+            f"{label} recommends Linux-only --changes CLI flag on macOS")
+    assert "OS-level network sandbox" in deep, deep
+
+    checks = (SKILL_DIR / "references" / "checks.md").read_text()
+    sast_lines = [ln for ln in checks.splitlines() if ln.startswith("| sec.sast |")]
+    assert len(sast_lines) == 1, sast_lines
+    assert "--deep" in sast_lines[0] and "exposure.py" in sast_lines[0]
+    assert "cloudflare-quick" in sast_lines[0]

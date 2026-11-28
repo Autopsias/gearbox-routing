@@ -7,7 +7,8 @@ Reference companion to [SKILL.md](../SKILL.md). Holds the per-probe command and 
 - [Pending probes](#pending-probes)
 - [Fix routing](#fix-routing)
 - [Vendored third-party skills](#vendored-third-party-skills)
-- [Gotchas and cadence](#gotchas-and-cadence)
+- [Observed gotchas](#observed-gotchas)
+- [Cadence](#cadence)
 
 ---
 
@@ -53,7 +54,7 @@ The primary mechanism has one sharp edge the probe hit: command files were writt
 |---|---|---|
 | `sec.secrets-history`, `sec.tracked-sensitive` | Agent `general-purpose`: `git rm --cached` the file, add the matching .gitignore rule, report kind + location only — never the value | **yes** — rotate every leaked credential; a history rewrite is a human call |
 | `sec.dep-vulns` | Agent `security-scanner`, `--mode=fix`: upgrade to the fixed versions, re-run the audit, report before/after counts | no |
-| `sec.sast` | Agent `security-scanner`, `--mode=fix` over findings triaged in context | no |
+| `sec.sast` | Default Semgrep/Bandit: Agent `security-scanner`, `--mode=fix` over findings triaged in context. When verified Cloudflare/exposure state applies (`omit_detail=True`, reading via `exposure.py show-open <evidence_repo>`): Agent `general-purpose` for Cloudflare prove-then-fix or mixed Sentry+Cloudflare; Agent `security-scanner` for Sentry+coverage (`last_sentry` only); read-only Agent `general-purpose` for incomplete/coverage-only or recovery/downgrade-only routes | conditional — no for default Semgrep/Bandit; yes when open leads need deployment-only validation, coverage is unfinished, state recovery/repair is required, or an exposure downgrade/error is unacknowledged |
 | `sec.diff-review` | Agent `security-scanner`, `--mode=fix` over the **confirmed** findings only — the false-positive bar ran before they were recorded, so the fixer does not re-triage | no |
 | `sec.dep-update-config` | Agent `ci-infrastructure-builder`: `.github/dependabot.yml` for every ecosystem with a tracked manifest, plus `github-actions`, weekly | no |
 | `sec.workflow-permissions`, `sec.action-pinning`, `sec.dangerous-workflow` | Agent `ci-infrastructure-builder`, one prompt per check: least-privilege top-level block / full-SHA pins with a version comment / the injection path, reading `<skill>/vendor/gha-security-review/SKILL.md` first | no |
@@ -78,7 +79,7 @@ The primary mechanism has one sharp edge the probe hit: command files were writt
 | `hyg.todo-density` | — | **yes, wholly.** No command fixes TODO density: each marker is either work to schedule or a stale line to delete, and only the owner knows which. `/declutter` is not it — read-only by invariant, no `--fix`, and a fan-out costing ~1–1.5M subagent tokens |
 | `ai.agents-md` | — | **yes, wholly.** `/init` is a Claude Code **built-in**: it is not a command file, so there is nothing for a subagent to read and follow. Run it yourself, then trim the result to commands + conventions |
 
-`python3 <skill>/scripts/health.py fix-routes --repo <repo>` prints the same routing as one JSON object per blocking check that is **failing or unmeasured**, with `status`, `tier`, `agent`, `prompt`, the resolved `command_file`, `flag_check`, `operator` and `routed` filled in — plus `stale` on **every** row when the scorecard those rows were computed from describes a different or dirty tree, so a dispatch can never look freshly-measured when it is not (the key is absent, not empty, when the card matches this tree). Every check the collector emits is in the table above — `routed` is `false` **only** for a check id nobody has written a route for at all, which is the one case that means "go edit `routes.py`". The rows with a dash in the middle column are `routed: true`: a decision that no automation fits, not an unfinished one. A check still `pending` gets a `"dispatch": "probe"` row naming the probe to run — it is not silently skipped with the passing ones, because a check nobody ran is not one that passed. Add **`--advisory`** once the user has given the step-5 go-ahead: it ADDS the advisory checks sitting at `warn` or `fail` — with their routes from the same table — on top of the blocking rows, never instead of them. Without it the output is blocking only, which is the set `--fix-blocking` may touch. The table above is the human-readable index of that data and `scripts/routes.py` is the source — `test_skill_md_routing_table_matches_the_code` fails the suite when they drift.
+`python3 <skill>/scripts/health.py fix-routes --repo <repo>` prints the same routing as one JSON object per blocking check that is **failing or unmeasured**, with `status`, `tier`, `agent`, `prompt`, the resolved `command_file`, `flag_check`, `operator` and `routed` filled in — plus `stale` on **every** row when the scorecard those rows were computed from describes a different or dirty tree, so a dispatch can never look freshly-measured when it is not (the key is absent, not empty, when the card matches this tree). Pass **`--handoff`** at dispatch/plan boundaries to refuse stale scorecards with **exit 2** and emit ready `plan_item`/`plan_session` payloads (rows with `"omit_detail": true` scrub raw `detail` so the agent reads digest-verified findings via `exposure.py show-open`). Every check the collector emits is in the table above — `routed` is `false` **only** for a check id nobody has written a route for at all, which is the one case that means "go edit `routes.py`". The rows with a dash in the middle column are `routed: true`: a decision that no automation fits, not an unfinished one. A check still `pending` gets a `"dispatch": "probe"` row naming the probe to run — it is not silently skipped with the passing ones, because a check nobody ran is not one that passed. Add **`--advisory`** once the user has given the step-5 go-ahead: it ADDS the advisory checks sitting at `warn` or `fail` — with their routes from the same table — on top of the blocking rows, never instead of them. Without it the output is blocking only, which is the set `--fix-blocking` may touch. The table above is the human-readable index of that data and `scripts/routes.py` is the source — `test_skill_md_routing_table_matches_the_code` fails the suite when they drift.
 
 **The arguments are checked too, not just the file name.** Every flag a route passes must appear in the target command file's `argument-hint:` frontmatter. Four routes once passed `--fix` to commands that define no such flag, so it landed on a positional (`test_scope`; the CI issue description) and the dispatch spent a subagent budget changing nothing. It is checked in three places, because the source and the copy that actually runs are different files:
 
@@ -109,19 +110,21 @@ Two known limits, both recorded in `vendor.json`: Sentry's `security-review` nam
 
 `check` applies the same rule to the network: an entry whose upstream it could not reach — no `gh`, unauthenticated, rate-limited, offline — was printed with a `?` and then dropped, so the run exited 0 with zero trees compared. It now exits 2 and names them. `verify` is unaffected by any of this: it is offline by construction.
 
-## Gotchas and cadence
+**Cloudflare run folders & trust model:** run folders hold vulnerability details and stay under `~/.gearbox-state` until deleted by hand. Keep the newest few per repo (later runs read them as prior runs) and never delete the newest accepted run folder (it holds the open set). The open set is kept per clone path (a re-clone or moved checkout starts empty) and protects against accidental loss and stale state, not against an agent with write access to `~/.gearbox-state`, which can also write `sec.sast` directly.
 
-### Observed gotchas
+## Observed gotchas
 
 - 2026-08-18: the full-history gitleaks scan took 8m36s on a 415-commit / 180 MB repo — start it in the background first, run the other probes while it works. (2026-11-09: it passed 15 minutes and the weekly run died waiting on it, so `scan-secrets` now scans only new commits and has a cap.)
 - 2026-11-10: a scheduled run ended its turn on "Semgrep runs now in the background" and never rendered, so no history line was written. In a scheduled or unattended run **never end your turn while a background command runs**: keep polling in the same turn (a short `until` loop with its own time limit), and at the command's cap record the check `pending` with the reason, then go on to `render`. A pending check is a result; a missing history line is not.
 - 2026-08-18: a suite's wall clock moved 202 s → 1513 s purely from CPU contention with other work. Record the idle-machine number, or the trend measures your laptop, not the repo.
 - 2026-08-18: an "intermittent" test was diagnosed as a TOCTOU race and "fixed" — it failed again on the next full run for a different reason (a derived path that was never created, not one that vanished). A test that passes in isolation proves nothing about why it failed; get the failing entry's actual data before naming a cause, and probe the fix in BOTH directions — it must still fail on the real defect.
 
-### Cadence
+## Cadence
 
 Re-run monthly or after any large change; the history strip makes drift visible. Comparing layers across repos is valid — the checks are repo-shape-aware, so a repo without workflows, without a remote, or without dependencies gets `na` rather than a penalty.
 
 Two things make a re-run cheap enough to actually happen: start the secrets scan (`scan-secrets`, which reads only new commits) in the background first and run the other probes while it works, and record the suite's wall clock from an **idle** machine — otherwise the trend line measures your laptop, not the repo.
 
 **Rolling out to a new repo:** run it, read the first scorecard as a baseline rather than a verdict, and expect the first run to surface scope disagreements (a linter and a quality gate policing different files) before it surfaces real defects. Fix the scope first, or every later number is noise.
+
+**Security cadence (two tiers on macOS):** run `/repo-health --deep` (`cloudflare-quick` on `.claude/exposure.json` repos) as the periodic ~20 min Sonnet tier, and reserve the installed `/claude-security` plugin's in-session jobs (`Scan codebase`, `Scan changes`, `Suggest patches`, `Vulnerability Triage`) for multi-hour Opus/Fable pre-release reviews.

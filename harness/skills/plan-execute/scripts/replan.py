@@ -83,7 +83,7 @@ def _statuses(plan_dir):
 
 
 def record_path(plan_dir, session_id):
-    return Path(plan_dir) / REPLAN_DIR / f"{session_id}.json"
+    return sj.resolve_inside(Path(plan_dir) / REPLAN_DIR, f"{session_id}.json")
 
 
 def load(plan_dir, session_id):

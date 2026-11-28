@@ -97,7 +97,7 @@ If a dispatched `Task` fails or is refused for **model access/entitlement**, imm
 When `begin` reports `active_provider: zai` (`~/.claude-glm` or `PLAN_EXECUTE_ROUTING_PROVIDER=zai`):
 - `model_arg`/`reasoning` are already translated to the ZAI cell (`Sonnet`→`sonnet`@max-or-low, `Opus`→`opus`@max, `Haiku`/`Fable` collapsed onto `sonnet`/`opus`), and `subagent_type` names a zai tier agent (`tier-sonnet-low`, `tier-sonnet-max`, `tier-opus-max`).
 - Degradation keeps `max` (`opus → sonnet@max`). Escalation has no apex and tops out at `opus@max`; null fallback on `sonnet` stops.
-- Announce with the wire name when known (e.g. `glm-5.3` / `glm-5.3-flash`).
+- Under the GLM env the tokens are `glm-5.3-flash` / `glm-5.4` (since routing v46, 2026-11-27; `glm-5.3` before) — announce with the wire name when known (e.g. *“Dispatching ‘Build govrun’ (s01) on glm-5.4 · reasoning: max”*).
 
 ## Workflow dispatch and seam rule
 

@@ -26,6 +26,14 @@ def test_bare_json_object_with_a_session_is_the_closeout():
     assert got["status"] == "ok" and got["json_text"] == BODY
 
 
+def test_text_notes_become_the_session_note_and_other_shapes_still_fail():
+    base = '{"session": "s04", "result": "DONE", "items_completed": [], "items_blocked": [], "notes": %s}'
+    got = cp.parse_and_validate_schema(base % '"one line"')
+    assert got["status"] == "ok" and got["parsed"]["notes"] == {"s04": "one line"}, got
+    bad = cp.parse_and_validate_schema(base % '["one line"]')
+    assert bad["status"] == "schema_error" and "'notes' must be dict, got list" in bad["violations"]
+
+
 def test_bare_text_that_is_not_a_session_object_still_reads_missing():
     for raw in ('{"result": "DONE"}', '[{"session": "s04"}]', "{not json", "Done. {\"session\": \"s04\"}"):
         assert cp.extract(raw)["status"] == "missing", raw

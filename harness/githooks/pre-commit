@@ -37,8 +37,9 @@ fi
 # and the CI template gearbox SHIPS runs it, but gearbox never ran it on itself.
 # 44 functions were over the bound when it was first pointed here.
 _ratchet_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+_ratchet_failed=0  # every ratchet runs and prints its failures, so one commit attempt shows them all
 if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes.py" ]]; then
-  for _check in check_file_sizes check_function_lengths check_complexity check_subprocess_results; do
+  for _check in check_file_sizes check_function_lengths check_complexity check_subprocess_results check_shared_append; do
     # A worktree cut before a checker existed has no such file: skip it. A checker that git tracks
     # (in HEAD or the index) but that is missing from disk is a broken tree: block, never skip.
     if [[ ! -f "$_ratchet_root/scripts/quality/$_check.py" ]]; then
@@ -52,9 +53,7 @@ if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes
     if ! python3 "$_ratchet_root/scripts/quality/$_check.py" --staged --project "$_ratchet_root"; then
       echo "" >&2
       echo "COMMIT BLOCKED: $_check — this commit grows code past its bound." >&2
-      echo "Split the file or extract a helper. Re-record a baseline only when" >&2
-      echo "the growth is genuinely unavoidable (--generate-baseline)." >&2
-      exit 1
+      _ratchet_failed=1
     fi
   done
   # Always-loaded context bound (owner decision, STRATEGY.md "Small, plain and owned"):
@@ -62,7 +61,7 @@ if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes
   if [[ -f "$_ratchet_root/scripts/quality/check_context_size.py" ]] && \
      ! python3 "$_ratchet_root/scripts/quality/check_context_size.py" --staged --project "$_ratchet_root"; then
     echo "COMMIT BLOCKED: check_context_size — this commit grows an always-loaded file past its bound. Prune first." >&2
-    exit 1
+    _ratchet_failed=1
   fi
   # Type-error ratchet for the staged files (1.5 s whole-tree, measured). CI runs it
   # too, but only after the push: a miss cost one failed CI run. Exit 2 (ty missing, or the script rejected its arguments) only warns, with the script's own message above.
@@ -75,10 +74,15 @@ if [[ -n "$_ratchet_root" && -f "$_ratchet_root/scripts/quality/check_file_sizes
     echo "" >&2
     echo "COMMIT BLOCKED: check_types — a staged file adds a type error (see BLOCK lines above)." >&2
     echo "Fix the error. CI runs the same check on the whole tree." >&2
-    exit 1
+    _ratchet_failed=1
   elif [[ $_rc -ne 0 ]]; then
     echo "WARNING: check_types exited $_rc and did NOT check this commit; read its message above (2 = ty missing or bad arguments). CI still runs it." >&2
   fi
+fi
+if [[ $_ratchet_failed -ne 0 ]]; then
+  echo "Fix every COMMIT BLOCKED line above. Split the file or extract a helper; re-record a baseline" >&2
+  echo "only when the growth is genuinely unavoidable (--generate-baseline)." >&2
+  exit 1
 fi
 
 # ============================================================================

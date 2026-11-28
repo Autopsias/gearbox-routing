@@ -60,6 +60,7 @@ try:
     import shipping_adapter as _ship_adapter
 except ImportError:
     _ship_adapter = None
+from safe_json import resolve_inside  # noqa: E402 — the write guard, shared with plan-execute; unguarded on purpose: without it the build must stop, not write unchecked
 
 # Same single-sourcing for per-article runtime state: article_block.py defines
 # what /plan-execute writes into a PLAN.html article AND how a --rebuild carries
@@ -342,7 +343,8 @@ def _validate_verify_block(block, where):
     gates = block.get("gates")
     # gates may be omitted when require_evidence carries the block on its own; but
     # an empty block (neither gates nor require_evidence) is meaningless.
-    if gates is None and not require_evidence and not block.get("checks") and "locked" not in block:
+    if gates is None and not require_evidence and not block.get("checks") and "locked" not in block \
+            and "blocking_rule" not in block:
         raise ValueError(f"{where} must declare `gates` (non-empty), `require_evidence: true`, "
                          f"and/or `checks` (non-empty)")
     if gates is not None and (not isinstance(gates, list) or not gates
@@ -3434,10 +3436,10 @@ def build(spec, out_path, project_root=None, preserve_state=False):
         sid = s["id"]
         resolved_ps = resolve_post_session(s, phases_by_id)
         resolved_vb = resolve_verify(s, phases_by_id)
-        write_clean_text(sessions_dir / f"{sid}.prompt.md", gen_session_prompt_md(
+        write_clean_text(resolve_inside(sessions_dir, f"{sid}.prompt.md"), gen_session_prompt_md(
             s, plan_dir.name, items_by_id, post_session=resolved_ps, verify=resolved_vb,
             plan_schema_version=stamp, project_root=reg_root))
-        write_clean_text(sessions_dir / f"{sid}.context.md", gen_session_context_md(s, items_by_id))
+        write_clean_text(resolve_inside(sessions_dir, f"{sid}.context.md"), gen_session_context_md(s, items_by_id))
 
     # 6. _closeouts/ directory placeholder
     (plan_dir / "_closeouts").mkdir(exist_ok=True)

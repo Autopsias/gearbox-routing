@@ -33,7 +33,7 @@ def rule_too_long(args, max_chars):
 
 def parse_args(argv, description, levels):
     ap = argparse.ArgumentParser(description=description)
-    ap.add_argument("--level", required=True, choices=levels)
+    ap.add_argument("--level", required=True, choices=levels, help="review level to run")
     ap.add_argument("--reviewer", default="claude", choices=("claude", "codex"),
                     help="which FAMILY reviews. `claude` is the on-box reviewer -- "
                          "the default, and every line of this file's history. "
@@ -45,7 +45,7 @@ def parse_args(argv, description, levels):
                          "default from 2026-10-11 (operator decision): on 20 broken + 20 correct "
                          "eval diffs it separated them at least as well as opus at under half "
                          "the cost. `opus` was the default before that date.")
-    ap.add_argument("--cwd", default=".")
+    ap.add_argument("--cwd", default=".", help="directory the review runs in")
     ap.add_argument("--harness", choices=("claude", "codex"),
                     default=os.environ.get("PLAN_EXECUTE_HARNESS", "claude"),
                     help="which family BUILT the code under review (verify.py "
@@ -56,7 +56,8 @@ def parse_args(argv, description, levels):
                     help="per-attempt wall limit in seconds (the gate makes at "
                          "most 2 attempts, so budget the registry timeout at "
                          "2x this plus slack)")
-    ap.add_argument("--intent-file", default=os.environ.get("PLAN_EXECUTE_INTENT_FILE", ""))
+    ap.add_argument("--intent-file", default=os.environ.get("PLAN_EXECUTE_INTENT_FILE", ""),
+                    help="file holding the session intent the reviewer is told")
     ap.add_argument("--blocking-rule", default=os.environ.get("PLAN_EXECUTE_BLOCKING_RULE", ""),
                     help="the plan author's numbered blocking conditions (the session's "
                          "verify.blocking_rule). With it, a finding blocks only when the reviewer "

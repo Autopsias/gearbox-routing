@@ -639,3 +639,18 @@ def test_no_check_was_added_or_lost(gate_results):
     check."""
     got, want = set(gate_results), set(EXPECTED_CHECKS)
     assert got == want, f"missing: {sorted(want - got)}\nunexpected: {sorted(got - want)}"
+
+
+def test_session_verify_may_set_only_blocking_rule():
+    build_plan._validate_verify_block({"blocking_rule": "1. a failure a test could show"}, "s.verify")
+    phases = {"p": {"verify": {"gates": ["llm-review-medium"]}}}
+    merged = build_plan.resolve_verify({"phase": "p", "verify": {"blocking_rule": "1. x"}}, phases)
+    assert merged["gates"] == ["llm-review-medium"] and merged["blocking_rule"] == "1. x"
+
+
+@pytest.mark.parametrize("rule", ["", "  ", 3])
+def test_a_wrong_blocking_rule_is_still_refused(rule):
+    with pytest.raises(ValueError, match="blocking_rule"):
+        build_plan._validate_verify_block({"gates": ["llm-review-medium"], "blocking_rule": rule}, "s.verify")
+    with pytest.raises(ValueError, match="blocking_rule"):
+        build_plan._validate_verify_block({"blocking_rule": rule}, "s.verify")

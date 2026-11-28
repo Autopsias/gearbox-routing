@@ -180,7 +180,7 @@ def _session_classes(status):
 def _session_record(vdir, sid):
     """One session's gate_status; a missing or unreadable record is an empty one."""
     try:
-        return sj.get_dict(sj.load_dict(Path(vdir, f"{sid}.json").read_text()), "gate_status", {})
+        return sj.get_dict(sj.load_dict(sj.resolve_inside(vdir, f"{sid}.json").read_text()), "gate_status", {})
     except OSError:
         return {}
 

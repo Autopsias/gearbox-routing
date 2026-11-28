@@ -29,12 +29,32 @@ def changed_lines(cwd, base, changed, new_files) -> int:
     """Changed lines of tracked files (git numstat) plus every line of each new file."""
     total = 0
     if changed:
-        res = subprocess.run(["git", "diff", "--numstat", base or "HEAD", "--", *changed],
+        wanted = set(changed)
+        res = subprocess.run(["git", "diff", "--numstat", "-z", base or "HEAD"],
                              cwd=cwd, capture_output=True, text=True, check=False)
-        for ln in (res.stdout if res.returncode == 0 else "").splitlines():   # a failed diff: size unknown, no halt
-            a, _, rest = ln.partition("\t")
-            b = rest.partition("\t")[0]
-            total += (int(a) if a.isdigit() else 0) + (int(b) if b.isdigit() else 0)
+        if res.returncode == 0:  # a failed diff: size unknown, no halt
+            entries = res.stdout.split("\0")
+            i = 0
+            while i < len(entries):
+                entry = entries[i]
+                i += 1
+                if not entry:
+                    continue
+                a, sep, rest = entry.partition("\t")
+                if not sep:
+                    continue
+                b, sep2, path = rest.partition("\t")
+                if not sep2:
+                    continue
+                if path:
+                    matched = path in wanted
+                elif i + 1 < len(entries):  # -z rename/copy: NUL old_path NUL new_path
+                    matched = entries[i] in wanted or entries[i + 1] in wanted
+                    i += 2
+                else:
+                    break
+                if matched:
+                    total += (int(a) if a.isdigit() else 0) + (int(b) if b.isdigit() else 0)
     for f in new_files:
         try:
             total += len(Path(cwd, f).read_bytes().splitlines())

@@ -120,5 +120,5 @@ def run_argv(plan_dir, session_id, g, dry_run):
     res = ssio.run_deploy_argv(g["argv"], cwd=cwd, timeout=g.get("timeout", 1200),
                                env_allowlist=g.get("env_allowlist", []), env_extra=env)
     gt.log_run(plan_dir, "verify", session_id, g["name"], gt.ms_since(t0) / 1000,
-               ssio.argv_outcome(res, g.get("indeterminate_exit")))
+               ssio.argv_outcome(res, g.get("indeterminate_exit")), res.get("stdout") or "")
     return res

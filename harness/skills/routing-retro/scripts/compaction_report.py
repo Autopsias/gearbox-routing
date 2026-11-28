@@ -382,13 +382,13 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scan", required=True, help="retro_scan.py JSON")
     ap.add_argument("--root", default=None, help="compaction state root (default ~/.gearbox-state/compaction)")
-    ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"))
+    ap.add_argument("--settings", default=os.path.expanduser("~/.claude/settings.json"), help="settings.json to read the autocompact window from")
     ap.add_argument("--plans-glob", default=None,
                     help="closeout glob for the adherence row; pass it SINGLE-QUOTED "
                          "so the shell expands neither the globs nor '~' — the script "
                          "expands '~' itself")
-    ap.add_argument("--dispatch", default=cr.DISPATCH_LEDGER)
-    ap.add_argument("-o", "--output", default=None)
+    ap.add_argument("--dispatch", default=cr.DISPATCH_LEDGER, help="dispatch ledger to read")
+    ap.add_argument("-o", "--output", default=None, help="write the JSON here instead of stdout")
     args = ap.parse_args(argv)
 
     with open(args.scan, encoding="utf-8") as f:

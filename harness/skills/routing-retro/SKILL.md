@@ -68,7 +68,7 @@ python3 ~/.claude/skills/routing-retro/scripts/retro_scan.py \
 - Read the JSON output, not the transcripts. Only open a raw transcript when a specific
   finding needs verbatim evidence (quote a switch line, confirm an escalation sequence).
 - Do not count prose routing receipts (`class -> tier` lines): that rule was retired in
-  `model-routing.yaml` DECISION HISTORY v1.18, and a missing one is NOT a misroute signal.
+  `docs/ROUTING-CHANGELOG.md` (`DECISION HISTORY` v1.18), and a missing one is NOT a misroute signal.
   Since v1.18 `hooks/dispatch-audit.py` is the dispatch record (log
   `~/.gearbox-state/routing/dispatch-audit.ndjson`).
 
@@ -342,7 +342,7 @@ empty activation ledger; a malformed-only ledger is `activation_unknown` + `PART
 
 ### 4. "Did it stick" check
 
-If a prior `/routing-update` or retro applied changes (check the SSOT `DECISION HISTORY`
+If a prior `/routing-update` or retro applied changes (check `docs/ROUTING-CHANGELOG.md`
 dates and `evals/routing/results/*/ROUTING-*-CHANGESET.md`), verify they're still in place:
 
 - Guard-covered surfaces: `bash ~/.claude/scripts/verify-routing.sh --full` (read-only) —

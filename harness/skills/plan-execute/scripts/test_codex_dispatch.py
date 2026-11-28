@@ -486,3 +486,17 @@ def test_explicit_codex_pin_on_irreversible_blocks_loudly(tmp_path, capsys, ssot
     assert run._statuses(plan_dir)["s01"] == "BLOCKED"
 
 
+@pytest.mark.parametrize("canary", [True, False])
+def test_record_only_pin_needs_the_canary_tag(ssot, canary):
+    """gpt-6.2-astra is a RECORD ONLY price row, not a routing tier: only a canary-tagged
+    session may pin it (effort = the session's reasoning, never ultra); any other pin refuses."""
+    text = ssot("openai").read_text() + (
+        '\nprices:\n  "gpt-6.2-astra": { in: 8.00, out: 40.00, note: "RECORD ONLY (test)" }\n')
+    if not canary:
+        with pytest.raises(ssot_policy.UnroutableCodexSession):
+            run._resolve_codex_dispatch("gpt-6.2-astra", "high", text)
+        return
+    assert run._resolve_codex_dispatch("gpt-6.2-astra", "high", text, canary=True) == ("gpt-6.2-astra", "high")
+    assert run._resolve_codex_dispatch("gpt-6.2-astra", "", text, canary=True)[1] == "medium"
+    with pytest.raises(ssot_policy.UnroutableCodexSession):   # a model with no RECORD ONLY row stays refused
+        run._resolve_codex_dispatch("gpt-9-nope", "high", text, canary=True)

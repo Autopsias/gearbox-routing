@@ -44,6 +44,10 @@ import sys
 import time
 from pathlib import Path
 
+# the one path guard lives in plan-execute's safe_json; appended, so it never shadows a hook module
+sys.path.append(str(Path(__file__).resolve().parent.parent / "skills" / "plan-execute" / "scripts"))
+from safe_json import resolve_inside  # noqa: E402
+
 MAX_BLOCKS = 3
 BG_TOOLS = ("Agent", "Workflow", "Task")
 DOING_RE = re.compile(r'<article class="session" id="([^"]+)"[^>]*data-status="DOING"')
@@ -94,6 +98,21 @@ def merge_parked_on_owner(body: str) -> bool:
     return bool(MERGE_WORD_RE.search(lines[-1]) and GATE_MERGE_RE.search(body))
 
 
+def _loads(text: str):
+    """json.loads, or None for text that is not JSON or is nested too deep (RecursionError on Python 3.11 to 3.15)."""
+    try:
+        return json.loads(text)
+    except (ValueError, RecursionError):
+        return None
+
+
+def _blocks(row) -> list[dict]:
+    """The dict content blocks of a transcript row; [] for any other shape."""
+    inner = row.get("message") if isinstance(row, dict) else None
+    content = inner.get("content") if isinstance(inner, dict) else None
+    return [c for c in content if isinstance(c, dict)] if isinstance(content, list) else []
+
+
 def state_dir() -> Path:
     return Path(os.environ.get("TURNEND_GUARD_STATE") or Path.home() / ".gearbox-state" / "turnend-guard")
 
@@ -111,10 +130,13 @@ def plans_of(cwd: Path, session_id: str) -> list[Path]:
     out = []
     for rs in sorted((cwd / "_plans").glob("*/run_state.json")):
         try:
-            lb = (json.loads(rs.read_text()).get("last_batch") or {})
-        except (OSError, ValueError):
+            state = _loads(rs.read_text())
+        except OSError:
             continue
-        if lb.get("orchestrator_session_id") == session_id:
+        if not isinstance(state, dict):
+            continue  # a broken row is skipped, never repaired
+        lb = state.get("last_batch")
+        if isinstance(lb, dict) and lb.get("orchestrator_session_id") == session_id:
             out.append(rs.parent)
     return out
 
@@ -122,20 +144,20 @@ def plans_of(cwd: Path, session_id: str) -> list[Path]:
 def _scan_blocks(line: str, issued: dict, results: dict, sends: dict, stopped: set | None = None) -> list:
     """One transcript line: record background tool_use ids and their tool_result text.
     Returns the agent ids a SendMessage on this line resumed or queued a message for."""
-    try:
-        msg = (json.loads(line).get("message") or {}).get("content")
-    except ValueError:
-        return []
     woken = []
-    for c in msg if isinstance(msg, list) else []:
+    for c in _blocks(_loads(line)):
+        if not all(isinstance(c.get(k, ""), str) for k in ("type", "name", "id", "tool_use_id")):
+            continue  # a wrong-typed field: skip the block, never repair it
+        inp = c.get("input")
+        inp = inp if isinstance(inp, dict) else {}
         if c.get("type") == "tool_use" and (c.get("name") in BG_TOOLS or (
-            c.get("name") == "Bash" and (c.get("input") or {}).get("run_in_background")
+            c.get("name") == "Bash" and inp.get("run_in_background")
         )):
             issued[c.get("id")] = c.get("name")
         elif c.get("type") == "tool_use" and c.get("name") == "TaskStop" and stopped is not None:
-            stopped.add(str((c.get("input") or {}).get("task_id") or ""))
-        elif c.get("type") == "tool_use" and c.get("name") == "SendMessage":
-            sends[c.get("id")] = (c.get("input") or {}).get("to")
+            stopped.add(str(inp.get("task_id") or ""))
+        elif c.get("type") == "tool_use" and c.get("name") == "SendMessage" and isinstance(inp.get("to"), str):
+            sends[c.get("id")] = inp["to"]
         elif c.get("type") == "tool_result" and c.get("tool_use_id") in sends:
             if any(m in str(c.get("content")) for m in RESUMED):
                 woken.append(sends[c["tool_use_id"]])
@@ -213,14 +235,10 @@ def last_reply_text(transcript_path: str | None) -> str:
     except OSError:
         return ""
     for line in reversed(lines):
-        try:
-            msg = json.loads(line)
-        except ValueError:
+        msg = _loads(line)
+        if not isinstance(msg, dict) or msg.get("type") != "assistant":
             continue
-        if msg.get("type") != "assistant":
-            continue
-        text = "".join(c.get("text", "") for c in (msg.get("message") or {}).get("content") or []
-                       if isinstance(c, dict) and c.get("type") == "text")
+        text = "".join(c["text"] for c in _blocks(msg) if c.get("type") == "text" and isinstance(c.get("text"), str))
         if text:
             return text
     return ""
@@ -239,10 +257,13 @@ def reply_guard(payload: dict, session_id: str) -> int:
     # gate); it is not open work. And a reply sent while background work runs is a
     # wait, not an end: both blocked every reworded status reply.
     body = re.sub(r"(?m)^State:.*$", "", text)
-    if NOTHING_RE.search(body) and OPEN_RE.search(body):
+    hit = OPEN_RE.search(body) if NOTHING_RE.search(body) else None
+    if hit:
         if background_outstanding(payload.get("transcript_path")):
             return 0
-        msg = ("TURN-END GUARD: your reply says 'Needs you: nothing' but also names open work. "
+        # The matched words, so the retry fixes the right phrase (a past-tense 'left open' blocked too).
+        msg = (f"TURN-END GUARD: your reply says 'Needs you: nothing' but also names open work "
+               f"(matched: '{hit.group(0)}'). "
                "Do the work you can do now, or put each item in a decision card or a dated timer, "
                "then send the reply again. This block fires once per reply.\n")
     elif merge_parked_on_owner(body):
@@ -255,13 +276,17 @@ def reply_guard(payload: dict, session_id: str) -> int:
                "('my pick: ...'), then send the reply again. This block fires once per reply.\n")
     else:
         return 0
-    sf = state_dir() / f"{session_id}.reply.json"
+    try:
+        sf = resolve_inside(state_dir(), f"{session_id}.reply.json")
+    except ValueError:  # a session id that leaves the state folder: no state, no block
+        return 0
     sig = hashlib.sha1(text.encode()).hexdigest()
     try:
-        if json.loads(sf.read_text()).get("sig") == sig:
-            return 0
-    except (OSError, ValueError):
-        pass
+        seen = _loads(sf.read_text())
+    except OSError:
+        seen = None
+    if isinstance(seen, dict) and seen.get("sig") == sig:
+        return 0
     try:
         sf.parent.mkdir(parents=True, exist_ok=True)
         sf.write_text(json.dumps({"sig": sig}))
@@ -272,9 +297,8 @@ def reply_guard(payload: dict, session_id: str) -> int:
 
 
 def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except ValueError:
+    payload = _loads(sys.stdin.read())
+    if not isinstance(payload, dict):
         return 0
     session_id = payload.get("session_id")
     if not session_id:
@@ -289,12 +313,19 @@ def main() -> int:
 
     sig = json.dumps([(str(p), s) for p, s in findings])
     sd = state_dir()
-    sf = sd / f"{session_id}.json"
     try:
-        st = json.loads(sf.read_text())
-    except (OSError, ValueError):
+        sf = resolve_inside(sd, f"{session_id}.json")
+    except ValueError:
+        return 0
+    try:
+        st = _loads(sf.read_text())
+    except OSError:
+        st = None
+    if not isinstance(st, dict):
         st = {}
-    n = st.get("n", 0) if st.get("sig") == sig else 0
+    n = st.get("n") if st.get("sig") == sig else 0
+    if not isinstance(n, int):
+        n = 0  # a counter of the wrong type restarts the count
     if n >= MAX_BLOCKS:
         return 0
     try:

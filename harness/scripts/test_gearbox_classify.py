@@ -159,6 +159,8 @@ def test_restore_orca_hook_timeout():
             "hooks": {
                 "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": orca_cmd, "timeout": 30}]}],
                 "SessionStart": [],
+                "PostToolUse": [{"matcher": "*", "hooks": [{"command": "a.sh"}]},
+                                {"matcher": "*", "hooks": [{"command": "b.sh"}]}],
             },
         }
         spath = os.path.join(d, "settings.json")
@@ -204,6 +206,20 @@ def test_restore_orca_hook_timeout():
         raised = json.loads(json.dumps(base))
         raised["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 45
         open(spath, "w", encoding="utf-8").write(json.dumps(raised, indent=2) + "\n")
+        assert gc.restore_orca_hook_timeout(d) is None
+
+        # 5. Orca downgrade PLUS Orca moving entries within an event (seen): restores both.
+        moved = json.loads(json.dumps(base))
+        moved["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"] = 10
+        moved["hooks"]["PostToolUse"].reverse()
+        open(spath, "w", encoding="utf-8").write(json.dumps(moved, indent=2) + "\n")
+        assert gc.restore_orca_hook_timeout(d) == (10, 30)
+        assert json.loads(open(spath, encoding="utf-8").read())["hooks"] == base["hooks"]
+
+        # 6. A moved entry that was also edited is not a move: must refuse.
+        moved_edit = json.loads(json.dumps(moved))
+        moved_edit["hooks"]["PostToolUse"][0]["hooks"][0]["command"] = "evil.sh"
+        open(spath, "w", encoding="utf-8").write(json.dumps(moved_edit, indent=2) + "\n")
         assert gc.restore_orca_hook_timeout(d) is None
 
 

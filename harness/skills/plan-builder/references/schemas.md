@@ -381,7 +381,7 @@ as effort drops — `max` 67% → `high` 44% → `medium` 11%. Never pair `gpt-5
 with any `reasoning` other than `max`; a "cheap" luna session run at a lower tier
 isn't cheaper, it's broken.
 
-#### GLM (zai) resolution — the `~/.claude-glm` tree (v1.21)
+#### GLM (zai) resolution — the `~/.claude-glm` tree (v1.21, 2026-08-30; opus-slot wire model → glm-5.4 at v46)
 
 **You do not author GLM plans differently.** A plan's `model`/`reasoning` vocabulary
 stays exactly as above — `Opus`/`Sonnet` + `low`…`max` — and the SAME plan directory
@@ -394,19 +394,26 @@ resolution time; nothing is re-authored:
 |---|---|---|
 | `Sonnet` + `low` | `sonnet@low` | glm-5.3-flash @ low — the one sub-max rung, mechanical only |
 | `Sonnet` + anything else (incl. unset) | `sonnet@max` | **glm-5.3-flash @ max** — the normal-work default |
-| `Opus` + anything except `low` | `opus@max` | **glm-5.3 @ max** — hard work, and the zai ladder's TOP rung |
+| `Opus` + anything except `low` | `opus@max` | **glm-5.4 @ max** (5.3 through v45) — hard work, and the zai ladder's TOP rung |
 | `Haiku` + any | `sonnet@`<its tier> | glm-5.3-flash (4.5-air is the rough zone; never a dispatch target) |
-| `Fable` + any | `opus@max` | glm-5.3 @ max (no zai apex above it; a bare fable alias would otherwise land on FLASH — probed) |
+| `Fable` + any | `opus@max` | glm-5.4 @ max (no zai apex above it; a bare fable alias would otherwise land on FLASH — probed) |
 
 **Escalation caps at `Opus`/`max`.** The zai ladder is `sonnet@max → opus@max →
 STOP` — no fable rungs exist on that lane, and degrade keeps `max`
 (`opus→sonnet@max`; effort-steep, unlike the Anthropic lane's high-landing).
 Evidence: DeepSWE v1.1 `glm-5.3[max]` 69%±3/$3.99 · `glm-5.3-flash[max]` 63%±4/$0.24 ·
-`glm-5.2[max]` 44%±2; z.ai's model docs recommend `reasoning_effort: max` for coding
+`glm-5.2[max]` 44%±2 (all glm-5.3-era measurements — **glm-5.4 has no benchmark row
+yet**); z.ai's model docs recommend `reasoning_effort: max` for coding
 (and for flash explicitly); live probes 2026-08-30 confirmed the Claude effort dial
 reaches z.ai end-to-end (thinking chars on one prompt: `low` 49 / `max` 642 /
 `xhigh` 1450) and that `-max` model-id suffixes are rejected client-side — effort
-rides the dial, never the model id.
+rides the dial, never the model id. v46: the opus slot serves
+**glm-5.4** — served on the Coding Plan, probed live; **no glm-5.4-flash exists**
+(sonnet stays glm-5.3-flash); the dial is live on 5.4 too (`low` 0-122 thinking
+chars vs 276-524 at high/max on two hard prompts, n=1 — not cleanly monotonic;
+z.ai's blog says looped models shift reasoning into implicit loop depth). Vendor
+caveat: 5.4 "tends to get caught in overly long marathon thinking loops" — keep
+output budgets bounded on max-rung sessions.
 
 **Agent layer:**
 - **`items`** (array of item IDs, required) — Items completed in this session.
@@ -532,8 +539,8 @@ shipping; absent → today's behaviour (DONE is taken at face value).
   | `opus@high` (the `linchpin` default) | `opus@high → opus@xhigh` | **2** |
   | `opus@medium` (the `deep_reasoning` default) — needs `opus@high` first, one extra rung | `opus@medium → opus@high → opus@xhigh` | **3** |
   | `sonnet@high` (the `standard_build` ceiling) | `sonnet@high → opus@high → opus@xhigh` | **3** |
-  | `sonnet@medium` (the first climb from the `standard_build` default) — needs `sonnet@high` first | `sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **4** |
-  | `sonnet@low` (the `standard_build` **default** since SSOT v38, and the `agentic_build` default since v40, which defaults to `max_rework: 4` — it reaches `opus@high`) — needs `sonnet@medium` and `sonnet@high` first | `sonnet@low → sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **5** |
+  | `sonnet@medium` (the `agentic_build` default since SSOT v45, which defaults to `max_rework: 4` — it reaches `opus@high`; also the first climb from the `standard_build` default) — needs `sonnet@high` first | `sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **4** |
+  | `sonnet@low` (the `standard_build` **default** since SSOT v38; the `agentic_build` default v40..v44) — needs `sonnet@medium` and `sonnet@high` first | `sonnet@low → sonnet@medium → sonnet@high → opus@high → opus@xhigh` | **5** |
 
   A session AUTHORED on fable (operator-elected) still climbs inside fable,
   `fable@medium → fable@high → fable@xhigh`; nothing climbs INTO fable since v39.

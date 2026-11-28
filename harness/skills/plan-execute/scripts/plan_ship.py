@@ -19,6 +19,11 @@ defined and exercised here because §8.b removes ``git add -A`` from the job of
 committing the plan record, and a rule that removes the only writer without
 naming the replacement leaves ``PLAN.html``, ``run_state.json`` and every closeout
 permanently uncommitted.
+
+Command line: `plan_ship.py {commit,push,pr,record-plan} ...`, with these options:
+`commit` takes `--worktree`, `--plan-dir` and an optional `--message`; `push` takes `--worktree` and
+`--branch`; `pr` takes `--worktree`, `--branch` and an optional `--base BRANCH` (default `main`) for
+the pull request's target; `record-plan` takes `--target`, `--plan-dir` and an optional `--message`.
 """
 
 import argparse
@@ -124,8 +129,21 @@ def _nothing_staged(tree):
     return _git(["diff", "--cached", "--quiet"], tree)[0] == 0
 
 
-def plans_paths(tree, base, head="HEAD", default=None):
-    """Paths under ``_plans/`` carried by ``base..head`` — §8.b's assertion.
+def _in_plans_scope(path, slug=None):
+    parts = Path(path).parts
+    if slug:
+        return parts[:2] == (PLANS_DIR, slug)
+    return parts[:1] == (PLANS_DIR,)
+
+
+def plans_paths(tree, base, head="HEAD", default=None, slug=None):
+    """Paths under ``_plans/`` (or ``_plans/<slug>/`` when ``slug`` is given)
+    carried by ``base..head`` — §8.b's assertion.
+
+    When ``slug`` is provided (the active plan's own directory name), only that
+    plan's frozen copy is guarded so a cleanup plan archiving *other* closed
+    ``_plans/*`` directories can commit and land cleanly while still forbidding
+    commits to its own frozen copy.
 
     With ``default`` (the default branch name), a path counts only when ``head``
     ALSO differs from the default-branch commit it last merged —
@@ -151,7 +169,7 @@ def plans_paths(tree, base, head="HEAD", default=None):
     """
     names = _names(["diff", "--name-only", f"{base}..{head}"], tree,
                    f"{base}..{head} to assert §8.b")
-    swept = [p for p in names if Path(p).parts[:1] == (PLANS_DIR,)]
+    swept = [p for p in names if _in_plans_scope(p, slug)]
     if swept and default:
         mb = _merged_default(tree, head, default)
         ours = set(_names(["diff", "--name-only", f"{mb}..{head}"],
@@ -172,13 +190,14 @@ def _merged_default(tree, head, default):
         "to assert §8.b")
 
 
-def _assert_no_plans_paths(tree, base, default=None):
+def _assert_no_plans_paths(tree, base, default=None, slug=None):
     """§8.b, asserted over the whole ``base..HEAD`` range — see ``plans_paths``."""
-    swept = plans_paths(tree, base, default=default)
+    swept = plans_paths(tree, base, default=default, slug=slug)
     if not swept:
         return
+    scope_label = f"{PLANS_DIR}/{slug}/" if slug else f"{PLANS_DIR}/"
     raise wt.WorktreeError(
-        f"{len(swept)} path(s) under {PLANS_DIR}/ are carried by {base[:12]}..HEAD in "
+        f"{len(swept)} path(s) under {scope_label} are carried by {base[:12]}..HEAD in "
         f"{tree} ({swept[:5]}). The plan directory inside a worktree is a FROZEN copy "
         "of the pinned base while the orchestrator writes the outer one (contract "
         "§8.a/§8.b), so committing it commits state that was already stale. Undo those "
@@ -187,8 +206,8 @@ def _assert_no_plans_paths(tree, base, default=None):
     )
 
 
-def _unstaged_outside_plans(tree):
-    """Paths OUTSIDE `_plans/` that `git add` left behind, from the INDEX.
+def _unstaged_outside_plans(tree, slug=None):
+    """Paths OUTSIDE `_plans/` (or `_plans/<slug>/`) that `git add` left behind, from the INDEX.
 
     `-z` is not decoration: under the default `core.quotePath` a non-ASCII path
     comes back as an escaped, DOUBLE-QUOTED token, and every prefix comparison
@@ -214,15 +233,15 @@ def _unstaged_outside_plans(tree):
         xy, path = entry[:2], entry[3:]
         if "R" in xy or "C" in xy:
             skip_next = True
-        if path == PLANS_DIR or path.startswith(PLANS_DIR + "/"):
+        if _in_plans_scope(path, slug):
             continue
         if xy == "??" or xy[1] != " ":     # untracked, or dirty in the WORKTREE
             left.append(path)
     return left
 
 
-def _stage(tree):
-    """Stage everything outside `_plans/`, tolerating git's ignored-path exit 1.
+def _stage(tree, slug=None):
+    """Stage everything outside `_plans/` (or `_plans/<slug>/`), tolerating git's ignored-path exit 1.
 
     `:(exclude)_plans` NAMES an ignored path, so in a repo whose `.gitignore`
     covers `_plans/` git warns and exits 1 while staging every file correctly.
@@ -244,20 +263,21 @@ def _stage(tree):
     NEVER THE MESSAGE — the same rule `commit` already states three lines
     below, and locale-proof, because git's message text is translated.
     """
-    rc, _, err = _git(["add", "-A", "--", ".", EXCLUDE_PLANS], tree)
+    exclude = f":(exclude){PLANS_DIR}/{slug}" if slug else EXCLUDE_PLANS
+    rc, _, err = _git(["add", "-A", "--", ".", exclude], tree)
     if rc == 0:
         return
-    leftover = _unstaged_outside_plans(tree)
+    leftover = _unstaged_outside_plans(tree, slug=slug)
     if leftover:
         raise wt.WorktreeError(
             f"git add failed in {tree} (rc={rc}) and left {len(leftover)} "
             f"path(s) unstaged: {leftover[:5]}\n{(err or '').strip()}")
 
 
-def stage(tree):
+def stage(tree, slug=None):
     """`_stage`, then True when something is staged. For `worktree.commit_member`:
     a member tree dirty ONLY under `_plans/` has nothing to commit."""
-    _stage(tree)
+    _stage(tree, slug=slug)
     return not _nothing_staged(tree)
 
 
@@ -281,12 +301,13 @@ def commit(tree, message, plan_dir):
             "the bound it would either report nothing or report the base commit's "
             "own unrelated history.")
     default = _default_branch(plan_dir)
-    _assert_no_plans_paths(tree, base, default)     # BEFORE: a retry sees the same refusal
-    _stage(tree)
+    slug = Path(plan_dir).resolve().name
+    _assert_no_plans_paths(tree, base, default, slug=slug)     # BEFORE: a retry sees the same refusal
+    _stage(tree, slug=slug)
     if _nothing_staged(tree):
         # ASK THE INDEX, NEVER THE MESSAGE. `git commit` has three refusals here
         # and only one of them says "nothing to commit" (measured):
-        # a tree dirty ONLY under `_plans/` — which the EXCLUDE_PLANS pathspec
+        # a tree dirty ONLY under `_plans/<slug>/` — which the exclude pathspec
         # stages nothing from, i.e. the §8.a case this ships for — gets "no
         # changes added to commit" (tracked) or "nothing added to commit but
         # untracked files present" (new). Both fell through to `commit failed`
@@ -295,7 +316,7 @@ def commit(tree, message, plan_dir):
         return {"status": "nothing-to-commit", "sha": None, "files": []}
     rc, out, err = _git(["commit", "-m", message], tree)
     if rc != 0 and wt._hooks_rewrote_the_tree(tree):
-        _stage(tree)
+        _stage(tree, slug=slug)
         rc, out, err = _git(["commit", "-m", message], tree)
     if rc != 0:
         # Unstage: a manual `git commit` in this worktree would otherwise sweep
@@ -305,7 +326,7 @@ def commit(tree, message, plan_dir):
             f"commit failed in {tree}: {(err or out).strip()}\n"
             "The index was reset, so nothing is staged; the working tree is unchanged.")
     _, sha, _ = _git(["rev-parse", "HEAD"], tree, check=True)
-    _assert_no_plans_paths(tree, base, default)     # AFTER: this commit did not add one
+    _assert_no_plans_paths(tree, base, default, slug=slug)     # AFTER: this commit did not add one
     return {"status": "committed", "sha": sha, "plan_dir": str(plan_dir),
             "files": _names(["show", "--name-only", "--format=", sha], tree, sha)}
 

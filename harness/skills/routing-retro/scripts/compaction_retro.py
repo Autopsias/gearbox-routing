@@ -10,7 +10,7 @@ activation row (see compaction_ledger.cohort_label).
 
 Usage:
   retro_scan.py --last 200 --since 2026-08-01 > /tmp/scan.json
-  compaction_retro.py --scan /tmp/scan.json > /tmp/compaction.json
+  compaction_report.py --scan /tmp/scan.json > /tmp/compaction.json   (the program with a command line)
 """
 
 import glob

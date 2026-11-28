@@ -475,3 +475,10 @@ def write(plan_dir, session_id, *, resolution, result, verified, attempt=1,
     except Exception as e:  # noqa: BLE001 — an observer never fails the caller
         print(f"outcomes: write failed for {session_id} ({resolution}): {e}", file=sys.stderr)
         return {"written": False, "reason": "error", "error": str(e)}
+
+
+def record_no_closeout(plan_dir, session_id, attempt):
+    """A Codex canary run that ends with no valid closeout (OpenAI's safety monitor ends the
+    task) is a FAILED attempt: `exhausted`, reason `no_closeout`. Never silence or "skipped"."""
+    return write(plan_dir, session_id, resolution="apply_no_closeout", result="exhausted",
+                 verified=False, attempt=attempt, gates_failed=["no_closeout"])

@@ -32,6 +32,9 @@ def test_the_count_is_per_session(tmp_path):
     rsi.set_halt(d, "y", "s06")
     rsi.clear_halt(d)      # a different session: free
     assert not rsi.is_halted(d)
+    import halt_clears
+    assert halt_clears._ledgers(d, "") == []         # no halting session: no ledgers, not an error
+    assert halt_clears._ledgers(d, "../x") == []
 
 
 def test_a_stuck_session_needs_a_decision_to_clear(tmp_path):

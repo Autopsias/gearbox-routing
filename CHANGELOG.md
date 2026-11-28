@@ -6,8 +6,8 @@ All notable changes to the Gearbox routing policy and framework. Format follows
 
 ## [Unreleased]
 
-### Changed (harness sync of 2026-11-27)
-This sync carries the private harness changes from 2026-11-20 to 2026-11-27.
+### Changed (harness sync of 2026-11-28)
+This sync carries the private harness changes from 2026-11-20 to 2026-11-28.
 The routing policy (`claude/model-routing.yaml`) does not change.
 
 - **CLAUDE.md export:** `harness/CLAUDE.md` is now exported as

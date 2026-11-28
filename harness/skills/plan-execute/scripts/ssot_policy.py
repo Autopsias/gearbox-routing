@@ -117,3 +117,22 @@ class UnroutableCodexSession(Exception):
     loud BLOCKED, never fall through to the silent None→inherit-Claude path —
     a mis-routed Codex session quietly executing on Claude is the exact opposite
     of the feature."""
+
+
+def is_canary(session):
+    """True when the session carries the `routing_experiment: {kind: canary}` tag."""
+    rx = session.get("routing_experiment")
+    return isinstance(rx, dict) and rx.get("kind") == "canary"
+
+
+def record_only_price_row(model, ssot_text):
+    """True when the SSOT `prices:` block lists `model` with a RECORD ONLY note."""
+    row = rf'^\s*"?{re.escape(model)}"?\s*:\s*\{{[^\n]*note:\s*"RECORD ONLY'
+    return bool(model) and bool(re.search(row, ssot_text, re.M | re.I))
+
+
+def canary_pin_cell(raw_model, reasoning_tier, ssot_text, canary):
+    """`(model, effort)` for a canary-tagged session pinning a RECORD ONLY model, else None.
+    Effort is the session's reasoning (never `ultra`; the tiers stop at max)."""
+    raw = raw_model.strip() if isinstance(raw_model, str) else ""
+    return (raw, reasoning_tier or "medium") if canary and record_only_price_row(raw, ssot_text) else None

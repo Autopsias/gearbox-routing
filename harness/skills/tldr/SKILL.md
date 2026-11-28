@@ -19,7 +19,7 @@ across outputs. Everything visual it delegates:
 |---|---|---|
 | Explainer page (HTML) | `eli5` skill | ledger, brief, storyboard, audience |
 | Branded deck (Marp HTML or PDF) | your house brand skill, Marp mode | brief, storyboard as claim headlines |
-| Narrated video (MP4) | `video-creator` plugin | `brief.md`, storyboard as the script arc |
+| Narrated video (MP4) | `video-creator` skill | `brief.md`, storyboard as the script arc |
 | One-page brief (PDF, DOCX) | `scripts/render.sh` | the brief as HTML and Markdown |
 | Infographic poster (PNG) | `scripts/render.sh` + eli5's `svg_text_audit.py` | one poster HTML |
 
@@ -195,14 +195,13 @@ Marp yields HTML, PDF and slide PNGs, with no Marp-to-PPTX
 converter, so say in the delivery message that there is no editable
 PowerPoint unless the user asked for one and you built it.
 
-**Video (only when the user asked for one).** Load the `video-creator` skill. Pick its theme from the audience
+**Video (only when the user asked for one).** Load the `video-creator` skill (it needs that skill; without it, skip the video and say so). Pick its theme by name from the audience
 before `lv.py init`, because the theme sets the colours, the font and the logo
-in every frame:
+in every frame (`lv.py themes` lists the names):
 
 | Audience | Theme |
 |---|---|
-| Your brand's audience | `--theme <path to your brand's video-theme CSS>` |
-| A Kuzushi course or lesson | `--theme kuzushi` |
+| A repo or a brand with its own theme pack | `--theme <name>`, the pack's name (the deck skill for that brand names it in its own text) |
 | Anyone else, or no brand named | `--theme neutral` |
 
 Name the theme in the delivery message. Write its `brief.md` from yours:
@@ -266,10 +265,9 @@ built. End with the state line.
   put the ask below 1600 px; the audit and the gate both passed and the PNG
   had no footer. Only reading the PNG caught it. Tighten spacing, never the
   canvas: a taller image breaks the 3:4 preview on a phone.
-- **2026-10-18 — themes need video-creator 1.2.0.** Older copies have no
-  `--theme` and render every video in the Kuzushi look with belt dots. When
-  `lv.py` with no command prints no `--theme`, refresh the plugin marketplace
-  first, or say in the delivery message that the video carries the Kuzushi look.
+- **2026-10-18 — themes need the gearbox video-creator skill.** An older
+  plugin copy has no theme names. When `lv.py themes` is not a command, the
+  skill is old or missing: do not render, and say so in the delivery message.
 - **2026-10-17 — Marp is not on PATH.** Marp mode needs `marp`;
   only an npx cache copy exists (`~/.npm/_npx/*/node_modules/.bin/marp`,
   4.1.2). Run it with `--no-stdin`, or it waits on standard input and hangs

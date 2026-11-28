@@ -42,6 +42,8 @@ verify pass (VERIFIED-ON-BOX) or stop the session (BLOCKED).
 import json
 from pathlib import Path
 
+import safe_json as sj
+
 #: THE FIRST `VERIFIER:` LINE IS THE DISPOSITION. Exactly one is printed per gate
 #: run, always before any reviewer output is echoed (the codex backend holds its
 #: markers until codex has answered precisely to keep that true). Found BY PREFIX
@@ -282,8 +284,7 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
 
     reason = reason_for(cause)
     state["gate_status"][gate] = AWAITS
-    state["on_box_review"] = {"gate": gate, "cause": cause, "reason": reason,
-                              "parked_at": _now()}
+    state["on_box_review"] = {"gate": gate, "cause": cause, "reason": reason, "parked_at": _now()}
     state["human_checkpoint_reason"] = reason
     # THE SUBAGENT MAY HAVE ASKED FOR A HUMAN OF ITS OWN — a DIFFERENT AUTHOR'S
     # claim on this one field. The park overwrote it and `verify_finalize` then
@@ -312,8 +313,7 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
     rsi.log_event(plan_dir, "checkpoint_reached", session_ids=[session_id], reason=reason)
     return {"action": "awaits-review", "session": session_id, "gate": gate,
             "cause": cause, "human_checkpoint_reason": reason,
-            "rework_count": state["rework_count"], "feedback_file": str(fb),
-            "decisions": sorted(DECISIONS)}
+            "rework_count": state["rework_count"], "feedback_file": str(fb), "decisions": sorted(DECISIONS)}
 
 
 # --------------------------------------------------------------------------
@@ -321,7 +321,7 @@ def park(plan_dir, session_id, state, gate, cause, excerpt):
 # --------------------------------------------------------------------------
 def _closeout(plan_dir, session_id):
     """(path, record) for this session's closeout; record is None when unreadable."""
-    path = Path(plan_dir) / "_closeouts" / f"{session_id}.json"
+    path = sj.resolve_inside(Path(plan_dir) / "_closeouts", f"{session_id}.json")
     try:
         rec = json.loads(path.read_text())
     except (OSError, ValueError):

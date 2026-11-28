@@ -69,6 +69,10 @@ RENAME = {
 # all four got mirrored. The prefix covers every tier, present and future.
 SKIP_PREFIX = "tier-"
 
+# Plugin marketplaces disabled in Antigravity and unneeded in ~/.agents/skills;
+# mirroring them crowds out real ~/.claude/skills under Antigravity's skill budget.
+SKIP_PLUGIN_MARKETPLACES = {"your-vault", "ponytail"}
+
 # Mirrors carrying Codex work the Claude source lacks. Overwriting these
 # silently destroys it, so the script reports their drift instead. This list is
 # a floor, not the whole guard: `is_safe_to_overwrite` below catches the rest.
@@ -276,12 +280,13 @@ def collect() -> list[tuple[str, pathlib.Path]]:
     items: dict[str, pathlib.Path] = {}
     for path in sorted((CLAUDE / "skills").glob("*/SKILL.md")):
         items.setdefault(path.parent.name, path)
-    for path in sorted((CLAUDE / "agents").glob("*.md")):
-        items.setdefault(path.stem, path)
+    # ~/.claude/agents/*.md are subagent definitions (not skills), and bmad-*.md
+    # commands duplicate workspace .agents/skills/bmad-* in BMAD repos. Skipping
+    # both keeps ~/.agents/skills lean so real skills fit Antigravity's budget.
     for path in sorted((CLAUDE / "commands").glob("*.md")):
-        # `bmad-bmm-create-story` has always been mirrored as `create-story`;
-        # keeping that shape avoids renaming skills the user already invokes.
-        items.setdefault(re.sub(r"^bmad-(?:agent-)?(?:bmm-|tea-)?", "", path.stem), path)
+        if path.stem.startswith("bmad-"):
+            continue
+        items.setdefault(path.stem, path)
 
     registry = CLAUDE / "plugins" / "installed_plugins.json"
     settings = CLAUDE / "settings.json"
@@ -294,6 +299,8 @@ def collect() -> list[tuple[str, pathlib.Path]]:
     if registry.exists():
         for key, entries in json.loads(registry.read_text())["plugins"].items():
             if not enabled.get(key):          # only plugins actually switched on
+                continue
+            if key.partition("@")[2] in SKIP_PLUGIN_MARKETPLACES:
                 continue
             for path in sorted(pathlib.Path(entries[0]["installPath"]).glob("skills/*/SKILL.md")):
                 items.setdefault(path.parent.name, path)

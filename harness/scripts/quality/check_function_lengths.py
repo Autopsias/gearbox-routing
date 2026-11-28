@@ -149,7 +149,10 @@ def iter_python_files(project_path: Path, exclude: list[str] | None = None):
             rel = rel_dir / name
             if is_excluded(rel, exclude):
                 continue
-            yield project_path / rel
+            path = project_path / rel
+            if not path.is_file():
+                continue  # a dangling symlink: os.walk lists it as a file, read_text() would raise
+            yield path
 
 
 def functions_in_source(source: str, filename: str = "<source>") -> list[tuple[int, str, int]]:

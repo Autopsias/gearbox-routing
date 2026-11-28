@@ -38,7 +38,10 @@ from common import typed, typed_items
 # file's docstring for why it is not the other way round. Safe to import at the
 # top: route_table.py takes the builders as ARGUMENTS rather than importing
 # them from here, so there is no cycle to order around.
-from route_table import build_routes
+from route_table import (build_cloudflare_incomplete_route,
+                         build_cloudflare_recovery_route,
+                         build_cloudflare_sast_route, build_routes,
+                         build_sentry_with_coverage_route)
 
 # The commands live in the user's Claude config directory, not in this skill —
 # they are harness surface, and no skill-relative path reaches them. Resolved at
@@ -275,7 +278,85 @@ def route_for(cid):
     return ROUTES.get(cid, UNKNOWN)
 
 
-def fix_rows(card, advisory=False):
+def _exposure_mode(route_kind):
+    return {"cloudflare-quick": "exposed", "sentry": "opted-out",
+            "sentry-downgrade": "downgrade", "error": "error"}.get(route_kind, "error")
+
+
+def _sast_unmeasured_or_na_route(rk, mode, ev_repo, st):
+    """Row 5: pending/na with active incomplete run, exposed route, error, or downgrade."""
+    if st.get("latest_complete") is False:
+        return build_cloudflare_incomplete_route(
+            agent, SKILL_DIR, exposure_mode=mode, evidence_repo=ev_repo)
+    if rk == "error":
+        return build_cloudflare_recovery_route(agent, SKILL_DIR, evidence_repo=ev_repo)
+    if rk == "sentry-downgrade":
+        return build_cloudflare_recovery_route(
+            agent, SKILL_DIR, downgrade_only=True, evidence_repo=ev_repo)
+    if rk == "cloudflare-quick":
+        return build_cloudflare_incomplete_route(
+            agent, SKILL_DIR, exposure_mode="exposed", evidence_repo=ev_repo)
+    return None
+
+
+def _sast_finding_route(rk, mode, ev_repo, st):
+    """Row 7: non-CLEAR finding."""
+    if rk == "cloudflare-quick" or st.get("latest_complete") is False:
+        return build_cloudflare_incomplete_route(
+            agent, SKILL_DIR, exposure_mode=mode, evidence_repo=ev_repo)
+    if rk == "sentry-downgrade" and not (st.get("sentry_current") and st.get("sentry_positive")):
+        return build_cloudflare_recovery_route(
+            agent, SKILL_DIR, downgrade_only=True, evidence_repo=ev_repo)
+    return ROUTES["sec.sast"]
+
+
+def _sast_route(status, st):
+    """7-row total decision table for sec.sast; returns a route dict or None (CLEAR)."""
+    rk = st.get("route_kind", "sentry")
+    mode = _exposure_mode(rk)
+    ev_repo = st.get("repo_root") or "."
+    open_set_err = bool(st.get("open_set_error"))
+    missing_ev = bool(st.get("missing_verified_ids"))
+    # Row 1: unreadable open-set state or missing/tampered verified evidence
+    if open_set_err or missing_ev:
+        return build_cloudflare_recovery_route(
+            agent, SKILL_DIR, open_set_error=open_set_err,
+            missing_evidence=missing_ev, evidence_repo=ev_repo)
+    # Row 2: open confirmed findings or leads
+    if st.get("open_confirmed", 0) > 0 or st.get("open_leads", 0) > 0:
+        mixed = rk in ("sentry", "sentry-downgrade") and bool(st.get("sentry_positive"))
+        return build_cloudflare_sast_route(
+            agent, SKILL_DIR, has_deployment=bool(st.get("has_deployment_check")),
+            exposure_mode=mode, mixed_sentry=mixed,
+            sentry_carried=bool(st.get("sentry_carried")),
+            also_pending=status in UNMEASURED, evidence_repo=ev_repo)
+    # Row 3: pending/na with recorded refusal
+    if status in UNMEASURED + ("na",) and st.get("last_refusal") is not None:
+        return build_cloudflare_recovery_route(agent, SKILL_DIR, evidence_repo=ev_repo)
+    # Row 4: carried unfinished coverage
+    if st.get("open_coverage", 0) > 0:
+        if (status not in UNMEASURED + CLEAR
+                and rk in ("sentry", "sentry-downgrade")
+                and st.get("sentry_current") and st.get("sentry_positive")):
+            return build_sentry_with_coverage_route(agent, SKILL_DIR, evidence_repo=ev_repo)
+        return build_cloudflare_incomplete_route(
+            agent, SKILL_DIR, exposure_mode=mode, evidence_repo=ev_repo)
+    # Row 5: pending/na with active incomplete run, exposed route, error, or downgrade
+    if status in UNMEASURED + ("na",):
+        row5 = _sast_unmeasured_or_na_route(rk, mode, ev_repo, st)
+        if row5 is not None:
+            return row5
+    # Standard CLEAR gate (clean pass, or clean never-exposed na)
+    if status in CLEAR:
+        return None
+    # Row 6: unrun Sentry probe
+    if status in UNMEASURED:
+        return PROBE
+    # Row 7: non-CLEAR finding
+    return _sast_finding_route(rk, mode, ev_repo, st)
+
+
+def fix_rows(card, advisory=False, sast_state=None):
     """One row per check that has a FINDING or is UNMEASURED, in card order.
 
     Three row shapes, because "broken", "nobody looked" and "couldn't look"
@@ -318,19 +399,69 @@ def fix_rows(card, advisory=False):
         if tier in TIERS and tier not in tiers:
             continue                   # a real tier this mode does not show yet
         status = c.get("status")
-        if status in CLEAR:
-            continue
-        # None as well as "pending": certified() turns a null into `pending` before
-        # a CARD reaches here, and fix_rows takes any dict, so it is refused twice.
         cid = c.get("id")          # .get: the comment above promised a guard here
-        # `unread` is set ONLY by common.unmeasured/pending_if_unread, and ONLY
-        # on the branch where the check's own conclusion rests on a file that
-        # would not open — never on a check that is `pending` because nobody
-        # has run its probe yet. That is what tells the two `pending` origins
-        # apart; see unreadable()'s docstring for why they need different rows.
-        unread = typed_items(c.get("unread"), str) if status in UNMEASURED else []
-        route = (UNTIERED if tier not in TIERS
-                 else unreadable(unread) if unread
-                 else PROBE if status in UNMEASURED else route_for(cid))
+        if cid == "sec.sast" and sast_state is not None and tier in TIERS:
+            route = _sast_route(status, sast_state)
+            if route is None:
+                continue
+        else:
+            if status in CLEAR:
+                continue
+            # None as well as "pending": certified() turns a null into `pending` before
+            # a CARD reaches here, and fix_rows takes any dict, so it is refused twice.
+            # `unread` is set ONLY by common.unmeasured/pending_if_unread, and ONLY
+            # on the branch where the check's own conclusion rests on a file that
+            # would not open — never on a check that is `pending` because nobody
+            # has run its probe yet. That is what tells the two `pending` origins
+            # apart; see unreadable()'s docstring for why they need different rows.
+            unread = typed_items(c.get("unread"), str) if status in UNMEASURED else []
+            route = (UNTIERED if tier not in TIERS
+                     else unreadable(unread) if unread
+                     else PROBE if status in UNMEASURED else route_for(cid))
         yield {"id": cid, "tier": tier, "status": status,
                "title": c.get("title", ""), "detail": c.get("detail", ""), **route}
+
+
+def prepare_handoff(row, repo):
+    """Build a consumer-preserving handoff payload for one fix_rows() row."""
+    omit = bool(row.get("omit_detail"))
+    detail = "" if omit else row.get("detail", "")
+    repo_str = str(Path(repo).resolve())
+    base_prompt = row.get("prompt", "")
+    if not base_prompt:
+        prompt = ""
+    elif omit or not detail:
+        prompt = f"Repo: {repo_str}\n\n{base_prompt}"
+    else:
+        prompt = f"Repo: {repo_str}\nCheck detail: {detail}\n\n{base_prompt}"
+    stale = row.get("stale", "")
+    plan_desc = "Read digest-verified open findings via exposure.py show-open." if omit else detail
+    return {
+        "id": row.get("id", ""),
+        "tier": row.get("tier"),
+        "status": row.get("status"),
+        "title": row.get("title", ""),
+        "detail": detail,
+        "dispatch": row.get("dispatch", ""),
+        "can_dispatch": not bool(stale),
+        "routed": row.get("routed", False),
+        "agent": row.get("agent", ""),
+        "command": row.get("command", ""),
+        "command_file": row.get("command_file", ""),
+        "command_file_found": row.get("command_file_found"),
+        "flag_check": row.get("flag_check", ""),
+        "omit_detail": omit,
+        "prompt": prompt,
+        "operator": row.get("operator", ""),
+        "plan_item": {"title": row.get("title", ""), "description": plan_desc},
+        "plan_session": {"prompt": prompt},
+    }
+
+
+def emit_handoff_rows(card, repo, advisory=False, sast_state=None, stale=""):
+    """Return (exit_code, handoff_rows, stderr_msg); blocks stale cards with exit 2."""
+    if stale:
+        return 2, [], f"refused --handoff on stale scorecard: {stale}"
+    rows = [prepare_handoff(r, repo)
+            for r in fix_rows(card, advisory=advisory, sast_state=sast_state)]
+    return 0, rows, ""

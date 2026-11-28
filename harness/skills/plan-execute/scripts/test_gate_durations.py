@@ -7,8 +7,12 @@ import gate_timing as gt
 def test_a_logged_gate_run_is_counted_and_old_ones_are_skipped(tmp_path, capsys):
     plan = tmp_path / "_plans" / "p"
     plan.mkdir(parents=True)
-    assert gt.log_run(str(plan), "verify", "s01", "tests", 12.34, "pass")
-    assert gt.log_run(str(plan), "land", None, "tests", 30, "fail")
+    assert gt.log_run(str(plan), "verify", "s01", "tests", 12.34, "pass",
+                      "x\n[session-quality-gate] base: session abc1234\n")
+    assert gt.log_run(str(plan), "land", None, "tests", 30, "fail", "a test printed base: session zz")
+    first, second = [json.loads(line) for line in (plan / "run.ndjson").read_text().splitlines()]
+    assert (first["scope"], second["scope"]) == ("session", None)
+    assert len(first["load"]) == 3 and all(isinstance(x, float) for x in first["load"])
     with open(plan / "run.ndjson", "a") as f:
         f.write(json.dumps({"ts": "2000-01-01", "event": "gate_run", "gate": "tests", "seconds": 999}) + "\n")
         f.write("not json\n")

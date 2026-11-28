@@ -170,7 +170,7 @@ def test_begin_under_zai_clamps_cells_and_binds_zai_tiers(tmp_path, capsys, monk
     assert by_id["s01"]["subagent_type"] == "tier-sonnet-max"
     assert by_id["s01"]["effort_enforced"] is True
 
-    # hard work: Opus@high -> glm-5.3@max, degrade keeps max
+    # hard work: Opus@high -> glm-5.4@max (wire; token opus@max), degrade keeps max
     assert by_id["s02"]["subagent_type"] == "tier-opus-max"
     assert by_id["s02"]["fallback_model"] == "sonnet"
     assert by_id["s02"]["fallback_reasoning"] == "max"

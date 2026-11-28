@@ -242,6 +242,23 @@ def test_commit_refuses_a_commit_that_carried_a_plans_path(iso, monkeypatch):
         pship.commit(tree, "feat(demo): work", iso["plan_dir"])
 
 
+def test_commit_allows_archiving_other_closed_plans_while_guarding_own_slug(iso):
+    """A cleanup plan archiving *other* closed `_plans/<other>/` directories may
+    commit them, while its own `_plans/<this-slug>/` frozen copy stays excluded."""
+    tree = iso["tree"]
+    _touch(tree, "_plans/old-closed-plan/PLAN.html", "<html>old</html>\n")
+    git(["add", "_plans/old-closed-plan/PLAN.html"], tree, check=True)
+    git(["commit", "-q", "-m", "chore: archive old closed plan"], tree, check=True)
+    (tree / "_plans" / SLUG / "PLAN.html").write_text("<html>STALE</html>\n")
+    _touch(tree, "src/clean.py", "X = 1\n")
+
+    result = pship.commit(tree, "feat(demo): cleanup", iso["plan_dir"])
+    assert result["status"] == "committed"
+    assert result["files"] == ["src/clean.py"]
+    assert pship.plans_paths(tree, iso["state"]["base_ref"], slug=SLUG) == []
+    assert f"_plans/{SLUG}/PLAN.html" in git(["status", "--porcelain"], tree, check=True)[1]
+
+
 def test_nothing_to_commit_is_a_status_not_a_failure(iso):
     assert pship.commit(iso["tree"], "feat(demo): nothing",
                         iso["plan_dir"])["status"] == "nothing-to-commit"

@@ -387,7 +387,21 @@ def _detail(out, ledger, findings, floor, old, since, carry, incomplete):
     return detail
 
 
-def _open_list(sha, old, open_now, ledger, findings, failed=()):
+def _ev_runs(k, inh, rep, failed, run_name):
+    """Governing run names for an open confirmed/lead item (None preserves legacy history)."""
+    if k not in ("confirmed", "lead"):
+        return None
+    if not rep:
+        return inh.get("evidence_runs") if inh else None
+    if run_name is None:
+        return inh.get("evidence_runs") if (failed and inh) else None
+    if not failed or inh is None:
+        return [run_name]
+    prev = inh.get("evidence_runs")
+    return None if prev is None else [run_name] + [r for r in prev if r != run_name]
+
+
+def _open_list(sha, old, open_now, ledger, findings, failed=(), run_name=None):
     # ref: the commit an item was last reported at, failed run or not; a carried one keeps
     # its old ref. Files: an inherited item reported in a run that failed a completion check
     # keeps its inherited files; a complete run gives a reported item its own files.
@@ -406,11 +420,16 @@ def _open_list(sha, old, open_now, ledger, findings, failed=()):
 
     # files: a finding's own trace files, stored with its ref (a record only: nothing clears by them)
     own = {f.get("fingerprint"): trace_files(f) for f in findings}
-    return [{"kind": k, "id": key, "label": label,
-             "ref": sha if reported(k, key) else (inherited(k, key) or {}).get("ref"),
-             "files": own.get(key) if reported(k, key) and not (failed and inherited(k, key))
-             else (inherited(k, key) or {}).get("files")}
-            for (k, key), label in sorted(open_now.items())]
+    out = []
+    for (k, key), label in sorted(open_now.items()):
+        inh, rep = inherited(k, key), reported(k, key)
+        item = {"kind": k, "id": key, "label": label,
+                "ref": sha if rep else (inh or {}).get("ref"),
+                "files": own.get(key) if rep and not (failed and inh) else (inh or {}).get("files")}
+        if k in ("confirmed", "lead"):
+            item["evidence_runs"] = _ev_runs(k, inh, rep, failed, run_name)
+        out.append(item)
+    return out
 
 
 def check_run(out_dir, repo, agents=None):
@@ -442,7 +461,8 @@ def check_run(out_dir, repo, agents=None):
     return {"status": status, "detail": SEP.join(detail),
             # runlog._digest of the bytes validated here: accept() refuses any other
             "digest": hashlib.sha256(b"".join(raw[n] for n in DOCS)).hexdigest(),
-            "open": _open_list(sha, old, carry[0], ledger, findings, incomplete)}
+            "complete": not incomplete,
+            "open": _open_list(sha, old, carry[0], ledger, findings, incomplete, out.name)}
 
 
 # ---------------------------------------------------------------- CLI

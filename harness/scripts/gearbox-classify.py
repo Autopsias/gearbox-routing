@@ -263,6 +263,22 @@ def _find_orca_pretooluse_hooks(hooks):
     ]
 
 
+def _canon(entry):
+    return json.dumps(entry, sort_keys=True)
+
+
+def _restore_entry_order(old_hooks, new_hooks):
+    """Take HEAD's order for an event whose entries are HEAD's own in another order.
+
+    Orca's hook reinstall can move its entry within an event; the set of entries is unchanged.
+    """
+    for event, entries in new_hooks.items():
+        before = old_hooks.get(event)
+        if (isinstance(before, list) and isinstance(entries, list) and entries != before
+                and sorted(map(_canon, entries)) == sorted(map(_canon, before))):
+            new_hooks[event] = copy.deepcopy(before)
+
+
 def restore_orca_hook_timeout(claude_dir):
     """Restore Orca's PreToolUse timeout when Orca's installer lowered it below HEAD.
 
@@ -286,6 +302,7 @@ def restore_orca_hook_timeout(claude_dir):
 
     old_orca = _find_orca_pretooluse_hooks(old_hooks)
     patched_hooks = copy.deepcopy(new_hooks)
+    _restore_entry_order(old_hooks, patched_hooks)
     new_orca = _find_orca_pretooluse_hooks(patched_hooks)
     if len(old_orca) != 1 or len(new_orca) != 1:
         return None

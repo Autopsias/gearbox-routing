@@ -21,6 +21,7 @@ import manifest_io as mio  # noqa: E402,F401
 import egress  # noqa: E402,F401
 import run  # noqa: E402
 import run_state_io as rsi  # noqa: E402
+import safe_json as sj  # noqa: E402
 import stuck_protocol as sp  # noqa: E402,F401
 import verify as vfy  # noqa: E402,F401
 from test_shipping import make_plan  # noqa: E402,F401
@@ -71,7 +72,7 @@ def _arm(plan_dir, session_id, *, consecutive, reworks):
     rsi.save_state(plan_dir, state)
     vs = Path(plan_dir) / "_verify_state"
     vs.mkdir(exist_ok=True)
-    (vs / f"{session_id}.json").write_text(json.dumps({
+    sj.resolve_inside(vs, f"{session_id}.json").write_text(json.dumps({
         "session_id": session_id, "rework_count": reworks, "max_rework": 9,
         "gates": [], "gate_status": {}, "on_fail": "rework", "outcome": "rework",
     }))

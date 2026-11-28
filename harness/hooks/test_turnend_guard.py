@@ -60,11 +60,107 @@ def payload(tmp_path, **kw):
     return p
 
 
+# json.loads raises RecursionError on this on every Python from 3.11 to 3.15 (3.11 already at about 1,200 levels).
+DEEP = "[" * 1_000_000 + "]" * 1_000_000
+BROKEN = ["[]", '"x"', "1", DEEP]  # a row that is not a dict, or too deep to parse
+
+
+@pytest.mark.parametrize("bad", BROKEN, ids=["list", "string", "number", "too-deep"])
+@pytest.mark.parametrize("where", ["run_state", "transcript", "reply_state", "block_state"])
+def test_a_row_that_is_not_a_dict_is_skipped_never_a_traceback(tmp_path, where, bad):
+    plan = plant(tmp_path)
+    t = tmp_path / "t.jsonl"
+    t.write_text(bad + "\n")
+    state = tmp_path / "state"
+    state.mkdir()
+    if where == "run_state":
+        (plan / "run_state.json").write_text(bad)
+    elif where == "reply_state":
+        (state / f"{SID}.reply.json").write_text(bad)
+    elif where == "block_state":
+        (state / f"{SID}.json").write_text(bad)
+    reply = "Needs you: nothing" if where == "reply_state" else None
+    p = payload(tmp_path, transcript_path=str(t), **({"last_assistant_message": reply} if reply else {}))
+    r = run(tmp_path, p)
+    assert "Traceback" not in r.stderr
+    assert r.returncode == (0 if where == "run_state" else 2)
+
+
+def _blocks(*content):
+    """One transcript row whose message holds these content blocks."""
+    return json.dumps({"type": "assistant", "message": {"content": list(content)}})
+
+
+# Rows that are dicts but whose inner fields have the wrong shape, each one reaching the background scan.
+SHAPED_ROWS = {
+    "message-string": '{"message": "tool_use"}',
+    "content-number": '{"message": {"content": 5, "x": "tool_use"}}',
+    "input-string": _blocks({"type": "tool_use", "name": "Bash", "id": "t", "input": "run_in_background"}),
+    "id-list": _blocks({"type": "tool_use", "name": "Agent", "id": ["x"], "input": {}}),
+    "result-ref-list": _blocks({"type": "tool_result", "tool_use_id": ["x"], "content": "x"}),
+    "send-to-list": _blocks({"type": "tool_use", "name": "SendMessage", "id": "s", "input": {"to": ["a"]}},
+                            {"type": "tool_result", "tool_use_id": "s", "content": "Resuming agent"}),
+    "taskstop-input-string": _blocks({"type": "tool_use", "name": "TaskStop", "id": "s", "input": "x"}),
+    "too-deep": "[" * 1_000_000 + '"tool_use"' + "]" * 1_000_000,
+}
+OPEN_REPLY = "The cleanup is still open.\nNext: x. Needs you: nothing"
+
+
+@pytest.mark.parametrize("row", SHAPED_ROWS.values(), ids=SHAPED_ROWS)
+def test_a_wrong_shaped_row_never_breaks_the_background_scan(tmp_path, row):
+    """No open plan: the reply guard reaches _scan_blocks. Nothing is outstanding, so the reply blocks."""
+    t = tmp_path / "t.jsonl"
+    t.write_text(row + "\n")
+    r = run(tmp_path, payload(tmp_path, transcript_path=str(t), last_assistant_message=OPEN_REPLY))
+    assert "Traceback" not in r.stderr and r.returncode == 2
+
+
+@pytest.mark.parametrize("row", [
+    '{"type": "assistant", "message": "x"}',
+    '{"type": "assistant", "message": {"content": 5}}',
+    _blocks({"type": "text", "text": 5}),
+    "[" * 190_000 + "]" * 190_000,  # inside the 400 KB tail the reply reader takes
+], ids=["message-string", "content-number", "text-number", "too-deep"])
+def test_a_wrong_shaped_last_row_is_skipped_and_the_reply_before_it_is_read(tmp_path, row):
+    """No open plan, no hook input text: last_reply_text reads the file. A bad row is skipped, never repaired."""
+    t = tmp_path / "t.jsonl"
+    t.write_text(_blocks({"type": "text", "text": OPEN_REPLY}) + "\n" + row + "\n")
+    r = run(tmp_path, payload(tmp_path, transcript_path=str(t)))
+    assert "Traceback" not in r.stderr and r.returncode == 2
+
+
+@pytest.mark.parametrize("bad", ["[]", '{"sig": []}', '{"sig": {}}', DEEP], ids=["list", "sig-list", "sig-dict", "too-deep"])
+def test_a_wrong_shaped_reply_state_is_read_as_absent(tmp_path, bad):
+    """No open plan: the reply guard reads its once-per-reply state. Bad state means the reply blocks."""
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / f"{SID}.reply.json").write_text(bad)
+    r = run(tmp_path, payload(tmp_path, last_assistant_message=OPEN_REPLY))
+    assert "Traceback" not in r.stderr and r.returncode == 2
+
+
+@pytest.mark.parametrize("n", ['"x"', "[1]", "null", "1.5"], ids=["string", "list", "null", "float"])
+def test_a_block_counter_of_the_wrong_type_restarts_the_count(tmp_path, n):
+    plan = plant(tmp_path)
+    (tmp_path / "state").mkdir()
+    sig = json.dumps([(str(plan), ["s03"])])
+    (tmp_path / "state" / f"{SID}.json").write_text(f'{{"sig": {json.dumps(sig)}, "n": {n}}}')
+    r = run(tmp_path, payload(tmp_path))
+    assert "Traceback" not in r.stderr and r.returncode == 2 and "Block 1 of 3" in r.stderr
+
+
 def test_blocks_doing_without_closeout_and_names_it(tmp_path):
     plant(tmp_path)
     r = run(tmp_path, payload(tmp_path))
     assert r.returncode == 2
     assert "plan p1" in r.stderr and "s03" in r.stderr and "Block 1 of 3" in r.stderr
+
+
+def test_escaping_session_id_writes_no_state_outside_the_state_dir(tmp_path):
+    sid = "../../escape"
+    plant(tmp_path, owner=sid)
+    r = run(tmp_path, payload(tmp_path, session_id=sid))
+    assert r.returncode == 0
+    assert not list(tmp_path.glob("**/escape*.json")) and not (tmp_path / "state").exists()
 
 
 def test_allows_when_closeout_exists(tmp_path):
@@ -103,7 +199,8 @@ def test_new_finding_resets_cap(tmp_path):
     assert run(tmp_path, payload(tmp_path)).returncode == 2
 
 
-@pytest.mark.parametrize("bad", ["", "not json", json.dumps({"cwd": "/nonexistent"})])
+@pytest.mark.parametrize("bad", ["", "not json", json.dumps({"cwd": "/nonexistent"}), "[]", '"x"', "1", "null", DEEP],
+                         ids=["empty", "not-json", "no-session", "list", "string", "number", "null", "too-deep"])
 def test_unreadable_input_allows(tmp_path, bad):
     env = {"PATH": "/usr/bin:/bin", "TURNEND_GUARD_STATE": str(tmp_path / "state")}
     r = subprocess.run([sys.executable, str(HOOK)], input=bad, text=True, capture_output=True, env=env)
@@ -199,6 +296,8 @@ def reply_transcript(tmp_path, text):
     ("Done.\nNext: x. Needs you: nothing\nState: committed no (uncommitted until the gate passes)", 0),
     ("The cleanup is still open.\nNext: x. Needs you: nothing\nState: committed no", 2),
     ("Deployed.\n**Not checked**\n- The fill rate in the owner's apps.\nNext: a timer. Needs you: nothing", 2),
+    # Past tense still blocks, but the message names the words (2026-11-27: a guess cost a turn).
+    ("I ran the two checks that my last reply left open.\nNext: x. Needs you: nothing", 2),
     # A decision in 'Needs you' with no pick blocks; the same with a pick, or "nothing, unless … or …", passes.
     ("Done.\nNext: wait. Needs you: run the plan now, both, or neither?", 2),
     ("Done.\nNext: wait. Needs you: run the plan now, or wait? My pick: run it now.", 0),
@@ -211,7 +310,11 @@ def reply_transcript(tmp_path, text):
 def test_reply_contradiction_blocks_once(tmp_path, text, expected):
     t = reply_transcript(tmp_path, text)
     pl = payload(tmp_path, transcript_path=str(t))
-    assert run(tmp_path, pl).returncode == expected
+    r = run(tmp_path, pl)
+    assert r.returncode == expected
+    if "open work" in r.stderr:
+        hit = r.stderr.split("(matched: '")[1].split("')")[0]
+        assert hit.lower() in text.lower()
     assert run(tmp_path, pl).returncode == 0  # once per reply
 
 

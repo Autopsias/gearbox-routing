@@ -12,6 +12,7 @@ No file means not exposed. A broken or symlinked file is an error.
     exposure.py check-run <out_dir> <repo> [--record --agents N]
     exposure.py prior-runs <repo>          earlier run folders, newest first
     exposure.py open-items <repo>          items still open from earlier recorded runs
+    exposure.py show-open <repo>           digest-verified open findings & Sentry state (JSON)
     exposure.py repair-log <repo>          rebuild unreadable acceptance state (exit 2: refused,
                                            nothing written, when any marker is unreadable)
 
@@ -19,6 +20,7 @@ Run-derived text (finding titles, blockers, the reason) is recorded by this
 script through health.set_result, never pasted into a shell by the agent.
 """
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -27,10 +29,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from runlog import (ACCEPTED, ACCEPTED_LOG, DOCS, KINDS, LOCK, MAX_DOC, MAX_NS,  # noqa: E402,F401
-                    RUN_NAME, TooDeep, _accepted, _accepted_names, _digest, _newest, accept, bad_text,
-                    cf_output_dir, loads, open_set, prior_runs, read_file, read_why, repair_log,
-                    repo_lock, runs_parent)
+from runlog import (ACCEPTED, ACCEPTED_LOG, DOCS, KINDS, LAST_REFUSAL, LAST_SENTRY,  # noqa: E402,F401
+                    LOCK, MAX_DOC, MAX_NS, RUN_NAME, TooDeep, _accepted, _accepted_names, _digest,
+                    _newest, _write_new, accept, bad_text, cf_output_dir, loads, open_set,
+                    prior_runs, read_file, read_why, repair_log, repo_lock, runs_parent)
 
 SKILL = Path(__file__).resolve().parent.parent
 VENDOR = SKILL / "vendor" / "cloudflare-security-audit"
@@ -239,12 +241,41 @@ def record(repo, status, detail):
     health.set_result(Path(repo).resolve(), "sec.sast", status, detail)
 
 
+def _write_sidecar(repo, name, payload):
+    parent = runs_parent(repo)
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _write_new(parent / name, json.dumps(payload))
+
+
+def _record_refusal(repo, origin, reason):
+    import card
+    text = reason or ""
+    if bad_text(text):
+        text = text.encode("utf-8", "backslashreplace").decode()
+    _write_sidecar(repo, LAST_REFUSAL, {
+        "origin": origin, "reason": text[:300], "tree": card.tree_key(Path(repo).resolve())})
+
+
+def _clear_refusal(repo):
+    with contextlib.suppress(OSError):
+        (runs_parent(repo) / LAST_REFUSAL).unlink()
+
+
+def _write_sentry(repo, had_sentry, status, detail):
+    import card
+    _write_sidecar(repo, LAST_SENTRY, {
+        "sentry_finding": bool(had_sentry), "status": status, "detail": detail,
+        "tree": card.tree_key(Path(repo).resolve())})
+
+
 def record_route(repo):
     r = Path(repo).resolve()
     kind, arg = route(r, make_dir=False)
     if kind == "error":
         prefix = "exposure error" if arg.startswith(str(r / EXPOSURE)) else "route error"
-        record(r, "pending", f"{prefix}: {arg}")
+        msg = f"{prefix}: {arg}"
+        record(r, "pending", msg)
+        _record_refusal(r, "record-route", msg)
     elif kind == "sentry-downgrade":
         import health
         cur = next((c for c in health.load_card(r)["checks"] if c["id"] == "sec.sast"), {})
@@ -272,7 +303,10 @@ def _check_run(ns, cf_check):
         if res["status"] != "pending":
             record(ns.repo, "pending", cf_check.cf_detail(
                 ns.repo, ns.out_dir, ns.agents, f"accepting a {res['status']} result"))
-            accept(ns.out_dir, res["status"], res["open"], res["digest"])
+            accept(ns.out_dir, res["status"], res["open"], res["digest"], res["complete"])
+            _clear_refusal(ns.repo)
+        else:
+            _record_refusal(ns.repo, "check-run", res["detail"])
         record(ns.repo, res["status"],
                cf_check.cf_detail(ns.repo, ns.out_dir, ns.agents, res["detail"]))
 
@@ -293,10 +327,23 @@ def _main_check_run(args, cf_check):
         except Exception as e:  # noqa: BLE001 — fail closed: any error prints pending and exits 2; with --record it also records pending over an older pass
             why = f"check-run error: {type(e).__name__}: {e}"[:MAX_LINE]
             if ns.record:           # a fixed detail: no further read of untrusted input
+                with contextlib.suppress(OSError, ValueError):
+                    _record_refusal(ns.repo, "check-run", why)
                 record(ns.repo, "pending", SEP.join([why, f"output: {ns.out_dir}"]))
             print("pending", why, sep="\n")
             return 2
     return 0
+
+
+def _validate_sentry_detail(status, detail):
+    if status == "pending":
+        return status, detail
+    if bad_text(detail):
+        return ("pending", "detail is not valid UTF-8 text: "
+                + detail.encode("utf-8", "backslashreplace").decode())
+    if not (detail or "").strip():
+        return "pending", "empty detail: nothing recorded to stand under the status"
+    return status, detail
 
 
 def _main_record(args):
@@ -323,7 +370,13 @@ def _main_record(args):
     except (OSError, ValueError) as e:  # never leave an older result standing
         why = read_why(e, ns.detail_file)
         status, detail = "pending", f"detail file unreadable: {why}"
-    record(ns.repo, *open_floor(ns.repo, status, detail))
+    status, detail = _validate_sentry_detail(status, detail)
+    had_sentry = status in ("warn", "fail")
+    final_status, final_detail = open_floor(ns.repo, status, detail)
+    record(ns.repo, final_status, final_detail)
+    _write_sentry(ns.repo, had_sentry, status, detail)
+    if status != "pending" and final_status != "pending":
+        _clear_refusal(ns.repo)
     return 0
 
 
@@ -361,6 +414,12 @@ def _main_record_route(repo):
     return 0
 
 
+def _main_show_open(repo):
+    import cf_route_state
+    print(json.dumps(cf_route_state.show_open_payload(repo), indent=2))
+    return 0
+
+
 def _main_route(repo):
     kind, arg = route(repo)
     if kind == "error":
@@ -380,7 +439,8 @@ def main(argv):
         return _main_record(argv[1:])
     if len(argv) == 2 and argv[0] in ("prior-runs", "open-items"):
         return _main_read(*argv)
-    one_repo = {"repair-log": _main_repair_log, "record-route": _main_record_route}
+    one_repo = {"repair-log": _main_repair_log, "record-route": _main_record_route,
+                "show-open": _main_show_open}
     if len(argv) == 2 and argv[0] in one_repo:
         return one_repo[argv[0]](argv[1])
     if len(argv) != 1:

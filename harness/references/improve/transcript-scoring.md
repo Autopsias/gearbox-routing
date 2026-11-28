@@ -23,7 +23,7 @@ same tools would have needed. One label per session:
 | repeated waste | waste recurred, or a rework round an earlier check would have prevented |
 | dominated by waste | same defect reworked across cycles, repeated user correction, extended flailing |
 
-Sources of waste to look for (common ones, not an exhaustive checklist):
+Sources of waste to look for (common ones, not an exhaustive checklist). Count only calls the model made: skip an assistant record whose `message.model` is `<synthetic>` (it has `isVirtual: true` and 0 tokens). A Code Mode script made that call inside one REPL call.
 
 - **Rework**: work redone because it was wrong the first time — a failure a local
   check would have caught, edits to the wrong file, a misread requirement reverted.

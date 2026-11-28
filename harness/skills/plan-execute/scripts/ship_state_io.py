@@ -123,7 +123,7 @@ def read_json_with_bak(path):
 # _shipping_state/<sid>.json IO
 # --------------------------------------------------------------------------
 def ship_state_path(plan_dir, session_id):
-    return Path(plan_dir) / "_shipping_state" / f"{session_id}.json"
+    return sj.resolve_inside(Path(plan_dir) / "_shipping_state", f"{session_id}.json")
 
 
 def load_ship_state(plan_dir, session_id):

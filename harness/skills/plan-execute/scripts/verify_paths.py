@@ -8,6 +8,7 @@ only place the on-disk layout of `_verify_state/` is spelled out.
 from datetime import UTC, datetime
 from pathlib import Path
 
+import safe_json as sj
 import ship_state_io as ssio
 
 # The one definition of the failed-gate sentinel: verify.py records it, rework.py
@@ -26,11 +27,11 @@ def _html(plan_dir):
     return Path(plan_dir) / "PLAN.html"
 
 def verify_state_path(plan_dir, session_id):
-    return Path(plan_dir) / "_verify_state" / f"{session_id}.json"
+    return sj.resolve_inside(Path(plan_dir) / "_verify_state", f"{session_id}.json")
 
 def _save_state(plan_dir, session_id, state):
     state["updated_at"] = _now()
     ssio.durable_write_json(verify_state_path(plan_dir, session_id), state)
 
 def _feedback_path(plan_dir, session_id):
-    return Path(plan_dir) / "_verify_state" / f"{session_id}.feedback.md"
+    return sj.resolve_inside(Path(plan_dir) / "_verify_state", f"{session_id}.feedback.md")

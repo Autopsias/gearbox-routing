@@ -120,6 +120,27 @@ def test_deleting_a_locked_file_fails_the_same_way(tmp_path):
     _assert_refused(plan_dir, _verify(plan_dir), marker, LOCKED, "deleted", "locked check")
 
 
+def test_a_crash_after_the_snapshot_write_is_recovered_by_the_next_begin(tmp_path, monkeypatch):
+    """C-04 row 12: the snapshot is written, then the event log raises. The next begin keeps
+    that snapshot (same generation), so an edit made after the crash is still caught."""
+    plan_dir, root, _ = _plan(tmp_path)
+    fired = []
+
+    def boom(*a, **k):
+        fired.append(1)
+        raise OSError("injected crash after the snapshot write")
+
+    with monkeypatch.context() as mp:
+        mp.setattr(lc.rsi, "log_event", boom)
+        with pytest.raises(OSError):
+            lc.begin(plan_dir, mio.load_manifest(plan_dir), ["s01"])
+    assert fired and lc.snapshot_path(plan_dir, "s01").exists()
+    f = root / LOCKED
+    f.write_text(f.read_text().replace("2\n", "3\n"))
+    lc.begin(plan_dir, mio.load_manifest(plan_dir), ["s01"])
+    assert (LOCKED, "changed", "locked check") in lc.check(plan_dir, "s01")
+
+
 def test_a_missing_locked_path_at_begin_refuses_the_session(tmp_path):
     plan_dir, root, _ = _plan(tmp_path, locked=(LOCKED, "tests/absent.py"))
     with pytest.raises(SystemExit, match="tests/absent.py"):

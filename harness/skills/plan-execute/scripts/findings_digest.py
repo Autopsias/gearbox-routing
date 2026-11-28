@@ -117,7 +117,9 @@ def live_answer(plan_dir, session_id):
 def _closeout_after(plan_dir, session_id, at):
     """True when any closeout of the session (live or archived `.r<N>`) was persisted after `at`.
     Unparseable files or times count as newer (fail closed)."""
-    for f in sorted((Path(plan_dir) / "_closeouts").glob(f"{session_id}.*json")):
+    co_dir = Path(plan_dir) / "_closeouts"
+    sj.resolve_inside(co_dir, session_id)
+    for f in sorted(co_dir.glob(f"{session_id}.*json")):
         if f.name != f"{session_id}.json" and not re.match(rf"^{re.escape(session_id)}\.r\d+\.json$", f.name):
             continue
         try:

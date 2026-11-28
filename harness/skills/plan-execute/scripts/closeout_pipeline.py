@@ -120,6 +120,9 @@ def parse_and_validate_schema(json_text):
         }
 
     violations = []
+    if isinstance(data.get("notes"), str) and isinstance(data.get("session"), str):
+        # agents often write one line of text; the format allows the session id as a notes key
+        data["notes"] = {data["session"]: data["notes"]}
     required = {
         "session": str,
         "result": str,
@@ -312,7 +315,7 @@ def persist(plan_dir, session_id, parsed):
     record["_closeout_digest"] = closeout_digest(parsed)
     record["replayed"] = False
     record["replayed_at"] = None
-    target = co_dir / f"{session_id}.json"
+    target = sj.resolve_inside(co_dir, f"{session_id}.json")
     fd, tmp = tempfile.mkstemp(dir=str(co_dir), prefix=".tmp-", suffix=".json")
     try:
         with os.fdopen(fd, "w") as f:
@@ -330,7 +333,7 @@ def persist(plan_dir, session_id, parsed):
 
 
 def mark_replayed(plan_dir, session_id):
-    target = Path(plan_dir) / "_closeouts" / f"{session_id}.json"
+    target = sj.resolve_inside(Path(plan_dir) / "_closeouts", f"{session_id}.json")
     if not target.exists():
         return
     rec = sj.as_dict(json.loads(target.read_text()))
@@ -342,7 +345,7 @@ def mark_replayed(plan_dir, session_id):
 
 
 def load_closeout(plan_dir, session_id):
-    target = Path(plan_dir) / "_closeouts" / f"{session_id}.json"
+    target = sj.resolve_inside(Path(plan_dir) / "_closeouts", f"{session_id}.json")
     if not target.exists():
         return None
     return sj.as_dict(json.loads(target.read_text()))

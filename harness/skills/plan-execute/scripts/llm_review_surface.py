@@ -196,6 +196,7 @@ def write_diff_file(cwd, base, out_path, scope=(), exclude=()):
     argv = ["git", "diff", base or "HEAD"] + _pathspec(scope, exclude)
     try:
         proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
                               check=False, timeout=120)
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -433,7 +434,7 @@ def prepare_surface(args, scope, exclude=()):
                          args.cwd, changed + list(new_files),
                          ledger.parse_floor(args.blocking_severity),
                          (getattr(args, "blocking_rule", "") or "").strip())
-    if (halt := size_check.check(led, args, base, changed, new_files)) is not None:
+    if (halt := size_check.check(led, args, base, changed, split_untracked(args.cwd, new_files)[0])) is not None:
         return halt
     focus, changed, new_files, note = ledger.narrow_to_delta(led, changed, new_files)
     if note:

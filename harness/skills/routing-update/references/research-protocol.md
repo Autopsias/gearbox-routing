@@ -124,3 +124,25 @@ or explicitly declined with a dated note in a changeset's Confidence section).
   current local-dispatch shape. Watch for: GA, depth-1 limit lifted, or an explicit
   proposal to move plan-execute dispatch to hosted infra — any of those is reason to
   open a changeset diff.
+- **zai lane — glm-5.4 open ends** (added, v46; all probed that day, see
+  `evals/routing/external-priors-glm54-2026-11.md`): the opus slot moved to glm-5.4
+  with NO external quality measurement (DeepSWE has no 5.4 row) and no API price
+  (vendor: API "coming soon"; the lane is quota-billed meanwhile). Four flip
+  conditions, each its own diff: (1) DeepSWE publishes a 5.4 row → re-judge the zai
+  task-class map with data (the runbook's New-model-GA eval); (2) z.ai ships
+  glm-5.4-flash → revisit the sonnet slot (currently pinned to glm-5.3-flash only
+  because no 5.4-flash exists); (3) the 5.4 API price publishes → restore a real
+  $-figure to the GLM tree's quota note (the "~1/16 flash-vs-5.3" number was
+  dropped at v46 as 5.4-unpublishable); (4) glm-5.3-flashx enters the Coding Plan
+  (today 429 "not included") → a candidate flash successor needing its own quality
+  reading before any move. Also re-check the vendor "marathon thinking" caveat
+  against our own session data at the next /routing-retro.
+- **GLM tree session effort — re-probe on every Claude Code binary bump** (added
+  2026-11-27, v47; `evals/routing/external-priors-glm54-2026-11.md` §5): on 2.1.332
+  the per-model settings dial cannot give a glm-5.4 session `max` (it sends `high`
+  from `max`, `xhigh` from `xhigh`), so `~/.claude-glm` sets
+  `CLAUDE_CODE_EFFORT_LEVEL=max`, which also overrides every agent's own `effort:`
+  pin. Flip to a diff if a later binary honours `max` in the dial: the env var
+  could then be dropped and the `low` rung for mechanical work would return. Also
+  open from the same pass: whether a `/skill` turn lowers the level (2 observations,
+  one session), and what reset the dial to `{}` at 17:13 UTC.

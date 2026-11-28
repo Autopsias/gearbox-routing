@@ -275,3 +275,195 @@ def test_fix_route_rows_are_silent_when_the_card_matches_the_tree(tmp_path):
     rows = fix_routes(repo)
     assert rows, "fixture produced no rows"
     assert not any("stale" in r for r in rows), f"false stale alarm: {rows[0]}"
+
+
+def _run_fix_routes_raw(repo, *extra, env=None):
+    return subprocess.run(
+        [sys.executable, str(Path(health.__file__)), "fix-routes",
+         "--repo", str(repo), *extra],
+        capture_output=True, text=True, cwd=str(Path(health.__file__).parent), env=env)
+
+
+def _accept_cf(repo, findings=(), ledger=None, complete=True, status="fail"):
+    import exposure
+    from exposure_testlib import plant
+    out = plant(repo, findings, ledger=ledger,
+                run_status="complete" if complete else "partial")
+    open_items = []
+    for f in findings:
+        kind = "confirmed" if f["verdict"] == "confirmed" else "lead"
+        open_items.append({
+            "kind": kind, "id": f["fingerprint"], "label": f["title"],
+            "ref": "src/api.py:1", "files": ["src/api.py"], "evidence_runs": [out.name],
+        })
+    for u in (ledger or ()):
+        if u["status"] != "covered":
+            open_items.append({
+                "kind": "unit", "id": u["coverage_id"],
+                "label": f"{u['surface']} ({u['status']})", "ref": u["surface"],
+                "files": u.get("starting_paths", []), "evidence_runs": [out.name],
+            })
+    exposure.accept(out, status, open_items, exposure._digest(out), complete=complete)
+    return out
+
+
+def test_fix_routes_cli_branches_cloudflare_sast_details(tmp_path, exposure_home):
+    import os
+    from exposure_testlib import CONF, EXPOSED, make_repo as make_cf_repo
+    env = {**os.environ, "HOME": str(exposure_home)}
+
+    # 1. Exposed repo with confirmed Cloudflare finding -> general-purpose prove-then-fix
+    cf_repo = make_cf_repo(tmp_path / "cf_cli", EXPOSED)
+    health.collect(cf_repo)
+    out = _accept_cf(cf_repo, findings=[CONF], complete=True, status="fail")
+    health.set_result(cf_repo, "sec.sast", "fail", f"route: cloudflare-quick | output: {out}")
+    proc = _run_fix_routes_raw(cf_repo, "--advisory", env=env)
+    assert proc.returncode == 0, proc.stderr
+    sast = next(r for r in (json.loads(x) for x in proc.stdout.splitlines()) if r["id"] == "sec.sast")
+    assert sast["agent"] == "general-purpose"
+    assert sast["omit_detail"] is True
+    assert "prove-then-fix" in sast["prompt"]
+
+    # 2. Plain Sentry repo with failing SAST -> security-scanner Semgrep/Bandit
+    plain = make_cf_repo(tmp_path / "plain_cli")
+    health.collect(plain)
+    health.set_result(plain, "sec.sast", "fail", "route: sentry | semgrep: 1 finding")
+    proc2 = _run_fix_routes_raw(plain, "--advisory", env=env)
+    assert proc2.returncode == 0, proc2.stderr
+    sast2 = next(r for r in (json.loads(x) for x in proc2.stdout.splitlines()) if r["id"] == "sec.sast")
+    assert sast2["agent"] == "security-scanner"
+    assert "semgrep/bandit" in sast2["prompt"]
+
+
+def test_show_open_from_separate_git_worktree(tmp_path, exposure_home):
+    import os
+    from exposure_testlib import CONF, EXPOSED, cli, git, make_repo as make_cf_repo
+    env = {**os.environ, "HOME": str(exposure_home)}
+    repo = make_cf_repo(tmp_path / "main_wt", EXPOSED)
+    health.collect(repo)
+    _accept_cf(repo, findings=[CONF], complete=True, status="fail")
+    wt = tmp_path / "linked_wt"
+    git(repo, "worktree", "add", "-q", "-b", "wt-branch", str(wt))
+    proc = cli("show-open", str(wt), env=env)
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["route_kind"] == "cloudflare-quick"
+    assert payload["repo_root"] == str(wt.resolve())
+    assert not (wt / ".claude" / "health").exists()
+
+
+def test_handoff_preserves_consumer_routing_fields(tmp_path, exposure_home):
+    import os
+    env = {**os.environ, "HOME": str(exposure_home)}
+    repo = blocking_repo(tmp_path, "handoff_fields")
+    health.set_result(repo, "test.suite", "fail", "3 tests failed")
+    health.set_result(repo, "hyg.todo-density", "warn", "120 TODOs")
+    health.set_result(repo, "cq.lint", "warn", "5 ruff errors")
+
+    proc = _run_fix_routes_raw(repo, "--advisory", "--handoff", env=env)
+    assert proc.returncode == 0, proc.stderr
+    rows = {r["id"]: r for r in (json.loads(x) for x in proc.stdout.splitlines() if x.strip())}
+
+    expected_dispatches = {
+        "sec.secrets-history": "probe",
+        "test.suite": "command-file",
+        "hyg.todo-density": "operator",
+        "cq.lint": "agent",
+    }
+    required_keys = {
+        "id", "tier", "status", "title", "dispatch", "can_dispatch", "routed",
+        "command", "command_file", "command_file_found", "flag_check", "omit_detail",
+        "agent", "prompt", "operator", "plan_item", "plan_session",
+    }
+    for cid, want_dispatch in expected_dispatches.items():
+        r = rows[cid]
+        assert required_keys <= set(r), f"{cid} missing keys: {required_keys - set(r)}"
+        assert isinstance(r["dispatch"], str) and r["dispatch"] == want_dispatch
+        assert r["can_dispatch"] is True
+        assert r["routed"] is True
+        assert set(r["plan_item"]) == {"title", "description"}
+        assert set(r["plan_session"]) == {"prompt"}
+    assert rows["test.suite"]["command_file"].endswith("commands/test-orchestrate.md")
+    assert rows["test.suite"]["command_file_found"] in (True, False)
+    assert isinstance(rows["test.suite"]["flag_check"], str)
+
+
+def test_cloudflare_cli_handoff_rejects_stale_and_omits_raw_detail(
+        tmp_path, exposure_home, exposure_node):
+    import os
+    import exposure
+    from exposure_testlib import (
+        ACK, CONF, DEFERRED_ADMIN, EXPOSED, git, make_repo as make_cf_repo, unit)
+    env = {**os.environ, "HOME": str(exposure_home)}
+    build_plan = Path(health.__file__).resolve().parents[2] / "plan-builder" / "scripts" / "build_plan.py"
+
+    # 1. Stale card -> exit 2 + empty stdout
+    repo = make_cf_repo(tmp_path / "cf_handoff", EXPOSED)
+    health.collect(repo)
+    _accept_cf(repo, findings=[CONF], complete=True, status="fail")
+    health.set_result(repo, "sec.sast", "fail", "AUDIT_CANARY_CONFIRMED_DETAIL")
+    card = health.load_card(repo)
+    card["tree"] = "0" * 40
+    health.save_card(repo, card)
+    stale_proc = _run_fix_routes_raw(repo, "--advisory", "--handoff", env=env)
+    assert stale_proc.returncode == 2
+    assert stale_proc.stdout == ""
+    assert "stale" in stale_proc.stderr.lower()
+
+    # 2. Current Cloudflare card -> zero canary text in CLI stdout AND in build_plan.py output
+    health.collect(repo, fresh=True)
+    health.set_result(repo, "sec.sast", "fail", "AUDIT_CANARY_CONFIRMED_DETAIL")
+    cur_proc = _run_fix_routes_raw(repo, "--advisory", "--handoff", env=env)
+    assert cur_proc.returncode == 0, cur_proc.stderr
+    assert "AUDIT_CANARY_CONFIRMED_DETAIL" not in cur_proc.stdout
+    cf_row = next(r for r in (json.loads(x) for x in cur_proc.stdout.splitlines()) if r["id"] == "sec.sast")
+    assert cf_row["omit_detail"] is True and cf_row["detail"] == ""
+
+    # 3. Row 4 positive Sentry + carried coverage with AUDIT_CANARY -> zero canary in CLI + build_plan.py
+    r4 = make_cf_repo(tmp_path / "row4_handoff", EXPOSED)
+    health.collect(r4)
+    cov_u = unit("admin", "deferred", **DEFERRED_ADMIN)
+    cov_u["surface"] = "AUDIT_CANARY_COVERAGE_SURFACE"
+    _accept_cf(r4, findings=[], ledger=[unit("api"), cov_u], complete=True, status="warn")
+    (r4 / ".claude" / "exposure.json").write_text(json.dumps(ACK))
+    git(r4, "commit", "-qam", "opt out")
+    health.collect(r4, fresh=True)
+    df = tmp_path / "sentry_pos.txt"
+    df.write_text("route: sentry | warn: weak hash in app.py:1\n")
+    assert exposure.main(["record", str(r4), "warn", "--detail-file", str(df)]) == 0
+    assert "AUDIT_CANARY_COVERAGE_SURFACE" in next(
+        c["detail"] for c in health.load_card(r4)["checks"] if c["id"] == "sec.sast")
+
+    r4_proc = _run_fix_routes_raw(r4, "--advisory", "--handoff", env=env)
+    assert r4_proc.returncode == 0, r4_proc.stderr
+    assert "AUDIT_CANARY_COVERAGE_SURFACE" not in r4_proc.stdout
+    r4_row = next(r for r in (json.loads(x) for x in r4_proc.stdout.splitlines()) if r["id"] == "sec.sast")
+    assert r4_row["omit_detail"] is True and r4_row["detail"] == ""
+    assert r4_row["operator"]
+
+    # Feed both handoff rows into real build_plan.py and verify sessions/s01.{prompt,context}.md
+    for idx, hrow in enumerate((cf_row, r4_row)):
+        plan_dir = tmp_path / f"plan_{idx}"
+        plan_dir.mkdir()
+        spec = {
+            "title": f"Fix plan {idx}",
+            "categories": [{"key": "sec", "label": "Security"}],
+            "items": [{"id": "sast-1", "title": hrow["plan_item"]["title"],
+                       "description": hrow["plan_item"]["description"], "category": "sec"}],
+            "sessions": [{"id": "s01", "title": "Fix SAST", "model": "Sonnet", "items": ["sast-1"],
+                          "prompt": hrow["plan_session"]["prompt"],
+                          "dispatch": {"subagent_type": hrow["agent"] or None, "depends_on": []}}],
+            "infographic": {"type": "phase-journey", "title": "T",
+                            "phases": [{"num": 1, "name": "P", "tagline": "t", "items": ["sast-1"]}],
+                            "anchor_now": {"name": "n", "tagline": "t"},
+                            "anchor_goal": {"name": "g", "tagline": "t"}},
+        }
+        spec_path = plan_dir / "spec.json"
+        spec_path.write_text(json.dumps(spec))
+        bp = subprocess.run([sys.executable, str(build_plan), str(spec_path),
+                             str(plan_dir / "PLAN.html")], capture_output=True, text=True)
+        assert bp.returncode == 0, bp.stderr
+        for fname in ("s01.prompt.md", "s01.context.md"):
+            text = (plan_dir / "sessions" / fname).read_text()
+            assert "AUDIT_CANARY_CONFIRMED_DETAIL" not in text
+            assert "AUDIT_CANARY_COVERAGE_SURFACE" not in text

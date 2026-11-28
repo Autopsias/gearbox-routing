@@ -40,7 +40,8 @@ from common import (JUNK_PARTS, LAYERS, STATUSES, check,  # noqa: F401  (LAYERS 
 from probes import pending_checks
 from quality_checks import cq_file_size, cq_function_length
 import accepted
-from routes import fix_rows
+import cf_route_state
+from routes import emit_handoff_rows, fix_rows
 from shape import (MANIFEST_LOOKED_FOR, detect_shape, tracked_files,
                    unpinned_requirements)
 from workflow_checks import workflow_checks
@@ -435,6 +436,8 @@ def main(argv):
     ap.add_argument("--advisory", action="store_true",
                     help="fix-routes: ALSO emit the advisory findings (SKILL.md "
                          "step 5's go-ahead); default is blocking only")
+    ap.add_argument("--handoff", action="store_true",
+                    help="fix-routes: emit consumer-preserving handoff payloads; exit 2 on stale")
     ns = ap.parse_args(argv)
     repo = Path(ns.repo).resolve()
     if ns.cmd == "collect":
@@ -463,7 +466,15 @@ def main(argv):
         # banner line, because the contract above is that each line is a
         # complete dispatch on its own — a banner would break `while read`.
         stale = staleness(repo, card)
-        for row in fix_rows(card, advisory=ns.advisory):
+        sast_state = cf_route_state.sast_state(repo)
+        if ns.handoff:
+            rc, rows, err = emit_handoff_rows(card, repo, ns.advisory, sast_state, stale)
+            if err:
+                print(err, file=sys.stderr)
+            if rows:
+                print("\n".join(json.dumps(r) for r in rows))
+            sys.exit(rc)
+        for row in fix_rows(card, advisory=ns.advisory, sast_state=sast_state):
             print(json.dumps({**row, "stale": stale} if stale else row))
     elif ns.cmd in ("accepted", "project", "ci-median"):
         print(json.dumps(accepted.helper_command(ns.cmd, repo, ns.args)))

@@ -231,3 +231,24 @@ def test_a_dropped_path_is_named_with_the_reason_that_actually_dropped_it(tmp_pa
     only_excl = capsys.readouterr().err
     assert ("not this session's surface (excluded from the review surface): theirs/a.py"
             in only_excl)
+
+
+def test_size_check_counts_only_what_the_reviewer_reads(tmp_path, monkeypatch):
+    import types
+    r, run = _repo(tmp_path)
+    (r / "a.py").write_text("x = 1\n")
+    run("git", "add", "-A")
+    run("git", "commit", "-qm", "base")
+    (r / "a.py").write_text("x = 2\n")
+    (r / "_evidence" / "s1").mkdir(parents=True)
+    (r / "_evidence" / "s1" / "run.log").write_text("line\n" * 9000)
+    plan = tmp_path / "plan"
+    (plan / "_verify_state").mkdir(parents=True)
+    import review_size_check as rsc
+    monkeypatch.setattr(rsc, "ENFORCE", True)
+    args = types.SimpleNamespace(level="medium", cwd=str(r), base="HEAD", plan_dir=str(plan), session="s1",
+                                 blocking_severity="", blocking_rule="", reviewer="claude")
+    assert not isinstance(srf.prepare_surface(args, []), int)
+    # a real source change above the limit is still stopped
+    (r / "big.py").write_text("y = 1\n" * 9000)
+    assert srf.prepare_surface(args, []) == rsc.INDETERMINATE

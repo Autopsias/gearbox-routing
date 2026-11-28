@@ -541,3 +541,17 @@ def test_the_codex_schema_and_adapter_carry_the_rule_field():
     said = {"findings": [{**d, "rule": "2"}, {**d, "file": "b.py", "rule": None}]}
     out = json.loads(g.crb.adapt(said, ["a.py"], None, "medium").split("```json")[1].split("```")[0])
     assert out[0]["rule"] == "2" and "rule" not in out[1]   # null = absent, so it still blocks (I1)
+
+
+def test_write_diff_file_handles_non_utf8_bytes(tmp_path):
+    """Non-UTF-8 bytes in a tracked diff must not raise UnicodeDecodeError."""
+    import llm_review_surface as surf
+    repo = _repo(tmp_path)
+    p = repo / "latin1.txt"
+    p.write_bytes(b"before\xfb\n")
+    subprocess.run(["git", "add", "latin1.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "latin1"], cwd=repo, check=True)
+    p.unlink()
+    out = tmp_path / "out.diff"
+    got = surf.write_diff_file(str(repo), "HEAD", str(out))
+    assert got == str(out) and "\ufffd" in out.read_text(encoding="utf-8")

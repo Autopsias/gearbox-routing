@@ -32,6 +32,8 @@ ACCEPTED = "gearbox-accepted.json"
 # The last one holds the open set; markers in folders it never names are ignored.
 ACCEPTED_LOG = "accepted-runs"
 LOCK = ".check-run.lock"
+LAST_REFUSAL = "last-refusal.json"
+LAST_SENTRY = "last-sentry.json"
 RUN_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{6}-cloudflare$")
 MAX_NS = 2 ** 63 - 1            # nanosecond timestamps beyond this cannot be dates
 KINDS = ("lead", "unit", "confirmed", "candidate")
@@ -172,17 +174,27 @@ def _newest(parent):
                          "run repair-log") from None
 
 
+def _valid_item(i):
+    files = i.get("files") if isinstance(i, dict) else None
+    ev = i.get("evidence_runs") if isinstance(i, dict) else None
+    return (isinstance(i, dict) and i.get("kind") in KINDS and isinstance(i.get("id"), str)
+            and isinstance(i.get("label"), (str, type(None)))
+            and isinstance(i.get("ref"), (str, type(None)))
+            and (files is None or isinstance(files, list) and all(isinstance(f, str) for f in files))
+            and (ev is None or isinstance(ev, list)
+                 and all(isinstance(r, str) and RUN_NAME.match(r) for r in ev)))
+
+
 def _read_mark(path):
     """A well-formed acceptance marker read from `path`, or ValueError."""
     mark = loads(read_file(path))
     at = mark.get("accepted_at") if isinstance(mark, dict) else None
+    comp = mark.get("complete") if isinstance(mark, dict) else None
     items = mark.get("open") if isinstance(mark, dict) else None
-    if type(at) is not int or not 0 < at <= MAX_NS or not isinstance(items, list) or not all(
-            isinstance(i, dict) and i.get("kind") in KINDS and isinstance(i.get("id"), str)
-            and isinstance(i.get("label"), (str, type(None)))
-            and isinstance(i.get("ref"), (str, type(None)))
-            and (i.get("files") is None or isinstance(i["files"], list)
-                 and all(isinstance(f, str) for f in i["files"])) for i in items) or bad_text(items):
+    if (type(at) is not int or not 0 < at <= MAX_NS
+            or (comp is not None and type(comp) is not bool)
+            or not isinstance(items, list)
+            or not all(_valid_item(i) for i in items) or bad_text(items)):
         raise ValueError(f"{path}: malformed acceptance marker")
     return mark
 
@@ -233,11 +245,12 @@ def repair_log(repo):
     items = {(i["kind"], i["id"]): i for i in (marks[0][1]["open"] if marks else [])}
     for mark in unlogged:                       # a marker the log never named adds, no ref
         for i in mark["open"]:
-            items.setdefault((i["kind"], i["id"]), {**i, "ref": None})
+            items.setdefault((i["kind"], i["id"]), {**i, "ref": None, "evidence_runs": None})
     # a lead never stays open beside a confirmed finding of the same id (cf_check._carry)
     items = {(k, i): v for (k, i), v in items.items() if k != "lead" or ("confirmed", i) not in items}
     run = cf_output_dir(repo)
     _write_new(run / ACCEPTED, json.dumps({"status": "repair", "digest": None,
+                                           "complete": None,
                                            "accepted_at": time.time_ns(),
                                            "open": list(items.values())}))
     _write_new(parent / ACCEPTED_LOG, "".join(f"{n}\n" for n in reversed(read)) + run.name + "\n")
@@ -268,7 +281,7 @@ def _digest(run):
     return h.hexdigest()
 
 
-def accept(run, status, open_items=(), digest=None):
+def accept(run, status, open_items=(), digest=None, complete=None):
     """Mark a run that check-run accepted and recorded: only these are prior runs.
 
     The marker also carries every still-open item (confirmed findings, leads,
@@ -288,6 +301,7 @@ def accept(run, status, open_items=(), digest=None):
     # order comes from the log, so a previous time in the future cannot block this
     at = min(max(time.time_ns(), prev["accepted_at"] + 1 if prev else 0), MAX_NS)
     _write_new(run / ACCEPTED, json.dumps({"status": status, "digest": digest or now,
+                                           "complete": complete,
                                            "accepted_at": at, "open": list(open_items)}))
     fd = _append_fd(run.parent / ACCEPTED_LOG)         # trusted order: only accept() writes
     try:
@@ -340,7 +354,8 @@ def open_set(repo):
     if best is None:
         return {}, None
     items = {(i["kind"], i["id"]): {"label": i.get("label") or i["id"], "ref": i.get("ref"),
-                                    "files": i.get("files")} for i in best["open"]}
+                                    "files": i.get("files"),
+                                    "evidence_runs": i.get("evidence_runs")} for i in best["open"]}
     return items, datetime.fromtimestamp(best["accepted_at"] / 1e9).strftime("%Y-%m-%d")
 
 

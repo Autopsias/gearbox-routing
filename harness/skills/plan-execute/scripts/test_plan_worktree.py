@@ -259,6 +259,28 @@ def test_a_rollback_then_a_successful_retry_restores_the_claim(repo):
     assert claim["branch"] == state["branch"] and claim["path"] == state["path"]
 
 
+def test_a_crash_between_the_state_file_and_the_claim_is_finished_by_the_next_call(repo, monkeypatch):
+    """C-04 row 10: the state file is saved, then the claim write raises. The next call
+    writes the claim on every call and creates the worktree: nothing half-isolated stays."""
+    root, plan_dir = repo["root"], repo["plan_dir"]
+    fired = []
+
+    def boom(*a, **k):
+        fired.append(1)
+        raise OSError("injected crash before the claim is written")
+
+    with monkeypatch.context() as mp:
+        mp.setattr(pwt, "_write_claim", boom)
+        with pytest.raises(OSError):
+            pwt.ensure_plan_worktree(plan_dir, project_root=root)
+    assert fired and pwt.load_state(plan_dir) and pwt.read_claim(root, "demo-plan") is None
+    path = pwt.plan_worktree_path(root, "demo-plan")
+    assert not path.exists()
+    state = pwt.ensure_plan_worktree(plan_dir, project_root=root)
+    claim = pwt.read_claim(root, "demo-plan")
+    assert claim["branch"] == state["branch"] and path.is_dir() and pwt.is_locked(root, path)
+
+
 def test_create_refuses_a_none_base_outright(repo):
     """Backstop on the helper itself: whatever the caller got wrong, `None`
     must never reach git's argv (that was a TypeError, no refusal, no

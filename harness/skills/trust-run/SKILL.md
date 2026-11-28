@@ -71,7 +71,7 @@ Write `trust-run-summary.{json,md}` to the run dir and report back, in plain lan
 ## Step 7.5 — Self-eval (E-checks) before the verdict is reported
 
 After `trust-run-summary.json` is written — before reporting to the user —
-run the four binary checks in `references/_evals.md`:
+run the five binary checks in `references/_evals.md`:
 
 ```bash
 python3 skills/trust-run/scripts/eval_checks.py --run-dir .trust/<run_id>
@@ -84,18 +84,21 @@ from the enum, never softer than the strictest component
 never patch the summary to match the components) · E3 one prioritised
 fix-list, must-fix first, each naming file+locator · E4
 reviewer_independence recorded and the Board/Regulatory same-family cap
-honored.
+honored · E5 the summary carries `not_reviewed_claims` (`[]` only when the
+reviewer saw every claim's primary source) and is never plain `ready` while
+the list is non-empty (`action_required` on fail).
 
 Max 2 repair rounds on record defects, then ACTION REQUIRED. Append the 🧪
 block to the run summary:
 
 ```markdown
-## 🧪 Self-eval — E-checks (4/4 passed, 0 repair rounds)
+## 🧪 Self-eval — E-checks (5/5 passed, 0 repair rounds)
 
 - E1 PASS — 6/6 claimed steps left artefacts (refresh not claimed)
 - E2 PASS — one verdict "blocked"; strictest component blocked — consistent
 - E3 PASS — 5-item fix-list, 2 must-fix first, all name file+locator
 - E4 PASS — reviewer_independence=cross-vendor recorded
+- E5 PASS — not_reviewed_claims recorded (0); verdict consistent
 ```
 
 **Memory append (event-driven).** If the owner corrected an orchestration

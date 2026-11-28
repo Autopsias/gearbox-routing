@@ -60,3 +60,15 @@ def test_I4_attempt_two_never_trips_the_check(tmp_path, monkeypatch, capsys):
 def test_not_enforced_prints_and_runs(tmp_path, monkeypatch, capsys):
     rc, cap, _, started = _run(tmp_path, monkeypatch, capsys, limit=1, enforce=False)
     assert (rc, started) == (g.PASS, 1) and "printed only" in cap.out
+
+
+def test_large_changed_list_avoids_argv_limit(tmp_path):
+    """Passing thousands of deleted/changed paths must not hit OS ARG_MAX."""
+    import subprocess
+    repo = _repo(tmp_path)
+    (repo / "tracked.py").write_text("x = 1\n")
+    subprocess.run(["git", "add", "tracked.py"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "track"], cwd=repo, check=True)
+    (repo / "tracked.py").write_text("x = 1\ny = 2\nz = 3\n")
+    huge_changed = ["tracked.py", *(f"archived/dir_{i}/file_{i}.md" for i in range(20_000))]
+    assert rsc.changed_lines(str(repo), "HEAD", huge_changed, []) == 2

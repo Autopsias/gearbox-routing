@@ -217,6 +217,11 @@ DECIDED-HERE (plan-harden grill).
 - **Cross-provider override** (for example a Codex model named on the Claude
   tree): skips the floor check and is recorded `pinned_override`. The existing bar
   on Codex pins for linchpin or irreversible work still applies.
+- **Canary pin to a RECORD ONLY model** (2026-11-26, `gpt-6.2-astra`): a session tagged
+  `routing_experiment: {kind: canary, proposal_id}` may pin a model whose SSOT `prices:` row
+  says RECORD ONLY. Effort is the session's `reasoning` (never `ultra`). An untagged pin is
+  still refused. A Codex canary run with no valid closeout writes an `exhausted` ledger row
+  with `gates_failed: ["no_closeout"]` (the safety monitor ends the task).
 - DECIDED-HERE (S03): an override equal to the class default is still an
   override for the ledger (`pinned_override`) and still needs `why_model`. The
   floor check passes it, because an equal rank is not "below".

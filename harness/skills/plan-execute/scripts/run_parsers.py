@@ -263,7 +263,7 @@ def _add_land_parsers(sub):
     add_dir(s)
     s.add_argument("--gate", required=True)
     s.add_argument("--status", required=True, choices=["passed", "failed"])
-    s.add_argument("--findings-count", type=int, default=None)
+    s.add_argument("--findings-count", type=int, default=None, help="Number of findings the gate raised")
     s.add_argument("--result-file", default=None,
                    help="an artifact a PASS can show. Checked to exist and be non-empty — "
                         "the same refusal the evidence gate applies.")

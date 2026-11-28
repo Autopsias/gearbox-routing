@@ -33,6 +33,7 @@ Prompt the agent to:
    artifact quality where the session shows code edits. The evidence is on the AGENT
    side of the transcript: extract it cheaply with grep (repeated identical commands,
    error-then-retry runs, tool-call density), never by reading a transcript in full.
+   Count only calls the model made: skip an assistant record whose `message.model` is `<synthetic>` (it has `isVirtual: true` and 0 tokens). A Code Mode script made that call inside one REPL call.
    Return one label per rubric per session, each with the verbatim moment that drove
    it, cited with its session.
 

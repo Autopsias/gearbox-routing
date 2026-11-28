@@ -184,11 +184,11 @@ def cmd_activation(argv):
     import argparse
 
     parser = argparse.ArgumentParser(prog="compact-policy.py activation")
-    parser.add_argument("--intervention", choices=INTERVENTIONS, required=True)
-    parser.add_argument("--evidence", required=True)
-    parser.add_argument("--source", choices=("operator", "session"), required=True)
-    parser.add_argument("--scope")
-    parser.add_argument("--restage", action="store_true")
+    parser.add_argument("--intervention", choices=INTERVENTIONS, required=True, help="the intervention being activated")
+    parser.add_argument("--evidence", required=True, help="path or note that shows the intervention worked")
+    parser.add_argument("--source", choices=("operator", "session"), required=True, help="who made the call")
+    parser.add_argument("--scope", help="where the activation applies")
+    parser.add_argument("--restage", action="store_true", help="write a new row even if the intervention already has one")
     args = parser.parse_args(argv)
     # Deliberately NOT gagged by the kill switch — see this module's docstring.
     mine = [r for r in read_activations() if r.get("intervention") == args.intervention]
@@ -235,7 +235,7 @@ def cmd_status(argv, safe_point_reader):
     import argparse
 
     parser = argparse.ArgumentParser(prog="compact-policy.py status")
-    parser.add_argument("--session")
+    parser.add_argument("--session", help="session id to report on (default: the current session)")
     args = parser.parse_args(argv)
     session = args.session or os.environ.get("CLAUDE_CODE_SESSION_ID") or "unknown"
     policy = read_policy(session)

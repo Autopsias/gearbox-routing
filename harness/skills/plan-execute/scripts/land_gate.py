@@ -184,7 +184,7 @@ def _run_argv_gate(plan_dir, ctx, st, gid, g, cwd, log=""):
             "findings_count": 1 if outcome == "fail" else 0,
             "review": rvs.EXCLUDE_ENV in (g.get("env_allowlist") or []),
             "excerpt": gx.expect_excerpt(gid, miss, out[-4000:])}
-    gt.log_run(plan_dir, "land" + log.replace(".", "-"), None, gid, wall_s, rec["outcome"])
+    gt.log_run(plan_dir, "land" + log.replace(".", "-"), None, gid, wall_s, rec["outcome"], out)
     if log != ".base":        # LND-12: every land-tree failure is recorded, and saved, now
         lfk.record(plan_dir, ctx, st, rec)
     return rec

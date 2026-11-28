@@ -150,13 +150,17 @@ def test_apply_refuses_a_supporting_tree_symlink(tmp_path: Path) -> None:
 
 def test_references_travel_from_where_each_kind_keeps_them(tmp_path: Path) -> None:
     # Command reference docs live in ~/.claude/references/, outside commands/,
-    # so Claude Code does not list each one as a slash command. Agents keep
-    # theirs in agents/references/.
+    # so Claude Code does not list each one as a slash command. Agents and
+    # bmad-* commands are skipped so ~/.agents/skills stays under budget.
     write(
         tmp_path / ".claude/commands/demo.md",
         "---\ndescription: Demo. Use when demo.\n---\n\nRead `~/.claude/references/demo/guide.md`.\n",
     )
     write(tmp_path / ".claude/references/demo/guide.md", "the guide\n")
+    write(
+        tmp_path / ".claude/commands/bmad-bmm-dev-story.md",
+        "---\ndescription: Legacy BMAD command.\n---\n",
+    )
     write(
         tmp_path / ".claude/agents/helper.md",
         "---\ndescription: Helper. Use when helping.\n---\n\nSee `references/helper/notes.md`.\n",
@@ -171,8 +175,9 @@ def test_references_travel_from_where_each_kind_keeps_them(tmp_path: Path) -> No
     assert "Read `references/demo/guide.md`." in body
     assert "~/.claude/references/" not in body
     assert (mirror / "references/demo/guide.md").read_text() == "the guide\n"
-    agent = tmp_path / ".agents/skills/helper/references/helper/notes.md"
-    assert agent.read_text() == "agent notes\n"
+    assert not (tmp_path / ".agents/skills/helper").exists()
+    assert not (tmp_path / ".agents/skills/dev-story").exists()
+    assert not (tmp_path / ".agents/skills/bmad-bmm-dev-story").exists()
 
 
 def test_a_pointer_inside_a_copied_doc_still_reaches_the_deployed_tree(

@@ -131,7 +131,7 @@ USAGE = """usage: govrun [--class ci|interactive] [--max-wait SECONDS] [--] COMM
 
   --class      which slot class to queue for (default: interactive)
   --max-wait   seconds to wait for a slot; 0 waits forever
-               (default: interactive 120, ci 0)
+               (default: interactive 120, ci 0); --max_wait is accepted too
   --cores N    a non-pytest job (video, a build) that uses N cores: skip the
                worker slot and take N of the machine's core tokens. Without
                it, a job takes the worker slot plus one core per worker.

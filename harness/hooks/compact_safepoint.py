@@ -38,12 +38,12 @@ HOLD_IS_INERT_FOR_TYPES = ()
 
 def parse(argv):
     parser = argparse.ArgumentParser(prog="compact-policy.py safe-point")
-    parser.add_argument("--state", choices=("ok", "hold"))
-    parser.add_argument("--session")
-    parser.add_argument("--plan-dir")
-    parser.add_argument("--phase")
-    parser.add_argument("--note")
-    parser.add_argument("--ttl-minutes", type=float, default=SAFE_POINT_TTL_MINUTES)
+    parser.add_argument("--state", choices=("ok", "hold"), help="mark the session safe to compact (ok) or not (hold)")
+    parser.add_argument("--session", help="session id (default: the current session)")
+    parser.add_argument("--plan-dir", help="plan directory the safe point belongs to")
+    parser.add_argument("--phase", help="phase label recorded with the safe point")
+    parser.add_argument("--note", help="free-text reason recorded with the safe point")
+    parser.add_argument("--ttl-minutes", type=float, default=SAFE_POINT_TTL_MINUTES, help="minutes the safe point stays valid")
     return parser.parse_args(argv)
 
 

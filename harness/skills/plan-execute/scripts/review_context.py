@@ -319,8 +319,8 @@ def declared_base(plan_dir, session_id, cwd):
     is logged for the operator.
     """
     try:
-        rec = sj.load_dict((pathlib.Path(plan_dir) / "_closeouts"
-                            / f"{session_id}.json").read_bytes())
+        rec = sj.load_dict(sj.resolve_inside(pathlib.Path(plan_dir) / "_closeouts",
+                                             f"{session_id}.json").read_bytes())
     except OSError:
         return None
     ref = (sj.get_str(rec, REVIEW_BASE_KEY) or "").strip()

@@ -6,7 +6,8 @@ this file so the skill stays portable). Binary pass/fail only — never scores.
 Light treatment per the APPROVED catalog (2026-06-04, orchestrators block).
 Change the catalog first if a check needs changing.
 
-**Why these four.** trust-run's own Step 0a names the worst failure for a
+**Why these five.** E5 guards coverage: a claim the reviewer did not see against
+its primary source is not reviewed. The first four: trust-run's own Step 0a names the worst failure for a
 trust tool: **a fabricated step** — claiming a pipeline stage ran when it
 left no artefact. And its Step 7 makes one promise above all: ONE verdict,
 taken from the strictest file and the strictest active cap, never an
@@ -54,6 +55,14 @@ only verifies the orchestration record. All script-type, run inline via
           blocked — never plain ready, never silently ready-with-limitations."
   how: script
   on_fail: repair
+
+- id: E5
+  check: "The summary carries a not_reviewed_claims list ([] when the reviewer
+          saw the primary source of every claim). Every entry names its file,
+          locator and cited source, and the verdict is never plain ready while
+          the list is non-empty. An absent list fails: rounds are not coverage."
+  how: script
+  on_fail: action_required
 ```
 
 ## Grading protocol (contract §2.3)
@@ -70,17 +79,20 @@ The loop (contract §2.4): FAIL → repair the record defect → re-run the FULL
 set. **Max 2 repair rounds**, then ACTION REQUIRED. **E2 is the exception**
 — a verdict already softer than its strictest component is not a record
 defect, it is a wrong verdict: re-derive it from the components, restate it
-to the user, never patch the summary to match.
+to the user, never patch the summary to match. **E5 is the same kind**: a
+missing list means coverage was never recorded — build the list from the
+Step-5 claim set; never write `[]` to pass.
 
 ## 🧪 report block (contract §2.5)
 
 ```markdown
-## 🧪 Self-eval — E-checks (4/4 passed, 0 repair rounds)
+## 🧪 Self-eval — E-checks (5/5 passed, 0 repair rounds)
 
 - E1 PASS — 6/6 claimed steps left artefacts (refresh not claimed)
 - E2 PASS — one verdict "blocked"; strictest component is blocked — consistent
 - E3 PASS — 5-item fix-list, 2 must-fix first, all name file+locator
 - E4 PASS — reviewer_independence=cross-vendor recorded
+- E5 PASS — not_reviewed_claims recorded (0); verdict consistent
 ```
 
 ## Memory focus (contract §3)

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """trust-run E-checks — deterministic self-eval runner (contract §2.3).
 
-Four binary checks on the orchestration record, per the approved 2026-06-04
-catalog block (orchestrators, light treatment). See references/_evals.md.
+Five binary checks on the orchestration record, per the approved 2026-06-04
+catalog block (orchestrators, light treatment), plus E5 (added).
+See references/_evals.md.
 
 Usage:
     python3 scripts/eval_checks.py --run-dir .trust/<run_id>
@@ -170,6 +171,25 @@ def check_e4(summary, serr):
     return True, f"reviewer_independence={indep!r} recorded; cap honored"
 
 
+def check_e5(summary, serr):
+    if serr:
+        return False, serr
+    nrc = summary.get("not_reviewed_claims")
+    if not isinstance(nrc, list):
+        return False, ("summary carries no not_reviewed_claims list — write [] only "
+                       "when the reviewer saw the primary source of every claim")
+    bad = [f"entry {i}: names no {k}" for i, c in enumerate(nrc)
+           for k in ("file", "locator", "source")
+           if not (isinstance(c, dict) and str(c.get(k) or "").strip())]
+    if bad:
+        return False, "; ".join(bad[:4])
+    verdict = summary.get("verdict") or summary.get("readiness") or summary.get("headline_verdict")
+    if nrc and verdict == "ready":
+        return False, (f"{len(nrc)} claim(s) not reviewed against a primary source "
+                       "but verdict 'ready' — an unreviewed claim was passed")
+    return True, f"not_reviewed_claims recorded ({len(nrc)}); verdict consistent"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--run-dir", required=True, help=".trust/<run_id> directory")
@@ -187,6 +207,7 @@ def main() -> int:
         ("E2", *check_e2(summary, serr, run_dir)),
         ("E3", *check_e3(summary, serr)),
         ("E4", *check_e4(summary, serr)),
+        ("E5", *check_e5(summary, serr)),
     ]
 
     n_fail = sum(1 for _, ok, _ in results if ok is False)

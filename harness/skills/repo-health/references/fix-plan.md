@@ -35,9 +35,11 @@ probes itself — measuring is plan work, not a reason to repeat the report.
    same rule as [`--fix-blocking`](../SKILL.md#--fix-blocking)). About 80 s on
    your-private-harness.
 2. **Save the rows.** `python3 <skill>/scripts/health.py fix-routes --repo
-   <repo> --advisory > <repo>/.claude/health/fix-routes.json`. No output and
-   exit 0 means every check is measured and none fails: say so, and build no
-   plan.
+   <repo> --advisory --handoff > <repo>/.claude/health/fix-routes.json`. Exit 2
+   means the scorecard is stale: build zero fix sessions, re-run `health.py
+   collect --repo <repo>`, and run `fix-routes --advisory --handoff` again. No
+   output and exit 0 means every check is measured and none fails: say so, and
+   build no plan.
 3. **Add the review findings** only when `<repo>/.claude/health/REVIEW.md`
    exists **and** its header commit is HEAD. Otherwise name it as left out
    because it describes another commit — an old finding planned as current is
@@ -49,11 +51,16 @@ probes itself — measuring is plan work, not a reason to repeat the report.
 
 ## Mapping rules for plan-builder
 
-- **One row is one plan item.** The item title is the row's `title`; its
-  description is the row's `detail`.
-- **The row's `prompt` is the session prompt**, word for word, plus the repo
-  path and the `detail`. `fix-routes` builds it with the agent-tool fixes from
-  [Fix routing](../SKILL.md#fix-routing--reuse-never-rebuild) — never rewrite it.
+- **Exit 2 on stale = zero fix sessions.** If `fix-routes --handoff` exits 2,
+  do not plan any fix sessions; re-run `health.py collect --repo <repo>` first.
+- **One row is one plan item.** Use the emitted `plan_item.title` and
+  `plan_item.description` verbatim. On `omit_detail=True` (`"omit_detail": true`)
+  rows, NEVER copy raw `detail` into `item.description` or `sessions/*.context.md`.
+- **The row's `plan_session.prompt` is the session prompt**, verbatim
+  (`fix-routes --handoff` already includes the repo path, the agent-tool fixes
+  from [Fix routing](../SKILL.md#fix-routing--reuse-never-rebuild), and `detail`
+  only when `omit_detail` is false) — never rewrite it and never append raw
+  `detail` on `omit_detail=True` rows.
 - **Group rows into a session** only when they name the same `agent` and touch
   different files. Blocking rows go before advisory rows.
 - **`"dispatch": "probe"` rows** go into one first session that runs each
@@ -68,7 +75,13 @@ probes itself — measuring is plan work, not a reason to repeat the report.
   `flag_check`** is not dispatchable. It becomes a first-session step: run
   `gearbox deploy`, then run `fix-routes` again.
 - **Every fix session sets `require_evidence: true`** and names two evidence
-  paths: the row before the fix, and the `fix-routes` output after it with the
-  check absent or at `pass`.
+  paths: for standard checks, the row before the fix and the `fix-routes` output
+  after it with the check absent or at `pass`. **Cloudflare `sec.sast`
+  patches:** do NOT gate the patch session on `fix-routes` showing `sec.sast`
+  absent or `pass` (open items stay open until a complete re-audit). Require a
+  failing-before / passing-after local PoC test plus the regression suite as the
+  patch evidence; closure happens via commit + a fresh complete `/repo-health
+  --deep` run on exposed repos, or an owner decision on opted-out/downgrade
+  repos.
 - **The last session** runs `collect` and `render` again and reports the score
   before and after.

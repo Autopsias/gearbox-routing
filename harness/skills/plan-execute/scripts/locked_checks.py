@@ -28,6 +28,7 @@ import manifest_io as mio
 import plan_scope as pscope
 import route_at_dispatch as rad
 import run_state_io as rsi
+import safe_json as sj
 import ship_state_io as ssio
 import worktree as wt
 from rework import _gate_failed
@@ -56,7 +57,7 @@ class LockRefused(Exception):
 
 
 def snapshot_path(plan_dir, session_id):
-    return Path(plan_dir) / "_verify_state" / f"{session_id}.locked.json"
+    return sj.resolve_inside(Path(plan_dir) / "_verify_state", f"{session_id}.locked.json")
 
 
 def locked_paths(manifest, session_id):

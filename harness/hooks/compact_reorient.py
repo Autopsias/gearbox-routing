@@ -142,7 +142,7 @@ def _last_compacted_line(session):
             continue
         # 'compaction-measured' carries the REAL ctx_after and is written
         # after 'compacted', so the last row of either kind is the best one.
-        if row.get("session") == session and row.get("event") in COMPACTED_EVENTS:
+        if isinstance(row, dict) and row.get("session") == session and row.get("event") in COMPACTED_EVENTS:
             return row
     return None
 
