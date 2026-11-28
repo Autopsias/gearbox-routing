@@ -177,7 +177,10 @@ to the verify term.
 
 1. Reuse black-box tests (CLI, HTTP, golden files) to judge both versions.
 2. Golden files: record the old version's outputs on a corpus of real inputs; the new
-   version must match them.
+   version must match them. When an AI agent writes the port, keep about every 5th recorded
+   input away from it, and add edge cases (NaN, ±infinity, -0.0, empty input, non-ASCII, larger
+   inputs) answered by the old version. A port that passes only the inputs it saw has memorized
+   them.
 3. Differential testing: generate inputs with property-based testing (for example
    Hypothesis, proptest or fast-check), run both versions, and compare the outputs.
 4. Shadow traffic: send real requests to both versions, compare the results, normalize known
