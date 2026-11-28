@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -160,10 +161,24 @@ def test_git_churn_ignores_repo_config_that_runs_a_program(tmp_path: Path) -> No
                        ("gpg.ssh.allowedSignersFile", str(tmp_path / "signers"))):
         subprocess.run(["git", "-C", str(repo), "config", key, value], check=True)
     # control: plain git log does run the planted program, so the check below can fail
-    subprocess.run(["git", "-C", str(repo), "log", "--name-only", "--pretty=format:"], capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "log", "--name-only", "--pretty=format:"], capture_output=True, check=True)
     if not marker.exists():
         pytest.skip("this git does not verify signatures in log; the attack cannot be shown here")
     marker.unlink()
     churn = _load_module().git_churn(repo, 2, 365)
     assert not marker.exists()
     assert churn == {"src": 1}
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs os.mkfifo")
+def test_fifo_source_file_is_skipped_not_read(tmp_path: Path) -> None:
+    _write(tmp_path, "src/a.py", "x = 1\n")
+    os.mkfifo(tmp_path / "src" / "pipe.py")  # reading it would block forever
+    rep = _load_module().build_report(tmp_path, use_git=False)
+    assert rep["total_code_lines"] == 1
+
+
+def test_go_mod_module_paths_are_read(tmp_path: Path) -> None:
+    _write(tmp_path, "go.mod", "module x\nrequire github.com/pkg/errors v0.9.1\n\tgolang.org/x/text v0.3.0\n")
+    found, _ = _load_module().scan_dependencies(tmp_path)
+    assert found[0]["runtime_deps"] == ["github.com/pkg/errors", "golang.org/x/text"]
