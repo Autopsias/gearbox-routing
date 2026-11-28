@@ -97,7 +97,7 @@ def iter_source_files(root: Path):
         for name in sorted(filenames):
             path = Path(dirpath) / name
             lang = LANG_BY_EXT.get(path.suffix.lower())
-            if lang and not path.is_symlink():
+            if lang and not path.is_symlink() and path.is_file():  # a FIFO would block the read
                 yield path, lang
 
 
@@ -141,9 +141,12 @@ def git_churn(root: Path, depth: int, days: int) -> dict[str, int] | None:
     try:
         out = subprocess.run(
             # the target may be untrusted: its .git/config must not make git run a program
-            ["git", "-c", "core.fsmonitor=false", "-C", str(root), "log", "--no-show-signature",
+            # protocol.allow=never and GIT_NO_LAZY_FETCH: a partial clone must not fetch (and run ssh)
+            ["git", "-c", "core.fsmonitor=false", "-c", "protocol.allow=never", "-C", str(root),
+             "log", "--no-show-signature", "--no-renames",
              f"--since={days}.days", "--name-only", "--pretty=format:"],
             capture_output=True, text=True, timeout=60, check=True,
+            env={**os.environ, "GIT_NO_LAZY_FETCH": "1"},
         ).stdout
     except (OSError, subprocess.SubprocessError):
         return None
@@ -181,7 +184,7 @@ def _deps_regex(pattern: str):
 MANIFESTS = {
     "pyproject.toml": ("pypi", _deps_pyproject),
     "package.json": ("npm", _deps_package_json),
-    "go.mod": ("go", _deps_regex(r"^\s*(?:require\s+)?([\w.\-]+\.[\w.\-/]+)\s+v[\d.]")),
+    "go.mod": ("go", _deps_regex(r"^\s*(?:require\s+)?([\w\-]+(?:\.[\w\-]+)+(?:/[\w.\-]+)*)\s+v[\d.]")),
     "Gemfile": ("rubygems", _deps_regex(r"^\s*gem\s+['\"]([\w\-]+)['\"]")),
     "pom.xml": ("maven", _deps_regex(r"<artifactId>([\w.\-]+)</artifactId>")),
     "build.gradle": ("maven", _deps_regex(r"(?:implementation|api)\s*\(?\s*['\"][\w.\-]+:([\w.\-]+)")),
@@ -228,7 +231,7 @@ def build_report(root: Path, depth: int = 2, churn_days: int = 365, use_git: boo
     units, skipped = scan_units(root, depth)
     churn = git_churn(root, depth, churn_days) if use_git else None
     languages: dict[str, int] = defaultdict(int)
-    rows = []
+    rows: list[dict[str, Any]] = []
     for name, u in units.items():
         for lang, n in u["lines"].items():
             languages[lang] += n
