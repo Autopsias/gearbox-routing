@@ -90,6 +90,7 @@ Every backup the installer makes and every file it creates is listed in
 <target>/skills/routing-update/           /routing-update: researches a model change and updates the policy
 <target>/skills/routing-retro/            /routing-retro: reads past sessions and reports misroutes (read-only)
 <target>/skills/repo-review/              /repo-review: whole-repo, agentic-readiness, evals & ways-of-working audit (read-only)
+<target>/skills/rust-migration-review/     /rust-migration-review: should all or part of a repo move to Rust, at what effort and risk (read-only)
 <target>/claude/evals/routing/            runbook and an empty misroute ledger (MISROUTES.md)
 <target>/claude/fixtures/                 test fixtures for the check and the resolver
 <target>/CLAUDE.md or <target>/AGENTS.md  gets a <!-- BEGIN ROUTING --> … <!-- END ROUTING --> block
@@ -98,16 +99,16 @@ Every backup the installer makes and every file it creates is listed in
 The installer backs up every existing file that it changes to
 `<file>.bak-<timestamp>`. A second run with the same flags changes nothing.
 
-The three skills land in `<target>/skills/`:
+The four skills land in `<target>/skills/`:
 
 - **Claude Code** (`~/.claude/skills/`): loaded automatically as personal skills ([Claude Code docs: skills](https://code.claude.com/docs/en/skills)).
 - **Google Antigravity** (`~/.gemini/config/skills/`): loaded automatically in both Antigravity App and Antigravity CLI, alongside `~/.gemini/config/AGENTS.md`.
 - **OpenAI Codex** (`~/.codex/skills/`): loaded by Codex for backward compatibility alongside `~/.codex/AGENTS.md` (symlink into `~/.agents/skills/` if you prefer Codex's shared user skills path).
 
 After an install, start a new session and `/routing-retro`, `/routing-update`,
-and `/repo-review` are available. Run `/routing-update` in your clone of this
-repo: it edits the policy and the changelog there, and you then run `install.sh`
-again. See the [routing skills](modules/routing-skills.md) card.
+`/repo-review` and `/rust-migration-review` are available. Run `/routing-update`
+in your clone of this repo: it edits the policy and the changelog there, and you
+then run `install.sh` again. See the [routing skills](modules/routing-skills.md) card.
 
 ### Step 3: install into your live agent home
 
